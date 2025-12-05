@@ -377,7 +377,8 @@ export default function Matrix() {
         <button
           className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-20 hover:scale-110 transition-transform"
           style={{ borderColor: shift.type === 'wanted' ? '#16a34a' : shift.type === 'unavailable' ? '#dc2626' : '#3b82f6' }}
-          onClick={(e) => handleTypeClick(e, worker, shift)}
+          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }}
         >
           {typeLabels[shift.type] || "A"}
         </button>
