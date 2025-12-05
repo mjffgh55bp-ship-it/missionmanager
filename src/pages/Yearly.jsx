@@ -43,7 +43,7 @@ export default function Yearly() {
   const [newRowColor, setNewRowColor] = useState("#3b82f6");
   const [selectedCell, setSelectedCell] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
-  const [eventForm, setEventForm] = useState({ title: "", start_time: "08:00", end_time: "16:00", worker_id: "", start_date: "", end_date: "" });
+  const [eventForm, setEventForm] = useState({ title: "", start_time: "08:00", end_time: "16:00", worker_ids: [], start_date: "", end_date: "" });
   const [workerCategoryFilter, setWorkerCategoryFilter] = useState("__all__");
   const [workerRoleFilter, setWorkerRoleFilter] = useState("__all__");
   const [dragging, setDragging] = useState(null);
@@ -93,11 +93,11 @@ export default function Yearly() {
     if (viewOnly) return;
     setSelectedCell({ rowId, date });
     setEditingEvent(null);
-    setEventForm({ title: "", start_time: "08:00", end_time: "16:00", worker_id: "", start_date: date, end_date: date });
+    setEventForm({ title: "", start_time: "08:00", end_time: "16:00", worker_ids: [], start_date: date, end_date: date });
     setShowEventDialog(true);
   };
 
-  const handleEventDoubleClick = (event, e) => {
+  const handleEventClick = (event, e) => {
     e.stopPropagation();
     if (viewOnly) return;
     setEditingEvent(event);
@@ -106,7 +106,7 @@ export default function Yearly() {
       title: event.title || "",
       start_time: event.start_time || "08:00",
       end_time: event.end_time || "16:00",
-      worker_id: event.worker_id || "",
+      worker_ids: event.worker_ids || (event.worker_id ? [event.worker_id] : []),
       start_date: event.start_date,
       end_date: event.end_date
     });
@@ -114,7 +114,7 @@ export default function Yearly() {
   };
 
   const handleSaveEvent = async () => {
-    const worker = workers.find(w => w.id === eventForm.worker_id);
+    const workerNames = eventForm.worker_ids.map(id => workers.find(w => w.id === id)?.full_name).filter(Boolean);
     const data = {
       row_id: selectedCell.rowId,
       start_date: eventForm.start_date,
@@ -122,8 +122,9 @@ export default function Yearly() {
       title: eventForm.title.trim() || "אירוע",
       start_time: eventForm.start_time,
       end_time: eventForm.end_time,
-      worker_id: eventForm.worker_id === "__none__" ? null : eventForm.worker_id || null,
-      worker_name: worker?.full_name || null
+      worker_ids: eventForm.worker_ids,
+      worker_id: eventForm.worker_ids[0] || null,
+      worker_name: workerNames.join(", ") || null
     };
     if (editingEvent) await base44.entities.YearlyEvent.update(editingEvent.id, data);
     else await base44.entities.YearlyEvent.create(data);
@@ -263,7 +264,7 @@ export default function Yearly() {
       <div
         className={`absolute rounded flex items-center text-white text-[10px] font-medium overflow-hidden ${viewOnly ? 'cursor-default' : 'cursor-pointer'} ${isDragging ? 'opacity-70 z-50' : 'z-10'}`}
         style={{ right: `${pos.left}px`, width: `${pos.width}px`, top: `${topOffset}px`, height: `${EVENT_HEIGHT}px`, backgroundColor: color }}
-        onDoubleClick={(e) => handleEventDoubleClick(event, e)}
+        onClick={(e) => handleEventClick(event, e)}
         title={`${event.title}${event.worker_name ? ` - ${event.worker_name}` : ""}${event.start_time ? ` (${event.start_time}-${event.end_time})` : ""}`}
       >
         {!viewOnly && <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => handleDragStart(e, event, "resize-end")} />}
@@ -495,14 +496,39 @@ export default function Yearly() {
               </div>
             </div>
             <div>
-              <Label>עובד</Label>
-              <Select value={eventForm.worker_id || "__none__"} onValueChange={(v) => setEventForm({...eventForm, worker_id: v})}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="בחר עובד..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">ללא</SelectItem>
-                  {filteredWorkersForDialog.map(w => <SelectItem key={w.id} value={w.id}>{w.full_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="flex justify-between items-center">
+                <Label>משתתפים ({eventForm.worker_ids.length})</Label>
+                {filteredWorkersForDialog.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-6 text-xs"
+                    onClick={() => setEventForm({...eventForm, worker_ids: filteredWorkersForDialog.map(w => w.id)})}
+                  >
+                    בחר הכל ({filteredWorkersForDialog.length})
+                  </Button>
+                )}
+              </div>
+              <div className="mt-2 max-h-32 overflow-y-auto border rounded-lg p-2 space-y-1">
+                {filteredWorkersForDialog.map(w => (
+                  <label key={w.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                    <input 
+                      type="checkbox" 
+                      checked={eventForm.worker_ids.includes(w.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setEventForm({...eventForm, worker_ids: [...eventForm.worker_ids, w.id]});
+                        } else {
+                          setEventForm({...eventForm, worker_ids: eventForm.worker_ids.filter(id => id !== w.id)});
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm">{w.full_name}</span>
+                  </label>
+                ))}
+                {filteredWorkersForDialog.length === 0 && <p className="text-xs text-gray-500">אין עובדים תואמים</p>}
+              </div>
             </div>
           </div>
           <DialogFooter className="flex-row-reverse gap-2">

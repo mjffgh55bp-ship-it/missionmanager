@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Clock, TrendingUp, Users, Calendar, ArrowUpDown, Calculator, Settings, Hash } from "lucide-react";
+import { Clock, TrendingUp, Users, Calendar, ChefHat, ArrowUpDown, Calculator, Settings, Hash } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getSeniorityInfo } from "../components/utils/SeniorityUtils";
 import { Button } from "@/components/ui/button";
@@ -23,24 +23,27 @@ export default function Reports() {
   const [sortConfig, setSortConfig] = useState({ key: 'totalHours', direction: 'desc' });
   const [fullTimeHours, setFullTimeHours] = useState(0);
   const [fullTimeShifts, setFullTimeShifts] = useState(0);
+  const [columnSubTypes, setColumnSubTypes] = useState({});
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings] = await Promise.all([
+    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
       base44.entities.FoodCart.list(),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
-      base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" })
+      base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
+      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" })
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
     setCarts(cartsData);
     if (globalSettings.length > 0) setGlobalParams(JSON.parse(globalSettings[0].setting_value) || []);
     if (cartParamsSettings.length > 0) setCartParams(JSON.parse(cartParamsSettings[0].setting_value) || {});
+    if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     setLoading(false);
   };
 
@@ -131,6 +134,34 @@ export default function Reports() {
 
   const allParams = getAllParams();
 
+  // Get all unique subtypes across all column types
+  const getAllSubTypes = () => {
+    const allSubs = new Set();
+    Object.values(columnSubTypes).forEach(subs => subs.forEach(s => allSubs.add(s)));
+    return Array.from(allSubs);
+  };
+
+  const allSubTypes = getAllSubTypes();
+
+  // Calculate hours per subtype per worker
+  const getWorkerHoursBySubType = (workerId, subType) => {
+    const workerAssignments = assignments.filter(a => 
+      a.chef_id === workerId || a.sous_chef_id === workerId || a.additional_chef_id === workerId
+    );
+    let totalHours = 0;
+    workerAssignments.forEach(a => {
+      if (a.column_values) {
+        Object.values(a.column_values).forEach(col => {
+          const subs = col.subTypes || (col.subType ? [col.subType] : []);
+          if (subs.includes(subType)) {
+            totalHours += (a.hours || 0);
+          }
+        });
+      }
+    });
+    return totalHours;
+  };
+
   const SortButton = ({ column, label }) => (
     <Button variant="ghost" size="sm" className="h-8 hover:bg-gray-100" onClick={() => handleSort(column)}>
       {label}<ArrowUpDown className="ml-2 h-3 w-3" />
@@ -183,11 +214,13 @@ export default function Reports() {
           </Card>
         </div>
 
-        {/* Custom Parameters Summary by Worker */}
-        {allParams.length > 0 && (
+
+
+        {/* Hours by SubType per Worker */}
+        {allSubTypes.length > 0 && (
           <Card className="border-none shadow-lg mb-8">
             <CardHeader className="border-b">
-              <CardTitle className="flex items-center gap-2"><Settings className="w-5 h-5 text-purple-600" />Custom Parameters by Worker</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5 text-green-600" />Hours by Sub-Type</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="overflow-x-auto">
@@ -195,36 +228,23 @@ export default function Reports() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Worker</TableHead>
-                      {allParams.map(param => (
-                        <TableHead key={param.name}>
-                          <div className="flex items-center gap-1">
-                            {param.category === "time" ? <Clock className="w-3 h-3" /> : <Hash className="w-3 h-3" />}
-                            {param.name}
-                          </div>
-                        </TableHead>
-                      ))}
+                      {allSubTypes.map(st => <TableHead key={st}>{st}</TableHead>)}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {workers.filter(w => w.active).map(worker => (
                       <TableRow key={worker.id}>
                         <TableCell className="font-medium">{worker.full_name}</TableCell>
-                        {allParams.map(param => {
-                          const summary = getParamSummaryByWorker(param);
-                          return (
-                            <TableCell key={param.name}>
-                              {summary[worker.id] || 0}{param.category === "time" ? "h" : ""}
-                            </TableCell>
-                          );
-                        })}
+                        {allSubTypes.map(st => (
+                          <TableCell key={st}>{getWorkerHoursBySubType(worker.id, st)}h</TableCell>
+                        ))}
                       </TableRow>
                     ))}
                     <TableRow className="bg-gray-100 font-semibold">
                       <TableCell>Total</TableCell>
-                      {allParams.map(param => {
-                        const summary = getParamSummaryByWorker(param);
-                        const total = Object.values(summary).reduce((a, b) => a + b, 0);
-                        return <TableCell key={param.name}>{total}{param.category === "time" ? "h" : ""}</TableCell>;
+                      {allSubTypes.map(st => {
+                        const total = workers.filter(w => w.active).reduce((sum, w) => sum + getWorkerHoursBySubType(w.id, st), 0);
+                        return <TableCell key={st}>{total}h</TableCell>;
                       })}
                     </TableRow>
                   </TableBody>

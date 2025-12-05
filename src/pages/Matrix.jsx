@@ -286,11 +286,29 @@ export default function Matrix() {
     loadData();
   };
 
-  const handleTypeClick = (e, worker, shift) => {
+  const handleTypeClick = async (e, worker, shift) => {
     e.stopPropagation();
-    setSelectedWorkerForType(worker);
-    setSelectedShiftForType(shift);
-    setShowTypeDialog(true);
+    e.preventDefault();
+    
+    // Cycle through types directly without dialog
+    const workerAvail = availabilities.find(a => a.worker_id === worker.id && a.week_start_date === weekStartDate);
+    if (!workerAvail) return;
+    
+    const currentType = shift.type || 'available';
+    let newType = 'available';
+    if (currentType === 'available') newType = 'wanted';
+    else if (currentType === 'wanted') newType = 'unavailable';
+    else if (currentType === 'unavailable') newType = 'available';
+    
+    const updatedShifts = workerAvail.shifts.map(s => {
+      if (s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time) {
+        return { ...s, type: newType };
+      }
+      return s;
+    });
+    
+    await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
+    loadData();
   };
 
   const handleChangeType = async (newType) => {

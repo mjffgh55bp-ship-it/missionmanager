@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
+
 const SHIFT_WINDOWS = [
   { start: "06:00", end: "10:00" },
   { start: "10:00", end: "14:00" },
@@ -279,14 +280,29 @@ export default function Schedule() {
     const [open, setOpen] = useState(false);
     const colData = assignment.column_values?.[colType];
     const value = colData?.value || "";
-    const subType = colData?.subType || "";
+    const subTypes_saved = colData?.subTypes || (colData?.subType ? [colData.subType] : []);
     const [localValue, setLocalValue] = useState(value);
-    const [localSubType, setLocalSubType] = useState(subType);
-    const subTypes = columnSubTypes[colType] || [];
+    const [localSubTypes, setLocalSubTypes] = useState(subTypes_saved);
+    const availableSubTypes = columnSubTypes[colType] || [];
+
+    useEffect(() => {
+      setLocalValue(colData?.value || "");
+      setLocalSubTypes(colData?.subTypes || (colData?.subType ? [colData.subType] : []));
+    }, [colData]);
 
     const handleSave = async () => {
-      await handleUpdateColumnValue(assignment.id, colType, localValue, localSubType === "__none__" ? "" : localSubType);
+      const updatedValues = { ...(assignment.column_values || {}), [colType]: { value: localValue, subTypes: localSubTypes.filter(st => st !== "__none__") } };
+      await base44.entities.Assignment.update(assignment.id, { column_values: updatedValues });
       setOpen(false);
+      loadData();
+    };
+
+    const toggleSubType = (st) => {
+      if (localSubTypes.includes(st)) {
+        setLocalSubTypes(localSubTypes.filter(s => s !== st));
+      } else {
+        setLocalSubTypes([...localSubTypes, st]);
+      }
     };
 
     return (
@@ -294,22 +310,27 @@ export default function Schedule() {
         <PopoverTrigger asChild>
           <button className="w-full text-left p-1 rounded border border-gray-200 hover:bg-blue-50 min-h-[28px]">
             <span className="text-xs truncate block">{value || "-"}</span>
-            {subType && <span className="text-[10px] text-gray-400">({subType})</span>}
+            {subTypes_saved.length > 0 && <span className="text-[10px] text-gray-400">({subTypes_saved.join(", ")})</span>}
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-48 p-2">
+        <PopoverContent className="w-56 p-2">
           <div className="space-y-2">
             <div><Label className="text-xs">Value</Label><Input className="h-7 text-xs" type="number" value={localValue} onChange={(e) => setLocalValue(e.target.value)} /></div>
-            {subTypes.length > 0 && (
+            {availableSubTypes.length > 0 && (
               <div>
-                <Label className="text-xs">Sub-type</Label>
-                <Select value={localSubType || "__none__"} onValueChange={setLocalSubType}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None</SelectItem>
-                    {subTypes.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs">Sub-types (multiple)</Label>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {availableSubTypes.map(st => (
+                    <Badge 
+                      key={st} 
+                      variant={localSubTypes.includes(st) ? "default" : "outline"} 
+                      className={`cursor-pointer text-xs ${localSubTypes.includes(st) ? 'bg-blue-600' : ''}`}
+                      onClick={() => toggleSubType(st)}
+                    >
+                      {st}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             )}
             <Button size="sm" className="w-full h-7 text-xs" onClick={handleSave}>Save</Button>
