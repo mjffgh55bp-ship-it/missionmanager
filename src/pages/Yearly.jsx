@@ -366,37 +366,44 @@ export default function Yearly() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Workers Unavailability Rows */}
-                  {workers.map(worker => {
-                    const workerUnavail = unavailabilities.filter(u => u.worker_id === worker.id);
-                    if (workerUnavail.length === 0) return null;
-                    return (
-                      <tr key={`unavail-${worker.id}`} className="bg-red-50 border-b">
-                        <td className="sticky right-0 z-10 bg-red-50 w-[160px] min-w-[160px] p-2 border-l">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                            <span className="text-xs font-medium text-red-700 truncate">{worker.full_name} - אי זמינות</span>
-                          </div>
-                        </td>
-                        {yearDays.map((day, idx) => {
-                          const dateStr = format(day, "yyyy-MM-dd");
-                          const unavail = workerUnavail.find(u => u.date === dateStr);
-                          const dayOfWeek = getDay(day);
-                          const isShabbat = dayOfWeek === 6;
-                          const isFriday = dayOfWeek === 5;
+                  {/* Workers Unavailability Row */}
+                  {unavailabilities.length > 0 && (
+                    <tr className="bg-red-50 border-b" style={{ height: "40px" }}>
+                      <td className="sticky right-0 z-10 bg-red-50 w-[160px] min-w-[160px] p-2 border-l">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <span className="text-xs font-medium text-red-700">אי זמינות עובדים</span>
+                        </div>
+                      </td>
+                      <td colSpan={yearDays.length} className="relative p-0 h-10">
+                        <div className="absolute inset-0 flex">
+                          {yearDays.map((day, idx) => {
+                            const dayOfWeek = getDay(day);
+                            const isShabbat = dayOfWeek === 6;
+                            const isFriday = dayOfWeek === 5;
+                            return (
+                              <div key={idx} className={`w-9 min-w-[${CELL_WIDTH}px] h-full border-l ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`} />
+                            );
+                          })}
+                        </div>
+                        {unavailabilities.map((unavail, idx) => {
+                          const dateIdx = yearDaysMap[unavail.date];
+                          if (dateIdx === undefined) return null;
+                          const worker = workers.find(w => w.id === unavail.worker_id);
                           return (
-                            <td key={idx} className={`w-9 min-w-[${CELL_WIDTH}px] h-9 border-l text-center ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}>
-                              {unavail && (
-                                <div className="w-5 h-5 mx-auto rounded bg-red-500 flex items-center justify-center text-white text-[7px]" title={`${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}>
-                                  X
-                                </div>
-                              )}
-                            </td>
+                            <div
+                              key={unavail.id || idx}
+                              className="absolute top-1 h-7 rounded bg-red-500 flex items-center justify-center text-white text-[9px] font-medium px-1 z-10"
+                              style={{ left: `${dateIdx * CELL_WIDTH}px`, width: `${CELL_WIDTH - 2}px` }}
+                              title={`${worker?.full_name || unavail.worker_name}: ${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}
+                            >
+                              <span className="truncate">{worker?.full_name?.split(' ')[0] || '?'}</span>
+                            </div>
                           );
                         })}
-                      </tr>
-                    );
-                  })}
+                      </td>
+                    </tr>
+                  )}
 
                   {/* Custom Rows */}
                   {loading ? (
