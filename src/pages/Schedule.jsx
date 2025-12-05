@@ -371,7 +371,7 @@ export default function Schedule() {
     const subTypes = paramSubTypes[param.name] || [];
     
     const handleSave = async () => {
-      await handleUpdateParamValue(assignment.id, param.name, value, subType);
+      await handleUpdateParamValue(assignment.id, param.name, value, subType === "__none__" ? "" : subType);
       setOpen(false);
     };
 
