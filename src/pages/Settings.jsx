@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Save, Info, Users, X, Plus, PartyPopper, Trash2, Clock, Hash } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -28,19 +27,8 @@ export default function Settings() {
   const [newSubType, setNewSubType] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [showEventDialog, setShowEventDialog] = useState(false);
-  const [eventForm, setEventForm] = useState({
-    title: "",
-    date: format(new Date(), "yyyy-MM-dd"),
-    description: "",
-    all_day: true,
-    start_time: "09:00",
-    end_time: "17:00"
-  });
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
+  useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
     const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings] = await Promise.all([
@@ -58,23 +46,10 @@ export default function Settings() {
       setTipsMessage(tipsData.message || "");
       setShowTipsAsPopup(tipsData.showAsPopup || false);
     }
-    
-    if (rolesSettings.length > 0) {
-      setUserRoles(JSON.parse(rolesSettings[0].setting_value));
-    }
-    
-    if (timeTypesSettings.length > 0) {
-      setTimeParamTypes(JSON.parse(timeTypesSettings[0].setting_value) || []);
-    }
-    
-    if (countTypesSettings.length > 0) {
-      setCountParamTypes(JSON.parse(countTypesSettings[0].setting_value) || []);
-    }
-    
-    if (subTypesSettings.length > 0) {
-      setParamSubTypes(JSON.parse(subTypesSettings[0].setting_value) || {});
-    }
-    
+    if (rolesSettings.length > 0) setUserRoles(JSON.parse(rolesSettings[0].setting_value));
+    if (timeTypesSettings.length > 0) setTimeParamTypes(JSON.parse(timeTypesSettings[0].setting_value) || []);
+    if (countTypesSettings.length > 0) setCountParamTypes(JSON.parse(countTypesSettings[0].setting_value) || []);
+    if (subTypesSettings.length > 0) setParamSubTypes(JSON.parse(subTypesSettings[0].setting_value) || {});
     setWorkers(workersData);
     setCompanyEvents(eventsData);
     setLoading(false);
@@ -157,13 +132,6 @@ export default function Settings() {
     setParamSubTypes(updated);
   };
 
-  const handleAddEvent = async () => {
-    await base44.entities.CompanyEvent.create(eventForm);
-    setShowEventDialog(false);
-    setEventForm({ title: "", date: format(new Date(), "yyyy-MM-dd"), description: "", all_day: true, start_time: "09:00", end_time: "17:00" });
-    loadSettings();
-  };
-
   const handleDeleteEvent = async (eventId) => {
     await base44.entities.CompanyEvent.delete(eventId);
     loadSettings();
@@ -180,10 +148,7 @@ export default function Settings() {
         {/* Parameter Types */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-purple-600" />
-              Parameter Types
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5 text-purple-600" />Parameter Types</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <Tabs defaultValue="time" className="w-full">
@@ -287,12 +252,12 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Company Events */}
+        {/* Company Events (View Only - Add from Yearly) */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
             <div className="flex justify-between items-center">
               <CardTitle className="flex items-center gap-2"><PartyPopper className="w-5 h-5 text-purple-600" />Company Events</CardTitle>
-              <Button onClick={() => setShowEventDialog(true)} size="sm"><Plus className="w-4 h-4 mr-2" />Add Event</Button>
+              <p className="text-sm text-gray-500">Add events from Yearly page</p>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
@@ -330,28 +295,6 @@ export default function Settings() {
             </div>
           </CardContent>
         </Card>
-
-        <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Add Company Event</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div><Label>Event Title</Label><Input value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} placeholder="Event name" /></div>
-              <div><Label>Date</Label><Input type="date" value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} /></div>
-              <div className="flex items-center gap-2"><Switch checked={eventForm.all_day} onCheckedChange={(checked) => setEventForm({ ...eventForm, all_day: checked })} /><Label>All Day Event</Label></div>
-              {!eventForm.all_day && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div><Label>Start Time</Label><Input type="time" value={eventForm.start_time} onChange={(e) => setEventForm({ ...eventForm, start_time: e.target.value })} /></div>
-                  <div><Label>End Time</Label><Input type="time" value={eventForm.end_time} onChange={(e) => setEventForm({ ...eventForm, end_time: e.target.value })} /></div>
-                </div>
-              )}
-              <div><Label>Description (Optional)</Label><Textarea value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} rows={3} /></div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEventDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddEvent} disabled={!eventForm.title} className="bg-purple-600 hover:bg-purple-700">Add Event</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );

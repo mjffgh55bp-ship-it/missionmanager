@@ -33,6 +33,7 @@ export default function Yearly() {
   const [events, setEvents] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [unavailabilities, setUnavailabilities] = useState([]);
+  const [categoryNames, setCategoryNames] = useState({ category_1: "קטגוריה 1", category_2: "קטגוריה 2", category_3: "קטגוריה 3" });
   const [loading, setLoading] = useState(true);
   const [viewOnly, setViewOnly] = useState(false);
   const [showAddRowDialog, setShowAddRowDialog] = useState(false);
@@ -43,18 +44,22 @@ export default function Yearly() {
   const [selectedCell, setSelectedCell] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventForm, setEventForm] = useState({ title: "", start_time: "08:00", end_time: "16:00", worker_id: "", start_date: "", end_date: "" });
+  const [workerCategoryFilter, setWorkerCategoryFilter] = useState("__all__");
+  const [workerRoleFilter, setWorkerRoleFilter] = useState("__all__");
   const [dragging, setDragging] = useState(null);
   const tableRef = useRef(null);
+  const scrollContainerRef = useRef(null);
 
   useEffect(() => { loadData(); }, [currentYear]);
 
   const loadData = async () => {
     setLoading(true);
-    const [rowsData, eventsData, workersData, unavailData] = await Promise.all([
+    const [rowsData, eventsData, workersData, unavailData, catSettings] = await Promise.all([
       base44.entities.YearlyRow.list("order"),
       base44.entities.YearlyEvent.list(),
       base44.entities.Worker.filter({ active: true }),
-      base44.entities.Unavailability.list()
+      base44.entities.Unavailability.list(),
+      base44.entities.AppSettings.filter({ setting_key: "worker_category_names" })
     ]);
     const yearStart = `${currentYear}-01-01`;
     const yearEnd = `${currentYear}-12-31`;
@@ -62,6 +67,7 @@ export default function Yearly() {
     setEvents(eventsData.filter(e => (e.start_date >= yearStart && e.start_date <= yearEnd) || (e.end_date >= yearStart && e.end_date <= yearEnd)));
     setWorkers(workersData);
     setUnavailabilities(unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd));
+    if (catSettings.length > 0) setCategoryNames(JSON.parse(catSettings[0].setting_value));
     setLoading(false);
   };
 
@@ -132,11 +138,13 @@ export default function Yearly() {
     }
   };
 
+  // Generate days from Jan 1 to Dec 31 (RTL: rightmost = Jan 1)
   const generateYearDays = () => {
     const days = [];
-    let current = new Date(currentYear, 11, 31);
     const start = new Date(currentYear, 0, 1);
-    while (current >= start) { days.push(new Date(current)); current = addDays(current, -1); }
+    const end = new Date(currentYear, 11, 31);
+    let current = start;
+    while (current <= end) { days.push(new Date(current)); current = addDays(current, 1); }
     return days;
   };
 
@@ -164,14 +172,14 @@ export default function Yearly() {
   const handleMouseMove = (e) => {
     if (!dragging) return;
     const { event, type, startX, originalStart, originalEnd } = dragging;
-    const deltaX = e.clientX - startX;
+    const deltaX = startX - e.clientX; // Reversed for RTL
     const deltaDays = Math.round(deltaX / CELL_WIDTH);
     const origStartDate = parseISO(originalStart);
     const origEndDate = parseISO(originalEnd);
     let newStart = origStartDate, newEnd = origEndDate;
-    if (type === "move") { newStart = addDays(origStartDate, -deltaDays); newEnd = addDays(origEndDate, -deltaDays); }
-    else if (type === "resize-start") { newStart = addDays(origStartDate, -deltaDays); if (newStart > newEnd) newStart = newEnd; }
-    else if (type === "resize-end") { newEnd = addDays(origEndDate, -deltaDays); if (newEnd < newStart) newEnd = newStart; }
+    if (type === "move") { newStart = addDays(origStartDate, deltaDays); newEnd = addDays(origEndDate, deltaDays); }
+    else if (type === "resize-start") { newStart = addDays(origStartDate, deltaDays); if (newStart > newEnd) newStart = newEnd; }
+    else if (type === "resize-end") { newEnd = addDays(origEndDate, deltaDays); if (newEnd < newStart) newEnd = newStart; }
     const yearStart = new Date(currentYear, 0, 1), yearEnd = new Date(currentYear, 11, 31);
     if (newStart < yearStart) newStart = yearStart;
     if (newEnd > yearEnd) newEnd = yearEnd;
@@ -223,13 +231,8 @@ export default function Yearly() {
   const monthGroups = getMonthGroups();
   const weekGroups = getWeekGroups();
 
-  // Layout events in tracks to avoid overlap
   const layoutEventsInTracks = (rowEvents) => {
-    const sorted = [...rowEvents].sort((a, b) => {
-      const aStart = yearDaysMap[a.start_date] ?? 999;
-      const bStart = yearDaysMap[b.start_date] ?? 999;
-      return aStart - bStart;
-    });
+    const sorted = [...rowEvents].sort((a, b) => (yearDaysMap[a.start_date] ?? 999) - (yearDaysMap[b.start_date] ?? 999));
     const tracks = [];
     for (const event of sorted) {
       const pos = getEventPosition(event);
@@ -238,14 +241,18 @@ export default function Yearly() {
       for (let i = 0; i < tracks.length; i++) {
         const lastInTrack = tracks[i][tracks[i].length - 1];
         const lastPos = getEventPosition(lastInTrack);
-        if (lastPos && pos.left >= lastPos.left + lastPos.width) {
-          tracks[i].push(event); placed = true; break;
-        }
+        if (lastPos && pos.left >= lastPos.left + lastPos.width) { tracks[i].push(event); placed = true; break; }
       }
       if (!placed) tracks.push([event]);
     }
     return tracks;
   };
+
+  const filteredWorkersForDialog = workers.filter(w => {
+    if (workerCategoryFilter !== "__all__" && w.category !== workerCategoryFilter) return false;
+    if (workerRoleFilter !== "__all__" && w.role !== workerRoleFilter) return false;
+    return true;
+  });
 
   const EventBar = ({ event, row, trackIndex }) => {
     const displayEvent = dragging?.event?.id === event.id ? { ...event, start_date: dragging.newStart || event.start_date, end_date: dragging.newEnd || event.end_date } : event;
@@ -257,23 +264,23 @@ export default function Yearly() {
     return (
       <div
         className={`absolute rounded flex items-center text-white text-[9px] font-medium overflow-hidden ${viewOnly ? 'cursor-default' : 'cursor-pointer'} ${isDragging ? 'opacity-70 z-50' : 'z-10'}`}
-        style={{ left: `${pos.left}px`, width: `${pos.width}px`, top: `${topOffset}px`, height: `${EVENT_HEIGHT}px`, backgroundColor: color }}
+        style={{ right: `${pos.left}px`, width: `${pos.width}px`, top: `${topOffset}px`, height: `${EVENT_HEIGHT}px`, backgroundColor: color }}
         onClick={(e) => handleEventClick(event, e)}
         title={`${event.title}${event.worker_name ? ` - ${event.worker_name}` : ""}${event.start_time ? ` (${event.start_time}-${event.end_time})` : ""}`}
       >
-        {!viewOnly && <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => handleDragStart(e, event, "resize-start")} />}
+        {!viewOnly && <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => handleDragStart(e, event, "resize-end")} />}
         <div className={`flex-1 px-1 truncate text-center ${viewOnly ? '' : 'cursor-move'}`} onMouseDown={(e) => !viewOnly && handleDragStart(e, event, "move")}>
           {event.title}
         </div>
-        {!viewOnly && <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => handleDragStart(e, event, "resize-end")} />}
+        {!viewOnly && <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => handleDragStart(e, event, "resize-start")} />}
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" dir="rtl">
       <div className="max-w-full mx-auto">
-        <div className="mb-6 flex flex-wrap justify-between items-center gap-4" dir="rtl">
+        <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-1">לוח שנתי</h1>
             <p className="text-gray-600">{viewOnly ? "מצב צפייה בלבד" : "ניהול אירועים - גרור לשינוי תאריכים"}</p>
@@ -284,9 +291,9 @@ export default function Yearly() {
               <Switch checked={viewOnly} onCheckedChange={setViewOnly} />
               {viewOnly ? <Eye className="w-4 h-4 text-gray-500" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
             </div>
-            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronRight className="w-4 h-4" /></Button>
+            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}><ChevronRight className="w-4 h-4" /></Button>
             <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[100px] text-center">{currentYear}</div>
-            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}><ChevronLeft className="w-4 h-4" /></Button>
+            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronLeft className="w-4 h-4" /></Button>
             <Button variant="outline" onClick={() => setCurrentYear(new Date().getFullYear())}>השנה</Button>
             {!viewOnly && <Button onClick={() => setShowAddRowDialog(true)}><Plus className="w-4 h-4 ml-2" />הוסף שורה</Button>}
           </div>
@@ -294,136 +301,148 @@ export default function Yearly() {
 
         <Card className="border-none shadow-lg overflow-hidden">
           <CardContent className="p-0">
-            <div className="overflow-auto max-h-[80vh]" ref={tableRef}>
-              <table className="border-collapse" style={{ minWidth: `${yearDays.length * CELL_WIDTH + 160}px` }} dir="rtl">
-                <thead className="sticky top-0 z-20">
-                  <tr className="bg-blue-900 text-white">
-                    <th className="sticky right-0 z-30 bg-blue-900 w-[160px] min-w-[160px] p-2 border-l text-right font-semibold">שורה</th>
+            <div className="flex">
+              {/* Fixed Row Headers */}
+              <div className="flex-shrink-0 z-20 bg-white border-l" style={{ width: 160 }}>
+                <div className="bg-blue-900 text-white p-2 font-semibold text-right h-[36px] flex items-center">שורה</div>
+                <div className="bg-blue-800 text-white p-2 text-xs text-right h-[28px] flex items-center">שבוע</div>
+                <div className="bg-gray-100 p-2 text-xs font-medium text-right h-[52px] flex items-center">יום, תאריך</div>
+                
+                {/* Custom Rows Headers */}
+                {rows.map((row, rowIdx) => {
+                  const rowEvents = getEventsForRow(row.id);
+                  const tracks = layoutEventsInTracks(rowEvents);
+                  const dynamicHeight = Math.max(ROW_HEIGHT, 8 + tracks.length * (EVENT_HEIGHT + 2));
+                  return (
+                    <div key={row.id} className={`p-2 border-b flex items-center justify-between ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`} style={{ height: dynamicHeight }}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: row.color }}></div>
+                        <span className="text-sm font-medium truncate">{row.name}</span>
+                      </div>
+                      {!viewOnly && (
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <div className="relative">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowColorPicker(showColorPicker === row.id ? null : row.id)}><Palette className="w-3 h-3" /></Button>
+                            {showColorPicker === row.id && (
+                              <div className="absolute top-7 left-0 bg-white border rounded-lg shadow-lg p-2 z-50 flex gap-1 flex-wrap w-24">
+                                {ROW_COLORS.map(c => (<button key={c} className="w-5 h-5 rounded-full border-2 border-white hover:scale-110" style={{ backgroundColor: c }} onClick={() => handleChangeRowColor(row.id, c)} />))}
+                              </div>
+                            )}
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteRow(row.id)}><Trash2 className="w-3 h-3" /></Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                
+                {/* Unavailability Header */}
+                {unavailabilities.length > 0 && (
+                  <div className="p-2 border-b bg-red-50 flex items-center gap-2" style={{ height: ROW_HEIGHT }}>
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <span className="text-xs font-medium text-red-700">אי זמינות</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="overflow-auto max-h-[80vh] flex-1" ref={scrollContainerRef}>
+                <div style={{ minWidth: `${yearDays.length * CELL_WIDTH}px` }} ref={tableRef}>
+                  {/* Month Header */}
+                  <div className="flex bg-blue-900 text-white h-[36px]">
                     {monthGroups.map((group, idx) => (
-                      <th key={idx} colSpan={group.count} className="text-center font-semibold text-xs py-2 border-l">{HEBREW_MONTHS[group.month]}</th>
+                      <div key={idx} className="text-center font-semibold text-xs py-2 border-l flex items-center justify-center" style={{ width: `${group.count * CELL_WIDTH}px` }}>
+                        {HEBREW_MONTHS[group.month]}
+                      </div>
                     ))}
-                  </tr>
-                  <tr className="bg-blue-800 text-white">
-                    <th className="sticky right-0 z-30 bg-blue-800 w-[160px] min-w-[160px] p-2 border-l text-right text-xs">שבוע</th>
+                  </div>
+
+                  {/* Week Header */}
+                  <div className="flex bg-blue-800 text-white h-[28px]">
                     {weekGroups.map((group, idx) => (
-                      <th key={idx} colSpan={group.count} className="text-center text-xs py-1 border-l">{group.week}</th>
+                      <div key={idx} className="text-center text-xs py-1 border-l flex items-center justify-center" style={{ width: `${group.count * CELL_WIDTH}px` }}>
+                        {group.week}
+                      </div>
                     ))}
-                  </tr>
-                  <tr className="bg-gray-100">
-                    <th className="sticky right-0 z-30 bg-gray-100 w-[160px] min-w-[160px] p-2 border-l text-right text-xs font-medium">יום, תאריך</th>
+                  </div>
+
+                  {/* Day/Date Header */}
+                  <div className="flex bg-gray-100 h-[52px]">
                     {yearDays.map((day, idx) => {
                       const dayOfWeek = getDay(day);
                       const isShabbat = dayOfWeek === 6;
                       const isFriday = dayOfWeek === 5;
                       const hebDate = getHebrewDate(day);
                       return (
-                        <th key={idx} className={`min-w-[${CELL_WIDTH}px] text-center text-[7px] py-1 border-l leading-tight ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH }}>
+                        <div key={idx} className={`text-center text-[7px] py-1 border-l leading-tight flex flex-col justify-center ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}>
                           <div className="font-semibold">{HEBREW_DAYS[dayOfWeek]}</div>
                           <div>{day.getDate()}</div>
                           <div className="text-gray-500">{hebDate.dayHeb}</div>
-                        </th>
+                        </div>
                       );
                     })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Workers Unavailability Row */}
-                  {unavailabilities.length > 0 && (
-                    <tr className="bg-red-50 border-b" style={{ height: ROW_HEIGHT }}>
-                      <td className="sticky right-0 z-10 bg-red-50 w-[160px] min-w-[160px] p-2 border-l">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                          <span className="text-xs font-medium text-red-700">אי זמינות עובדים</span>
-                        </div>
-                      </td>
-                      <td colSpan={yearDays.length} className="relative p-0" style={{ height: ROW_HEIGHT }}>
-                        <div className="absolute inset-0 flex">
+                  </div>
+
+                  {/* Custom Rows */}
+                  {rows.map((row, rowIdx) => {
+                    const rowEvents = getEventsForRow(row.id);
+                    const tracks = layoutEventsInTracks(rowEvents);
+                    const dynamicHeight = Math.max(ROW_HEIGHT, 8 + tracks.length * (EVENT_HEIGHT + 2));
+                    return (
+                      <div key={row.id} className={`flex border-b ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ height: dynamicHeight }}>
+                        <div className="relative flex" style={{ width: `${yearDays.length * CELL_WIDTH}px` }}>
                           {yearDays.map((day, idx) => {
+                            const dateStr = format(day, "yyyy-MM-dd");
                             const dayOfWeek = getDay(day);
                             const isShabbat = dayOfWeek === 6;
                             const isFriday = dayOfWeek === 5;
-                            return <div key={idx} className={`h-full border-l ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }} />;
+                            return (
+                              <div key={idx}
+                                className={`h-full border-l ${viewOnly ? '' : 'cursor-pointer hover:bg-blue-50'} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
+                                style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}
+                                onClick={() => handleCellClick(row.id, dateStr)} />
+                            );
                           })}
+                          {tracks.map((track, trackIdx) => track.map(event => <EventBar key={event.id} event={event} row={row} trackIndex={trackIdx} />))}
                         </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Unavailability Row - at bottom */}
+                  {unavailabilities.length > 0 && (
+                    <div className="flex border-b bg-red-50" style={{ height: ROW_HEIGHT }}>
+                      <div className="relative flex" style={{ width: `${yearDays.length * CELL_WIDTH}px` }}>
+                        {yearDays.map((day, idx) => {
+                          const dayOfWeek = getDay(day);
+                          const isShabbat = dayOfWeek === 6;
+                          const isFriday = dayOfWeek === 5;
+                          return <div key={idx} className={`h-full border-l ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }} />;
+                        })}
                         {unavailabilities.map((unavail, idx) => {
                           const dateIdx = yearDaysMap[unavail.date];
                           if (dateIdx === undefined) return null;
                           const worker = workers.find(w => w.id === unavail.worker_id);
                           return (
                             <div key={unavail.id || idx} className="absolute top-1 rounded bg-red-500 flex items-center justify-center text-white text-[8px] font-medium px-1 z-10"
-                              style={{ left: `${dateIdx * CELL_WIDTH}px`, width: `${CELL_WIDTH - 2}px`, height: EVENT_HEIGHT }}
+                              style={{ right: `${dateIdx * CELL_WIDTH}px`, width: `${CELL_WIDTH - 2}px`, height: EVENT_HEIGHT }}
                               title={`${worker?.full_name}: ${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}>
                               <span className="truncate">{worker?.full_name?.split(' ')[0] || '?'}</span>
                             </div>
                           );
                         })}
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   )}
-
-                  {/* Custom Rows */}
-                  {loading ? (
-                    <tr><td colSpan={yearDays.length + 1} className="p-8 text-center text-gray-500">טוען...</td></tr>
-                  ) : rows.length === 0 ? (
-                    <tr><td colSpan={yearDays.length + 1} className="p-8 text-center text-gray-500">אין שורות. לחץ "הוסף שורה" להתחיל.</td></tr>
-                  ) : (
-                    rows.map((row, rowIdx) => {
-                      const rowEvents = getEventsForRow(row.id);
-                      const tracks = layoutEventsInTracks(rowEvents);
-                      const dynamicHeight = Math.max(ROW_HEIGHT, 8 + tracks.length * (EVENT_HEIGHT + 2));
-                      return (
-                        <tr key={row.id} className={`border-b ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ height: dynamicHeight }}>
-                          <td className={`sticky right-0 z-10 w-[160px] min-w-[160px] p-2 border-l ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                            <div className="flex items-center justify-between gap-1">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: row.color }}></div>
-                                <span className="text-sm font-medium truncate">{row.name}</span>
-                              </div>
-                              {!viewOnly && (
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                  <div className="relative">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowColorPicker(showColorPicker === row.id ? null : row.id)}><Palette className="w-3 h-3" /></Button>
-                                    {showColorPicker === row.id && (
-                                      <div className="absolute top-7 right-0 bg-white border rounded-lg shadow-lg p-2 z-50 flex gap-1 flex-wrap w-24">
-                                        {ROW_COLORS.map(c => (<button key={c} className="w-5 h-5 rounded-full border-2 border-white hover:scale-110" style={{ backgroundColor: c }} onClick={() => handleChangeRowColor(row.id, c)} />))}
-                                      </div>
-                                    )}
-                                  </div>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteRow(row.id)}><Trash2 className="w-3 h-3" /></Button>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td colSpan={yearDays.length} className="relative p-0" style={{ height: dynamicHeight }}>
-                            <div className="absolute inset-0 flex">
-                              {yearDays.map((day, idx) => {
-                                const dateStr = format(day, "yyyy-MM-dd");
-                                const dayOfWeek = getDay(day);
-                                const isShabbat = dayOfWeek === 6;
-                                const isFriday = dayOfWeek === 5;
-                                return (
-                                  <div key={idx}
-                                    className={`h-full border-l ${viewOnly ? '' : 'cursor-pointer hover:bg-blue-50'} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
-                                    style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}
-                                    onClick={() => handleCellClick(row.id, dateStr)} />
-                                );
-                              })}
-                            </div>
-                            {tracks.map((track, trackIdx) => track.map(event => <EventBar key={event.id} event={event} row={row} trackIndex={trackIdx} />))}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Add Row Dialog */}
         <Dialog open={showAddRowDialog} onOpenChange={setShowAddRowDialog}>
-          <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle>הוסף שורה חדשה</DialogTitle></DialogHeader>
             <div className="py-4 space-y-4">
               <div><Label>שם השורה</Label><Input value={newRowName} onChange={(e) => setNewRowName(e.target.value)} placeholder="הכנס שם..." className="mt-2" /></div>
@@ -438,7 +457,7 @@ export default function Yearly() {
 
         {/* Event Dialog */}
         <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
-          <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle>{editingEvent ? "ערוך אירוע" : "הוסף אירוע"}</DialogTitle></DialogHeader>
             <div className="py-4 space-y-4">
               <div><Label>כותרת</Label><Input value={eventForm.title} onChange={(e) => setEventForm({...eventForm, title: e.target.value})} placeholder="שם האירוע" className="mt-1" /></div>
@@ -450,13 +469,38 @@ export default function Yearly() {
                 <div><Label>שעת התחלה</Label><Input type="time" value={eventForm.start_time} onChange={(e) => setEventForm({...eventForm, start_time: e.target.value})} className="mt-1" /></div>
                 <div><Label>שעת סיום</Label><Input type="time" value={eventForm.end_time} onChange={(e) => setEventForm({...eventForm, end_time: e.target.value})} className="mt-1" /></div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>סינון קטגוריה</Label>
+                  <Select value={workerCategoryFilter} onValueChange={setWorkerCategoryFilter}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">הכל</SelectItem>
+                      <SelectItem value="category_1">{categoryNames.category_1}</SelectItem>
+                      <SelectItem value="category_2">{categoryNames.category_2}</SelectItem>
+                      <SelectItem value="category_3">{categoryNames.category_3}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>סינון תפקיד</Label>
+                  <Select value={workerRoleFilter} onValueChange={setWorkerRoleFilter}>
+                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">הכל</SelectItem>
+                      <SelectItem value="chef">שף</SelectItem>
+                      <SelectItem value="sous_chef">סו-שף</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <div>
                 <Label>עובד</Label>
                 <Select value={eventForm.worker_id || "__none__"} onValueChange={(v) => setEventForm({...eventForm, worker_id: v})}>
                   <SelectTrigger className="mt-1"><SelectValue placeholder="בחר עובד..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">ללא</SelectItem>
-                    {workers.map(w => <SelectItem key={w.id} value={w.id}>{w.full_name}</SelectItem>)}
+                    {filteredWorkersForDialog.map(w => <SelectItem key={w.id} value={w.id}>{w.full_name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
