@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, AlertTriangle, Plus, Trash2, Pencil, Clock, Hash } from "lucide-react";
+import { Search, ChefHat, AlertTriangle, Plus, Trash2, Pencil, Clock, Hash } from "lucide-react";
 import { format, addDays, subDays, startOfWeek } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -365,7 +365,8 @@ export default function Schedule() {
     const paramData = assignment.custom_params?.[param.name];
     const initialValue = typeof paramData === 'object' ? (paramData?.value || "") : (paramData || "");
     const [value, setValue] = useState(initialValue);
-    const [subType, setSubType] = useState(assignment.custom_params?.[param.name]?.subType || "");
+    const initialSubType = typeof paramData === 'object' ? (paramData?.subType || "") : "";
+    const [subType, setSubType] = useState(initialSubType);
     
     const subTypes = paramSubTypes[param.name] || [];
     
