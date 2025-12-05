@@ -1,0 +1,358 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Save, Info, Users, X, Plus, PartyPopper, Trash2, Clock, Hash } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+export default function Settings() {
+  const [tipsMessage, setTipsMessage] = useState("");
+  const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
+  const [userRoles, setUserRoles] = useState({});
+  const [workers, setWorkers] = useState([]);
+  const [companyEvents, setCompanyEvents] = useState([]);
+  const [timeParamTypes, setTimeParamTypes] = useState([]);
+  const [countParamTypes, setCountParamTypes] = useState([]);
+  const [newTimeType, setNewTimeType] = useState("");
+  const [newCountType, setNewCountType] = useState("");
+  const [paramSubTypes, setParamSubTypes] = useState({});
+  const [selectedTypeForSubType, setSelectedTypeForSubType] = useState("");
+  const [newSubType, setNewSubType] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showEventDialog, setShowEventDialog] = useState(false);
+  const [eventForm, setEventForm] = useState({
+    title: "",
+    date: format(new Date(), "yyyy-MM-dd"),
+    description: "",
+    all_day: true,
+    start_time: "09:00",
+    end_time: "17:00"
+  });
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings] = await Promise.all([
+      base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
+      base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
+      base44.entities.Worker.list(),
+      base44.entities.CompanyEvent.list("-date"),
+      base44.entities.AppSettings.filter({ setting_key: "time_param_types" }),
+      base44.entities.AppSettings.filter({ setting_key: "count_param_types" }),
+      base44.entities.AppSettings.filter({ setting_key: "param_sub_types" })
+    ]);
+    
+    if (tipsSettings.length > 0) {
+      const tipsData = JSON.parse(tipsSettings[0].setting_value);
+      setTipsMessage(tipsData.message || "");
+      setShowTipsAsPopup(tipsData.showAsPopup || false);
+    }
+    
+    if (rolesSettings.length > 0) {
+      setUserRoles(JSON.parse(rolesSettings[0].setting_value));
+    }
+    
+    if (timeTypesSettings.length > 0) {
+      setTimeParamTypes(JSON.parse(timeTypesSettings[0].setting_value) || []);
+    }
+    
+    if (countTypesSettings.length > 0) {
+      setCountParamTypes(JSON.parse(countTypesSettings[0].setting_value) || []);
+    }
+    
+    if (subTypesSettings.length > 0) {
+      setParamSubTypes(JSON.parse(subTypesSettings[0].setting_value) || {});
+    }
+    
+    setWorkers(workersData);
+    setCompanyEvents(eventsData);
+    setLoading(false);
+  };
+
+  const handleSaveTips = async () => {
+    setSaving(true);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "availability_tips" });
+    const data = { setting_key: "availability_tips", setting_value: JSON.stringify({ message: tipsMessage, showAsPopup: showTipsAsPopup }) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setSaving(false);
+  };
+
+  const handleSaveRoles = async () => {
+    setSaving(true);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "user_roles" });
+    const data = { setting_key: "user_roles", setting_value: JSON.stringify(userRoles) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setSaving(false);
+  };
+
+  const handleRoleChange = (email, role) => {
+    if (!email) return;
+    setUserRoles({ ...userRoles, [email]: role });
+  };
+
+  const handleAddTimeType = async () => {
+    if (!newTimeType.trim()) return;
+    const updated = [...timeParamTypes, newTimeType.trim()];
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "time_param_types" });
+    const data = { setting_key: "time_param_types", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setTimeParamTypes(updated);
+    setNewTimeType("");
+  };
+
+  const handleRemoveTimeType = async (type) => {
+    const updated = timeParamTypes.filter(t => t !== type);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "time_param_types" });
+    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+    setTimeParamTypes(updated);
+  };
+
+  const handleAddCountType = async () => {
+    if (!newCountType.trim()) return;
+    const updated = [...countParamTypes, newCountType.trim()];
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "count_param_types" });
+    const data = { setting_key: "count_param_types", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setCountParamTypes(updated);
+    setNewCountType("");
+  };
+
+  const handleRemoveCountType = async (type) => {
+    const updated = countParamTypes.filter(t => t !== type);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "count_param_types" });
+    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+    setCountParamTypes(updated);
+  };
+
+  const handleAddSubType = async () => {
+    if (!selectedTypeForSubType || !newSubType.trim()) return;
+    const updated = { ...paramSubTypes, [selectedTypeForSubType]: [...(paramSubTypes[selectedTypeForSubType] || []), newSubType.trim()] };
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "param_sub_types" });
+    const data = { setting_key: "param_sub_types", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setParamSubTypes(updated);
+    setNewSubType("");
+  };
+
+  const handleRemoveSubType = async (type, subType) => {
+    const updated = { ...paramSubTypes, [type]: (paramSubTypes[type] || []).filter(st => st !== subType) };
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "param_sub_types" });
+    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+    setParamSubTypes(updated);
+  };
+
+  const handleAddEvent = async () => {
+    await base44.entities.CompanyEvent.create(eventForm);
+    setShowEventDialog(false);
+    setEventForm({ title: "", date: format(new Date(), "yyyy-MM-dd"), description: "", all_day: true, start_time: "09:00", end_time: "17:00" });
+    loadSettings();
+  };
+
+  const handleDeleteEvent = async (eventId) => {
+    await base44.entities.CompanyEvent.delete(eventId);
+    loadSettings();
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Settings</h1>
+          <p className="text-gray-600">Configure system-wide settings</p>
+        </div>
+
+        {/* Parameter Types */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-purple-600" />
+              Parameter Types
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <Tabs defaultValue="time" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="time"><Clock className="w-3 h-3 mr-1" />Time Types</TabsTrigger>
+                <TabsTrigger value="count"><Hash className="w-3 h-3 mr-1" />Count Types</TabsTrigger>
+              </TabsList>
+              <TabsContent value="time" className="mt-4">
+                <p className="text-sm text-gray-600 mb-3">Time parameters sum hours worked under each type</p>
+                <div className="flex gap-2 mb-4">
+                  <Input value={newTimeType} onChange={(e) => setNewTimeType(e.target.value)} placeholder="New time type name..." />
+                  <Button onClick={handleAddTimeType}><Plus className="w-4 h-4" /></Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {timeParamTypes.map(type => (
+                    <Badge key={type} className="bg-purple-100 text-purple-800 pr-1">
+                      {type}
+                      <button onClick={() => handleRemoveTimeType(type)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                    </Badge>
+                  ))}
+                  {timeParamTypes.length === 0 && <p className="text-sm text-gray-400">No time types defined</p>}
+                </div>
+              </TabsContent>
+              <TabsContent value="count" className="mt-4">
+                <p className="text-sm text-gray-600 mb-3">Count parameters sum numeric values under each type</p>
+                <div className="flex gap-2 mb-4">
+                  <Input value={newCountType} onChange={(e) => setNewCountType(e.target.value)} placeholder="New count type name..." />
+                  <Button onClick={handleAddCountType}><Plus className="w-4 h-4" /></Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {countParamTypes.map(type => (
+                    <Badge key={type} className="bg-blue-100 text-blue-800 pr-1">
+                      {type}
+                      <button onClick={() => handleRemoveCountType(type)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                    </Badge>
+                  ))}
+                  {countParamTypes.length === 0 && <p className="text-sm text-gray-400">No count types defined</p>}
+                </div>
+              </TabsContent>
+              <div className="mt-6 pt-6 border-t">
+                <p className="text-sm font-semibold mb-3">Sub-types (per parameter type)</p>
+                <div className="flex gap-2 mb-4">
+                  <Select value={selectedTypeForSubType} onValueChange={setSelectedTypeForSubType}>
+                    <SelectTrigger className="w-40"><SelectValue placeholder="Select type..." /></SelectTrigger>
+                    <SelectContent>
+                      {[...timeParamTypes, ...countParamTypes].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Input value={newSubType} onChange={(e) => setNewSubType(e.target.value)} placeholder="New sub-type..." className="flex-1" />
+                  <Button onClick={handleAddSubType} disabled={!selectedTypeForSubType}><Plus className="w-4 h-4" /></Button>
+                </div>
+                {Object.entries(paramSubTypes).filter(([_, subs]) => subs.length > 0).map(([type, subs]) => (
+                  <div key={type} className="mb-2">
+                    <p className="text-xs font-medium text-gray-700 mb-1">{type}:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {subs.map(sub => (
+                        <Badge key={sub} variant="outline" className="text-xs pr-1">
+                          {sub}
+                          <button onClick={() => handleRemoveSubType(type, sub)} className="ml-1 hover:text-red-600"><X className="w-2 h-2" /></button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* User Roles */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5 text-blue-600" />User Roles Management</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-gray-700"><strong>Manager:</strong> Full access<br /><strong>User:</strong> Availability only</p>
+              </div>
+              <div className="space-y-3">
+                {workers.filter(w => w.email).map((worker) => (
+                  <div key={worker.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{worker.full_name}</p>
+                      <p className="text-sm text-gray-600">{worker.email}</p>
+                    </div>
+                    <Select value={userRoles[worker.email] || "user"} onValueChange={(value) => handleRoleChange(worker.email, value)}>
+                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="manager">Manager</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+              <Button onClick={handleSaveRoles} disabled={saving} className="bg-blue-900 hover:bg-blue-800">
+                <Save className="w-4 h-4 mr-2" />{saving ? "Saving..." : "Save User Roles"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Company Events */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <div className="flex justify-between items-center">
+              <CardTitle className="flex items-center gap-2"><PartyPopper className="w-5 h-5 text-purple-600" />Company Events</CardTitle>
+              <Button onClick={() => setShowEventDialog(true)} size="sm"><Plus className="w-4 h-4 mr-2" />Add Event</Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {companyEvents.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-4">No events scheduled</p>
+            ) : (
+              <div className="space-y-3">
+                {companyEvents.map((event) => (
+                  <div key={event.id} className="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div>
+                      <p className="font-medium text-gray-900">{event.title}</p>
+                      <p className="text-sm text-gray-600">{format(new Date(event.date), "EEEE, MMM d, yyyy")}{!event.all_day && ` • ${event.start_time} - ${event.end_time}`}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteEvent(event.id)} className="text-red-500"><Trash2 className="w-4 h-4" /></Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Tips & Policy */}
+        <Card className="border-none shadow-lg">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2"><Info className="w-5 h-5 text-blue-600" />Availability Tips & Policy</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div><Label>Show as popup confirmation</Label><p className="text-xs text-gray-600">Display tips in a popup</p></div>
+                <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
+              </div>
+              <div><Label htmlFor="tips">Message for Workers</Label><Textarea id="tips" value={tipsMessage} onChange={(e) => setTipsMessage(e.target.value)} placeholder="Enter tips..." rows={10} className="font-mono text-sm mt-2" /></div>
+              <Button onClick={handleSaveTips} disabled={saving} className="bg-blue-900 hover:bg-blue-800"><Save className="w-4 h-4 mr-2" />{saving ? "Saving..." : "Save Tips"}</Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle>Add Company Event</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div><Label>Event Title</Label><Input value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} placeholder="Event name" /></div>
+              <div><Label>Date</Label><Input type="date" value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} /></div>
+              <div className="flex items-center gap-2"><Switch checked={eventForm.all_day} onCheckedChange={(checked) => setEventForm({ ...eventForm, all_day: checked })} /><Label>All Day Event</Label></div>
+              {!eventForm.all_day && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div><Label>Start Time</Label><Input type="time" value={eventForm.start_time} onChange={(e) => setEventForm({ ...eventForm, start_time: e.target.value })} /></div>
+                  <div><Label>End Time</Label><Input type="time" value={eventForm.end_time} onChange={(e) => setEventForm({ ...eventForm, end_time: e.target.value })} /></div>
+                </div>
+              )}
+              <div><Label>Description (Optional)</Label><Textarea value={eventForm.description} onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })} rows={3} /></div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEventDialog(false)}>Cancel</Button>
+              <Button onClick={handleAddEvent} disabled={!eventForm.title} className="bg-purple-600 hover:bg-purple-700">Add Event</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  );
+}
