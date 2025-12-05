@@ -276,37 +276,40 @@ export default function Schedule() {
     return "text-gray-900";
   };
 
-  const ColumnCell = ({ assignment, colType, onUpdate }) => {
+  const ColumnCell = ({ assignment, colType, availableSubTypes, onSave }) => {
     const [open, setOpen] = useState(false);
     const colData = assignment.column_values?.[colType];
     const savedValue = colData?.value || "";
     const savedSubTypes = colData?.subTypes || (colData?.subType ? [colData.subType] : []);
     const [localValue, setLocalValue] = useState(savedValue);
     const [localSubTypes, setLocalSubTypes] = useState(savedSubTypes);
-    const availableSubTypes = columnSubTypes[colType] || [];
 
     // Reset local state when popover opens
     const handleOpenChange = (isOpen) => {
       if (isOpen) {
-        setLocalValue(colData?.value || "");
-        setLocalSubTypes(colData?.subTypes || (colData?.subType ? [colData.subType] : []));
+        const currentData = assignment.column_values?.[colType];
+        setLocalValue(currentData?.value || "");
+        setLocalSubTypes(currentData?.subTypes || (currentData?.subType ? [currentData.subType] : []));
       }
       setOpen(isOpen);
     };
 
     const handleSave = async () => {
-      const updatedValues = { ...(assignment.column_values || {}), [colType]: { value: localValue, subTypes: localSubTypes.filter(st => st !== "__none__") } };
+      const cleanedSubTypes = localSubTypes.filter(st => st && st !== "__none__");
+      const updatedValues = { ...(assignment.column_values || {}), [colType]: { value: localValue, subTypes: cleanedSubTypes } };
       await base44.entities.Assignment.update(assignment.id, { column_values: updatedValues });
       setOpen(false);
-      loadData();
+      onSave();
     };
 
     const toggleSubType = (st) => {
-      if (localSubTypes.includes(st)) {
-        setLocalSubTypes(localSubTypes.filter(s => s !== st));
-      } else {
-        setLocalSubTypes([...localSubTypes, st]);
-      }
+      setLocalSubTypes(prev => {
+        if (prev.includes(st)) {
+          return prev.filter(s => s !== st);
+        } else {
+          return [...prev, st];
+        }
+      });
     };
 
     return (
