@@ -375,10 +375,9 @@ export default function Schedule() {
       setOpen(false);
     };
 
-    const displayValue = typeof assignment.custom_params?.[param.name] === 'object' 
-      ? assignment.custom_params?.[param.name]?.value 
-      : assignment.custom_params?.[param.name];
-    const displaySubType = assignment.custom_params?.[param.name]?.subType;
+    const rawDisplayValue = assignment.custom_params?.[param.name];
+    const displayValue = typeof rawDisplayValue === 'object' ? (rawDisplayValue?.value || "") : (rawDisplayValue || "");
+    const displaySubType = typeof rawDisplayValue === 'object' ? (rawDisplayValue?.subType || "") : "";
 
     return (
       <Popover open={open} onOpenChange={setOpen}>
