@@ -396,10 +396,10 @@ export default function Schedule() {
             {subTypes.length > 0 && (
               <div>
                 <Label className="text-xs">Sub-type</Label>
-                <Select value={subType} onValueChange={setSubType}>
+                <Select value={subType || ""} onValueChange={setSubType}>
                   <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={null}>None</SelectItem>
+                    <SelectItem value="__none__">None</SelectItem>
                     {subTypes.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
                   </SelectContent>
                 </Select>
