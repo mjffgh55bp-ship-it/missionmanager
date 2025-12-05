@@ -7,6 +7,7 @@ import Matrix from './pages/Matrix';
 import Availability from './pages/Availability';
 import Qualifications from './pages/Qualifications';
 import Settings from './pages/Settings';
+import Yearly from './pages/Yearly';
 import __Layout from './Layout.jsx';
 
 
@@ -20,6 +21,7 @@ export const PAGES = {
     "Availability": Availability,
     "Qualifications": Qualifications,
     "Settings": Settings,
+    "Yearly": Yearly,
 }
 
 export const pagesConfig = {

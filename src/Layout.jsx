@@ -26,6 +26,7 @@ const managerNavigationItems = [
   { title: "Food Carts", url: createPageUrl("FoodCarts"), icon: Truck },
   { title: "Qualifications", url: createPageUrl("Qualifications"), icon: Award },
   { title: "Reports", url: createPageUrl("Reports"), icon: BarChart3 },
+  { title: "Yearly", url: createPageUrl("Yearly"), icon: BarChart3 },
   { title: "Settings", url: createPageUrl("Settings"), icon: Settings },
 ];
 
