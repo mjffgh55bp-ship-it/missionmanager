@@ -330,9 +330,10 @@ export default function Schedule() {
     }
   };
 
-  const handleUpdateParamValue = async (assignmentId, paramName, value, subType) => {
+  const handleUpdateParamValue = async (assignmentId, paramName, value, subType, subTypeCounts = null) => {
     const assignment = assignments.find(a => a.id === assignmentId);
-    const updatedParams = { ...assignment.custom_params, [paramName]: { value, subType } };
+    const paramData = subTypeCounts ? { value, subType, subTypeCounts } : { value, subType };
+    const updatedParams = { ...assignment.custom_params, [paramName]: paramData };
     await base44.entities.Assignment.update(assignmentId, { custom_params: updatedParams });
     loadData();
   };
@@ -363,47 +364,97 @@ export default function Schedule() {
   const ParamCell = ({ assignment, param }) => {
     const [open, setOpen] = useState(false);
     const paramData = assignment.custom_params?.[param.name];
+    
+    // For count params: support multiple subtypes with counts
+    const isCountParam = param.category === "count";
+    const subTypes = paramSubTypes[param.name] || [];
+    
+    // Initialize subtype counts for count params
+    const getInitialSubTypeCounts = () => {
+      if (!isCountParam || subTypes.length === 0) return {};
+      if (typeof paramData === 'object' && paramData?.subTypeCounts) {
+        return paramData.subTypeCounts;
+      }
+      return {};
+    };
+    
     const initialValue = typeof paramData === 'object' ? (paramData?.value || "") : (paramData || "");
     const [value, setValue] = useState(initialValue);
     const initialSubType = typeof paramData === 'object' ? (paramData?.subType || "") : "";
     const [subType, setSubType] = useState(initialSubType);
-    
-    const subTypes = paramSubTypes[param.name] || [];
+    const [subTypeCounts, setSubTypeCounts] = useState(getInitialSubTypeCounts());
     
     const handleSave = async () => {
-      await handleUpdateParamValue(assignment.id, param.name, value, subType === "__none__" ? "" : subType);
+      if (isCountParam && subTypes.length > 0) {
+        // Save with subtype counts
+        const totalValue = Object.values(subTypeCounts).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+        await handleUpdateParamValue(assignment.id, param.name, totalValue, "", subTypeCounts);
+      } else {
+        await handleUpdateParamValue(assignment.id, param.name, value, subType === "__none__" ? "" : subType);
+      }
       setOpen(false);
     };
 
     const rawDisplayValue = assignment.custom_params?.[param.name];
     const displayValue = typeof rawDisplayValue === 'object' ? (rawDisplayValue?.value || "") : (rawDisplayValue || "");
     const displaySubType = typeof rawDisplayValue === 'object' ? (rawDisplayValue?.subType || "") : "";
+    const displaySubTypeCounts = typeof rawDisplayValue === 'object' ? (rawDisplayValue?.subTypeCounts || {}) : {};
+
+    // Build display string for count params with subtypes
+    const getDisplayText = () => {
+      if (isCountParam && subTypes.length > 0) {
+        const entries = Object.entries(displaySubTypeCounts).filter(([_, v]) => v > 0);
+        if (entries.length === 0) return "-";
+        return entries.map(([st, v]) => `${st}:${v}`).join(", ");
+      }
+      return displayValue || "-";
+    };
 
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button className="w-full text-left p-1 rounded border border-gray-200 hover:bg-blue-50 min-h-[28px]">
-            <span className="text-xs">{displayValue || "-"}</span>
-            {displaySubType && <span className="text-[10px] text-gray-400 ml-1">({displaySubType})</span>}
+            <span className="text-xs truncate block">{getDisplayText()}</span>
+            {!isCountParam && displaySubType && <span className="text-[10px] text-gray-400 ml-1">({displaySubType})</span>}
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-48 p-2">
+        <PopoverContent className="w-56 p-2">
           <div className="space-y-2">
-            <div>
-              <Label className="text-xs">Value</Label>
-              <Input className="h-7 text-xs" type={param.category === "time" ? "number" : "text"} value={value} onChange={(e) => setValue(e.target.value)} />
-            </div>
-            {subTypes.length > 0 && (
-              <div>
-                <Label className="text-xs">Sub-type</Label>
-                <Select value={subType || ""} onValueChange={setSubType}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None</SelectItem>
-                    {subTypes.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            {isCountParam && subTypes.length > 0 ? (
+              <>
+                <Label className="text-xs font-semibold">Count per sub-type:</Label>
+                {subTypes.map(st => (
+                  <div key={st} className="flex items-center gap-2">
+                    <span className="text-xs w-20 truncate">{st}</span>
+                    <Input 
+                      className="h-7 text-xs flex-1" 
+                      type="number" 
+                      value={subTypeCounts[st] || ""} 
+                      onChange={(e) => setSubTypeCounts({...subTypeCounts, [st]: e.target.value})} 
+                      placeholder="0"
+                    />
+                  </div>
+                ))}
+              </>
+            ) : (
+              <>
+                <div>
+                  <Label className="text-xs">Value</Label>
+                  <Input className="h-7 text-xs" type={param.category === "time" ? "number" : "text"} value={value} onChange={(e) => setValue(e.target.value)} />
+                </div>
+                {subTypes.length > 0 && (
+                  <div>
+                    <Label className="text-xs">Sub-type</Label>
+                    <Select value={subType || ""} onValueChange={setSubType}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {subTypes.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
             )}
             <Button size="sm" className="w-full h-7 text-xs" onClick={handleSave}>Save</Button>
           </div>
