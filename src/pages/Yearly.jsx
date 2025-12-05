@@ -426,8 +426,8 @@ export default function Yearly() {
                           return (
                             <div key={unavail.id || idx} className="absolute top-1 rounded bg-red-500 flex items-center justify-center text-white text-[8px] font-medium px-1 z-10"
                               style={{ right: `${dateIdx * CELL_WIDTH}px`, width: `${CELL_WIDTH - 2}px`, height: EVENT_HEIGHT }}
-                              title={`${worker?.full_name}: ${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}>
-                              <span className="truncate">{worker?.full_name?.split(' ')[0] || '?'}</span>
+                              title={`${worker?.full_name || 'Unknown'}: ${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}>
+                              <span className="truncate">{worker?.full_name ? worker.full_name.split(' ')[0] : '?'}</span>
                             </div>
                           );
                         })}
