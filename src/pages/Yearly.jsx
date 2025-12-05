@@ -1,24 +1,23 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react";
-import { format, addDays, startOfYear, endOfYear, getDay, getWeek, differenceInDays } from "date-fns";
-import { getHebrewDate, toHebrewNumerals } from "../components/utils/HebrewDate";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Palette } from "lucide-react";
+import { format, addDays, getDay, differenceInDays } from "date-fns";
+import { getHebrewDate } from "../components/utils/HebrewDate";
 
 const HEBREW_DAYS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+const ROW_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
 
-// Calculate week number where Dec 28 is week 1
 const getCustomWeekNumber = (date, year) => {
-  // Week 1 starts on the Sunday of the week containing Dec 28 of the previous year
   const dec28PrevYear = new Date(year - 1, 11, 28);
   const weekStartDec28 = new Date(dec28PrevYear);
-  weekStartDec28.setDate(dec28PrevYear.getDate() - dec28PrevYear.getDay()); // Go to Sunday
-  
+  weekStartDec28.setDate(dec28PrevYear.getDate() - dec28PrevYear.getDay());
   const diffDays = differenceInDays(date, weekStartDec28);
   if (diffDays < 0) return 0;
   return Math.floor(diffDays / 7) + 1;
@@ -28,12 +27,17 @@ export default function Yearly() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [rows, setRows] = useState([]);
   const [events, setEvents] = useState([]);
+  const [workers, setWorkers] = useState([]);
+  const [unavailabilities, setUnavailabilities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddRowDialog, setShowAddRowDialog] = useState(false);
   const [showAddEventDialog, setShowAddEventDialog] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(null);
   const [newRowName, setNewRowName] = useState("");
+  const [newRowColor, setNewRowColor] = useState("#3b82f6");
   const [selectedCell, setSelectedCell] = useState(null);
-  const [eventTitle, setEventTitle] = useState("");
+  const [eventForm, setEventForm] = useState({ title: "", hours: "", worker_id: "" });
+  const [selectedWorkerFilter, setSelectedWorkerFilter] = useState("");
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -42,17 +46,22 @@ export default function Yearly() {
 
   const loadData = async () => {
     setLoading(true);
-    const [rowsData, eventsData] = await Promise.all([
+    const [rowsData, eventsData, workersData, unavailData] = await Promise.all([
       base44.entities.YearlyRow.list("order"),
-      base44.entities.YearlyEvent.list()
+      base44.entities.YearlyEvent.list(),
+      base44.entities.Worker.filter({ active: true }),
+      base44.entities.Unavailability.list()
     ]);
     
     const yearStart = `${currentYear}-01-01`;
     const yearEnd = `${currentYear}-12-31`;
     const yearEvents = eventsData.filter(e => e.date >= yearStart && e.date <= yearEnd);
+    const yearUnavail = unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd);
     
     setRows(rowsData);
     setEvents(yearEvents);
+    setWorkers(workersData);
+    setUnavailabilities(yearUnavail);
     setLoading(false);
   };
 
@@ -61,16 +70,16 @@ export default function Yearly() {
     await base44.entities.YearlyRow.create({
       name: newRowName.trim(),
       order: rows.length,
-      color: "#3b82f6"
+      color: newRowColor
     });
     setNewRowName("");
+    setNewRowColor("#3b82f6");
     setShowAddRowDialog(false);
     loadData();
   };
 
   const handleDeleteRow = async (rowId) => {
     await base44.entities.YearlyRow.delete(rowId);
-    // Delete all events for this row
     const rowEvents = events.filter(e => e.row_id === rowId);
     for (const event of rowEvents) {
       await base44.entities.YearlyEvent.delete(event.id);
@@ -78,22 +87,32 @@ export default function Yearly() {
     loadData();
   };
 
+  const handleChangeRowColor = async (rowId, color) => {
+    await base44.entities.YearlyRow.update(rowId, { color });
+    setShowColorPicker(null);
+    loadData();
+  };
+
   const handleCellClick = (rowId, date) => {
     setSelectedCell({ rowId, date });
-    setEventTitle("");
+    setEventForm({ title: "", hours: "", worker_id: "" });
     setShowAddEventDialog(true);
   };
 
   const handleAddEvent = async () => {
     if (!selectedCell) return;
+    const worker = workers.find(w => w.id === eventForm.worker_id);
     await base44.entities.YearlyEvent.create({
       row_id: selectedCell.rowId,
       date: selectedCell.date,
-      title: eventTitle.trim() || "•"
+      title: eventForm.title.trim() || "•",
+      hours: eventForm.hours ? parseFloat(eventForm.hours) : null,
+      worker_id: eventForm.worker_id || null,
+      worker_name: worker?.full_name || null
     });
     setShowAddEventDialog(false);
     setSelectedCell(null);
-    setEventTitle("");
+    setEventForm({ title: "", hours: "", worker_id: "" });
     loadData();
   };
 
@@ -106,35 +125,32 @@ export default function Yearly() {
     return events.find(e => e.row_id === rowId && e.date === dateStr);
   };
 
-  // Generate all days of the year
+  const getUnavailForWorkerDate = (workerId, dateStr) => {
+    return unavailabilities.find(u => u.worker_id === workerId && u.date === dateStr);
+  };
+
   const generateYearDays = () => {
     const days = [];
     const start = new Date(currentYear, 0, 1);
     const end = new Date(currentYear, 11, 31);
-    let current = start;
-    
-    while (current <= end) {
+    let current = end;
+    while (current >= start) {
       days.push(new Date(current));
-      current = addDays(current, 1);
+      current = addDays(current, -1);
     }
-    
-    return days; // Left to right (reversed for RTL display)
+    return days;
   };
 
   const yearDays = generateYearDays();
 
-  // Group days by month for header
   const getMonthGroups = () => {
     const groups = [];
     let currentMonth = -1;
     let count = 0;
-    
     for (const day of yearDays) {
       const month = day.getMonth();
       if (month !== currentMonth) {
-        if (currentMonth !== -1) {
-          groups.push({ month: currentMonth, count });
-        }
+        if (currentMonth !== -1) groups.push({ month: currentMonth, count });
         currentMonth = month;
         count = 1;
       } else {
@@ -145,18 +161,14 @@ export default function Yearly() {
     return groups;
   };
 
-  // Group days by week for header
   const getWeekGroups = () => {
     const groups = [];
     let currentWeek = -1;
     let count = 0;
-    
     for (const day of yearDays) {
       const week = getCustomWeekNumber(day, currentYear);
       if (week !== currentWeek) {
-        if (currentWeek !== -1) {
-          groups.push({ week: currentWeek, count });
-        }
+        if (currentWeek !== -1) groups.push({ week: currentWeek, count });
         currentWeek = week;
         count = 1;
       } else {
@@ -169,133 +181,175 @@ export default function Yearly() {
 
   const monthGroups = getMonthGroups();
   const weekGroups = getWeekGroups();
+  const filteredWorker = workers.find(w => w.id === selectedWorkerFilter);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-full mx-auto">
-        <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
+        <div className="mb-6 flex flex-wrap justify-between items-center gap-4" dir="rtl">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-1">לוח שנתי</h1>
             <p className="text-gray-600">ניהול אירועים שנתיים</p>
           </div>
           
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}>
               <ChevronRight className="w-4 h-4" />
             </Button>
             <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[100px] text-center">
               {currentYear}
             </div>
-            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}>
+            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            <Button variant="outline" onClick={() => setCurrentYear(new Date().getFullYear())}>
-              השנה
-            </Button>
+            <Button variant="outline" onClick={() => setCurrentYear(new Date().getFullYear())}>השנה</Button>
+            <Select value={selectedWorkerFilter} onValueChange={setSelectedWorkerFilter}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="בחר עובד..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">כל העובדים</SelectItem>
+                {workers.map(w => <SelectItem key={w.id} value={w.id}>{w.full_name}</SelectItem>)}
+              </SelectContent>
+            </Select>
             <Button onClick={() => setShowAddRowDialog(true)}>
-              <Plus className="w-4 h-4 ml-2" />
-              הוסף שורה
+              <Plus className="w-4 h-4 ml-2" />הוסף שורה
             </Button>
           </div>
         </div>
 
         <Card className="border-none shadow-lg overflow-hidden">
           <CardContent className="p-0">
-            <div className="overflow-x-auto" ref={scrollRef}>
-              <div style={{ minWidth: `${yearDays.length * 40 + 150}px` }}>
-                {/* Month Header */}
-                <div className="flex flex-row-reverse border-b bg-blue-900 text-white sticky top-0 z-20">
-                  <div className="w-[150px] min-w-[150px] p-2 border-r font-semibold sticky right-0 bg-blue-900 z-30">שורה</div>
-                  {monthGroups.map((group, idx) => (
-                    <div 
-                      key={idx} 
-                      className="text-center font-semibold text-xs py-2 border-r"
-                      style={{ width: `${group.count * 40}px`, minWidth: `${group.count * 40}px` }}
-                    >
-                      {HEBREW_MONTHS[group.month]}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Week Header */}
-                <div className="flex flex-row-reverse border-b bg-blue-800 text-white sticky top-[36px] z-20">
-                  <div className="w-[150px] min-w-[150px] p-2 border-r text-xs sticky right-0 bg-blue-800 z-30">שבוע</div>
-                  {weekGroups.map((group, idx) => (
-                    <div 
-                      key={idx} 
-                      className="text-center text-xs py-1 border-r"
-                      style={{ width: `${group.count * 40}px`, minWidth: `${group.count * 40}px` }}
-                    >
-                      {group.week}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Combined Day/Date/Hebrew Header */}
-                <div className="flex flex-row-reverse border-b bg-gray-100 sticky top-[72px] z-20">
-                  <div className="w-[150px] min-w-[150px] p-2 border-r text-xs font-medium sticky right-0 bg-gray-100 z-30">יום, תאריך</div>
-                  {yearDays.map((day, idx) => {
-                    const dayOfWeek = getDay(day);
-                    const isShabbat = dayOfWeek === 6;
-                    const isFriday = dayOfWeek === 5;
-                    const hebDate = getHebrewDate(day);
-                    return (
-                      <div 
-                        key={idx} 
-                        className={`w-10 min-w-[40px] text-center text-[9px] py-1 border-r leading-tight ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : ''}`}
-                      >
-                        <div className="font-medium">{HEBREW_DAYS[dayOfWeek]}</div>
-                        <div>{day.getDate()}</div>
-                        <div className="text-gray-500">{hebDate.dayHeb}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Rows */}
-                {loading ? (
-                  <div className="p-8 text-center text-gray-500">טוען...</div>
-                ) : rows.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">אין שורות. לחץ "הוסף שורה" להתחיל.</div>
-                ) : (
-                  rows.map((row, rowIdx) => (
-                    <div key={row.id} className={`flex flex-row-reverse border-b ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                      <div className="w-[150px] min-w-[150px] p-2 border-r flex items-center justify-between sticky right-0 bg-inherit z-10">
-                        <span className="text-sm font-medium truncate">{row.name}</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteRow(row.id)}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
+            <div className="overflow-auto max-h-[80vh]" ref={scrollRef}>
+              <table className="border-collapse" style={{ minWidth: `${yearDays.length * 36 + 160}px` }}>
+                <thead className="sticky top-0 z-20">
+                  {/* Month Header */}
+                  <tr className="bg-blue-900 text-white">
+                    <th className="sticky right-0 z-30 bg-blue-900 w-[160px] min-w-[160px] p-2 border-l text-right font-semibold">שורה</th>
+                    {monthGroups.map((group, idx) => (
+                      <th key={idx} colSpan={group.count} className="text-center font-semibold text-xs py-2 border-l">
+                        {HEBREW_MONTHS[group.month]}
+                      </th>
+                    ))}
+                  </tr>
+                  {/* Week Header */}
+                  <tr className="bg-blue-800 text-white">
+                    <th className="sticky right-0 z-30 bg-blue-800 w-[160px] min-w-[160px] p-2 border-l text-right text-xs">שבוע</th>
+                    {weekGroups.map((group, idx) => (
+                      <th key={idx} colSpan={group.count} className="text-center text-xs py-1 border-l">
+                        {group.week}
+                      </th>
+                    ))}
+                  </tr>
+                  {/* Day/Date Header */}
+                  <tr className="bg-gray-100">
+                    <th className="sticky right-0 z-30 bg-gray-100 w-[160px] min-w-[160px] p-2 border-l text-right text-xs font-medium">יום, תאריך</th>
+                    {yearDays.map((day, idx) => {
+                      const dayOfWeek = getDay(day);
+                      const isShabbat = dayOfWeek === 6;
+                      const isFriday = dayOfWeek === 5;
+                      const hebDate = getHebrewDate(day);
+                      return (
+                        <th key={idx} className={`w-9 min-w-[36px] text-center text-[8px] py-1 border-l leading-tight ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`}>
+                          <div className="font-semibold">{HEBREW_DAYS[dayOfWeek]}</div>
+                          <div>{day.getDate()}</div>
+                          <div className="text-gray-500">{hebDate.dayHeb}</div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Worker Unavailability Row */}
+                  {selectedWorkerFilter && selectedWorkerFilter !== "__all__" && (
+                    <tr className="bg-red-50 border-b">
+                      <td className="sticky right-0 z-10 bg-red-50 w-[160px] min-w-[160px] p-2 border-l">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                          <span className="text-sm font-medium text-red-700">אי זמינות - {filteredWorker?.full_name}</span>
+                        </div>
+                      </td>
                       {yearDays.map((day, idx) => {
                         const dateStr = format(day, "yyyy-MM-dd");
-                        const event = getEventForCell(row.id, dateStr);
+                        const unavail = getUnavailForWorkerDate(selectedWorkerFilter, dateStr);
                         const dayOfWeek = getDay(day);
                         const isShabbat = dayOfWeek === 6;
                         const isFriday = dayOfWeek === 5;
-                        
                         return (
-                          <div 
-                            key={idx} 
-                            className={`w-10 min-w-[40px] h-10 border-r flex items-center justify-center cursor-pointer hover:bg-blue-100 transition-colors ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
-                            onClick={() => event ? null : handleCellClick(row.id, dateStr)}
-                          >
-                            {event && (
-                              <div 
-                                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[8px] font-bold cursor-pointer hover:opacity-80"
-                                style={{ backgroundColor: event.color || row.color || '#3b82f6' }}
-                                onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id); }}
-                                title={event.title || "לחץ למחיקה"}
-                              >
-                                {event.title ? event.title.charAt(0) : "•"}
+                          <td key={idx} className={`w-9 min-w-[36px] h-9 border-l text-center ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}>
+                            {unavail && (
+                              <div className="w-6 h-6 mx-auto rounded-full bg-red-500 flex items-center justify-center text-white text-[8px]" title={`${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}>
+                                X
                               </div>
                             )}
-                          </div>
+                          </td>
                         );
                       })}
-                    </div>
-                  ))
-                )}
-              </div>
+                    </tr>
+                  )}
+
+                  {/* Custom Rows */}
+                  {loading ? (
+                    <tr><td colSpan={yearDays.length + 1} className="p-8 text-center text-gray-500">טוען...</td></tr>
+                  ) : rows.length === 0 ? (
+                    <tr><td colSpan={yearDays.length + 1} className="p-8 text-center text-gray-500">אין שורות. לחץ "הוסף שורה" להתחיל.</td></tr>
+                  ) : (
+                    rows.map((row, rowIdx) => (
+                      <tr key={row.id} className={`border-b ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                        <td className={`sticky right-0 z-10 w-[160px] min-w-[160px] p-2 border-l ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: row.color }}></div>
+                              <span className="text-sm font-medium truncate">{row.name}</span>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <div className="relative">
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowColorPicker(showColorPicker === row.id ? null : row.id)}>
+                                  <Palette className="w-3 h-3" />
+                                </Button>
+                                {showColorPicker === row.id && (
+                                  <div className="absolute top-7 right-0 bg-white border rounded-lg shadow-lg p-2 z-50 flex gap-1 flex-wrap w-24">
+                                    {ROW_COLORS.map(c => (
+                                      <button key={c} className="w-5 h-5 rounded-full border-2 border-white hover:scale-110" style={{ backgroundColor: c }} onClick={() => handleChangeRowColor(row.id, c)} />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteRow(row.id)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </td>
+                        {yearDays.map((day, idx) => {
+                          const dateStr = format(day, "yyyy-MM-dd");
+                          const event = getEventForCell(row.id, dateStr);
+                          const dayOfWeek = getDay(day);
+                          const isShabbat = dayOfWeek === 6;
+                          const isFriday = dayOfWeek === 5;
+                          
+                          return (
+                            <td 
+                              key={idx} 
+                              className={`w-9 min-w-[36px] h-9 border-l cursor-pointer hover:bg-blue-100 transition-colors ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
+                              onClick={() => !event && handleCellClick(row.id, dateStr)}
+                            >
+                              {event && (
+                                <div 
+                                  className="w-7 h-7 mx-auto rounded-full flex items-center justify-center text-white text-[7px] font-bold cursor-pointer hover:opacity-80"
+                                  style={{ backgroundColor: event.color || row.color || '#3b82f6' }}
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id); }}
+                                  title={`${event.title || ""}${event.hours ? ` (${event.hours}h)` : ""}${event.worker_name ? ` - ${event.worker_name}` : ""}\nלחץ למחיקה`}
+                                >
+                                  {event.hours || (event.title ? event.title.charAt(0) : "•")}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>
@@ -303,17 +357,20 @@ export default function Yearly() {
         {/* Add Row Dialog */}
         <Dialog open={showAddRowDialog} onOpenChange={setShowAddRowDialog}>
           <DialogContent className="sm:max-w-md" dir="rtl">
-            <DialogHeader>
-              <DialogTitle>הוסף שורה חדשה</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <Label>שם השורה</Label>
-              <Input 
-                value={newRowName} 
-                onChange={(e) => setNewRowName(e.target.value)} 
-                placeholder="הכנס שם..."
-                className="mt-2"
-              />
+            <DialogHeader><DialogTitle>הוסף שורה חדשה</DialogTitle></DialogHeader>
+            <div className="py-4 space-y-4">
+              <div>
+                <Label>שם השורה</Label>
+                <Input value={newRowName} onChange={(e) => setNewRowName(e.target.value)} placeholder="הכנס שם..." className="mt-2" />
+              </div>
+              <div>
+                <Label>צבע</Label>
+                <div className="flex gap-2 mt-2">
+                  {ROW_COLORS.map(c => (
+                    <button key={c} className={`w-8 h-8 rounded-full border-2 ${newRowColor === c ? 'border-gray-800 scale-110' : 'border-white'}`} style={{ backgroundColor: c }} onClick={() => setNewRowColor(c)} />
+                  ))}
+                </div>
+              </div>
             </div>
             <DialogFooter className="flex-row-reverse gap-2">
               <Button onClick={handleAddRow} disabled={!newRowName.trim()}>הוסף</Button>
@@ -325,20 +382,27 @@ export default function Yearly() {
         {/* Add Event Dialog */}
         <Dialog open={showAddEventDialog} onOpenChange={setShowAddEventDialog}>
           <DialogContent className="sm:max-w-md" dir="rtl">
-            <DialogHeader>
-              <DialogTitle>הוסף אירוע</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <p className="text-sm text-gray-600 mb-4">
-                תאריך: {selectedCell?.date ? format(new Date(selectedCell.date), "dd/MM/yyyy") : ""}
-              </p>
-              <Label>כותרת (אופציונלי)</Label>
-              <Input 
-                value={eventTitle} 
-                onChange={(e) => setEventTitle(e.target.value)} 
-                placeholder="השאר ריק לסימון פשוט"
-                className="mt-2"
-              />
+            <DialogHeader><DialogTitle>הוסף אירוע</DialogTitle></DialogHeader>
+            <div className="py-4 space-y-4">
+              <p className="text-sm text-gray-600">תאריך: {selectedCell?.date ? format(new Date(selectedCell.date), "dd/MM/yyyy") : ""}</p>
+              <div>
+                <Label>כותרת (אופציונלי)</Label>
+                <Input value={eventForm.title} onChange={(e) => setEventForm({...eventForm, title: e.target.value})} placeholder="השאר ריק לסימון פשוט" className="mt-1" />
+              </div>
+              <div>
+                <Label>שעות (אופציונלי)</Label>
+                <Input type="number" value={eventForm.hours} onChange={(e) => setEventForm({...eventForm, hours: e.target.value})} placeholder="0" className="mt-1" />
+              </div>
+              <div>
+                <Label>עובד (אופציונלי)</Label>
+                <Select value={eventForm.worker_id} onValueChange={(v) => setEventForm({...eventForm, worker_id: v})}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="בחר עובד..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">ללא</SelectItem>
+                    {workers.map(w => <SelectItem key={w.id} value={w.id}>{w.full_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter className="flex-row-reverse gap-2">
               <Button onClick={handleAddEvent}>הוסף</Button>
