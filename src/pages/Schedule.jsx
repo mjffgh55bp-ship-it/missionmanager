@@ -3,18 +3,14 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ChefHat, AlertTriangle, Plus, Trash2, Pencil, Clock, Hash } from "lucide-react";
+import { Search, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react";
 import { format, addDays, subDays, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Star } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Check, Star } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const SHIFT_WINDOWS = [
   { start: "06:00", end: "10:00" },
@@ -32,28 +28,20 @@ export default function Schedule() {
   const [availabilities, setAvailabilities] = useState([]);
   const [unavailabilities, setUnavailabilities] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [globalParams, setGlobalParams] = useState([]);
-  const [cartParams, setCartParams] = useState({});
-  const [timeParamTypes, setTimeParamTypes] = useState([]);
-  const [countParamTypes, setCountParamTypes] = useState([]);
-  const [paramSubTypes, setParamSubTypes] = useState({});
+  const [loading, setLoading] = useState(true);
   
   const [showWorkerDialog, setShowWorkerDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showAddShiftDialog, setShowAddShiftDialog] = useState(false);
-  const [showAddParamDialog, setShowAddParamDialog] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [selectedCartId, setSelectedCartId] = useState(null);
-  const [paramDialogCartId, setParamDialogCartId] = useState(null);
-  const [newParam, setNewParam] = useState({ category: "time", type: "" });
   
   const [editFormData, setEditFormData] = useState({
     start_time: "",
     end_time: "",
     hours: 4,
-    notes: "",
-    custom_params: {}
+    notes: ""
   });
 
   const [newShiftData, setNewShiftData] = useState({
@@ -65,26 +53,8 @@ export default function Schedule() {
     loadData();
   }, [currentDate]);
 
-  useEffect(() => {
-    loadParamSettings();
-  }, []);
-
-  const loadParamSettings = async () => {
-    const [globalSettings, cartParamsSettings, timeTypes, countTypes, subTypesSettings] = await Promise.all([
-      base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
-      base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
-      base44.entities.AppSettings.filter({ setting_key: "time_param_types" }),
-      base44.entities.AppSettings.filter({ setting_key: "count_param_types" }),
-      base44.entities.AppSettings.filter({ setting_key: "param_sub_types" })
-    ]);
-    if (globalSettings.length > 0) setGlobalParams(JSON.parse(globalSettings[0].setting_value) || []);
-    if (cartParamsSettings.length > 0) setCartParams(JSON.parse(cartParamsSettings[0].setting_value) || {});
-    if (timeTypes.length > 0) setTimeParamTypes(JSON.parse(timeTypes[0].setting_value) || []);
-    if (countTypes.length > 0) setCountParamTypes(JSON.parse(countTypes[0].setting_value) || []);
-    if (subTypesSettings.length > 0) setParamSubTypes(JSON.parse(subTypesSettings[0].setting_value) || {});
-  };
-
   const loadData = async () => {
+    setLoading(true);
     const dateString = format(currentDate, "yyyy-MM-dd");
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
@@ -101,21 +71,18 @@ export default function Schedule() {
     setAssignments(assignmentsData);
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
+    setLoading(false);
   };
 
   const dateString = format(currentDate, "yyyy-MM-dd");
+  
   const filteredWorkers = workers.filter(w => 
-    w.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    w.role.toLowerCase().includes(searchQuery.toLowerCase())
+    w.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    w.role?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getCartAssignments = (cartId) => {
-    return assignments.filter(a => a.food_cart_id === cartId).sort((a, b) => a.start_time.localeCompare(b.start_time));
-  };
-
-  const getCartParams = (cartId) => {
-    const specific = cartParams[cartId] || [];
-    return [...globalParams, ...specific];
+    return assignments.filter(a => a.food_cart_id === cartId).sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
   };
 
   const getNextShiftWindow = (cartId) => {
@@ -127,26 +94,17 @@ export default function Schedule() {
   };
 
   const isWorkerUnavailable = (workerId, startTime, endTime) => {
+    if (!workerId || !startTime || !endTime) return false;
     const workerUnavail = unavailabilities.filter(u => u.worker_id === workerId);
-    const workerAvail = availabilities.find(a => a.worker_id === workerId && a.status === "approved");
-    
-    const hasUnavail = workerUnavail.some(u => {
+    return workerUnavail.some(u => {
       return (startTime >= u.start_time && startTime < u.end_time) ||
              (endTime > u.start_time && endTime <= u.end_time) ||
              (startTime <= u.start_time && endTime >= u.end_time);
     });
-    
-    if (hasUnavail) return true;
-    
-    if (workerAvail && workerAvail.shifts) {
-      const shift = workerAvail.shifts.find(s => s.date === dateString && s.start_time === startTime && s.end_time === endTime);
-      if (shift && shift.type === "unavailable") return true;
-    }
-    
-    return false;
   };
 
   const getWorkerAvailabilityPriority = (workerId, startTime, endTime) => {
+    if (!workerId || !startTime || !endTime) return null;
     const workerAvail = availabilities.find(a => a.worker_id === workerId && a.status === "approved");
     if (!workerAvail || !workerAvail.shifts) return null;
     const shift = workerAvail.shifts.find(s => s.date === dateString && s.type !== "unavailable" && startTime >= s.start_time && endTime <= s.end_time);
@@ -161,31 +119,18 @@ export default function Schedule() {
 
   const handleWorkerSelect = async (workerId) => {
     const worker = workers.find(w => w.id === workerId);
-    let assignmentData = { ...currentAssignment };
-
+    if (!worker || !currentAssignment) return;
+    
+    let updateData = {};
     if (selectedPosition.position === 'chef') {
-      assignmentData.chef_id = workerId;
-      assignmentData.chef_name = worker.full_name;
-      assignmentData.chef_seniority = worker.seniority;
+      updateData = { chef_id: workerId, chef_name: worker.full_name, chef_seniority: worker.seniority };
     } else if (selectedPosition.position === 'sous_chef') {
-      assignmentData.sous_chef_id = workerId;
-      assignmentData.sous_chef_name = worker.full_name;
-      assignmentData.sous_chef_seniority = worker.seniority;
+      updateData = { sous_chef_id: workerId, sous_chef_name: worker.full_name, sous_chef_seniority: worker.seniority };
     } else if (selectedPosition.position === 'additional') {
-      assignmentData.additional_chef_id = workerId;
-      assignmentData.additional_chef_name = worker.full_name;
-      assignmentData.additional_chef_role = worker.role;
+      updateData = { additional_chef_id: workerId, additional_chef_name: worker.full_name, additional_chef_role: worker.role };
     }
 
-    const allWorkers = [
-      assignmentData.chef_id ? workers.find(w => w.id === assignmentData.chef_id) : null,
-      assignmentData.sous_chef_id ? workers.find(w => w.id === assignmentData.sous_chef_id) : null,
-      assignmentData.additional_chef_id ? workers.find(w => w.id === assignmentData.additional_chef_id) : null
-    ].filter(Boolean);
-    
-    assignmentData.has_trainee = allWorkers.some(w => w.seniority === "trainee");
-
-    await base44.entities.Assignment.update(currentAssignment.id, assignmentData);
+    await base44.entities.Assignment.update(currentAssignment.id, updateData);
     setShowWorkerDialog(false);
     setCurrentAssignment(null);
     setSelectedPosition(null);
@@ -193,25 +138,18 @@ export default function Schedule() {
   };
 
   const handleRemoveWorker = async () => {
-    if (!currentAssignment) return;
-    let assignmentData = { ...currentAssignment };
-
+    if (!currentAssignment || !selectedPosition) return;
+    
+    let updateData = {};
     if (selectedPosition.position === 'chef') {
-      assignmentData.chef_id = null; assignmentData.chef_name = null; assignmentData.chef_seniority = null;
+      updateData = { chef_id: null, chef_name: null, chef_seniority: null };
     } else if (selectedPosition.position === 'sous_chef') {
-      assignmentData.sous_chef_id = null; assignmentData.sous_chef_name = null; assignmentData.sous_chef_seniority = null;
+      updateData = { sous_chef_id: null, sous_chef_name: null, sous_chef_seniority: null };
     } else if (selectedPosition.position === 'additional') {
-      assignmentData.additional_chef_id = null; assignmentData.additional_chef_name = null; assignmentData.additional_chef_role = null;
+      updateData = { additional_chef_id: null, additional_chef_name: null, additional_chef_role: null };
     }
 
-    const allWorkers = [
-      assignmentData.chef_id ? workers.find(w => w.id === assignmentData.chef_id) : null,
-      assignmentData.sous_chef_id ? workers.find(w => w.id === assignmentData.sous_chef_id) : null,
-      assignmentData.additional_chef_id ? workers.find(w => w.id === assignmentData.additional_chef_id) : null
-    ].filter(Boolean);
-    
-    assignmentData.has_trainee = allWorkers.some(w => w.seniority === "trainee");
-    await base44.entities.Assignment.update(currentAssignment.id, assignmentData);
+    await base44.entities.Assignment.update(currentAssignment.id, updateData);
     setShowWorkerDialog(false);
     setCurrentAssignment(null);
     setSelectedPosition(null);
@@ -221,16 +159,16 @@ export default function Schedule() {
   const handleEditAssignment = (assignment) => {
     setCurrentAssignment(assignment);
     setEditFormData({
-      start_time: assignment.start_time,
-      end_time: assignment.end_time,
-      hours: assignment.hours,
-      notes: assignment.notes || "",
-      custom_params: assignment.custom_params || {}
+      start_time: assignment.start_time || "",
+      end_time: assignment.end_time || "",
+      hours: assignment.hours || 4,
+      notes: assignment.notes || ""
     });
     setShowEditDialog(true);
   };
 
   const calculateHours = (start, end) => {
+    if (!start || !end) return 4;
     const [startHour, startMin] = start.split(':').map(Number);
     const [endHour, endMin] = end.split(':').map(Number);
     let hours = endHour - startHour;
@@ -246,8 +184,7 @@ export default function Schedule() {
       start_time: editFormData.start_time,
       end_time: editFormData.end_time,
       hours,
-      notes: editFormData.notes,
-      custom_params: editFormData.custom_params
+      notes: editFormData.notes
     });
     setShowEditDialog(false);
     setCurrentAssignment(null);
@@ -261,6 +198,7 @@ export default function Schedule() {
 
   const handleAddShift = async () => {
     const cart = carts.find(c => c.id === selectedCartId);
+    if (!cart) return;
     const hours = calculateHours(newShiftData.start_time, newShiftData.end_time);
     await base44.entities.Assignment.create({
       date: dateString,
@@ -269,9 +207,8 @@ export default function Schedule() {
       start_time: newShiftData.start_time,
       end_time: newShiftData.end_time,
       hours,
-      chef_id: null, chef_name: null, sous_chef_id: null, sous_chef_name: null,
-      additional_chef_id: null, additional_chef_name: null,
-      notes: "", has_trainee: false, custom_params: {}
+      notes: "",
+      has_trainee: false
     });
     setShowAddShiftDialog(false);
     setNewShiftData({ start_time: "06:00", end_time: "10:00" });
@@ -285,183 +222,19 @@ export default function Schedule() {
     setShowAddShiftDialog(true);
   };
 
-  const openAddParamDialog = (cartId) => {
-    setParamDialogCartId(cartId);
-    setNewParam({ category: "time", type: "" });
-    setShowAddParamDialog(true);
+  const getSeniorityColor = (seniority) => {
+    if (seniority === "newbie") return "text-blue-600";
+    if (seniority === "trainee") return "text-orange-600";
+    return "text-gray-900";
   };
 
-  const handleAddParam = async () => {
-    if (!newParam.type) return;
-    
-    const paramObj = { name: newParam.type, category: newParam.category };
-    
-    if (paramDialogCartId === "global") {
-      const updated = [...globalParams, paramObj];
-      setGlobalParams(updated);
-      const settings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
-      const data = { setting_key: "custom_schedule_params", setting_value: JSON.stringify(updated) };
-      if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-      else await base44.entities.AppSettings.create(data);
-    } else {
-      const updated = { ...cartParams, [paramDialogCartId]: [...(cartParams[paramDialogCartId] || []), paramObj] };
-      setCartParams(updated);
-      const settings = await base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" });
-      const data = { setting_key: "cart_specific_params", setting_value: JSON.stringify(updated) };
-      if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-      else await base44.entities.AppSettings.create(data);
-    }
-    
-    setShowAddParamDialog(false);
-    setNewParam({ category: "time", type: "" });
-  };
-
-  const handleRemoveParam = async (cartId, paramName) => {
-    if (cartId === "global") {
-      const updated = globalParams.filter(p => p.name !== paramName);
-      setGlobalParams(updated);
-      const settings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
-      await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    } else {
-      const updated = { ...cartParams, [cartId]: (cartParams[cartId] || []).filter(p => p.name !== paramName) };
-      setCartParams(updated);
-      const settings = await base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" });
-      await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    }
-  };
-
-  const handleUpdateParamValue = async (assignmentId, paramName, value, subType, subTypeCounts = null) => {
-    const assignment = assignments.find(a => a.id === assignmentId);
-    const paramData = subTypeCounts ? { value, subType, subTypeCounts } : { value, subType };
-    const updatedParams = { ...assignment.custom_params, [paramName]: paramData };
-    await base44.entities.Assignment.update(assignmentId, { custom_params: updatedParams });
-    loadData();
-  };
-
-  const getParamIcon = (param) => {
-    if (param.category === "time") return <Clock className="w-3 h-3" />;
-    return <Hash className="w-3 h-3" />;
-  };
-
-  const allTypes = [...timeParamTypes, ...countParamTypes];
-
-  const WorkerCell = ({ workerId, workerName, seniority, position, assignment }) => {
-    const isUnavailable = workerId && isWorkerUnavailable(workerId, assignment.start_time, assignment.end_time);
+  if (loading) {
     return (
-      <button onClick={() => handlePositionClick(assignment, position)} className={`w-full text-left p-1 rounded border hover:bg-blue-50 transition-all ${isUnavailable ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-        <div className="flex items-center gap-1">
-          {isUnavailable && <TooltipProvider><Tooltip><TooltipTrigger><AlertTriangle className="w-3 h-3 text-red-500" /></TooltipTrigger><TooltipContent><p className="text-xs">Worker unavailable</p></TooltipContent></Tooltip></TooltipProvider>}
-          {workerName ? (
-            <span className={`text-xs font-medium truncate ${seniority === "newbie" ? "text-blue-600" : seniority === "trainee" ? "text-orange-600" : "text-gray-900"}`}>{workerName}</span>
-          ) : (
-            <span className="text-xs text-gray-400">+ {position === 'chef' ? 'Chef' : position === 'sous_chef' ? 'S.Chef' : 'Add'}</span>
-          )}
-        </div>
-      </button>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8 flex items-center justify-center">
+        <div className="text-gray-600">Loading...</div>
+      </div>
     );
-  };
-
-  const ParamCell = ({ assignment, param }) => {
-    const [open, setOpen] = useState(false);
-    const paramData = assignment.custom_params?.[param.name];
-    
-    // For count params: support multiple subtypes with counts
-    const isCountParam = param.category === "count";
-    const subTypes = paramSubTypes[param.name] || [];
-    
-    // Initialize subtype counts for count params
-    const getInitialSubTypeCounts = () => {
-      if (!isCountParam || subTypes.length === 0) return {};
-      if (typeof paramData === 'object' && paramData?.subTypeCounts) {
-        return paramData.subTypeCounts;
-      }
-      return {};
-    };
-    
-    const initialValue = typeof paramData === 'object' ? (paramData?.value || "") : (paramData || "");
-    const [value, setValue] = useState(initialValue);
-    const initialSubType = typeof paramData === 'object' ? (paramData?.subType || "") : "";
-    const [subType, setSubType] = useState(initialSubType);
-    const [subTypeCounts, setSubTypeCounts] = useState(getInitialSubTypeCounts());
-    
-    const handleSave = async () => {
-      if (isCountParam && subTypes.length > 0) {
-        // Save with subtype counts
-        const totalValue = Object.values(subTypeCounts).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
-        await handleUpdateParamValue(assignment.id, param.name, totalValue, "", subTypeCounts);
-      } else {
-        await handleUpdateParamValue(assignment.id, param.name, value, subType === "__none__" ? "" : subType);
-      }
-      setOpen(false);
-    };
-
-    const rawDisplayValue = assignment.custom_params?.[param.name];
-    const displayValue = typeof rawDisplayValue === 'object' ? (rawDisplayValue?.value || "") : (rawDisplayValue || "");
-    const displaySubType = typeof rawDisplayValue === 'object' ? (rawDisplayValue?.subType || "") : "";
-    const displaySubTypeCounts = typeof rawDisplayValue === 'object' ? (rawDisplayValue?.subTypeCounts || {}) : {};
-
-    // Build display string for count params with subtypes
-    const getDisplayText = () => {
-      if (isCountParam && subTypes.length > 0) {
-        const entries = Object.entries(displaySubTypeCounts).filter(([_, v]) => v > 0);
-        if (entries.length === 0) return "-";
-        return entries.map(([st, v]) => `${st}:${v}`).join(", ");
-      }
-      return displayValue || "-";
-    };
-
-    return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button className="w-full text-left p-1 rounded border border-gray-200 hover:bg-blue-50 min-h-[28px]">
-            <span className="text-xs truncate block">{getDisplayText()}</span>
-            {!isCountParam && displaySubType && <span className="text-[10px] text-gray-400 ml-1">({displaySubType})</span>}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-56 p-2">
-          <div className="space-y-2">
-            {isCountParam && subTypes.length > 0 ? (
-              <>
-                <Label className="text-xs font-semibold">Count per sub-type:</Label>
-                {subTypes.map(st => (
-                  <div key={st} className="flex items-center gap-2">
-                    <span className="text-xs w-20 truncate">{st}</span>
-                    <Input 
-                      className="h-7 text-xs flex-1" 
-                      type="number" 
-                      value={subTypeCounts[st] || ""} 
-                      onChange={(e) => setSubTypeCounts({...subTypeCounts, [st]: e.target.value})} 
-                      placeholder="0"
-                    />
-                  </div>
-                ))}
-              </>
-            ) : (
-              <>
-                <div>
-                  <Label className="text-xs">Value</Label>
-                  <Input className="h-7 text-xs" type={param.category === "time" ? "number" : "text"} value={value} onChange={(e) => setValue(e.target.value)} />
-                </div>
-                {subTypes.length > 0 && (
-                  <div>
-                    <Label className="text-xs">Sub-type</Label>
-                    <Select value={subType || ""} onValueChange={setSubType}>
-                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">None</SelectItem>
-                        {subTypes.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </>
-            )}
-            <Button size="sm" className="w-full h-7 text-xs" onClick={handleSave}>Save</Button>
-          </div>
-        </PopoverContent>
-      </Popover>
-    );
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
@@ -475,7 +248,6 @@ export default function Schedule() {
                 <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center">{format(currentDate, "MMM d, yyyy")}</div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
                 <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Today</Button>
-                <Button variant="outline" size="icon" onClick={() => openAddParamDialog("global")} title="Add Global Parameter"><Plus className="w-4 h-4" /></Button>
               </div>
             </div>
           </CardHeader>
@@ -487,7 +259,6 @@ export default function Schedule() {
           <div className="space-y-6">
             {carts.map((cart) => {
               const cartAssignments = getCartAssignments(cart.id);
-              const params = getCartParams(cart.id);
               
               return (
                 <Card key={cart.id} className="border-none shadow-lg overflow-hidden">
@@ -503,36 +274,49 @@ export default function Schedule() {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[100px]">Time</TableHead>
-                            <TableHead className="w-[120px]">Chef</TableHead>
-                            <TableHead className="w-[120px]">Sous-Chef</TableHead>
-                            <TableHead className="w-[120px]">Additional</TableHead>
-                            {params.map(param => (
-                              <TableHead key={param.name} className="w-[100px]">
-                                <div className="flex items-center gap-1">
-                                  {getParamIcon(param)}<span className="truncate">{param.name}</span>
-                                  <button onClick={() => handleRemoveParam(globalParams.find(p => p.name === param.name) ? "global" : cart.id, param.name)} className="text-gray-400 hover:text-red-500 ml-1"><Trash2 className="w-3 h-3" /></button>
-                                </div>
-                              </TableHead>
-                            ))}
-                            <TableHead className="w-[80px]">
-                              <div className="flex items-center gap-1">
-                                Actions
-                                <button onClick={() => openAddParamDialog(cart.id)} className="text-gray-400 hover:text-blue-600"><Plus className="w-3 h-3" /></button>
-                              </div>
-                            </TableHead>
+                            <TableHead className="w-[140px]">Chef</TableHead>
+                            <TableHead className="w-[140px]">Sous-Chef</TableHead>
+                            <TableHead className="w-[140px]">Additional</TableHead>
+                            <TableHead className="w-[80px]">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {cartAssignments.length === 0 ? (
-                            <TableRow><TableCell colSpan={5 + params.length} className="text-center text-gray-500 py-8">No shifts. Click "Add Shift".</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5} className="text-center text-gray-500 py-8">No shifts. Click "Add Shift".</TableCell></TableRow>
                           ) : (
                             cartAssignments.map((assignment) => (
                               <TableRow key={assignment.id} className={assignment.has_trainee ? "bg-orange-50" : ""}>
-                                <TableCell className="font-medium"><div className="text-sm">{assignment.start_time}-{assignment.end_time}</div><div className="text-xs text-gray-500">{assignment.hours}h</div></TableCell>
-                                <TableCell><WorkerCell workerId={assignment.chef_id} workerName={assignment.chef_name} seniority={assignment.chef_seniority} position="chef" assignment={assignment} /></TableCell>
-                                <TableCell><WorkerCell workerId={assignment.sous_chef_id} workerName={assignment.sous_chef_name} seniority={assignment.sous_chef_seniority} position="sous_chef" assignment={assignment} /></TableCell>
-                                <TableCell><WorkerCell workerId={assignment.additional_chef_id} workerName={assignment.additional_chef_name} seniority={null} position="additional" assignment={assignment} /></TableCell>
-                                {params.map(param => (<TableCell key={param.name}><ParamCell assignment={assignment} param={param} /></TableCell>))}
+                                <TableCell className="font-medium">
+                                  <div className="text-sm">{assignment.start_time || "?"}-{assignment.end_time || "?"}</div>
+                                  <div className="text-xs text-gray-500">{assignment.hours || 0}h</div>
+                                </TableCell>
+                                <TableCell>
+                                  <button onClick={() => handlePositionClick(assignment, 'chef')} className={`w-full text-left p-1 rounded border hover:bg-blue-50 ${assignment.chef_id && isWorkerUnavailable(assignment.chef_id, assignment.start_time, assignment.end_time) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                                    {assignment.chef_name ? (
+                                      <span className={`text-xs font-medium truncate ${getSeniorityColor(assignment.chef_seniority)}`}>{assignment.chef_name}</span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400">+ Chef</span>
+                                    )}
+                                  </button>
+                                </TableCell>
+                                <TableCell>
+                                  <button onClick={() => handlePositionClick(assignment, 'sous_chef')} className={`w-full text-left p-1 rounded border hover:bg-blue-50 ${assignment.sous_chef_id && isWorkerUnavailable(assignment.sous_chef_id, assignment.start_time, assignment.end_time) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
+                                    {assignment.sous_chef_name ? (
+                                      <span className={`text-xs font-medium truncate ${getSeniorityColor(assignment.sous_chef_seniority)}`}>{assignment.sous_chef_name}</span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400">+ S.Chef</span>
+                                    )}
+                                  </button>
+                                </TableCell>
+                                <TableCell>
+                                  <button onClick={() => handlePositionClick(assignment, 'additional')} className="w-full text-left p-1 rounded border border-gray-200 hover:bg-blue-50">
+                                    {assignment.additional_chef_name ? (
+                                      <span className="text-xs font-medium truncate text-gray-900">{assignment.additional_chef_name}</span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400">+ Add</span>
+                                    )}
+                                  </button>
+                                </TableCell>
                                 <TableCell>
                                   <div className="flex gap-1">
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditAssignment(assignment)}><Pencil className="w-3 h-3" /></Button>
@@ -559,18 +343,7 @@ export default function Schedule() {
             <div className="py-4">
               <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" /><Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" /></div>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {selectedPosition && filteredWorkers.filter(w => selectedPosition.position === 'additional' || (selectedPosition.position === 'chef' ? w.role === 'chef' : w.role === 'sous_chef')).sort((a, b) => {
-                  const aInfo = getWorkerAvailabilityPriority(a.id, currentAssignment?.start_time, currentAssignment?.end_time);
-                  const bInfo = getWorkerAvailabilityPriority(b.id, currentAssignment?.start_time, currentAssignment?.end_time);
-                  if (aInfo?.type === "wanted" && bInfo?.type !== "wanted") return -1;
-                  if (bInfo?.type === "wanted" && aInfo?.type !== "wanted") return 1;
-                  if (aInfo?.type === "available" && !bInfo) return -1;
-                  if (bInfo?.type === "available" && !aInfo) return 1;
-                  if (!aInfo && !bInfo) return 0;
-                  if (!aInfo) return 1;
-                  if (!bInfo) return -1;
-                  return aInfo.priority - bInfo.priority;
-                }).map((worker) => {
+                {selectedPosition && filteredWorkers.filter(w => selectedPosition.position === 'additional' || (selectedPosition.position === 'chef' ? w.role === 'chef' : w.role === 'sous_chef')).map((worker) => {
                   const availInfo = currentAssignment ? getWorkerAvailabilityPriority(worker.id, currentAssignment.start_time, currentAssignment.end_time) : null;
                   const isUnavailable = currentAssignment ? isWorkerUnavailable(worker.id, currentAssignment.start_time, currentAssignment.end_time) : false;
                   return (
@@ -582,7 +355,7 @@ export default function Schedule() {
                         <div className="flex-1">
                           <div className="font-medium text-gray-900">{worker.full_name}</div>
                           <div className="flex gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">{worker.seniority}</Badge>
+                            <Badge variant="outline" className="text-xs">{worker.seniority || 'unknown'}</Badge>
                             {worker.is_guide && <Badge className="text-xs bg-yellow-100 text-yellow-800">Guide</Badge>}
                             {availInfo && <Badge variant="outline" className="text-xs capitalize">{availInfo.type} #{availInfo.priority}</Badge>}
                             {isUnavailable && <Badge className="text-xs bg-red-100 text-red-800">Unavailable</Badge>}
@@ -635,40 +408,6 @@ export default function Schedule() {
               </div>
             </div>
             <DialogFooter><Button variant="outline" onClick={() => setShowAddShiftDialog(false)}>Cancel</Button><Button onClick={handleAddShift} className="bg-blue-900 hover:bg-blue-800">Add Shift</Button></DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Param Dialog */}
-        <Dialog open={showAddParamDialog} onOpenChange={setShowAddParamDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Add Parameter {paramDialogCartId === "global" ? "(Global)" : "(Cart Specific)"}</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label>Category</Label>
-                <Select value={newParam.category} onValueChange={(v) => setNewParam({ ...newParam, category: v, type: "" })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="time"><Clock className="w-3 h-3 inline mr-1" />Time (sums hours)</SelectItem>
-                    <SelectItem value="count"><Hash className="w-3 h-3 inline mr-1" />Count (sums values)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Type (from Settings)</Label>
-                <Select value={newParam.type} onValueChange={(v) => setNewParam({ ...newParam, type: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select type..." /></SelectTrigger>
-                  <SelectContent>
-                    {(newParam.category === "time" ? timeParamTypes : countParamTypes).map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                    {(newParam.category === "time" ? timeParamTypes : countParamTypes).length === 0 && (
-                      <div className="p-2 text-xs text-gray-500">No types defined. Add them in Settings.</div>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter><Button variant="outline" onClick={() => setShowAddParamDialog(false)}>Cancel</Button><Button onClick={handleAddParam} disabled={!newParam.type} className="bg-blue-900 hover:bg-blue-800">Add</Button></DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

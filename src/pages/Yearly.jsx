@@ -6,14 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Palette, Pencil } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Palette, Eye, EyeOff } from "lucide-react";
 import { format, addDays, getDay, differenceInDays, parseISO } from "date-fns";
 import { getHebrewDate } from "../components/utils/HebrewDate";
 
 const HEBREW_DAYS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 const ROW_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
-const CELL_WIDTH = 36;
+const CELL_WIDTH = 28;
+const ROW_HEIGHT = 60;
+const EVENT_HEIGHT = 14;
 
 const getCustomWeekNumber = (date, year) => {
   const dec28PrevYear = new Date(year - 1, 11, 28);
@@ -31,6 +34,7 @@ export default function Yearly() {
   const [workers, setWorkers] = useState([]);
   const [unavailabilities, setUnavailabilities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [viewOnly, setViewOnly] = useState(false);
   const [showAddRowDialog, setShowAddRowDialog] = useState(false);
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(null);
@@ -39,13 +43,10 @@ export default function Yearly() {
   const [selectedCell, setSelectedCell] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventForm, setEventForm] = useState({ title: "", start_time: "08:00", end_time: "16:00", worker_id: "", start_date: "", end_date: "" });
-  const [selectedWorkerFilter, setSelectedWorkerFilter] = useState("");
   const [dragging, setDragging] = useState(null);
   const tableRef = useRef(null);
 
-  useEffect(() => {
-    loadData();
-  }, [currentYear]);
+  useEffect(() => { loadData(); }, [currentYear]);
 
   const loadData = async () => {
     setLoading(true);
@@ -55,32 +56,24 @@ export default function Yearly() {
       base44.entities.Worker.filter({ active: true }),
       base44.entities.Unavailability.list()
     ]);
-    
     const yearStart = `${currentYear}-01-01`;
     const yearEnd = `${currentYear}-12-31`;
-    const yearEvents = eventsData.filter(e => (e.start_date >= yearStart && e.start_date <= yearEnd) || (e.end_date >= yearStart && e.end_date <= yearEnd));
-    const yearUnavail = unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd);
-    
     setRows(rowsData);
-    setEvents(yearEvents);
+    setEvents(eventsData.filter(e => (e.start_date >= yearStart && e.start_date <= yearEnd) || (e.end_date >= yearStart && e.end_date <= yearEnd)));
     setWorkers(workersData);
-    setUnavailabilities(yearUnavail);
+    setUnavailabilities(unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd));
     setLoading(false);
   };
 
   const handleAddRow = async () => {
     if (!newRowName.trim()) return;
     await base44.entities.YearlyRow.create({ name: newRowName.trim(), order: rows.length, color: newRowColor });
-    setNewRowName("");
-    setNewRowColor("#3b82f6");
-    setShowAddRowDialog(false);
-    loadData();
+    setNewRowName(""); setNewRowColor("#3b82f6"); setShowAddRowDialog(false); loadData();
   };
 
   const handleDeleteRow = async (rowId) => {
     await base44.entities.YearlyRow.delete(rowId);
-    const rowEvents = events.filter(e => e.row_id === rowId);
-    for (const event of rowEvents) {
+    for (const event of events.filter(e => e.row_id === rowId)) {
       await base44.entities.YearlyEvent.delete(event.id);
     }
     loadData();
@@ -88,11 +81,11 @@ export default function Yearly() {
 
   const handleChangeRowColor = async (rowId, color) => {
     await base44.entities.YearlyRow.update(rowId, { color });
-    setShowColorPicker(null);
-    loadData();
+    setShowColorPicker(null); loadData();
   };
 
   const handleCellClick = (rowId, date) => {
+    if (viewOnly) return;
     setSelectedCell({ rowId, date });
     setEditingEvent(null);
     setEventForm({ title: "", start_time: "08:00", end_time: "16:00", worker_id: "", start_date: date, end_date: date });
@@ -101,6 +94,7 @@ export default function Yearly() {
 
   const handleEventClick = (event, e) => {
     e.stopPropagation();
+    if (viewOnly) return;
     setEditingEvent(event);
     setSelectedCell({ rowId: event.row_id, date: event.start_date });
     setEventForm({
@@ -126,36 +120,23 @@ export default function Yearly() {
       worker_id: eventForm.worker_id === "__none__" ? null : eventForm.worker_id || null,
       worker_name: worker?.full_name || null
     };
-    
-    if (editingEvent) {
-      await base44.entities.YearlyEvent.update(editingEvent.id, data);
-    } else {
-      await base44.entities.YearlyEvent.create(data);
-    }
-    setShowEventDialog(false);
-    setSelectedCell(null);
-    setEditingEvent(null);
-    loadData();
+    if (editingEvent) await base44.entities.YearlyEvent.update(editingEvent.id, data);
+    else await base44.entities.YearlyEvent.create(data);
+    setShowEventDialog(false); setSelectedCell(null); setEditingEvent(null); loadData();
   };
 
   const handleDeleteEvent = async () => {
     if (editingEvent) {
       await base44.entities.YearlyEvent.delete(editingEvent.id);
-      setShowEventDialog(false);
-      setEditingEvent(null);
-      loadData();
+      setShowEventDialog(false); setEditingEvent(null); loadData();
     }
   };
 
   const generateYearDays = () => {
     const days = [];
+    let current = new Date(currentYear, 11, 31);
     const start = new Date(currentYear, 0, 1);
-    const end = new Date(currentYear, 11, 31);
-    let current = end;
-    while (current >= start) {
-      days.push(new Date(current));
-      current = addDays(current, -1);
-    }
+    while (current >= start) { days.push(new Date(current)); current = addDays(current, -1); }
     return days;
   };
 
@@ -175,9 +156,9 @@ export default function Yearly() {
   };
 
   const handleDragStart = (e, event, type) => {
+    if (viewOnly) return;
     e.stopPropagation();
-    const rect = tableRef.current.getBoundingClientRect();
-    setDragging({ event, type, startX: e.clientX, rect, originalStart: event.start_date, originalEnd: event.end_date });
+    setDragging({ event, type, startX: e.clientX, originalStart: event.start_date, originalEnd: event.end_date });
   };
 
   const handleMouseMove = (e) => {
@@ -185,31 +166,15 @@ export default function Yearly() {
     const { event, type, startX, originalStart, originalEnd } = dragging;
     const deltaX = e.clientX - startX;
     const deltaDays = Math.round(deltaX / CELL_WIDTH);
-    
     const origStartDate = parseISO(originalStart);
     const origEndDate = parseISO(originalEnd);
-    
-    let newStart = origStartDate;
-    let newEnd = origEndDate;
-    
-    if (type === "move") {
-      newStart = addDays(origStartDate, -deltaDays);
-      newEnd = addDays(origEndDate, -deltaDays);
-    } else if (type === "resize-start") {
-      newStart = addDays(origStartDate, -deltaDays);
-      if (newStart > newEnd) newStart = newEnd;
-    } else if (type === "resize-end") {
-      newEnd = addDays(origEndDate, -deltaDays);
-      if (newEnd < newStart) newEnd = newStart;
-    }
-    
-    const yearStart = new Date(currentYear, 0, 1);
-    const yearEnd = new Date(currentYear, 11, 31);
+    let newStart = origStartDate, newEnd = origEndDate;
+    if (type === "move") { newStart = addDays(origStartDate, -deltaDays); newEnd = addDays(origEndDate, -deltaDays); }
+    else if (type === "resize-start") { newStart = addDays(origStartDate, -deltaDays); if (newStart > newEnd) newStart = newEnd; }
+    else if (type === "resize-end") { newEnd = addDays(origEndDate, -deltaDays); if (newEnd < newStart) newEnd = newStart; }
+    const yearStart = new Date(currentYear, 0, 1), yearEnd = new Date(currentYear, 11, 31);
     if (newStart < yearStart) newStart = yearStart;
     if (newEnd > yearEnd) newEnd = yearEnd;
-    if (newStart < yearStart) newStart = yearStart;
-    if (newEnd > yearEnd) newEnd = yearEnd;
-    
     setDragging(prev => ({ ...prev, newStart: format(newStart, "yyyy-MM-dd"), newEnd: format(newEnd, "yyyy-MM-dd") }));
   };
 
@@ -227,26 +192,17 @@ export default function Yearly() {
     if (dragging) {
       document.addEventListener("mousemove", handleMouseMove);
       document.addEventListener("mouseup", handleMouseUp);
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
+      return () => { document.removeEventListener("mousemove", handleMouseMove); document.removeEventListener("mouseup", handleMouseUp); };
     }
   }, [dragging]);
 
   const getMonthGroups = () => {
     const groups = [];
-    let currentMonth = -1;
-    let count = 0;
+    let currentMonth = -1, count = 0;
     for (const day of yearDays) {
       const month = day.getMonth();
-      if (month !== currentMonth) {
-        if (currentMonth !== -1) groups.push({ month: currentMonth, count });
-        currentMonth = month;
-        count = 1;
-      } else {
-        count++;
-      }
+      if (month !== currentMonth) { if (currentMonth !== -1) groups.push({ month: currentMonth, count }); currentMonth = month; count = 1; }
+      else count++;
     }
     groups.push({ month: currentMonth, count });
     return groups;
@@ -254,17 +210,11 @@ export default function Yearly() {
 
   const getWeekGroups = () => {
     const groups = [];
-    let currentWeek = -1;
-    let count = 0;
+    let currentWeek = -1, count = 0;
     for (const day of yearDays) {
       const week = getCustomWeekNumber(day, currentYear);
-      if (week !== currentWeek) {
-        if (currentWeek !== -1) groups.push({ week: currentWeek, count });
-        currentWeek = week;
-        count = 1;
-      } else {
-        count++;
-      }
+      if (week !== currentWeek) { if (currentWeek !== -1) groups.push({ week: currentWeek, count }); currentWeek = week; count = 1; }
+      else count++;
     }
     groups.push({ week: currentWeek, count });
     return groups;
@@ -273,35 +223,49 @@ export default function Yearly() {
   const monthGroups = getMonthGroups();
   const weekGroups = getWeekGroups();
 
-  const EventBar = ({ event, row }) => {
-    const displayEvent = dragging?.event?.id === event.id ? 
-      { ...event, start_date: dragging.newStart || event.start_date, end_date: dragging.newEnd || event.end_date } : event;
+  // Layout events in tracks to avoid overlap
+  const layoutEventsInTracks = (rowEvents) => {
+    const sorted = [...rowEvents].sort((a, b) => {
+      const aStart = yearDaysMap[a.start_date] ?? 999;
+      const bStart = yearDaysMap[b.start_date] ?? 999;
+      return aStart - bStart;
+    });
+    const tracks = [];
+    for (const event of sorted) {
+      const pos = getEventPosition(event);
+      if (!pos) continue;
+      let placed = false;
+      for (let i = 0; i < tracks.length; i++) {
+        const lastInTrack = tracks[i][tracks[i].length - 1];
+        const lastPos = getEventPosition(lastInTrack);
+        if (lastPos && pos.left >= lastPos.left + lastPos.width) {
+          tracks[i].push(event); placed = true; break;
+        }
+      }
+      if (!placed) tracks.push([event]);
+    }
+    return tracks;
+  };
+
+  const EventBar = ({ event, row, trackIndex }) => {
+    const displayEvent = dragging?.event?.id === event.id ? { ...event, start_date: dragging.newStart || event.start_date, end_date: dragging.newEnd || event.end_date } : event;
     const pos = getEventPosition(displayEvent);
     if (!pos) return null;
-    
     const color = event.color || row?.color || "#3b82f6";
     const isDragging = dragging?.event?.id === event.id;
-    
+    const topOffset = 2 + trackIndex * (EVENT_HEIGHT + 2);
     return (
       <div
-        className={`absolute top-1 h-7 rounded flex items-center text-white text-[10px] font-medium overflow-hidden cursor-pointer ${isDragging ? 'opacity-70 z-50' : 'z-10'}`}
-        style={{ left: `${pos.left}px`, width: `${pos.width}px`, backgroundColor: color }}
+        className={`absolute rounded flex items-center text-white text-[9px] font-medium overflow-hidden ${viewOnly ? 'cursor-default' : 'cursor-pointer'} ${isDragging ? 'opacity-70 z-50' : 'z-10'}`}
+        style={{ left: `${pos.left}px`, width: `${pos.width}px`, top: `${topOffset}px`, height: `${EVENT_HEIGHT}px`, backgroundColor: color }}
         onClick={(e) => handleEventClick(event, e)}
+        title={`${event.title}${event.worker_name ? ` - ${event.worker_name}` : ""}${event.start_time ? ` (${event.start_time}-${event.end_time})` : ""}`}
       >
-        <div
-          className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20"
-          onMouseDown={(e) => handleDragStart(e, event, "resize-start")}
-        />
-        <div
-          className="flex-1 px-2 truncate cursor-move text-center"
-          onMouseDown={(e) => handleDragStart(e, event, "move")}
-        >
-          {event.title}{event.worker_name ? ` - ${event.worker_name}` : ""}{event.start_time ? ` (${event.start_time}-${event.end_time})` : ""}
+        {!viewOnly && <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => handleDragStart(e, event, "resize-start")} />}
+        <div className={`flex-1 px-1 truncate text-center ${viewOnly ? '' : 'cursor-move'}`} onMouseDown={(e) => !viewOnly && handleDragStart(e, event, "move")}>
+          {event.title}
         </div>
-        <div
-          className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20"
-          onMouseDown={(e) => handleDragStart(e, event, "resize-end")}
-        />
+        {!viewOnly && <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => handleDragStart(e, event, "resize-end")} />}
       </div>
     );
   };
@@ -312,29 +276,26 @@ export default function Yearly() {
         <div className="mb-6 flex flex-wrap justify-between items-center gap-4" dir="rtl">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-1">לוח שנתי</h1>
-            <p className="text-gray-600">ניהול אירועים שנתיים - גרור לשינוי תאריכים</p>
+            <p className="text-gray-600">{viewOnly ? "מצב צפייה בלבד" : "ניהול אירועים - גרור לשינוי תאריכים"}</p>
           </div>
-          
           <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border">
+              <Label className="text-sm">צפייה בלבד</Label>
+              <Switch checked={viewOnly} onCheckedChange={setViewOnly} />
+              {viewOnly ? <Eye className="w-4 h-4 text-gray-500" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
+            </div>
             <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronRight className="w-4 h-4" /></Button>
             <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[100px] text-center">{currentYear}</div>
             <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}><ChevronLeft className="w-4 h-4" /></Button>
             <Button variant="outline" onClick={() => setCurrentYear(new Date().getFullYear())}>השנה</Button>
-            <Select value={selectedWorkerFilter} onValueChange={setSelectedWorkerFilter}>
-              <SelectTrigger className="w-40"><SelectValue placeholder="בחר עובד..." /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">כל העובדים</SelectItem>
-                {workers.map(w => <SelectItem key={w.id} value={w.id}>{w.full_name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Button onClick={() => setShowAddRowDialog(true)}><Plus className="w-4 h-4 ml-2" />הוסף שורה</Button>
+            {!viewOnly && <Button onClick={() => setShowAddRowDialog(true)}><Plus className="w-4 h-4 ml-2" />הוסף שורה</Button>}
           </div>
         </div>
 
         <Card className="border-none shadow-lg overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-auto max-h-[80vh]" ref={tableRef}>
-              <table className="border-collapse" style={{ minWidth: `${yearDays.length * CELL_WIDTH + 160}px` }}>
+              <table className="border-collapse" style={{ minWidth: `${yearDays.length * CELL_WIDTH + 160}px` }} dir="rtl">
                 <thead className="sticky top-0 z-20">
                   <tr className="bg-blue-900 text-white">
                     <th className="sticky right-0 z-30 bg-blue-900 w-[160px] min-w-[160px] p-2 border-l text-right font-semibold">שורה</th>
@@ -356,7 +317,7 @@ export default function Yearly() {
                       const isFriday = dayOfWeek === 5;
                       const hebDate = getHebrewDate(day);
                       return (
-                        <th key={idx} className={`w-9 min-w-[${CELL_WIDTH}px] text-center text-[8px] py-1 border-l leading-tight ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`}>
+                        <th key={idx} className={`min-w-[${CELL_WIDTH}px] text-center text-[7px] py-1 border-l leading-tight ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH }}>
                           <div className="font-semibold">{HEBREW_DAYS[dayOfWeek]}</div>
                           <div>{day.getDate()}</div>
                           <div className="text-gray-500">{hebDate.dayHeb}</div>
@@ -368,22 +329,20 @@ export default function Yearly() {
                 <tbody>
                   {/* Workers Unavailability Row */}
                   {unavailabilities.length > 0 && (
-                    <tr className="bg-red-50 border-b" style={{ height: "40px" }}>
+                    <tr className="bg-red-50 border-b" style={{ height: ROW_HEIGHT }}>
                       <td className="sticky right-0 z-10 bg-red-50 w-[160px] min-w-[160px] p-2 border-l">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 rounded-full bg-red-500"></div>
                           <span className="text-xs font-medium text-red-700">אי זמינות עובדים</span>
                         </div>
                       </td>
-                      <td colSpan={yearDays.length} className="relative p-0 h-10">
+                      <td colSpan={yearDays.length} className="relative p-0" style={{ height: ROW_HEIGHT }}>
                         <div className="absolute inset-0 flex">
                           {yearDays.map((day, idx) => {
                             const dayOfWeek = getDay(day);
                             const isShabbat = dayOfWeek === 6;
                             const isFriday = dayOfWeek === 5;
-                            return (
-                              <div key={idx} className={`w-9 min-w-[${CELL_WIDTH}px] h-full border-l ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`} />
-                            );
+                            return <div key={idx} className={`h-full border-l ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }} />;
                           })}
                         </div>
                         {unavailabilities.map((unavail, idx) => {
@@ -391,12 +350,9 @@ export default function Yearly() {
                           if (dateIdx === undefined) return null;
                           const worker = workers.find(w => w.id === unavail.worker_id);
                           return (
-                            <div
-                              key={unavail.id || idx}
-                              className="absolute top-1 h-7 rounded bg-red-500 flex items-center justify-center text-white text-[9px] font-medium px-1 z-10"
-                              style={{ left: `${dateIdx * CELL_WIDTH}px`, width: `${CELL_WIDTH - 2}px` }}
-                              title={`${worker?.full_name || unavail.worker_name}: ${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}
-                            >
+                            <div key={unavail.id || idx} className="absolute top-1 rounded bg-red-500 flex items-center justify-center text-white text-[8px] font-medium px-1 z-10"
+                              style={{ left: `${dateIdx * CELL_WIDTH}px`, width: `${CELL_WIDTH - 2}px`, height: EVENT_HEIGHT }}
+                              title={`${worker?.full_name}: ${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}>
                               <span className="truncate">{worker?.full_name?.split(' ')[0] || '?'}</span>
                             </div>
                           );
@@ -413,34 +369,32 @@ export default function Yearly() {
                   ) : (
                     rows.map((row, rowIdx) => {
                       const rowEvents = getEventsForRow(row.id);
+                      const tracks = layoutEventsInTracks(rowEvents);
+                      const dynamicHeight = Math.max(ROW_HEIGHT, 8 + tracks.length * (EVENT_HEIGHT + 2));
                       return (
-                        <tr key={row.id} className={`border-b ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ height: "40px" }}>
+                        <tr key={row.id} className={`border-b ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ height: dynamicHeight }}>
                           <td className={`sticky right-0 z-10 w-[160px] min-w-[160px] p-2 border-l ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                             <div className="flex items-center justify-between gap-1">
                               <div className="flex items-center gap-2 min-w-0">
                                 <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: row.color }}></div>
                                 <span className="text-sm font-medium truncate">{row.name}</span>
                               </div>
-                              <div className="flex items-center gap-1 flex-shrink-0">
-                                <div className="relative">
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowColorPicker(showColorPicker === row.id ? null : row.id)}>
-                                    <Palette className="w-3 h-3" />
-                                  </Button>
-                                  {showColorPicker === row.id && (
-                                    <div className="absolute top-7 right-0 bg-white border rounded-lg shadow-lg p-2 z-50 flex gap-1 flex-wrap w-24">
-                                      {ROW_COLORS.map(c => (
-                                        <button key={c} className="w-5 h-5 rounded-full border-2 border-white hover:scale-110" style={{ backgroundColor: c }} onClick={() => handleChangeRowColor(row.id, c)} />
-                                      ))}
-                                    </div>
-                                  )}
+                              {!viewOnly && (
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <div className="relative">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowColorPicker(showColorPicker === row.id ? null : row.id)}><Palette className="w-3 h-3" /></Button>
+                                    {showColorPicker === row.id && (
+                                      <div className="absolute top-7 right-0 bg-white border rounded-lg shadow-lg p-2 z-50 flex gap-1 flex-wrap w-24">
+                                        {ROW_COLORS.map(c => (<button key={c} className="w-5 h-5 rounded-full border-2 border-white hover:scale-110" style={{ backgroundColor: c }} onClick={() => handleChangeRowColor(row.id, c)} />))}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteRow(row.id)}><Trash2 className="w-3 h-3" /></Button>
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteRow(row.id)}>
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </div>
+                              )}
                             </div>
                           </td>
-                          <td colSpan={yearDays.length} className="relative p-0 h-10">
+                          <td colSpan={yearDays.length} className="relative p-0" style={{ height: dynamicHeight }}>
                             <div className="absolute inset-0 flex">
                               {yearDays.map((day, idx) => {
                                 const dateStr = format(day, "yyyy-MM-dd");
@@ -448,15 +402,14 @@ export default function Yearly() {
                                 const isShabbat = dayOfWeek === 6;
                                 const isFriday = dayOfWeek === 5;
                                 return (
-                                  <div
-                                    key={idx}
-                                    className={`w-9 min-w-[${CELL_WIDTH}px] h-full border-l cursor-pointer hover:bg-blue-50 ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
-                                    onClick={() => handleCellClick(row.id, dateStr)}
-                                  />
+                                  <div key={idx}
+                                    className={`h-full border-l ${viewOnly ? '' : 'cursor-pointer hover:bg-blue-50'} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
+                                    style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}
+                                    onClick={() => handleCellClick(row.id, dateStr)} />
                                 );
                               })}
                             </div>
-                            {rowEvents.map(event => <EventBar key={event.id} event={event} row={row} />)}
+                            {tracks.map((track, trackIdx) => track.map(event => <EventBar key={event.id} event={event} row={row} trackIndex={trackIdx} />))}
                           </td>
                         </tr>
                       );
