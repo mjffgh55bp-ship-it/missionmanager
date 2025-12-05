@@ -118,7 +118,7 @@ export default function Yearly() {
       current = addDays(current, 1);
     }
     
-    return days.reverse(); // Right to left
+    return days; // Left to right (reversed for RTL display)
   };
 
   const yearDays = generateYearDays();
@@ -202,15 +202,15 @@ export default function Yearly() {
         <Card className="border-none shadow-lg overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto" ref={scrollRef}>
-              <div style={{ minWidth: `${yearDays.length * 32 + 150}px` }}>
+              <div style={{ minWidth: `${yearDays.length * 40 + 150}px` }}>
                 {/* Month Header */}
-                <div className="flex border-b bg-blue-900 text-white sticky top-0 z-20">
-                  <div className="w-[150px] min-w-[150px] p-2 border-l font-semibold sticky right-0 bg-blue-900 z-30">שורה</div>
+                <div className="flex flex-row-reverse border-b bg-blue-900 text-white sticky top-0 z-20">
+                  <div className="w-[150px] min-w-[150px] p-2 border-r font-semibold sticky right-0 bg-blue-900 z-30">שורה</div>
                   {monthGroups.map((group, idx) => (
                     <div 
                       key={idx} 
-                      className="text-center font-semibold text-xs py-2 border-l"
-                      style={{ width: `${group.count * 32}px`, minWidth: `${group.count * 32}px` }}
+                      className="text-center font-semibold text-xs py-2 border-r"
+                      style={{ width: `${group.count * 40}px`, minWidth: `${group.count * 40}px` }}
                     >
                       {HEBREW_MONTHS[group.month]}
                     </div>
@@ -218,69 +218,35 @@ export default function Yearly() {
                 </div>
 
                 {/* Week Header */}
-                <div className="flex border-b bg-blue-800 text-white sticky top-[36px] z-20">
-                  <div className="w-[150px] min-w-[150px] p-2 border-l text-xs sticky right-0 bg-blue-800 z-30">שבוע</div>
+                <div className="flex flex-row-reverse border-b bg-blue-800 text-white sticky top-[36px] z-20">
+                  <div className="w-[150px] min-w-[150px] p-2 border-r text-xs sticky right-0 bg-blue-800 z-30">שבוע</div>
                   {weekGroups.map((group, idx) => (
                     <div 
                       key={idx} 
-                      className="text-center text-xs py-1 border-l"
-                      style={{ width: `${group.count * 32}px`, minWidth: `${group.count * 32}px` }}
+                      className="text-center text-xs py-1 border-r"
+                      style={{ width: `${group.count * 40}px`, minWidth: `${group.count * 40}px` }}
                     >
                       {group.week}
                     </div>
                   ))}
                 </div>
 
-                {/* Day Header */}
-                <div className="flex border-b bg-gray-100 sticky top-[72px] z-20">
-                  <div className="w-[150px] min-w-[150px] p-2 border-l text-xs font-medium sticky right-0 bg-gray-100 z-30">יום</div>
+                {/* Combined Day/Date/Hebrew Header */}
+                <div className="flex flex-row-reverse border-b bg-gray-100 sticky top-[72px] z-20">
+                  <div className="w-[150px] min-w-[150px] p-2 border-r text-xs font-medium sticky right-0 bg-gray-100 z-30">יום, תאריך</div>
                   {yearDays.map((day, idx) => {
                     const dayOfWeek = getDay(day);
                     const isShabbat = dayOfWeek === 6;
                     const isFriday = dayOfWeek === 5;
-                    return (
-                      <div 
-                        key={idx} 
-                        className={`w-8 min-w-[32px] text-center text-[10px] py-1 border-l ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : ''}`}
-                      >
-                        {HEBREW_DAYS[dayOfWeek]}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Date Header */}
-                <div className="flex border-b bg-gray-50 sticky top-[108px] z-20">
-                  <div className="w-[150px] min-w-[150px] p-2 border-l text-xs sticky right-0 bg-gray-50 z-30">תאריך</div>
-                  {yearDays.map((day, idx) => {
-                    const dayOfWeek = getDay(day);
-                    const isShabbat = dayOfWeek === 6;
-                    const isFriday = dayOfWeek === 5;
-                    return (
-                      <div 
-                        key={idx} 
-                        className={`w-8 min-w-[32px] text-center text-[10px] py-1 border-l ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : ''}`}
-                      >
-                        {day.getDate()}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Hebrew Date Header */}
-                <div className="flex border-b bg-gray-50 sticky top-[144px] z-20">
-                  <div className="w-[150px] min-w-[150px] p-2 border-l text-xs sticky right-0 bg-gray-50 z-30">עברי</div>
-                  {yearDays.map((day, idx) => {
                     const hebDate = getHebrewDate(day);
-                    const dayOfWeek = getDay(day);
-                    const isShabbat = dayOfWeek === 6;
-                    const isFriday = dayOfWeek === 5;
                     return (
                       <div 
                         key={idx} 
-                        className={`w-8 min-w-[32px] text-center text-[9px] py-1 border-l text-gray-500 ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : ''}`}
+                        className={`w-10 min-w-[40px] text-center text-[9px] py-1 border-r leading-tight ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : ''}`}
                       >
-                        {hebDate.dayHeb}
+                        <div className="font-medium">{HEBREW_DAYS[dayOfWeek]}</div>
+                        <div>{day.getDate()}</div>
+                        <div className="text-gray-500">{hebDate.dayHeb}</div>
                       </div>
                     );
                   })}
@@ -293,8 +259,8 @@ export default function Yearly() {
                   <div className="p-8 text-center text-gray-500">אין שורות. לחץ "הוסף שורה" להתחיל.</div>
                 ) : (
                   rows.map((row, rowIdx) => (
-                    <div key={row.id} className={`flex border-b ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                      <div className="w-[150px] min-w-[150px] p-2 border-l flex items-center justify-between sticky right-0 bg-inherit z-10">
+                    <div key={row.id} className={`flex flex-row-reverse border-b ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                      <div className="w-[150px] min-w-[150px] p-2 border-r flex items-center justify-between sticky right-0 bg-inherit z-10">
                         <span className="text-sm font-medium truncate">{row.name}</span>
                         <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteRow(row.id)}>
                           <Trash2 className="w-3 h-3" />
@@ -310,12 +276,12 @@ export default function Yearly() {
                         return (
                           <div 
                             key={idx} 
-                            className={`w-8 min-w-[32px] h-8 border-l flex items-center justify-center cursor-pointer hover:bg-blue-100 transition-colors ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
+                            className={`w-10 min-w-[40px] h-10 border-r flex items-center justify-center cursor-pointer hover:bg-blue-100 transition-colors ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
                             onClick={() => event ? null : handleCellClick(row.id, dateStr)}
                           >
                             {event && (
                               <div 
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[8px] font-bold cursor-pointer hover:opacity-80"
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[8px] font-bold cursor-pointer hover:opacity-80"
                                 style={{ backgroundColor: event.color || row.color || '#3b82f6' }}
                                 onClick={(e) => { e.stopPropagation(); handleDeleteEvent(event.id); }}
                                 title={event.title || "לחץ למחיקה"}
