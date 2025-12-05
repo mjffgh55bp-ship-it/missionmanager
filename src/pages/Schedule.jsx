@@ -381,7 +381,15 @@ export default function Schedule() {
                                   </button>
                                 </TableCell>
                                 {columns.map(col => (
-                                  <TableCell key={col}><ColumnCell assignment={assignment} colType={col} availableSubTypes={columnSubTypes[col] || []} onSave={loadData} /></TableCell>
+                                  <TableCell key={col}>
+                                    <ColumnCell 
+                                      assignmentId={assignment.id} 
+                                      colType={col} 
+                                      columnValues={assignment.column_values} 
+                                      availableSubTypes={columnSubTypes[col] || []} 
+                                      onSaved={loadData} 
+                                    />
+                                  </TableCell>
                                 ))}
                                 <TableCell>
                                   <div className="flex gap-1">
