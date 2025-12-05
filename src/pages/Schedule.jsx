@@ -276,19 +276,23 @@ export default function Schedule() {
     return "text-gray-900";
   };
 
-  const ColumnCell = ({ assignment, colType }) => {
+  const ColumnCell = ({ assignment, colType, onUpdate }) => {
     const [open, setOpen] = useState(false);
     const colData = assignment.column_values?.[colType];
-    const value = colData?.value || "";
-    const subTypes_saved = colData?.subTypes || (colData?.subType ? [colData.subType] : []);
-    const [localValue, setLocalValue] = useState(value);
-    const [localSubTypes, setLocalSubTypes] = useState(subTypes_saved);
+    const savedValue = colData?.value || "";
+    const savedSubTypes = colData?.subTypes || (colData?.subType ? [colData.subType] : []);
+    const [localValue, setLocalValue] = useState(savedValue);
+    const [localSubTypes, setLocalSubTypes] = useState(savedSubTypes);
     const availableSubTypes = columnSubTypes[colType] || [];
 
-    useEffect(() => {
-      setLocalValue(colData?.value || "");
-      setLocalSubTypes(colData?.subTypes || (colData?.subType ? [colData.subType] : []));
-    }, [colData]);
+    // Reset local state when popover opens
+    const handleOpenChange = (isOpen) => {
+      if (isOpen) {
+        setLocalValue(colData?.value || "");
+        setLocalSubTypes(colData?.subTypes || (colData?.subType ? [colData.subType] : []));
+      }
+      setOpen(isOpen);
+    };
 
     const handleSave = async () => {
       const updatedValues = { ...(assignment.column_values || {}), [colType]: { value: localValue, subTypes: localSubTypes.filter(st => st !== "__none__") } };
@@ -306,14 +310,14 @@ export default function Schedule() {
     };
 
     return (
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <button className="w-full text-left p-1 rounded border border-gray-200 hover:bg-blue-50 min-h-[28px]">
-            <span className="text-xs truncate block">{value || "-"}</span>
-            {subTypes_saved.length > 0 && <span className="text-[10px] text-gray-400">({subTypes_saved.join(", ")})</span>}
+            <span className="text-xs truncate block">{savedValue || "-"}</span>
+            {savedSubTypes.length > 0 && <span className="text-[10px] text-gray-400">({savedSubTypes.join(", ")})</span>}
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-56 p-2">
+        <PopoverContent className="w-56 p-2" onOpenAutoFocus={(e) => e.preventDefault()}>
           <div className="space-y-2">
             <div><Label className="text-xs">Value</Label><Input className="h-7 text-xs" type="number" value={localValue} onChange={(e) => setLocalValue(e.target.value)} /></div>
             {availableSubTypes.length > 0 && (
