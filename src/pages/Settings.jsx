@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Info, Users, X, Plus, PartyPopper, Trash2, Clock, Hash } from "lucide-react";
+import { Save, Info, Users, X, Plus, PartyPopper, Trash2, Clock, Hash, Columns } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
@@ -25,20 +25,28 @@ export default function Settings() {
   const [paramSubTypes, setParamSubTypes] = useState({});
   const [selectedTypeForSubType, setSelectedTypeForSubType] = useState("");
   const [newSubType, setNewSubType] = useState("");
+  // Schedule column types
+  const [columnTypes, setColumnTypes] = useState([]);
+  const [columnSubTypes, setColumnSubTypes] = useState({});
+  const [newColumnType, setNewColumnType] = useState("");
+  const [selectedColTypeForSubType, setSelectedColTypeForSubType] = useState("");
+  const [newColSubType, setNewColSubType] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings] = await Promise.all([
+    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
       base44.entities.CompanyEvent.list("-date"),
       base44.entities.AppSettings.filter({ setting_key: "time_param_types" }),
       base44.entities.AppSettings.filter({ setting_key: "count_param_types" }),
-      base44.entities.AppSettings.filter({ setting_key: "param_sub_types" })
+      base44.entities.AppSettings.filter({ setting_key: "param_sub_types" }),
+      base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
+      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" })
     ]);
     
     if (tipsSettings.length > 0) {
@@ -50,6 +58,8 @@ export default function Settings() {
     if (timeTypesSettings.length > 0) setTimeParamTypes(JSON.parse(timeTypesSettings[0].setting_value) || []);
     if (countTypesSettings.length > 0) setCountParamTypes(JSON.parse(countTypesSettings[0].setting_value) || []);
     if (subTypesSettings.length > 0) setParamSubTypes(JSON.parse(subTypesSettings[0].setting_value) || {});
+    if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
+    if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     setWorkers(workersData);
     setCompanyEvents(eventsData);
     setLoading(false);
@@ -78,6 +88,7 @@ export default function Settings() {
     setUserRoles({ ...userRoles, [email]: role });
   };
 
+  // Time/Count param types handlers
   const handleAddTimeType = async () => {
     if (!newTimeType.trim()) return;
     const updated = [...timeParamTypes, newTimeType.trim()];
@@ -132,6 +143,43 @@ export default function Settings() {
     setParamSubTypes(updated);
   };
 
+  // Schedule column types handlers
+  const handleAddColumnType = async () => {
+    if (!newColumnType.trim()) return;
+    const updated = [...columnTypes, newColumnType.trim()];
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" });
+    const data = { setting_key: "schedule_column_types", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setColumnTypes(updated);
+    setNewColumnType("");
+  };
+
+  const handleRemoveColumnType = async (type) => {
+    const updated = columnTypes.filter(t => t !== type);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" });
+    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+    setColumnTypes(updated);
+  };
+
+  const handleAddColSubType = async () => {
+    if (!selectedColTypeForSubType || !newColSubType.trim()) return;
+    const updated = { ...columnSubTypes, [selectedColTypeForSubType]: [...(columnSubTypes[selectedColTypeForSubType] || []), newColSubType.trim()] };
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" });
+    const data = { setting_key: "schedule_column_subtypes", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setColumnSubTypes(updated);
+    setNewColSubType("");
+  };
+
+  const handleRemoveColSubType = async (type, subType) => {
+    const updated = { ...columnSubTypes, [type]: (columnSubTypes[type] || []).filter(st => st !== subType) };
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" });
+    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+    setColumnSubTypes(updated);
+  };
+
   const handleDeleteEvent = async (eventId) => {
     await base44.entities.CompanyEvent.delete(eventId);
     loadSettings();
@@ -145,10 +193,60 @@ export default function Settings() {
           <p className="text-gray-600">Configure system-wide settings</p>
         </div>
 
+        {/* Schedule Column Types */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2"><Columns className="w-5 h-5 text-green-600" />Schedule Column Types</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600 mb-3">Define column types that can be added to carts in the Schedule page</p>
+            <div className="flex gap-2 mb-4">
+              <Input value={newColumnType} onChange={(e) => setNewColumnType(e.target.value)} placeholder="New column type name..." />
+              <Button onClick={handleAddColumnType}><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-6">
+              {columnTypes.map(type => (
+                <Badge key={type} className="bg-green-100 text-green-800 pr-1">
+                  {type}
+                  <button onClick={() => handleRemoveColumnType(type)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                </Badge>
+              ))}
+              {columnTypes.length === 0 && <p className="text-sm text-gray-400">No column types defined</p>}
+            </div>
+            
+            <div className="pt-4 border-t">
+              <p className="text-sm font-semibold mb-3">Column Sub-types (per column type)</p>
+              <div className="flex gap-2 mb-4">
+                <Select value={selectedColTypeForSubType} onValueChange={setSelectedColTypeForSubType}>
+                  <SelectTrigger className="w-40"><SelectValue placeholder="Select type..." /></SelectTrigger>
+                  <SelectContent>
+                    {columnTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Input value={newColSubType} onChange={(e) => setNewColSubType(e.target.value)} placeholder="New sub-type..." className="flex-1" />
+                <Button onClick={handleAddColSubType} disabled={!selectedColTypeForSubType}><Plus className="w-4 h-4" /></Button>
+              </div>
+              {Object.entries(columnSubTypes).filter(([_, subs]) => subs.length > 0).map(([type, subs]) => (
+                <div key={type} className="mb-2">
+                  <p className="text-xs font-medium text-gray-700 mb-1">{type}:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {subs.map(sub => (
+                      <Badge key={sub} variant="outline" className="text-xs pr-1">
+                        {sub}
+                        <button onClick={() => handleRemoveColSubType(type, sub)} className="ml-1 hover:text-red-600"><X className="w-2 h-2" /></button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Parameter Types */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5 text-purple-600" />Parameter Types</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5 text-purple-600" />Parameter Types (Reports)</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <Tabs defaultValue="time" className="w-full">
@@ -252,7 +350,7 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Company Events (View Only - Add from Yearly) */}
+        {/* Company Events (View Only) */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
             <div className="flex justify-between items-center">

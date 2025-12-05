@@ -14,9 +14,9 @@ import { getHebrewDate } from "../components/utils/HebrewDate";
 const HEBREW_DAYS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 const ROW_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
-const CELL_WIDTH = 28;
+const CELL_WIDTH = 42;
 const ROW_HEIGHT = 60;
-const EVENT_HEIGHT = 14;
+const EVENT_HEIGHT = 16;
 
 const getCustomWeekNumber = (date, year) => {
   const dec28PrevYear = new Date(year - 1, 11, 28);
@@ -47,7 +47,6 @@ export default function Yearly() {
   const [workerCategoryFilter, setWorkerCategoryFilter] = useState("__all__");
   const [workerRoleFilter, setWorkerRoleFilter] = useState("__all__");
   const [dragging, setDragging] = useState(null);
-  const tableRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
   useEffect(() => { loadData(); }, [currentYear]);
@@ -98,7 +97,7 @@ export default function Yearly() {
     setShowEventDialog(true);
   };
 
-  const handleEventClick = (event, e) => {
+  const handleEventDoubleClick = (event, e) => {
     e.stopPropagation();
     if (viewOnly) return;
     setEditingEvent(event);
@@ -138,7 +137,6 @@ export default function Yearly() {
     }
   };
 
-  // Generate days from Jan 1 to Dec 31 (RTL: rightmost = Jan 1)
   const generateYearDays = () => {
     const days = [];
     const start = new Date(currentYear, 0, 1);
@@ -172,7 +170,7 @@ export default function Yearly() {
   const handleMouseMove = (e) => {
     if (!dragging) return;
     const { event, type, startX, originalStart, originalEnd } = dragging;
-    const deltaX = startX - e.clientX; // Reversed for RTL
+    const deltaX = startX - e.clientX;
     const deltaDays = Math.round(deltaX / CELL_WIDTH);
     const origStartDate = parseISO(originalStart);
     const origEndDate = parseISO(originalEnd);
@@ -263,9 +261,9 @@ export default function Yearly() {
     const topOffset = 2 + trackIndex * (EVENT_HEIGHT + 2);
     return (
       <div
-        className={`absolute rounded flex items-center text-white text-[9px] font-medium overflow-hidden ${viewOnly ? 'cursor-default' : 'cursor-pointer'} ${isDragging ? 'opacity-70 z-50' : 'z-10'}`}
+        className={`absolute rounded flex items-center text-white text-[10px] font-medium overflow-hidden ${viewOnly ? 'cursor-default' : 'cursor-pointer'} ${isDragging ? 'opacity-70 z-50' : 'z-10'}`}
         style={{ right: `${pos.left}px`, width: `${pos.width}px`, top: `${topOffset}px`, height: `${EVENT_HEIGHT}px`, backgroundColor: color }}
-        onClick={(e) => handleEventClick(event, e)}
+        onDoubleClick={(e) => handleEventDoubleClick(event, e)}
         title={`${event.title}${event.worker_name ? ` - ${event.worker_name}` : ""}${event.start_time ? ` (${event.start_time}-${event.end_time})` : ""}`}
       >
         {!viewOnly && <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => handleDragStart(e, event, "resize-end")} />}
@@ -278,12 +276,13 @@ export default function Yearly() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" dir="rtl">
-      <div className="max-w-full mx-auto">
-        <div className="mb-6 flex flex-wrap justify-between items-center gap-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col" dir="rtl">
+      {/* Fixed Header */}
+      <div className="sticky top-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 pb-2">
+        <div className="max-w-full mx-auto flex flex-wrap justify-between items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-1">לוח שנתי</h1>
-            <p className="text-gray-600">{viewOnly ? "מצב צפייה בלבד" : "ניהול אירועים - גרור לשינוי תאריכים"}</p>
+            <p className="text-gray-600 text-sm">{viewOnly ? "מצב צפייה בלבד" : "לחץ פעמיים על אירוע לעריכה"}</p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border">
@@ -298,17 +297,19 @@ export default function Yearly() {
             {!viewOnly && <Button onClick={() => setShowAddRowDialog(true)}><Plus className="w-4 h-4 ml-2" />הוסף שורה</Button>}
           </div>
         </div>
+      </div>
 
-        <Card className="border-none shadow-lg overflow-hidden">
-          <CardContent className="p-0">
-            <div className="flex">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-hidden px-4 md:px-6 pb-4">
+        <Card className="border-none shadow-lg overflow-hidden h-full">
+          <CardContent className="p-0 h-full">
+            <div className="flex h-full">
               {/* Fixed Row Headers */}
-              <div className="flex-shrink-0 z-20 bg-white border-l" style={{ width: 160 }}>
-                <div className="bg-blue-900 text-white p-2 font-semibold text-right h-[36px] flex items-center">שורה</div>
-                <div className="bg-blue-800 text-white p-2 text-xs text-right h-[28px] flex items-center">שבוע</div>
-                <div className="bg-gray-100 p-2 text-xs font-medium text-right h-[52px] flex items-center">יום, תאריך</div>
+              <div className="flex-shrink-0 z-20 bg-white border-l overflow-y-auto" style={{ width: 160 }}>
+                <div className="bg-blue-900 text-white p-2 font-semibold text-right h-[36px] flex items-center sticky top-0">שורה</div>
+                <div className="bg-blue-800 text-white p-2 text-xs text-right h-[28px] flex items-center sticky top-[36px]">שבוע</div>
+                <div className="bg-gray-100 p-2 text-xs font-medium text-right h-[52px] flex items-center sticky top-[64px]">יום, תאריך</div>
                 
-                {/* Custom Rows Headers */}
                 {rows.map((row, rowIdx) => {
                   const rowEvents = getEventsForRow(row.id);
                   const tracks = layoutEventsInTracks(rowEvents);
@@ -336,7 +337,6 @@ export default function Yearly() {
                   );
                 })}
                 
-                {/* Unavailability Header */}
                 {unavailabilities.length > 0 && (
                   <div className="p-2 border-b bg-red-50 flex items-center gap-2" style={{ height: ROW_HEIGHT }}>
                     <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -345,11 +345,11 @@ export default function Yearly() {
                 )}
               </div>
 
-              {/* Scrollable Content */}
-              <div className="overflow-auto max-h-[80vh] flex-1" ref={scrollContainerRef}>
-                <div style={{ minWidth: `${yearDays.length * CELL_WIDTH}px` }} ref={tableRef}>
+              {/* Scrollable Grid */}
+              <div className="overflow-auto flex-1" ref={scrollContainerRef}>
+                <div style={{ minWidth: `${yearDays.length * CELL_WIDTH}px` }}>
                   {/* Month Header */}
-                  <div className="flex bg-blue-900 text-white h-[36px]">
+                  <div className="flex bg-blue-900 text-white h-[36px] sticky top-0 z-10">
                     {monthGroups.map((group, idx) => (
                       <div key={idx} className="text-center font-semibold text-xs py-2 border-l flex items-center justify-center" style={{ width: `${group.count * CELL_WIDTH}px` }}>
                         {HEBREW_MONTHS[group.month]}
@@ -358,7 +358,7 @@ export default function Yearly() {
                   </div>
 
                   {/* Week Header */}
-                  <div className="flex bg-blue-800 text-white h-[28px]">
+                  <div className="flex bg-blue-800 text-white h-[28px] sticky top-[36px] z-10">
                     {weekGroups.map((group, idx) => (
                       <div key={idx} className="text-center text-xs py-1 border-l flex items-center justify-center" style={{ width: `${group.count * CELL_WIDTH}px` }}>
                         {group.week}
@@ -367,14 +367,14 @@ export default function Yearly() {
                   </div>
 
                   {/* Day/Date Header */}
-                  <div className="flex bg-gray-100 h-[52px]">
+                  <div className="flex bg-gray-100 h-[52px] sticky top-[64px] z-10">
                     {yearDays.map((day, idx) => {
                       const dayOfWeek = getDay(day);
                       const isShabbat = dayOfWeek === 6;
                       const isFriday = dayOfWeek === 5;
                       const hebDate = getHebrewDate(day);
                       return (
-                        <div key={idx} className={`text-center text-[7px] py-1 border-l leading-tight flex flex-col justify-center ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}>
+                        <div key={idx} className={`text-center text-[8px] py-1 border-l leading-tight flex flex-col justify-center ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}>
                           <div className="font-semibold">{HEBREW_DAYS[dayOfWeek]}</div>
                           <div>{day.getDate()}</div>
                           <div className="text-gray-500">{hebDate.dayHeb}</div>
@@ -409,7 +409,7 @@ export default function Yearly() {
                     );
                   })}
 
-                  {/* Unavailability Row - at bottom */}
+                  {/* Unavailability Row */}
                   {unavailabilities.length > 0 && (
                     <div className="flex border-b bg-red-50" style={{ height: ROW_HEIGHT }}>
                       <div className="relative flex" style={{ width: `${yearDays.length * CELL_WIDTH}px` }}>
@@ -439,80 +439,79 @@ export default function Yearly() {
             </div>
           </CardContent>
         </Card>
+      </div>
 
-        {/* Add Row Dialog */}
-        <Dialog open={showAddRowDialog} onOpenChange={setShowAddRowDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>הוסף שורה חדשה</DialogTitle></DialogHeader>
-            <div className="py-4 space-y-4">
-              <div><Label>שם השורה</Label><Input value={newRowName} onChange={(e) => setNewRowName(e.target.value)} placeholder="הכנס שם..." className="mt-2" /></div>
-              <div><Label>צבע</Label><div className="flex gap-2 mt-2">{ROW_COLORS.map(c => (<button key={c} className={`w-8 h-8 rounded-full border-2 ${newRowColor === c ? 'border-gray-800 scale-110' : 'border-white'}`} style={{ backgroundColor: c }} onClick={() => setNewRowColor(c)} />))}</div></div>
+      {/* Dialogs */}
+      <Dialog open={showAddRowDialog} onOpenChange={setShowAddRowDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>הוסף שורה חדשה</DialogTitle></DialogHeader>
+          <div className="py-4 space-y-4">
+            <div><Label>שם השורה</Label><Input value={newRowName} onChange={(e) => setNewRowName(e.target.value)} placeholder="הכנס שם..." className="mt-2" /></div>
+            <div><Label>צבע</Label><div className="flex gap-2 mt-2">{ROW_COLORS.map(c => (<button key={c} className={`w-8 h-8 rounded-full border-2 ${newRowColor === c ? 'border-gray-800 scale-110' : 'border-white'}`} style={{ backgroundColor: c }} onClick={() => setNewRowColor(c)} />))}</div></div>
+          </div>
+          <DialogFooter className="flex-row-reverse gap-2">
+            <Button onClick={handleAddRow} disabled={!newRowName.trim()}>הוסף</Button>
+            <Button variant="outline" onClick={() => setShowAddRowDialog(false)}>ביטול</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>{editingEvent ? "ערוך אירוע" : "הוסף אירוע"}</DialogTitle></DialogHeader>
+          <div className="py-4 space-y-4">
+            <div><Label>כותרת</Label><Input value={eventForm.title} onChange={(e) => setEventForm({...eventForm, title: e.target.value})} placeholder="שם האירוע" className="mt-1" /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label>תאריך התחלה</Label><Input type="date" value={eventForm.start_date} onChange={(e) => setEventForm({...eventForm, start_date: e.target.value})} className="mt-1" /></div>
+              <div><Label>תאריך סיום</Label><Input type="date" value={eventForm.end_date} onChange={(e) => setEventForm({...eventForm, end_date: e.target.value})} className="mt-1" /></div>
             </div>
-            <DialogFooter className="flex-row-reverse gap-2">
-              <Button onClick={handleAddRow} disabled={!newRowName.trim()}>הוסף</Button>
-              <Button variant="outline" onClick={() => setShowAddRowDialog(false)}>ביטול</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Event Dialog */}
-        <Dialog open={showEventDialog} onOpenChange={setShowEventDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>{editingEvent ? "ערוך אירוע" : "הוסף אירוע"}</DialogTitle></DialogHeader>
-            <div className="py-4 space-y-4">
-              <div><Label>כותרת</Label><Input value={eventForm.title} onChange={(e) => setEventForm({...eventForm, title: e.target.value})} placeholder="שם האירוע" className="mt-1" /></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>תאריך התחלה</Label><Input type="date" value={eventForm.start_date} onChange={(e) => setEventForm({...eventForm, start_date: e.target.value})} className="mt-1" /></div>
-                <div><Label>תאריך סיום</Label><Input type="date" value={eventForm.end_date} onChange={(e) => setEventForm({...eventForm, end_date: e.target.value})} className="mt-1" /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>שעת התחלה</Label><Input type="time" value={eventForm.start_time} onChange={(e) => setEventForm({...eventForm, start_time: e.target.value})} className="mt-1" /></div>
-                <div><Label>שעת סיום</Label><Input type="time" value={eventForm.end_time} onChange={(e) => setEventForm({...eventForm, end_time: e.target.value})} className="mt-1" /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>סינון קטגוריה</Label>
-                  <Select value={workerCategoryFilter} onValueChange={setWorkerCategoryFilter}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">הכל</SelectItem>
-                      <SelectItem value="category_1">{categoryNames.category_1}</SelectItem>
-                      <SelectItem value="category_2">{categoryNames.category_2}</SelectItem>
-                      <SelectItem value="category_3">{categoryNames.category_3}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>סינון תפקיד</Label>
-                  <Select value={workerRoleFilter} onValueChange={setWorkerRoleFilter}>
-                    <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__all__">הכל</SelectItem>
-                      <SelectItem value="chef">שף</SelectItem>
-                      <SelectItem value="sous_chef">סו-שף</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><Label>שעת התחלה</Label><Input type="time" value={eventForm.start_time} onChange={(e) => setEventForm({...eventForm, start_time: e.target.value})} className="mt-1" /></div>
+              <div><Label>שעת סיום</Label><Input type="time" value={eventForm.end_time} onChange={(e) => setEventForm({...eventForm, end_time: e.target.value})} className="mt-1" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>סינון קטגוריה</Label>
+                <Select value={workerCategoryFilter} onValueChange={setWorkerCategoryFilter}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">הכל</SelectItem>
+                    <SelectItem value="category_1">{categoryNames.category_1}</SelectItem>
+                    <SelectItem value="category_2">{categoryNames.category_2}</SelectItem>
+                    <SelectItem value="category_3">{categoryNames.category_3}</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
-                <Label>עובד</Label>
-                <Select value={eventForm.worker_id || "__none__"} onValueChange={(v) => setEventForm({...eventForm, worker_id: v})}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="בחר עובד..." /></SelectTrigger>
+                <Label>סינון תפקיד</Label>
+                <Select value={workerRoleFilter} onValueChange={setWorkerRoleFilter}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">ללא</SelectItem>
-                    {filteredWorkersForDialog.map(w => <SelectItem key={w.id} value={w.id}>{w.full_name}</SelectItem>)}
+                    <SelectItem value="__all__">הכל</SelectItem>
+                    <SelectItem value="chef">שף</SelectItem>
+                    <SelectItem value="sous_chef">סו-שף</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <DialogFooter className="flex-row-reverse gap-2">
-              <Button onClick={handleSaveEvent}>{editingEvent ? "שמור" : "הוסף"}</Button>
-              {editingEvent && <Button variant="destructive" onClick={handleDeleteEvent}><Trash2 className="w-4 h-4 ml-1" />מחק</Button>}
-              <Button variant="outline" onClick={() => setShowEventDialog(false)}>ביטול</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            <div>
+              <Label>עובד</Label>
+              <Select value={eventForm.worker_id || "__none__"} onValueChange={(v) => setEventForm({...eventForm, worker_id: v})}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="בחר עובד..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">ללא</SelectItem>
+                  {filteredWorkersForDialog.map(w => <SelectItem key={w.id} value={w.id}>{w.full_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="flex-row-reverse gap-2">
+            <Button onClick={handleSaveEvent}>{editingEvent ? "שמור" : "הוסף"}</Button>
+            {editingEvent && <Button variant="destructive" onClick={handleDeleteEvent}><Trash2 className="w-4 h-4 ml-1" />מחק</Button>}
+            <Button variant="outline" onClick={() => setShowEventDialog(false)}>ביטול</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const SHIFT_WINDOWS = [
   { start: "06:00", end: "10:00" },
@@ -29,19 +31,25 @@ export default function Schedule() {
   const [unavailabilities, setUnavailabilities] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [columnTypes, setColumnTypes] = useState([]);
+  const [columnSubTypes, setColumnSubTypes] = useState({});
+  const [cartColumns, setCartColumns] = useState({});
   
   const [showWorkerDialog, setShowWorkerDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showAddShiftDialog, setShowAddShiftDialog] = useState(false);
+  const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [selectedCartId, setSelectedCartId] = useState(null);
+  const [newColumnType, setNewColumnType] = useState("");
   
   const [editFormData, setEditFormData] = useState({
     start_time: "",
     end_time: "",
     hours: 4,
-    notes: ""
+    notes: "",
+    column_values: {}
   });
 
   const [newShiftData, setNewShiftData] = useState({
@@ -49,9 +57,7 @@ export default function Schedule() {
     end_time: "10:00"
   });
 
-  useEffect(() => {
-    loadData();
-  }, [currentDate]);
+  useEffect(() => { loadData(); }, [currentDate]);
 
   const loadData = async () => {
     setLoading(true);
@@ -59,18 +65,24 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     
-    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData] = await Promise.all([
+    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData, colTypesSettings, colSubTypesSettings, cartColsSettings] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.FoodCart.filter({ active: true }),
       base44.entities.Assignment.filter({ date: dateString }),
       base44.entities.Availability.filter({ week_start_date: weekStartStr }),
-      base44.entities.Unavailability.filter({ date: dateString })
+      base44.entities.Unavailability.filter({ date: dateString }),
+      base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
+      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
+      base44.entities.AppSettings.filter({ setting_key: "cart_columns" })
     ]);
     setWorkers(workersData);
     setCarts(cartsData);
     setAssignments(assignmentsData);
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
+    if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
+    if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
+    if (cartColsSettings.length > 0) setCartColumns(JSON.parse(cartColsSettings[0].setting_value) || {});
     setLoading(false);
   };
 
@@ -162,7 +174,8 @@ export default function Schedule() {
       start_time: assignment.start_time || "",
       end_time: assignment.end_time || "",
       hours: assignment.hours || 4,
-      notes: assignment.notes || ""
+      notes: assignment.notes || "",
+      column_values: assignment.column_values || {}
     });
     setShowEditDialog(true);
   };
@@ -184,7 +197,8 @@ export default function Schedule() {
       start_time: editFormData.start_time,
       end_time: editFormData.end_time,
       hours,
-      notes: editFormData.notes
+      notes: editFormData.notes,
+      column_values: editFormData.column_values
     });
     setShowEditDialog(false);
     setCurrentAssignment(null);
@@ -208,7 +222,8 @@ export default function Schedule() {
       end_time: newShiftData.end_time,
       hours,
       notes: "",
-      has_trainee: false
+      has_trainee: false,
+      column_values: {}
     });
     setShowAddShiftDialog(false);
     setNewShiftData({ start_time: "06:00", end_time: "10:00" });
@@ -222,10 +237,86 @@ export default function Schedule() {
     setShowAddShiftDialog(true);
   };
 
+  const openAddColumnDialog = (cartId) => {
+    setSelectedCartId(cartId);
+    setNewColumnType("");
+    setShowAddColumnDialog(true);
+  };
+
+  const handleAddColumn = async () => {
+    if (!newColumnType) return;
+    const updated = { ...cartColumns, [selectedCartId]: [...(cartColumns[selectedCartId] || []), newColumnType] };
+    setCartColumns(updated);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "cart_columns" });
+    const data = { setting_key: "cart_columns", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setShowAddColumnDialog(false);
+    setNewColumnType("");
+  };
+
+  const handleRemoveColumn = async (cartId, colType) => {
+    const updated = { ...cartColumns, [cartId]: (cartColumns[cartId] || []).filter(c => c !== colType) };
+    setCartColumns(updated);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "cart_columns" });
+    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+  };
+
+  const handleUpdateColumnValue = async (assignmentId, colType, value, subType) => {
+    const assignment = assignments.find(a => a.id === assignmentId);
+    const updatedValues = { ...(assignment.column_values || {}), [colType]: { value, subType } };
+    await base44.entities.Assignment.update(assignmentId, { column_values: updatedValues });
+    loadData();
+  };
+
   const getSeniorityColor = (seniority) => {
     if (seniority === "newbie") return "text-blue-600";
     if (seniority === "trainee") return "text-orange-600";
     return "text-gray-900";
+  };
+
+  const ColumnCell = ({ assignment, colType }) => {
+    const [open, setOpen] = useState(false);
+    const colData = assignment.column_values?.[colType];
+    const value = colData?.value || "";
+    const subType = colData?.subType || "";
+    const [localValue, setLocalValue] = useState(value);
+    const [localSubType, setLocalSubType] = useState(subType);
+    const subTypes = columnSubTypes[colType] || [];
+
+    const handleSave = async () => {
+      await handleUpdateColumnValue(assignment.id, colType, localValue, localSubType === "__none__" ? "" : localSubType);
+      setOpen(false);
+    };
+
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button className="w-full text-left p-1 rounded border border-gray-200 hover:bg-blue-50 min-h-[28px]">
+            <span className="text-xs truncate block">{value || "-"}</span>
+            {subType && <span className="text-[10px] text-gray-400">({subType})</span>}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-48 p-2">
+          <div className="space-y-2">
+            <div><Label className="text-xs">Value</Label><Input className="h-7 text-xs" type="number" value={localValue} onChange={(e) => setLocalValue(e.target.value)} /></div>
+            {subTypes.length > 0 && (
+              <div>
+                <Label className="text-xs">Sub-type</Label>
+                <Select value={localSubType || "__none__"} onValueChange={setLocalSubType}>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {subTypes.map(st => <SelectItem key={st} value={st}>{st}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <Button size="sm" className="w-full h-7 text-xs" onClick={handleSave}>Save</Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
   };
 
   if (loading) {
@@ -259,13 +350,17 @@ export default function Schedule() {
           <div className="space-y-6">
             {carts.map((cart) => {
               const cartAssignments = getCartAssignments(cart.id);
+              const columns = cartColumns[cart.id] || [];
               
               return (
                 <Card key={cart.id} className="border-none shadow-lg overflow-hidden">
                   <CardHeader className="bg-gradient-to-r from-amber-500 to-amber-600 text-white py-3">
                     <div className="flex justify-between items-center">
                       <CardTitle className="flex items-center gap-2 text-lg">🚚 {cart.name}<span className="text-sm font-normal opacity-90">• {cart.location}</span></CardTitle>
-                      <Button size="sm" variant="secondary" onClick={() => openAddShiftDialog(cart.id)}><Plus className="w-4 h-4 mr-1" />Add Shift</Button>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => openAddColumnDialog(cart.id)}><Plus className="w-3 h-3" /></Button>
+                        <Button size="sm" variant="secondary" onClick={() => openAddShiftDialog(cart.id)}><Plus className="w-4 h-4 mr-1" />Shift</Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -274,15 +369,23 @@ export default function Schedule() {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[100px]">Time</TableHead>
-                            <TableHead className="w-[140px]">Chef</TableHead>
-                            <TableHead className="w-[140px]">Sous-Chef</TableHead>
-                            <TableHead className="w-[140px]">Additional</TableHead>
+                            <TableHead className="w-[120px]">Chef</TableHead>
+                            <TableHead className="w-[120px]">Sous-Chef</TableHead>
+                            <TableHead className="w-[120px]">Additional</TableHead>
+                            {columns.map(col => (
+                              <TableHead key={col} className="w-[100px]">
+                                <div className="flex items-center gap-1">
+                                  <span className="truncate">{col}</span>
+                                  <button onClick={() => handleRemoveColumn(cart.id, col)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                                </div>
+                              </TableHead>
+                            ))}
                             <TableHead className="w-[80px]">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {cartAssignments.length === 0 ? (
-                            <TableRow><TableCell colSpan={5} className="text-center text-gray-500 py-8">No shifts. Click "Add Shift".</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5 + columns.length} className="text-center text-gray-500 py-8">No shifts. Click "Shift" to add.</TableCell></TableRow>
                           ) : (
                             cartAssignments.map((assignment) => (
                               <TableRow key={assignment.id} className={assignment.has_trainee ? "bg-orange-50" : ""}>
@@ -317,6 +420,9 @@ export default function Schedule() {
                                     )}
                                   </button>
                                 </TableCell>
+                                {columns.map(col => (
+                                  <TableCell key={col}><ColumnCell assignment={assignment} colType={col} /></TableCell>
+                                ))}
                                 <TableCell>
                                   <div className="flex gap-1">
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditAssignment(assignment)}><Pencil className="w-3 h-3" /></Button>
@@ -408,6 +514,29 @@ export default function Schedule() {
               </div>
             </div>
             <DialogFooter><Button variant="outline" onClick={() => setShowAddShiftDialog(false)}>Cancel</Button><Button onClick={handleAddShift} className="bg-blue-900 hover:bg-blue-800">Add Shift</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Column Dialog */}
+        <Dialog open={showAddColumnDialog} onOpenChange={setShowAddColumnDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle>Add Column</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Column Type</Label>
+                <Select value={newColumnType} onValueChange={setNewColumnType}>
+                  <SelectTrigger><SelectValue placeholder="Select type..." /></SelectTrigger>
+                  <SelectContent>
+                    {columnTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {columnTypes.length === 0 && <div className="p-2 text-xs text-gray-500">No types defined. Add them in Settings.</div>}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddColumnDialog(false)}>Cancel</Button>
+              <Button onClick={handleAddColumn} disabled={!newColumnType} className="bg-blue-900 hover:bg-blue-800">Add</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

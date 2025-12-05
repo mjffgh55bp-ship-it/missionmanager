@@ -35,6 +35,7 @@ export default function Availability() {
   const [unavailabilities, setUnavailabilities] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [companyEvents, setCompanyEvents] = useState([]);
+  const [yearlyEvents, setYearlyEvents] = useState([]);
   const [showSummary, setShowSummary] = useState(false);
   const [showEditMode, setShowEditMode] = useState(false);
   const [showChangeRecap, setShowChangeRecap] = useState(false);
