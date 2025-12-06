@@ -15,11 +15,12 @@ import { formatHebrewDate } from "../components/utils/HebrewDate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const SHIFT_BLOCKS = [
+  { start: "22:00", end: "02:00" },
+  { start: "02:00", end: "06:00" },
   { start: "06:00", end: "10:00" },
   { start: "10:00", end: "14:00" },
   { start: "14:00", end: "18:00" },
-  { start: "18:00", end: "22:00" },
-  { start: "22:00", end: "02:00" }
+  { start: "18:00", end: "22:00" }
 ];
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -367,9 +368,27 @@ END:VEVENT
     if (!currentWorker) return [];
     const dateStr = format(date, "yyyy-MM-dd");
     return yearlyEvents.filter(e => 
-      e.worker_id === currentWorker.id && 
+      e.worker_ids?.includes(currentWorker.id) && 
       dateStr >= e.start_date && dateStr <= e.end_date
     );
+  };
+
+  const getYearlyEventsForShift = (date, shiftStart, shiftEnd) => {
+    if (!currentWorker) return [];
+    const dateStr = format(date, "yyyy-MM-dd");
+    return yearlyEvents.filter(e => {
+      if (e.start_date > dateStr || e.end_date < dateStr) return false;
+      if (!e.worker_ids?.includes(currentWorker.id)) return false;
+      if (!e.start_time || !e.end_time) return false;
+      
+      const eventStart = e.start_time;
+      const eventEnd = e.end_time;
+      
+      // Check if event overlaps with shift
+      return (eventStart >= shiftStart && eventStart < shiftEnd) ||
+             (eventEnd > shiftStart && eventEnd <= shiftEnd) ||
+             (eventStart <= shiftStart && eventEnd >= shiftEnd);
+    });
   };
 
   const getAssignmentForDate = (date) => {
@@ -545,19 +564,30 @@ END:VEVENT
                             </Badge>
                           )}
                         </div>
-                        <div className="grid grid-cols-5 gap-1">
+                        <div className="grid grid-cols-6 gap-1">
                           {SHIFT_BLOCKS.map((shift) => {
                             const state = getShiftState(date, shift);
+                            const yearlyEvts = getYearlyEventsForShift(addDays(weekStart, dayIndex), shift.start, shift.end);
                             return (
-                              <button
-                                key={shift.start}
-                                onClick={() => cycleShiftState(date, shift)}
-                                disabled={!canEdit}
-                                className={`p-1.5 rounded border-2 transition-all flex flex-col items-center justify-center ${getShiftStyle(state)} ${!canEdit ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                              >
-                                {getShiftIcon(state)}
-                                <span className="text-[10px] mt-0.5">{shift.start}</span>
-                              </button>
+                              <div key={shift.start} className="flex flex-col gap-0.5">
+                                <button
+                                  onClick={() => cycleShiftState(date, shift)}
+                                  disabled={!canEdit}
+                                  className={`p-1.5 rounded border-2 transition-all flex flex-col items-center justify-center ${getShiftStyle(state)} ${!canEdit ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                >
+                                  {getShiftIcon(state)}
+                                  <span className="text-[10px] mt-0.5">{shift.start}</span>
+                                </button>
+                                {yearlyEvts.length > 0 && (
+                                  <div className="space-y-0.5">
+                                    {yearlyEvts.map(evt => (
+                                      <div key={evt.id} className="text-[9px] bg-purple-100 border border-purple-300 rounded px-1 py-0.5 truncate" title={`${evt.title} (${evt.start_time}-${evt.end_time})`}>
+                                        📅 {evt.title}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             );
                           })}
                         </div>
