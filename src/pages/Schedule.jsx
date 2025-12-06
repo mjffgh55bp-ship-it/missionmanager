@@ -387,13 +387,12 @@ export default function Schedule() {
                                       colType={col} 
                                       columnValues={assignment.column_values} 
                                       availableSubTypes={columnSubTypes[col] || []} 
-                                      onSaved={() => {
-                                        const updated = assignments.map(a => 
+                                      onSaved={(updatedColumnValues) => {
+                                        setAssignments(prev => prev.map(a => 
                                           a.id === assignment.id 
-                                            ? { ...a, column_values: { ...a.column_values } }
+                                            ? { ...a, column_values: updatedColumnValues }
                                             : a
-                                        );
-                                        setAssignments(updated);
+                                        ));
                                       }} 
                                     />
                                   </TableCell>
