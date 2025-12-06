@@ -32,7 +32,7 @@ export default function ColumnCell({ assignmentId, colType, columnValues, availa
     };
     await base44.entities.Assignment.update(assignmentId, { column_values: updatedValues });
     setOpen(false);
-    if (onSaved) onSaved();
+    if (onSaved) onSaved(updatedValues);
   };
 
   const toggleSubType = (st) => {
