@@ -5,11 +5,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Clock, TrendingUp, Users, Calendar, ChefHat, ArrowUpDown, Calculator, Settings, Hash } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 import { getSeniorityInfo } from "../components/utils/SeniorityUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const COLORS = ['#1e3a5f', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4'];
 
@@ -161,19 +162,22 @@ export default function Reports() {
     if (dateFilterMode === 'daily') {
       start = end = format(today, 'yyyy-MM-dd');
     } else if (dateFilterMode === 'week') {
-      const weekStart = new Date(today);
-      weekStart.setDate(today.getDate() - today.getDay());
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      start = format(weekStart, 'yyyy-MM-dd');
-      end = format(weekEnd, 'yyyy-MM-dd');
+      const wStart = startOfWeek(today, { weekStartsOn: 0 });
+      const wEnd = endOfWeek(today, { weekStartsOn: 0 });
+      start = format(wStart, 'yyyy-MM-dd');
+      end = format(wEnd, 'yyyy-MM-dd');
     } else if (dateFilterMode === 'month') {
-      start = format(new Date(today.getFullYear(), today.getMonth(), 1), 'yyyy-MM-dd');
-      end = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
+      const mStart = startOfMonth(today);
+      const mEnd = endOfMonth(today);
+      start = format(mStart, 'yyyy-MM-dd');
+      end = format(mEnd, 'yyyy-MM-dd');
     } else if (dateFilterMode === 'half_year') {
-      start = format(new Date(today.getFullYear(), Math.floor(today.getMonth() / 6) * 6, 1), 'yyyy-MM-dd');
-      end = format(new Date(today.getFullYear(), Math.floor(today.getMonth() / 6) * 6 + 6, 0), 'yyyy-MM-dd');
+      const halfStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 6) * 6, 1);
+      const halfEnd = new Date(today.getFullYear(), Math.floor(today.getMonth() / 6) * 6 + 6, 0);
+      start = format(halfStart, 'yyyy-MM-dd');
+      end = format(halfEnd, 'yyyy-MM-dd');
     } else if (dateFilterMode === 'custom') {
+      if (!startDate || !endDate) return null;
       start = startDate;
       end = endDate;
     } else {
