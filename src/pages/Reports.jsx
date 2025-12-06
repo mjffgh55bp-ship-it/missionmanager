@@ -20,23 +20,33 @@ export default function Reports() {
   const [globalParams, setGlobalParams] = useState([]);
   const [cartParams, setCartParams] = useState({});
   const [loading, setLoading] = useState(true);
+  const [categoryNames, setCategoryNames] = useState({ category_1: "Category 1", category_2: "Category 2", category_3: "Category 3" });
   const [sortConfig, setSortConfig] = useState({ key: 'totalHours', direction: 'desc' });
   const [fullTimeHours, setFullTimeHours] = useState(0);
   const [fullTimeShifts, setFullTimeShifts] = useState(0);
   const [columnSubTypes, setColumnSubTypes] = useState({});
+  const [dateFilterMode, setDateFilterMode] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [workerFilters, setWorkerFilters] = useState({
+    category: '__all__',
+    guide: '__all__',
+    role: '__all__'
+  });
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings] = await Promise.all([
+    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings, catSettings] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
       base44.entities.FoodCart.list(),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
-      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" })
+      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
+      base44.entities.AppSettings.filter({ setting_key: "worker_category_names" })
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -44,6 +54,7 @@ export default function Reports() {
     if (globalSettings.length > 0) setGlobalParams(JSON.parse(globalSettings[0].setting_value) || []);
     if (cartParamsSettings.length > 0) setCartParams(JSON.parse(cartParamsSettings[0].setting_value) || {});
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
+    if (catSettings.length > 0) setCategoryNames(JSON.parse(catSettings[0].setting_value));
     setLoading(false);
   };
 
@@ -143,11 +154,43 @@ export default function Reports() {
 
   const allSubTypes = getAllSubTypes();
 
+  const getDateRange = () => {
+    const today = new Date();
+    let start, end;
+    
+    if (dateFilterMode === 'daily') {
+      start = end = format(today, 'yyyy-MM-dd');
+    } else if (dateFilterMode === 'week') {
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      start = format(weekStart, 'yyyy-MM-dd');
+      end = format(weekEnd, 'yyyy-MM-dd');
+    } else if (dateFilterMode === 'month') {
+      start = format(new Date(today.getFullYear(), today.getMonth(), 1), 'yyyy-MM-dd');
+      end = format(new Date(today.getFullYear(), today.getMonth() + 1, 0), 'yyyy-MM-dd');
+    } else if (dateFilterMode === 'half_year') {
+      start = format(new Date(today.getFullYear(), Math.floor(today.getMonth() / 6) * 6, 1), 'yyyy-MM-dd');
+      end = format(new Date(today.getFullYear(), Math.floor(today.getMonth() / 6) * 6 + 6, 0), 'yyyy-MM-dd');
+    } else if (dateFilterMode === 'custom') {
+      start = startDate;
+      end = endDate;
+    } else {
+      return null;
+    }
+    
+    return { start, end };
+  };
+
   // Calculate hours per subtype per worker
   const getWorkerHoursBySubType = (workerId, subType) => {
-    const workerAssignments = assignments.filter(a => 
-      a.chef_id === workerId || a.sous_chef_id === workerId || a.additional_chef_id === workerId
-    );
+    const dateRange = getDateRange();
+    const workerAssignments = assignments.filter(a => {
+      if (!(a.chef_id === workerId || a.sous_chef_id === workerId || a.additional_chef_id === workerId)) return false;
+      if (dateRange && (a.date < dateRange.start || a.date > dateRange.end)) return false;
+      return true;
+    });
     let totalHours = 0;
     workerAssignments.forEach(a => {
       if (a.column_values) {
@@ -161,6 +204,14 @@ export default function Reports() {
     });
     return totalHours;
   };
+
+  const filteredWorkersForSubTypes = workers.filter(w => {
+    if (!w.active) return false;
+    if (workerFilters.category !== '__all__' && w.category !== workerFilters.category) return false;
+    if (workerFilters.guide !== '__all__' && (workerFilters.guide === 'yes' ? !w.is_guide : w.is_guide)) return false;
+    if (workerFilters.role !== '__all__' && w.role !== workerFilters.role) return false;
+    return true;
+  });
 
   const SortButton = ({ column, label }) => (
     <Button variant="ghost" size="sm" className="h-8 hover:bg-gray-100" onClick={() => handleSort(column)}>
@@ -220,7 +271,91 @@ export default function Reports() {
         {allSubTypes.length > 0 && (
           <Card className="border-none shadow-lg mb-8">
             <CardHeader className="border-b">
-              <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5 text-green-600" />Hours by Sub-Type</CardTitle>
+              <div className="flex justify-between items-start flex-wrap gap-4">
+                <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5 text-green-600" />Hours by Sub-Type</CardTitle>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant={dateFilterMode === 'all' ? 'default' : 'outline'} 
+                    size="sm"
+                    onClick={() => setDateFilterMode('all')}
+                  >
+                    All Time
+                  </Button>
+                  <Button 
+                    variant={dateFilterMode === 'daily' ? 'default' : 'outline'} 
+                    size="sm"
+                    onClick={() => setDateFilterMode('daily')}
+                  >
+                    Today
+                  </Button>
+                  <Button 
+                    variant={dateFilterMode === 'week' ? 'default' : 'outline'} 
+                    size="sm"
+                    onClick={() => setDateFilterMode('week')}
+                  >
+                    This Week
+                  </Button>
+                  <Button 
+                    variant={dateFilterMode === 'month' ? 'default' : 'outline'} 
+                    size="sm"
+                    onClick={() => setDateFilterMode('month')}
+                  >
+                    This Month
+                  </Button>
+                  <Button 
+                    variant={dateFilterMode === 'half_year' ? 'default' : 'outline'} 
+                    size="sm"
+                    onClick={() => setDateFilterMode('half_year')}
+                  >
+                    Half Year
+                  </Button>
+                  <Button 
+                    variant={dateFilterMode === 'custom' ? 'default' : 'outline'} 
+                    size="sm"
+                    onClick={() => setDateFilterMode('custom')}
+                  >
+                    Custom
+                  </Button>
+                </div>
+              </div>
+
+              {dateFilterMode === 'custom' && (
+                <div className="flex gap-2 mt-3">
+                  <div><Label className="text-xs">Start Date</Label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-8" /></div>
+                  <div><Label className="text-xs">End Date</Label><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-8" /></div>
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-3 flex-wrap">
+                <Select value={workerFilters.category} onValueChange={(v) => setWorkerFilters({...workerFilters, category: v})}>
+                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Categories</SelectItem>
+                    <SelectItem value="category_1">{categoryNames.category_1}</SelectItem>
+                    <SelectItem value="category_2">{categoryNames.category_2}</SelectItem>
+                    <SelectItem value="category_3">{categoryNames.category_3}</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={workerFilters.guide} onValueChange={(v) => setWorkerFilters({...workerFilters, guide: v})}>
+                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Guides</SelectItem>
+                    <SelectItem value="yes">Guides Only</SelectItem>
+                    <SelectItem value="no">Non-Guides</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={workerFilters.role} onValueChange={(v) => setWorkerFilters({...workerFilters, role: v})}>
+                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">All Roles</SelectItem>
+                    <SelectItem value="chef">Chef</SelectItem>
+                    <SelectItem value="sous_chef">Sous-Chef</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="overflow-x-auto">
@@ -232,7 +367,7 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {workers.filter(w => w.active).map(worker => (
+                    {filteredWorkersForSubTypes.map(worker => (
                       <TableRow key={worker.id}>
                         <TableCell className="font-medium">{worker.full_name}</TableCell>
                         {allSubTypes.map(st => (
@@ -243,7 +378,7 @@ export default function Reports() {
                     <TableRow className="bg-gray-100 font-semibold">
                       <TableCell>Total</TableCell>
                       {allSubTypes.map(st => {
-                        const total = workers.filter(w => w.active).reduce((sum, w) => sum + getWorkerHoursBySubType(w.id, st), 0);
+                        const total = filteredWorkersForSubTypes.reduce((sum, w) => sum + getWorkerHoursBySubType(w.id, st), 0);
                         return <TableCell key={st}>{total}h</TableCell>;
                       })}
                     </TableRow>
