@@ -26,7 +26,9 @@ export function toHebrewNumerals(num) {
 
 // Simple approximation of Hebrew date
 export function getHebrewDate(gregorianDate) {
+  if (!gregorianDate) return { day: 1, month: "Nisan", monthHeb: "ניסן", year: 5784, dayHeb: "א" };
   const date = new Date(gregorianDate);
+  if (isNaN(date.getTime())) return { day: 1, month: "Nisan", monthHeb: "ניסן", year: 5784, dayHeb: "א" };
   const year = date.getFullYear();
   const month = date.getMonth();
   const day = date.getDate();
@@ -51,6 +53,7 @@ export function getHebrewDate(gregorianDate) {
 }
 
 export function formatHebrewDate(gregorianDate) {
+  if (!gregorianDate) return "";
   const heb = getHebrewDate(gregorianDate);
   return `${heb.dayHeb} ${heb.monthHeb}`;
 }
