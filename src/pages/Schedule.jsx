@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react";
 import { format, addDays, subDays, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, Check, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Star, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -277,6 +278,53 @@ export default function Schedule() {
     return "text-gray-900";
   };
 
+  const handleExportToExcel = () => {
+    const exportData = [];
+    
+    carts.forEach(cart => {
+      const cartAssignments = getCartAssignments(cart.id);
+      const columns = cartColumns[cart.id] || [];
+      
+      cartAssignments.forEach(assignment => {
+        const row = {
+          "Food Cart": cart.name,
+          "Location": cart.location,
+          "Date": dateString,
+          "Time": `${assignment.start_time || "?"}-${assignment.end_time || "?"}`,
+          "Hours": assignment.hours || 0,
+          "Chef": assignment.chef_name || "",
+          "Sous-Chef": assignment.sous_chef_name || "",
+          "Additional": assignment.additional_chef_name || "",
+        };
+        
+        columns.forEach(col => {
+          const colValue = assignment.column_values?.[col];
+          if (colValue) {
+            row[col] = colValue.value || "";
+            if (colValue.subType) {
+              row[`${col} Type`] = colValue.subType;
+            }
+          } else {
+            row[col] = "";
+          }
+        });
+        
+        if (assignment.notes) {
+          row["Notes"] = assignment.notes;
+        }
+        
+        exportData.push(row);
+      });
+    });
+    
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Schedule");
+    
+    const fileName = `schedule_${dateString}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
 
 
   if (loading) {
@@ -299,6 +347,10 @@ export default function Schedule() {
                 <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center">{format(currentDate, "MMM d, yyyy")}</div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
                 <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Today</Button>
+                <Button variant="outline" onClick={handleExportToExcel} className="gap-2">
+                  <Download className="w-4 h-4" />
+                  Export
+                </Button>
               </div>
             </div>
           </CardHeader>
