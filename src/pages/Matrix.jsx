@@ -341,7 +341,7 @@ export default function Matrix() {
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className={`absolute h-full border-l-2 rounded-sm flex items-center px-2 overflow-hidden z-30 ${assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`}
+              className={`absolute h-full border-l-2 rounded-sm flex items-center px-2 overflow-hidden z-20 ${assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`}
               style={{ left: `${startPercent}%`, width: `${width}%` }}
             >
               <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>
@@ -375,7 +375,7 @@ export default function Matrix() {
         
         {/* Type indicator - clickable circle */}
         <button
-          className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-20 hover:scale-110 transition-transform"
+          className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform"
           style={{ borderColor: shift.type === 'wanted' ? '#16a34a' : shift.type === 'unavailable' ? '#dc2626' : '#3b82f6' }}
           onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
           onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }}
@@ -401,7 +401,7 @@ export default function Matrix() {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className={`absolute h-full rounded-sm flex items-center justify-center z-20 ${unavail.reason === 'overseas' ? 'bg-red-200 border-l-2 border-red-500' : 'bg-gray-300 border-l-2 border-gray-500'}`} style={{ left: `${startPercent}%`, width: `${width}%` }}>
+            <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-l-2 border-red-500' : 'bg-gray-300 border-l-2 border-gray-500'}`} style={{ left: `${startPercent}%`, width: `${width}%` }}>
               <Ban className="w-3 h-3 text-gray-600" />
             </div>
           </TooltipTrigger>
@@ -421,7 +421,7 @@ export default function Matrix() {
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
 
     return (
-      <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-50 opacity-80" style={{ left: `${startPercent}%`, width: `${width}%` }}>
+      <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80" style={{ left: `${startPercent}%`, width: `${width}%` }}>
         <span className="text-xs font-bold">{preview.start} - {preview.end}</span>
       </div>
     );
@@ -479,7 +479,7 @@ export default function Matrix() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <div className="min-w-[1400px]">
-                <div className="flex sticky top-0 bg-gray-100 z-40 border-b">
+                <div className="flex sticky top-0 bg-gray-100 z-50 border-b">
                   <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50">Worker</div>
                   <div className="flex-1 relative flex">
                     {timeSlots.map((hour) => (
@@ -500,7 +500,7 @@ export default function Matrix() {
                     
                     return (
                       <div key={worker.id} className={`flex border-b ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                        <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-10">
+                        <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-40">
                           <div className="flex items-center">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'}`}>
                               <ChefHat className="w-4 h-4" />
