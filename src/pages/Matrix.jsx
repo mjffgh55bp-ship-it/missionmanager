@@ -79,7 +79,7 @@ export default function Matrix() {
       });
     }
     
-    setWorkers(workersData);
+    setWorkers(workersData.sort((a, b) => a.full_name.localeCompare(b.full_name)));
     setAssignments(filteredAssignments);
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
