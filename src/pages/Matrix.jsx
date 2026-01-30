@@ -383,7 +383,7 @@ export default function Matrix() {
           {typeLabels[shift.type] || "A"}
         </button>
         
-        <div className="flex items-center gap-1 text-gray-800 text-[10px] font-medium mx-2 truncate mt-2">
+        <div className="flex items-center gap-1 text-gray-800 text-[10px] font-medium mx-2 truncate mt-2 pointer-events-none">
           {icons[shift.type]}
           <span>{shift.start_time}-{shift.end_time}</span>
         </div>
