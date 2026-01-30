@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +27,7 @@ const SHIFT_BLOCKS = [
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function Availability() {
+  const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState(null);
   const [currentWorker, setCurrentWorker] = useState(null);
   const [workers, setWorkers] = useState([]);
@@ -205,30 +207,34 @@ export default function Availability() {
       desired_shifts: desiredShiftsCount ? parseInt(desiredShiftsCount) : null
     };
 
+    let updatedAvailability;
     if (existingAvailability) {
-      await base44.entities.Availability.update(existingAvailability.id, availabilityData);
+      updatedAvailability = await base44.entities.Availability.update(existingAvailability.id, availabilityData);
+      setExistingAvailability(updatedAvailability);
     } else {
-      await base44.entities.Availability.create(availabilityData);
+      updatedAvailability = await base44.entities.Availability.create(availabilityData);
+      setExistingAvailability(updatedAvailability);
     }
-
+    
+    setOriginalShifts(JSON.parse(JSON.stringify(selectedShifts)));
     setShowSummary(false);
     setShowEditMode(false);
-    loadData();
   };
 
   const handleSubmitChangeRequest = async () => {
     if (!existingAvailability) return;
 
-    await base44.entities.Availability.update(existingAvailability.id, {
+    const updatedAvailability = await base44.entities.Availability.update(existingAvailability.id, {
       shifts: selectedShifts,
       status: "pending_change",
       change_request: changeNote || "Shift changes requested"
     });
 
+    setExistingAvailability(updatedAvailability);
+    setOriginalShifts(JSON.parse(JSON.stringify(selectedShifts)));
     setShowChangeRecap(false);
     setShowEditMode(false);
     setChangeNote("");
-    loadData();
   };
 
   const getChanges = () => {
@@ -259,8 +265,9 @@ export default function Availability() {
       currentD = addDays(currentD, 1);
     }
 
+    const newUnavailabilities = [];
     for (const dateStr of datesToAdd) {
-      await base44.entities.Unavailability.create({
+      const created = await base44.entities.Unavailability.create({
         worker_id: currentWorker.id,
         worker_name: currentWorker.full_name,
         date: dateStr,
@@ -268,7 +275,17 @@ export default function Availability() {
         end_time: unavailabilityForm.end_time,
         reason: unavailabilityForm.reason
       });
+      newUnavailabilities.push(created);
     }
+
+    // Update state with new unavailabilities
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
+    const weekUnavailabilities = newUnavailabilities.filter(u => {
+      const uDate = new Date(u.date);
+      return uDate >= new Date(weekStartStr) && uDate <= new Date(weekEndStr);
+    });
+    setUnavailabilities([...unavailabilities, ...weekUnavailabilities]);
 
     // Also mark affected shifts as unavailable in selectedShifts
     if (unavailabilityForm.multiDay) {
@@ -298,12 +315,11 @@ export default function Availability() {
       reason: "occupied",
       multiDay: false
     });
-    loadData();
   };
 
   const handleDeleteUnavailability = async (id) => {
     await base44.entities.Unavailability.delete(id);
-    loadData();
+    setUnavailabilities(unavailabilities.filter(u => u.id !== id));
   };
 
   const generateICSFile = () => {
