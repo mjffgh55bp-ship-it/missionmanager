@@ -52,6 +52,17 @@ export default function Yearly() {
 
   useEffect(() => { loadData(); }, [currentYear]);
 
+  useEffect(() => {
+    if (!loading && scrollContainerRef.current && yearDays.length > 0) {
+      const today = format(new Date(), "yyyy-MM-dd");
+      const todayIndex = yearDaysMap[today];
+      if (todayIndex !== undefined) {
+        const scrollPosition = todayIndex * CELL_WIDTH - (scrollContainerRef.current.clientWidth / 2) + (CELL_WIDTH / 2);
+        scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
+      }
+    }
+  }, [loading, yearDays.length]);
+
   const loadData = async () => {
     setLoading(true);
     const [rowsData, eventsData, workersData, unavailData, catSettings] = await Promise.all([
