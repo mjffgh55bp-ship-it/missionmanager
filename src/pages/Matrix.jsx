@@ -369,7 +369,7 @@ export default function Matrix() {
       <div
         className={`absolute h-full border-l-2 rounded-sm flex items-center justify-between px-1 z-10 cursor-move ${colors[shift.type] || colors.available}`}
         style={{ left: `${startPercent}%`, width: `${width}%` }}
-        onMouseDown={(e) => handleMouseDown(e, worker, shift, 'move')}
+        onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move'); }}
       >
         <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start'); }} />
         
