@@ -279,7 +279,7 @@ export default function Yearly() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col" dir="rtl">
       {/* Fixed Header */}
-      <div className="sticky top-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 pb-2">
+      <div className="fixed top-0 left-64 right-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 pb-2">
         <div className="max-w-full mx-auto flex flex-wrap justify-between items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-1">לוח שנתי</h1>
@@ -301,7 +301,7 @@ export default function Yearly() {
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-hidden px-4 md:px-6 pb-4">
+      <div className="flex-1 overflow-hidden px-4 md:px-6 pb-4 pt-24">
         <Card className="border-none shadow-lg overflow-hidden h-full">
           <CardContent className="p-0 h-full">
             <div className="flex h-full">
