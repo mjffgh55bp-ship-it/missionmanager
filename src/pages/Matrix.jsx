@@ -534,8 +534,12 @@ export default function Matrix() {
                           </div>
                           {availabilityShifts.map((shift, idx) => (<AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />))}
                           {workerUnavailabilities.map(unavail => (<UnavailabilityBar key={unavail.id} unavail={unavail} />))}
-                          {workerAssignments.length > 0 && console.log(`Rendering ${workerAssignments.length} assignments for ${worker.full_name}`)}
-                          {workerAssignments.map(ass => (<AssignmentBar key={ass.id} assignment={ass} />))}
+                          {workerAssignments.length > 0 && console.log(`Rendering ${workerAssignments.length} assignments for ${worker.full_name}:`, workerAssignments.map(a => `${a.chef_id || a.sous_chef_id || a.additional_chef_id}`).join(', '))}
+                          {workerAssignments.map(ass => {
+                            const actualChefId = ass.chef_id || ass.sous_chef_id || ass.additional_chef_id;
+                            if (actualChefId !== worker.id) console.warn(`MISMATCH: Assignment for ${actualChefId} rendering in ${worker.full_name}'s row!`);
+                            return <AssignmentBar key={ass.id} assignment={ass} />;
+                          })}
                           <DragPreviewBar preview={dragPreview} workerId={worker.id} />
                         </div>
                       </div>
