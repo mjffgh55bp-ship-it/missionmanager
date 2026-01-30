@@ -53,15 +53,19 @@ export default function Yearly() {
   useEffect(() => { loadData(); }, [currentYear]);
 
   useEffect(() => {
-    if (!loading && scrollContainerRef.current && yearDays.length > 0) {
-      const today = format(new Date(), "yyyy-MM-dd");
-      const todayIndex = yearDaysMap[today];
-      if (todayIndex !== undefined) {
-        const scrollPosition = todayIndex * CELL_WIDTH - (scrollContainerRef.current.clientWidth / 2) + (CELL_WIDTH / 2);
-        scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
-      }
+    if (!loading && scrollContainerRef.current) {
+      setTimeout(() => {
+        const today = format(new Date(), "yyyy-MM-dd");
+        const yearStart = new Date(currentYear, 0, 1);
+        const todayDate = new Date();
+        const daysDiff = Math.floor((todayDate - yearStart) / (1000 * 60 * 60 * 24));
+        if (daysDiff >= 0 && todayDate.getFullYear() === currentYear) {
+          const scrollPosition = daysDiff * CELL_WIDTH - (scrollContainerRef.current.clientWidth / 2) + (CELL_WIDTH / 2);
+          scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
+        }
+      }, 100);
     }
-  }, [loading, yearDays.length]);
+  }, [loading, currentYear]);
 
   const loadData = async () => {
     setLoading(true);
