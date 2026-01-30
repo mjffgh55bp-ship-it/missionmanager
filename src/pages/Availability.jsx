@@ -44,9 +44,6 @@ export default function Availability() {
   const [showDateDetails, setShowDateDetails] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [changeNote, setChangeNote] = useState("");
-  const [showYearlyEventDialog, setShowYearlyEventDialog] = useState(false);
-  const [editingYearlyEvent, setEditingYearlyEvent] = useState(null);
-  const [yearlyEventForm, setYearlyEventForm] = useState({ title: "", start_date: "", end_date: "", start_time: "", end_time: "" });
   const [tipsMessage, setTipsMessage] = useState("");
   const [showTipsPopup, setShowTipsPopup] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -432,35 +429,6 @@ END:VEVENT
     setShowDateDetails(true);
   };
 
-  const handleYearlyEventDoubleClick = (event, e) => {
-    e.stopPropagation();
-    setEditingYearlyEvent(event);
-    setYearlyEventForm({
-      title: event.title || "",
-      start_date: event.start_date,
-      end_date: event.end_date,
-      start_time: event.start_time || "",
-      end_time: event.end_time || ""
-    });
-    setShowYearlyEventDialog(true);
-  };
-
-  const handleSaveYearlyEvent = async () => {
-    if (!editingYearlyEvent) return;
-    await base44.entities.YearlyEvent.update(editingYearlyEvent.id, yearlyEventForm);
-    setShowYearlyEventDialog(false);
-    setEditingYearlyEvent(null);
-    loadData();
-  };
-
-  const handleDeleteYearlyEvent = async () => {
-    if (!editingYearlyEvent) return;
-    await base44.entities.YearlyEvent.delete(editingYearlyEvent.id);
-    setShowYearlyEventDialog(false);
-    setEditingYearlyEvent(null);
-    loadData();
-  };
-
   const wantedShifts = selectedShifts.filter(s => s.type === "wanted").sort((a, b) => (a.priority || 0) - (b.priority || 0));
   const availableShifts = selectedShifts.filter(s => s.type === "available").sort((a, b) => (a.priority || 0) - (b.priority || 0));
 
@@ -641,12 +609,7 @@ END:VEVENT
                                 {yearlyEvts.length > 0 && (
                                   <div className="space-y-0.5">
                                     {yearlyEvts.map(evt => (
-                                      <div 
-                                        key={evt.id} 
-                                        className="text-[9px] bg-purple-100 border border-purple-300 rounded px-1 py-0.5 truncate cursor-pointer hover:bg-purple-200" 
-                                        title={`${evt.title} (${evt.start_time}-${evt.end_time}) - Double click to edit`}
-                                        onDoubleClick={(e) => handleYearlyEventDoubleClick(evt, e)}
-                                      >
+                                      <div key={evt.id} className="text-[9px] bg-purple-100 border border-purple-300 rounded px-1 py-0.5 truncate" title={`${evt.title} (${evt.start_time}-${evt.end_time})`}>
                                         📅 {evt.title}
                                       </div>
                                     ))}
@@ -719,14 +682,7 @@ END:VEVENT
                         <div className="font-medium">{format(day, "d")}</div>
                         {event && <div className="bg-purple-100 text-purple-700 rounded px-1 truncate mt-1">🎉</div>}
                         {workerYearlyEvents.slice(0, 1).map((e, i) => (
-                          <div 
-                            key={i} 
-                            className="bg-green-100 text-green-700 rounded px-1 truncate mt-1 cursor-pointer hover:bg-green-200" 
-                            title={`${e.title} - Double click to edit`}
-                            onDoubleClick={(evt) => handleYearlyEventDoubleClick(e, evt)}
-                          >
-                            {e.title}
-                          </div>
+                          <div key={i} className="bg-green-100 text-green-700 rounded px-1 truncate mt-1" title={e.title}>{e.title}</div>
                         ))}
                         {dayAssignments.slice(0, 1).map((a, i) => (
                           <div key={i} className="bg-blue-100 text-blue-700 rounded px-1 truncate mt-1">{a.start_time.slice(0, 5)}</div>
@@ -902,43 +858,6 @@ END:VEVENT
           </DialogContent>
         </Dialog>
 
-        <Dialog open={showYearlyEventDialog} onOpenChange={setShowYearlyEventDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Edit Yearly Event</DialogTitle></DialogHeader>
-            <div className="py-4 space-y-4">
-              <div>
-                <Label>Title</Label>
-                <Input value={yearlyEventForm.title} onChange={(e) => setYearlyEventForm({...yearlyEventForm, title: e.target.value})} placeholder="Event title" className="mt-1" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Start Date</Label>
-                  <Input type="date" value={yearlyEventForm.start_date} onChange={(e) => setYearlyEventForm({...yearlyEventForm, start_date: e.target.value})} className="mt-1" />
-                </div>
-                <div>
-                  <Label>End Date</Label>
-                  <Input type="date" value={yearlyEventForm.end_date} onChange={(e) => setYearlyEventForm({...yearlyEventForm, end_date: e.target.value})} className="mt-1" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Start Time</Label>
-                  <Input type="time" value={yearlyEventForm.start_time} onChange={(e) => setYearlyEventForm({...yearlyEventForm, start_time: e.target.value})} className="mt-1" />
-                </div>
-                <div>
-                  <Label>End Time</Label>
-                  <Input type="time" value={yearlyEventForm.end_time} onChange={(e) => setYearlyEventForm({...yearlyEventForm, end_time: e.target.value})} className="mt-1" />
-                </div>
-              </div>
-            </div>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setShowYearlyEventDialog(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleDeleteYearlyEvent}>Delete</Button>
-              <Button onClick={handleSaveYearlyEvent} className="bg-blue-900 hover:bg-blue-800">Save</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
         <Dialog open={showDateDetails} onOpenChange={setShowDateDetails}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
@@ -960,12 +879,7 @@ END:VEVENT
                   <div>
                     <p className="font-semibold mb-2">Your Yearly Events:</p>
                     {getYearlyEventsForDate(selectedDate).map((e, i) => (
-                      <div 
-                        key={i} 
-                        className="p-3 bg-green-50 border border-green-200 rounded-lg mb-2 cursor-pointer hover:bg-green-100"
-                        onDoubleClick={(evt) => handleYearlyEventDoubleClick(e, evt)}
-                        title="Double click to edit"
-                      >
+                      <div key={i} className="p-3 bg-green-50 border border-green-200 rounded-lg mb-2">
                         <p className="font-medium text-green-800">{e.title}</p>
                         <p className="text-sm text-gray-600">{e.start_time} - {e.end_time}</p>
                       </div>
