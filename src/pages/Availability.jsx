@@ -615,7 +615,22 @@ END:VEVENT
                             const state = getShiftState(date, shift);
                             const yearlyEvts = getYearlyEventsForShift(addDays(weekStart, dayIndex), shift.start, shift.end);
                             return (
-                              <div key={shift.start} className="flex flex-col gap-0.5">
+                              <div key={shift.start} className="flex flex-col gap-0.5 relative">
+                                {yearlyEvts.length > 0 && (
+                                  <div className="h-3 relative mb-0.5">
+                                    {yearlyEvts.map(evt => {
+                                      const barPos = getEventBarPosition(evt.start_time, evt.end_time, shift.start, shift.end);
+                                      return (
+                                        <div 
+                                          key={evt.id} 
+                                          className="absolute h-2.5 bg-purple-500 rounded-sm border border-purple-600" 
+                                          style={{ left: barPos.left, width: barPos.width, top: '0px' }}
+                                          title={`${evt.title} (${evt.start_time}-${evt.end_time})`}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                )}
                                 <button
                                   onClick={() => cycleShiftState(date, shift)}
                                   disabled={!canEdit}
@@ -624,15 +639,6 @@ END:VEVENT
                                   {getShiftIcon(state)}
                                   <span className="text-[10px] mt-0.5">{shift.start}</span>
                                 </button>
-                                {yearlyEvts.length > 0 && (
-                                  <div className="space-y-0.5">
-                                    {yearlyEvts.map(evt => (
-                                      <div key={evt.id} className="text-[9px] bg-purple-100 border border-purple-300 rounded px-1 py-0.5 truncate" title={`${evt.title} (${evt.start_time}-${evt.end_time})`}>
-                                        📅 {evt.title}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
                               </div>
                             );
                           })}
