@@ -20,7 +20,8 @@ const SHIFT_BLOCKS = [
   { start: "14:00", end: "18:00" },
   { start: "18:00", end: "22:00" },
   { start: "22:00", end: "02:00" },
-  { start: "02:00", end: "06:00" }
+  { start: "02:00", end: "04:00" },
+  { start: "04:00", end: "06:00" }
 ];
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
