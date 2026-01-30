@@ -15,7 +15,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 const HEBREW_DAYS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 const ROW_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
-const CELL_WIDTH = 42;
+const CELL_WIDTH = 60;
 const ROW_HEIGHT = 60;
 const EVENT_HEIGHT = 16;
 
