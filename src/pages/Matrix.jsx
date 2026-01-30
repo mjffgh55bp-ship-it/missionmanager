@@ -534,6 +534,7 @@ export default function Matrix() {
                           </div>
                           {availabilityShifts.map((shift, idx) => (<AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />))}
                           {workerUnavailabilities.map(unavail => (<UnavailabilityBar key={unavail.id} unavail={unavail} />))}
+                          {workerAssignments.length > 0 && console.log(`Rendering ${workerAssignments.length} assignments for ${worker.full_name}`)}
                           {workerAssignments.map(ass => (<AssignmentBar key={ass.id} assignment={ass} />))}
                           <DragPreviewBar preview={dragPreview} workerId={worker.id} />
                         </div>
