@@ -325,13 +325,41 @@ END:VEVENT
 `;
     });
     
+    // Add yearly events assigned to current worker
+    if (currentWorker) {
+      yearlyEvents.filter(e => e.worker_ids?.includes(currentWorker.id)).forEach(event => {
+        const startDateStr = event.start_date.replace(/-/g, '');
+        const endDateStr = event.end_date.replace(/-/g, '');
+        
+        if (event.start_time && event.end_time) {
+          const startTimeStr = event.start_time.replace(/:/g, '');
+          const endTimeStr = event.end_time.replace(/:/g, '');
+          icsContent += `BEGIN:VEVENT
+DTSTART:${startDateStr}T${startTimeStr}00
+DTEND:${endDateStr}T${endTimeStr}00
+SUMMARY:${event.title || 'Event'}
+DESCRIPTION:${event.worker_name || ''}
+END:VEVENT
+`;
+        } else {
+          icsContent += `BEGIN:VEVENT
+DTSTART;VALUE=DATE:${startDateStr}
+DTEND;VALUE=DATE:${endDateStr}
+SUMMARY:${event.title || 'Event'}
+DESCRIPTION:${event.worker_name || ''}
+END:VEVENT
+`;
+        }
+      });
+    }
+    
     icsContent += `END:VCALENDAR`;
     
     const blob = new Blob([icsContent], { type: 'text/calendar' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'company-events.ics';
+    a.download = 'my-schedule.ics';
     a.click();
     URL.revokeObjectURL(url);
   };
