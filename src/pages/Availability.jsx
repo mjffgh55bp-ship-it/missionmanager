@@ -20,8 +20,7 @@ const SHIFT_BLOCKS = [
   { start: "14:00", end: "18:00" },
   { start: "18:00", end: "22:00" },
   { start: "22:00", end: "02:00" },
-  { start: "02:00", end: "04:00" },
-  { start: "04:00", end: "06:00" }
+  { start: "02:00", end: "06:00" }
 ];
 
 const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -611,7 +610,7 @@ END:VEVENT
                             </Badge>
                           )}
                         </div>
-                        <div className="grid grid-cols-7 gap-1">
+                        <div className="grid grid-cols-6 gap-1">
                           {SHIFT_BLOCKS.map((shift) => {
                             const state = getShiftState(date, shift);
                             const yearlyEvts = getYearlyEventsForShift(addDays(weekStart, dayIndex), shift.start, shift.end);
