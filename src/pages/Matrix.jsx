@@ -499,8 +499,8 @@ export default function Matrix() {
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
                     
                     return (
-                      <div key={worker.id} className={`flex border-b min-h-16 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                        <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-40 min-h-16">
+                      <div key={worker.id} className={`flex border-b ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                        <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-40">
                           <div className="flex items-center">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'}`}>
                               <ChefHat className="w-4 h-4" />
@@ -521,7 +521,7 @@ export default function Matrix() {
                             }
                           }}
                         >
-                          <div className="flex min-h-16 h-full">
+                          <div className="flex h-full">
                             {timeSlots.map(hour => (<div key={hour} className="flex-1 border-r time-slot h-full"></div>))}
                           </div>
                           {availabilityShifts.map((shift, idx) => (<AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />))}
