@@ -194,6 +194,8 @@ export default function Yearly() {
   const handleDragStart = (e, event, type) => {
     if (viewOnly) return;
     e.stopPropagation();
+    // Prevent drag from starting on double-click
+    if (e.detail > 1) return;
     setDragging({ event, type, startX: e.clientX, originalStart: event.start_date, originalEnd: event.end_date });
   };
 
