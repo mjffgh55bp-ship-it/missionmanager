@@ -498,6 +498,8 @@ export default function Matrix() {
                     const workerAssignments = getWorkerAssignments(worker.id);
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
                     
+                    console.log(`Row ${index}: ${worker.full_name} (${worker.id}) - Assignments:`, workerAssignments.length, 'Availability:', availabilityShifts.length);
+                    
                     return (
                       <div key={worker.id} className={`flex border-b h-16 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                         <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-40 h-16">
