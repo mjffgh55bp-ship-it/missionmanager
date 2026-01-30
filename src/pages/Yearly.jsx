@@ -7,9 +7,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Palette, Eye, EyeOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Palette, Eye, EyeOff, GripVertical } from "lucide-react";
 import { format, addDays, getDay, differenceInDays, parseISO } from "date-fns";
 import { getHebrewDate } from "../components/utils/HebrewDate";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 const HEBREW_DAYS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
@@ -74,6 +75,19 @@ export default function Yearly() {
     if (!newRowName.trim()) return;
     await base44.entities.YearlyRow.create({ name: newRowName.trim(), order: rows.length, color: newRowColor });
     setNewRowName(""); setNewRowColor("#3b82f6"); setShowAddRowDialog(false); loadData();
+  };
+
+  const handleDragEnd = async (result) => {
+    if (!result.destination || viewOnly) return;
+    const items = Array.from(rows);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    
+    setRows(items);
+    
+    for (let i = 0; i < items.length; i++) {
+      await base44.entities.YearlyRow.update(items[i].id, { order: i });
+    }
   };
 
   const handleDeleteRow = async (rowId) => {
@@ -295,8 +309,7 @@ export default function Yearly() {
             <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[100px] text-center">{currentYear}</div>
             <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronLeft className="w-4 h-4" /></Button>
             <Button variant="outline" onClick={() => setCurrentYear(new Date().getFullYear())}>השנה</Button>
-            {!viewOnly && <Button onClick={() => setShowAddRowDialog(true)}><Plus className="w-4 h-4 ml-2" />הוסף שורה</Button>}
-          </div>
+            </div>
         </div>
       </div>
 
@@ -310,33 +323,66 @@ export default function Yearly() {
                 <div className="bg-blue-900 text-white p-2 font-semibold text-right h-[36px] flex items-center sticky top-0 z-30">שורה</div>
                 <div className="bg-blue-800 text-white p-2 text-xs text-right h-[28px] flex items-center sticky top-[36px] z-30">שבוע</div>
                 <div className="bg-gray-100 p-2 text-xs font-medium text-right h-[52px] flex items-center sticky top-[64px] z-30">יום, תאריך</div>
-                
-                {rows.map((row, rowIdx) => {
-                  const rowEvents = getEventsForRow(row.id);
-                  const tracks = layoutEventsInTracks(rowEvents);
-                  const dynamicHeight = Math.max(ROW_HEIGHT, 8 + tracks.length * (EVENT_HEIGHT + 2));
-                  return (
-                    <div key={row.id} className={`p-2 border-b flex items-center justify-between ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`} style={{ height: dynamicHeight }}>
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: row.color }}></div>
-                        <span className="text-sm font-medium truncate">{row.name}</span>
-                      </div>
-                      {!viewOnly && (
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <div className="relative">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowColorPicker(showColorPicker === row.id ? null : row.id)}><Palette className="w-3 h-3" /></Button>
-                            {showColorPicker === row.id && (
-                              <div className="absolute top-7 left-0 bg-white border rounded-lg shadow-lg p-2 z-50 flex gap-1 flex-wrap w-24">
-                                {ROW_COLORS.map(c => (<button key={c} className="w-5 h-5 rounded-full border-2 border-white hover:scale-110" style={{ backgroundColor: c }} onClick={() => handleChangeRowColor(row.id, c)} />))}
-                              </div>
-                            )}
-                          </div>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteRow(row.id)}><Trash2 className="w-3 h-3" /></Button>
+
+                <DragDropContext onDragEnd={handleDragEnd}>
+                  <Droppable droppableId="rows">
+                    {(provided) => (
+                      <div {...provided.droppableProps} ref={provided.innerRef}>
+                        {rows.map((row, rowIdx) => {
+                          const rowEvents = getEventsForRow(row.id);
+                          const tracks = layoutEventsInTracks(rowEvents);
+                          const dynamicHeight = Math.max(ROW_HEIGHT, 8 + tracks.length * (EVENT_HEIGHT + 2));
+                          return (
+                            <Draggable key={row.id} draggableId={row.id} index={rowIdx} isDragDisabled={viewOnly}>
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.draggableProps}
+                                  className={`p-2 border-b flex items-center justify-between ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${snapshot.isDragging ? 'shadow-lg' : ''}`}
+                                  style={{ height: dynamicHeight, ...provided.draggableProps.style }}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {!viewOnly && (
+                                      <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                                        <GripVertical className="w-4 h-4 text-gray-400" />
+                                      </div>
+                                    )}
+                                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: row.color }}></div>
+                                    <span className="text-sm font-medium truncate">{row.name}</span>
+                                  </div>
+                                  {!viewOnly && (
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      <div className="relative">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowColorPicker(showColorPicker === row.id ? null : row.id)}><Palette className="w-3 h-3" /></Button>
+                                        {showColorPicker === row.id && (
+                                          <div className="absolute top-7 left-0 bg-white border rounded-lg shadow-lg p-2 z-50 flex gap-1 flex-wrap w-24">
+                                            {ROW_COLORS.map(c => (<button key={c} className="w-5 h-5 rounded-full border-2 border-white hover:scale-110" style={{ backgroundColor: c }} onClick={() => handleChangeRowColor(row.id, c)} />))}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteRow(row.id)}><Trash2 className="w-3 h-3" /></Button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </Draggable>
+                          );
+                        })}
+                        {provided.placeholder}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        )}
+                        </Droppable>
+                        </DragDropContext>
+
+                        {!viewOnly && (
+                        <button
+                        onClick={() => setShowAddRowDialog(true)}
+                        className="w-full p-3 border-b bg-blue-50 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 text-blue-900 font-medium"
+                        >
+                        <Plus className="w-4 h-4" />
+                        <span>הוסף שורה</span>
+                        </button>
+                        )}
                 
                 {unavailabilities.length > 0 && (
                   <div className="p-2 border-b bg-red-50 flex items-center gap-2" style={{ height: ROW_HEIGHT }}>
@@ -385,30 +431,49 @@ export default function Yearly() {
                   </div>
 
                   {/* Custom Rows */}
-                  {rows.map((row, rowIdx) => {
-                    const rowEvents = getEventsForRow(row.id);
-                    const tracks = layoutEventsInTracks(rowEvents);
-                    const dynamicHeight = Math.max(ROW_HEIGHT, 8 + tracks.length * (EVENT_HEIGHT + 2));
-                    return (
-                      <div key={row.id} className={`flex border-b ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ height: dynamicHeight }}>
-                        <div className="relative flex" style={{ width: `${yearDays.length * CELL_WIDTH}px` }}>
-                          {yearDays.map((day, idx) => {
-                            const dateStr = format(day, "yyyy-MM-dd");
-                            const dayOfWeek = getDay(day);
-                            const isShabbat = dayOfWeek === 6;
-                            const isFriday = dayOfWeek === 5;
+                  <DragDropContext onDragEnd={handleDragEnd}>
+                    <Droppable droppableId="rows-grid">
+                      {(provided) => (
+                        <div {...provided.droppableProps} ref={provided.innerRef}>
+                          {rows.map((row, rowIdx) => {
+                            const rowEvents = getEventsForRow(row.id);
+                            const tracks = layoutEventsInTracks(rowEvents);
+                            const dynamicHeight = Math.max(ROW_HEIGHT, 8 + tracks.length * (EVENT_HEIGHT + 2));
                             return (
-                              <div key={idx}
-                                className={`h-full border-l ${viewOnly ? '' : 'cursor-pointer hover:bg-blue-50'} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
-                                style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}
-                                onClick={() => handleCellClick(row.id, dateStr)} />
+                              <Draggable key={row.id} draggableId={row.id} index={rowIdx} isDragDisabled={viewOnly}>
+                                {(provided) => (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className={`flex border-b ${rowIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                                    style={{ height: dynamicHeight, ...provided.draggableProps.style }}
+                                  >
+                                    <div className="relative flex" style={{ width: `${yearDays.length * CELL_WIDTH}px` }}>
+                                      {yearDays.map((day, idx) => {
+                                        const dateStr = format(day, "yyyy-MM-dd");
+                                        const dayOfWeek = getDay(day);
+                                        const isShabbat = dayOfWeek === 6;
+                                        const isFriday = dayOfWeek === 5;
+                                        return (
+                                          <div key={idx}
+                                            className={`h-full border-l ${viewOnly ? '' : 'cursor-pointer hover:bg-blue-50'} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
+                                            style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}
+                                            onClick={() => handleCellClick(row.id, dateStr)} />
+                                        );
+                                      })}
+                                      {tracks.map((track, trackIdx) => track.map(event => <EventBar key={event.id} event={event} row={row} trackIndex={trackIdx} />))}
+                                    </div>
+                                  </div>
+                                )}
+                              </Draggable>
                             );
                           })}
-                          {tracks.map((track, trackIdx) => track.map(event => <EventBar key={event.id} event={event} row={row} trackIndex={trackIdx} />))}
-                        </div>
-                      </div>
-                    );
-                  })}
+                          {provided.placeholder}
+                          </div>
+                          )}
+                          </Droppable>
+                          </DragDropContext>
 
                   {/* Unavailability Row */}
                   {unavailabilities.length > 0 && (
