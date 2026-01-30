@@ -419,6 +419,24 @@ END:VEVENT
     });
   };
 
+  const getEventBarPosition = (eventStart, eventEnd, shiftStart, shiftEnd) => {
+    const timeToMinutes = (time) => {
+      const [h, m] = time.split(':').map(Number);
+      return h * 60 + m;
+    };
+    
+    const shiftStartMin = timeToMinutes(shiftStart);
+    const shiftEndMin = timeToMinutes(shiftEnd);
+    const eventStartMin = Math.max(timeToMinutes(eventStart), shiftStartMin);
+    const eventEndMin = Math.min(timeToMinutes(eventEnd), shiftEndMin);
+    
+    const shiftDuration = shiftEndMin - shiftStartMin;
+    const left = ((eventStartMin - shiftStartMin) / shiftDuration) * 100;
+    const width = ((eventEndMin - eventStartMin) / shiftDuration) * 100;
+    
+    return { left: `${left}%`, width: `${width}%` };
+  };
+
   const getAssignmentForDate = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     return assignments.filter(a => a.date === dateStr);
