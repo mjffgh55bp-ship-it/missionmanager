@@ -515,7 +515,13 @@ export default function Matrix() {
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSendNotification(worker)}><Send className="w-3 h-3" /></Button>
                         </div>
                         <div 
-                          ref={el => timelineRefs.current[worker.id] = el}
+                          data-worker-id={worker.id}
+                          ref={el => {
+                            if (el) {
+                              timelineRefs.current[worker.id] = el;
+                              console.log(`Assigned ref for ${worker.full_name} (${worker.id}):`, el);
+                            }
+                          }}
                           className="flex-1 relative border-r cursor-crosshair"
                           onMouseDown={(e) => {
                             if (e.target === e.currentTarget || e.target.classList.contains('time-slot')) {
