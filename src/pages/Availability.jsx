@@ -611,7 +611,7 @@ END:VEVENT
                             </Badge>
                           )}
                         </div>
-                        <div className="grid grid-cols-6 gap-1">
+                        <div className="grid grid-cols-7 gap-1">
                           {SHIFT_BLOCKS.map((shift) => {
                             const state = getShiftState(date, shift);
                             const yearlyEvts = getYearlyEventsForShift(addDays(weekStart, dayIndex), shift.start, shift.end);
