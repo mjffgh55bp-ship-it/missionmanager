@@ -69,53 +69,53 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Dashboard</h1>
-            <p className="text-gray-600">Overview of your food cart operations</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">לוח בקרה</h1>
+            <p className="text-gray-600" dir="rtl">סקירה כללית של פעילות עגלות המזון</p>
           </div>
           <Link to={createPageUrl("Schedule")}>
-            <Button className="bg-blue-900 hover:bg-blue-800 text-white px-6">
-              View Schedule
+            <Button className="bg-blue-900 hover:bg-blue-800 text-white px-6" dir="rtl">
+              צפה בלוח תורים
             </Button>
           </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard
-            title="Active Workers"
+            title="עובדים פעילים"
             value={activeWorkers.length}
             icon={Users}
             color="bg-blue-900"
-            subtitle={`${chefs} chefs, ${sousChefs} sous-chefs`}
+            subtitle={`${chefs} טבחים ראשיים, ${sousChefs} עוזרים`}
           />
           <StatCard
-            title="Food Carts"
+            title="עגלות מזון"
             value={activeCarts.length}
             icon={Truck}
             color="bg-amber-500"
-            subtitle="Currently operational"
+            subtitle="פעילות כרגע"
           />
           <StatCard
-            title="Hours This Week"
+            title="שעות השבוע"
             value={totalHoursThisWeek}
             icon={Clock}
             color="bg-green-600"
-            subtitle={`${thisWeekAssignments.length} shifts`}
+            subtitle={`${thisWeekAssignments.length} משמרות`}
           />
           <StatCard
-            title="Avg Hours/Worker"
+            title="ממוצע שעות לעובד"
             value={activeWorkers.length > 0 ? Math.round(totalHoursThisWeek / activeWorkers.length) : 0}
             icon={TrendingUp}
             color="bg-purple-600"
-            subtitle="This week"
+            subtitle="השבוע"
           />
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
           <Card className="shadow-lg border-none">
             <CardHeader className="border-b bg-white">
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2" dir="rtl">
                 <ChefHat className="w-5 h-5 text-blue-900" />
-                Active Team Members
+                חברי צוות פעילים
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
@@ -143,12 +143,12 @@ export default function Dashboard() {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">No active workers</p>
+                <p className="text-gray-500 text-center py-8" dir="rtl">אין עובדים פעילים</p>
               )}
               {activeWorkers.length > 5 && (
                 <Link to={createPageUrl("Workers")}>
-                  <Button variant="ghost" className="w-full mt-4">
-                    View All Workers
+                  <Button variant="ghost" className="w-full mt-4" dir="rtl">
+                    צפה בכל העובדים
                   </Button>
                 </Link>
               )}
@@ -157,9 +157,9 @@ export default function Dashboard() {
 
           <Card className="shadow-lg border-none">
             <CardHeader className="border-b bg-white">
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2" dir="rtl">
                 <Truck className="w-5 h-5 text-amber-500" />
-                Food Carts
+                עגלות מזון
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
@@ -176,12 +176,12 @@ export default function Dashboard() {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-8">No food carts configured</p>
+                <p className="text-gray-500 text-center py-8" dir="rtl">לא הוגדרו עגלות מזון</p>
               )}
               {activeCarts.length > 5 && (
                 <Link to={createPageUrl("FoodCarts")}>
-                  <Button variant="ghost" className="w-full mt-4">
-                    View All Carts
+                  <Button variant="ghost" className="w-full mt-4" dir="rtl">
+                    צפה בכל העגלות
                   </Button>
                 </Link>
               )}

@@ -18,20 +18,20 @@ import {
 } from "@/components/ui/sidebar";
 
 const managerNavigationItems = [
-  { title: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
-  { title: "Schedule", url: createPageUrl("Schedule"), icon: Calendar },
-  { title: "Matrix", url: createPageUrl("Matrix"), icon: Grid },
-  { title: "Availability", url: createPageUrl("Availability"), icon: Clock },
-  { title: "Workers", url: createPageUrl("Workers"), icon: Users },
-  { title: "Food Carts", url: createPageUrl("FoodCarts"), icon: Truck },
-  { title: "Qualifications", url: createPageUrl("Qualifications"), icon: Award },
-  { title: "Reports", url: createPageUrl("Reports"), icon: BarChart3 },
-  { title: "Yearly", url: createPageUrl("Yearly"), icon: BarChart3 },
-  { title: "Settings", url: createPageUrl("Settings"), icon: Settings },
+  { title: "לוח בקרה", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
+  { title: "לוח תורים", url: createPageUrl("Schedule"), icon: Calendar },
+  { title: "מטריצה", url: createPageUrl("Matrix"), icon: Grid },
+  { title: "זמינות", url: createPageUrl("Availability"), icon: Clock },
+  { title: "עובדים", url: createPageUrl("Workers"), icon: Users },
+  { title: "עגלות", url: createPageUrl("FoodCarts"), icon: Truck },
+  { title: "הסמכות", url: createPageUrl("Qualifications"), icon: Award },
+  { title: "דוחות", url: createPageUrl("Reports"), icon: BarChart3 },
+  { title: "תצוגה שנתית", url: createPageUrl("Yearly"), icon: BarChart3 },
+  { title: "הגדרות", url: createPageUrl("Settings"), icon: Settings },
 ];
 
 const userNavigationItems = [
-  { title: "Availability", url: createPageUrl("Availability"), icon: Clock },
+  { title: "זמינות", url: createPageUrl("Availability"), icon: Clock },
 ];
 
 export default function Layout({ children }) {
@@ -64,7 +64,7 @@ export default function Layout({ children }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Loading...</div>
+        <div className="text-gray-600" dir="rtl">טוען...</div>
       </div>
     );
   }
@@ -78,17 +78,17 @@ export default function Layout({ children }) {
               <div className="w-10 h-10 bg-gradient-to-br from-blue-900 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
                 <ChefHat className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h2 className="font-bold text-gray-900 text-lg">Mission Manager</h2>
-                <p className="text-xs text-gray-500">Food Cart Operations</p>
+              <div dir="rtl">
+                <h2 className="font-bold text-gray-900 text-lg">מנהל משימות</h2>
+                <p className="text-xs text-gray-500">ניהול עגלות מזון</p>
               </div>
             </div>
           </SidebarHeader>
           
           <SidebarContent className="p-3">
             <SidebarGroup>
-              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2">
-                Navigation
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2" dir="rtl">
+                ניווט
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
@@ -117,7 +117,7 @@ export default function Layout({ children }) {
           <header className="bg-white border-b border-gray-200 px-6 py-4 md:hidden">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="hover:bg-gray-100 p-2 rounded-lg transition-colors duration-200" />
-              <h1 className="text-xl font-bold text-gray-900">Mission Manager</h1>
+              <h1 className="text-xl font-bold text-gray-900" dir="rtl">מנהל משימות</h1>
             </div>
           </header>
 
