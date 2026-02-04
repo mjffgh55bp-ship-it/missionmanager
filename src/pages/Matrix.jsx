@@ -446,30 +446,30 @@ export default function Matrix() {
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b bg-white">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <CardTitle className="text-2xl">{viewMode === "weekly" ? "Weekly" : "Daily"} Hours Matrix</CardTitle>
-                <p className="text-sm text-gray-600 mt-1">Drag edges to resize, drag middle to move, click type circle to change</p>
+              <div dir="rtl">
+                <CardTitle className="text-2xl">מטריצת שעות {viewMode === "weekly" ? "שבועית" : "יומית"}</CardTitle>
+                <p className="text-sm text-gray-600 mt-1">גרור קצוות לשינוי גודל, גרור אמצע להזזה, לחץ על עיגול הסוג לשינוי</p>
                 <div className="flex gap-2 mt-2 flex-wrap">
-                  <Badge className="bg-green-100 text-green-800"><Star className="w-3 h-3 mr-1 fill-current" />Wanted</Badge>
-                  <Badge className="bg-blue-100 text-blue-800"><Check className="w-3 h-3 mr-1" />Available</Badge>
-                  <Badge className="bg-red-100 text-red-800"><Ban className="w-3 h-3 mr-1" />Unavailable</Badge>
-                  <Badge className="bg-blue-400 text-white">Assignment</Badge>
+                  <Badge className="bg-green-100 text-green-800" dir="rtl"><Star className="w-3 h-3 mr-1 fill-current" />רצוי</Badge>
+                  <Badge className="bg-blue-100 text-blue-800" dir="rtl"><Check className="w-3 h-3 mr-1" />זמין</Badge>
+                  <Badge className="bg-red-100 text-red-800" dir="rtl"><Ban className="w-3 h-3 mr-1" />לא זמין</Badge>
+                  <Badge className="bg-blue-400 text-white" dir="rtl">שיבוץ</Badge>
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-1">
                   <Calendar className="w-4 h-4" />
-                  <span className="text-sm">Daily</span>
+                  <span className="text-sm" dir="rtl">יומי</span>
                   <Switch checked={viewMode === "weekly"} onCheckedChange={(checked) => setViewMode(checked ? "weekly" : "daily")} />
                   <CalendarDays className="w-4 h-4" />
-                  <span className="text-sm">Weekly</span>
+                  <span className="text-sm" dir="rtl">שבועי</span>
                 </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronLeft className="w-4 h-4" /></Button>
                 <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center">
                   {viewMode === "weekly" ? `Week of ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "MMM d")}` : format(currentDate, "MMM d, yyyy")}
                 </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronRight className="w-4 h-4" /></Button>
-                <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Today</Button>
+                <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
               </div>
             </div>
           </CardHeader>
@@ -480,7 +480,7 @@ export default function Matrix() {
             <div className="overflow-x-auto">
               <div className="min-w-[1400px]">
                 <div className="flex sticky top-0 bg-gray-100 z-50 border-b">
-                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50">Worker</div>
+                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50" dir="rtl">עובד</div>
                   <div className="flex-1 relative flex">
                     {timeSlots.map((hour) => (
                       <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">{String(hour).padStart(2, '0')}:00</div>
@@ -489,9 +489,9 @@ export default function Matrix() {
                 </div>
 
                 {loading ? (
-                  <div className="text-center p-8">Loading...</div>
+                  <div className="text-center p-8" dir="rtl">טוען...</div>
                 ) : workers.length === 0 ? (
-                  <div className="text-center p-8 text-gray-500">No active workers found.</div>
+                  <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
                 ) : (
                   workers.map((worker, index) => {
                     const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
@@ -554,7 +554,7 @@ export default function Matrix() {
         {/* Notification Dialog */}
         <Dialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Send {viewMode === "weekly" ? "Weekly" : "Daily"} Schedule - {selectedWorkerForNotification?.full_name}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">שלח לוח זמנים {viewMode === "weekly" ? "שבועי" : "יומי"} - {selectedWorkerForNotification?.full_name}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-h-60 overflow-y-auto">
                 <p className="text-sm font-semibold mb-2">
@@ -587,11 +587,11 @@ export default function Matrix() {
                   <p className="text-sm text-gray-600">No shifts scheduled</p>
                 )}
               </div>
-              <div><Label>Additional Notes</Label><Textarea value={notificationNotes} onChange={(e) => setNotificationNotes(e.target.value)} rows={4} /></div>
+              <div><Label dir="rtl">הערות נוספות</Label><Textarea value={notificationNotes} onChange={(e) => setNotificationNotes(e.target.value)} rows={4} dir="rtl" /></div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowNotificationDialog(false)}>Cancel</Button>
-              <Button onClick={sendNotification} className="bg-blue-900 hover:bg-blue-800" disabled={!selectedWorkerForNotification?.email}><Send className="w-4 h-4 mr-2" />Send</Button>
+              <Button variant="outline" onClick={() => setShowNotificationDialog(false)} dir="rtl">ביטול</Button>
+              <Button onClick={sendNotification} className="bg-blue-900 hover:bg-blue-800" disabled={!selectedWorkerForNotification?.email} dir="rtl"><Send className="w-4 h-4 mr-2" />שלח</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

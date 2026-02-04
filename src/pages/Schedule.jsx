@@ -330,7 +330,7 @@ export default function Schedule() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8 flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+        <div className="text-gray-600" dir="rtl">טוען...</div>
       </div>
     );
   }
@@ -341,15 +341,15 @@ export default function Schedule() {
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b bg-white">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <CardTitle className="text-2xl">Daily Schedule</CardTitle>
+              <CardTitle className="text-2xl" dir="rtl">לוח תורים יומי</CardTitle>
               <div className="flex items-center gap-3 flex-wrap">
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
                 <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center">{format(currentDate, "MMM d, yyyy")}</div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
-                <Button variant="outline" onClick={() => setCurrentDate(new Date())}>Today</Button>
-                <Button variant="outline" onClick={handleExportToExcel} className="gap-2">
+                <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
+                <Button variant="outline" onClick={handleExportToExcel} className="gap-2" dir="rtl">
                   <Download className="w-4 h-4" />
-                  Export
+                  ייצא
                 </Button>
               </div>
             </div>
@@ -357,7 +357,7 @@ export default function Schedule() {
         </Card>
 
         {carts.length === 0 ? (
-          <Card className="border-none shadow-lg"><CardContent className="py-16 text-center"><h3 className="text-xl font-semibold text-gray-900 mb-2">Setup Required</h3><p className="text-gray-600">Please add food carts first.</p></CardContent></Card>
+          <Card className="border-none shadow-lg"><CardContent className="py-16 text-center" dir="rtl"><h3 className="text-xl font-semibold text-gray-900 mb-2">נדרשת הגדרה</h3><p className="text-gray-600">אנא הוסף עגלות מזון תחילה.</p></CardContent></Card>
         ) : (
           <div className="space-y-6">
             {carts.map((cart) => {
@@ -371,7 +371,7 @@ export default function Schedule() {
                       <CardTitle className="flex items-center gap-2 text-lg">🚚 {cart.name}<span className="text-sm font-normal opacity-90">• {cart.location}</span></CardTitle>
                       <div className="flex gap-2">
                         <Button size="sm" variant="secondary" onClick={() => openAddColumnDialog(cart.id)}><Plus className="w-3 h-3" /></Button>
-                        <Button size="sm" variant="secondary" onClick={() => openAddShiftDialog(cart.id)}><Plus className="w-4 h-4 mr-1" />Shift</Button>
+                        <Button size="sm" variant="secondary" onClick={() => openAddShiftDialog(cart.id)} dir="rtl"><Plus className="w-4 h-4 mr-1" />משמרת</Button>
                       </div>
                     </div>
                   </CardHeader>
@@ -380,10 +380,10 @@ export default function Schedule() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[100px]">Time</TableHead>
-                            <TableHead className="w-[120px]">Chef</TableHead>
-                            <TableHead className="w-[120px]">Sous-Chef</TableHead>
-                            <TableHead className="w-[120px]">Additional</TableHead>
+                            <TableHead className="w-[100px]" dir="rtl">שעה</TableHead>
+                            <TableHead className="w-[120px]" dir="rtl">טבח ראשי</TableHead>
+                            <TableHead className="w-[120px]" dir="rtl">עוזר טבח</TableHead>
+                            <TableHead className="w-[120px]" dir="rtl">נוסף</TableHead>
                             {columns.map(col => (
                               <TableHead key={col} className="w-[100px]">
                                 <div className="flex items-center gap-1">
@@ -392,12 +392,12 @@ export default function Schedule() {
                                 </div>
                               </TableHead>
                             ))}
-                            <TableHead className="w-[80px]">Actions</TableHead>
+                            <TableHead className="w-[80px]" dir="rtl">פעולות</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {cartAssignments.length === 0 ? (
-                            <TableRow><TableCell colSpan={5 + columns.length} className="text-center text-gray-500 py-8">No shifts. Click "Shift" to add.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={5 + columns.length} className="text-center text-gray-500 py-8" dir="rtl">אין משמרות. לחץ "משמרת" להוספה.</TableCell></TableRow>
                           ) : (
                             cartAssignments.map((assignment) => (
                               <TableRow key={assignment.id} className={assignment.has_trainee ? "bg-orange-50" : ""}>
@@ -410,7 +410,7 @@ export default function Schedule() {
                                     {assignment.chef_name ? (
                                       <span className={`text-xs font-medium truncate ${getSeniorityColor(assignment.chef_seniority)}`}>{assignment.chef_name}</span>
                                     ) : (
-                                      <span className="text-xs text-gray-400">+ Chef</span>
+                                      <span className="text-xs text-gray-400" dir="rtl">+ טבח</span>
                                     )}
                                   </button>
                                 </TableCell>
@@ -419,7 +419,7 @@ export default function Schedule() {
                                     {assignment.sous_chef_name ? (
                                       <span className={`text-xs font-medium truncate ${getSeniorityColor(assignment.sous_chef_seniority)}`}>{assignment.sous_chef_name}</span>
                                     ) : (
-                                      <span className="text-xs text-gray-400">+ S.Chef</span>
+                                      <span className="text-xs text-gray-400" dir="rtl">+ עוזר</span>
                                     )}
                                   </button>
                                 </TableCell>
@@ -428,7 +428,7 @@ export default function Schedule() {
                                     {assignment.additional_chef_name ? (
                                       <span className="text-xs font-medium truncate text-gray-900">{assignment.additional_chef_name}</span>
                                     ) : (
-                                      <span className="text-xs text-gray-400">+ Add</span>
+                                      <span className="text-xs text-gray-400" dir="rtl">+ נוסף</span>
                                     )}
                                   </button>
                                 </TableCell>
@@ -471,9 +471,9 @@ export default function Schedule() {
         {/* Worker Dialog */}
         <Dialog open={showWorkerDialog} onOpenChange={setShowWorkerDialog}>
           <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Select {selectedPosition?.position === 'chef' ? 'Chef' : selectedPosition?.position === 'sous_chef' ? 'Sous-Chef' : 'Additional'}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">בחר {selectedPosition?.position === 'chef' ? 'טבח ראשי' : selectedPosition?.position === 'sous_chef' ? 'עוזר טבח' : 'נוסף'}</DialogTitle></DialogHeader>
             <div className="py-4">
-              <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" /><Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" /></div>
+              <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" /><Input placeholder="חיפוש..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" dir="rtl" /></div>
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {selectedPosition && filteredWorkers.filter(w => selectedPosition.position === 'additional' || (selectedPosition.position === 'chef' ? w.role === 'chef' : w.role === 'sous_chef')).map((worker) => {
                   const availInfo = currentAssignment ? getWorkerAvailabilityPriority(worker.id, currentAssignment.start_time, currentAssignment.end_time) : null;
@@ -501,9 +501,9 @@ export default function Schedule() {
             </div>
             <DialogFooter>
               {currentAssignment && selectedPosition && ((selectedPosition.position === 'chef' && currentAssignment.chef_id) || (selectedPosition.position === 'sous_chef' && currentAssignment.sous_chef_id) || (selectedPosition.position === 'additional' && currentAssignment.additional_chef_id)) && (
-                <Button variant="destructive" onClick={handleRemoveWorker}>Remove Worker</Button>
+                <Button variant="destructive" onClick={handleRemoveWorker} dir="rtl">הסר עובד</Button>
               )}
-              <Button variant="outline" onClick={() => setShowWorkerDialog(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setShowWorkerDialog(false)} dir="rtl">ביטול</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -511,17 +511,17 @@ export default function Schedule() {
         {/* Edit Dialog */}
         <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Edit Shift</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">ערוך משמרת</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
-                <div><Label>Start Time</Label><Input type="time" value={editFormData.start_time} onChange={(e) => setEditFormData({ ...editFormData, start_time: e.target.value })} /></div>
-                <div><Label>End Time</Label><Input type="time" value={editFormData.end_time} onChange={(e) => setEditFormData({ ...editFormData, end_time: e.target.value })} /></div>
+                <div><Label dir="rtl">שעת התחלה</Label><Input type="time" value={editFormData.start_time} onChange={(e) => setEditFormData({ ...editFormData, start_time: e.target.value })} /></div>
+                <div><Label dir="rtl">שעת סיום</Label><Input type="time" value={editFormData.end_time} onChange={(e) => setEditFormData({ ...editFormData, end_time: e.target.value })} /></div>
               </div>
-              <div><Label>Notes</Label><Textarea value={editFormData.notes} onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })} rows={2} /></div>
+              <div><Label dir="rtl">הערות</Label><Textarea value={editFormData.notes} onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })} rows={2} dir="rtl" /></div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
-              <Button onClick={handleSaveEdit} className="bg-blue-900 hover:bg-blue-800">Save</Button>
+              <Button variant="outline" onClick={() => setShowEditDialog(false)} dir="rtl">ביטול</Button>
+              <Button onClick={handleSaveEdit} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שמור</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -529,39 +529,39 @@ export default function Schedule() {
         {/* Add Shift Dialog */}
         <Dialog open={showAddShiftDialog} onOpenChange={setShowAddShiftDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Add New Shift</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">הוסף משמרת חדשה</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>Start Time</Label><Input type="time" value={newShiftData.start_time} onChange={(e) => setNewShiftData({ ...newShiftData, start_time: e.target.value })} /></div>
                 <div><Label>End Time</Label><Input type="time" value={newShiftData.end_time} onChange={(e) => setNewShiftData({ ...newShiftData, end_time: e.target.value })} /></div>
               </div>
-              <div className="flex flex-wrap gap-2"><p className="text-sm text-gray-600 w-full">Quick select:</p>
+              <div className="flex flex-wrap gap-2"><p className="text-sm text-gray-600 w-full" dir="rtl">בחירה מהירה:</p>
                 {SHIFT_WINDOWS.map(w => (<Button key={w.start} variant="outline" size="sm" onClick={() => setNewShiftData({ start_time: w.start, end_time: w.end })} className={newShiftData.start_time === w.start ? "border-blue-500 bg-blue-50" : ""}>{w.start}-{w.end}</Button>))}
               </div>
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setShowAddShiftDialog(false)}>Cancel</Button><Button onClick={handleAddShift} className="bg-blue-900 hover:bg-blue-800">Add Shift</Button></DialogFooter>
+            <DialogFooter><Button variant="outline" onClick={() => setShowAddShiftDialog(false)} dir="rtl">ביטול</Button><Button onClick={handleAddShift} className="bg-blue-900 hover:bg-blue-800" dir="rtl">הוסף משמרת</Button></DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Add Column Dialog */}
         <Dialog open={showAddColumnDialog} onOpenChange={setShowAddColumnDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Add Column</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">הוסף עמודה</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label>Column Type</Label>
+                <Label dir="rtl">סוג עמודה</Label>
                 <Select value={newColumnType} onValueChange={setNewColumnType}>
-                  <SelectTrigger><SelectValue placeholder="Select type..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="בחר סוג..." /></SelectTrigger>
                   <SelectContent>
                     {columnTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    {columnTypes.length === 0 && <div className="p-2 text-xs text-gray-500">No types defined. Add them in Settings.</div>}
+                    {columnTypes.length === 0 && <div className="p-2 text-xs text-gray-500" dir="rtl">לא הוגדרו סוגים. הוסף אותם בהגדרות.</div>}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddColumnDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddColumn} disabled={!newColumnType} className="bg-blue-900 hover:bg-blue-800">Add</Button>
+              <Button variant="outline" onClick={() => setShowAddColumnDialog(false)} dir="rtl">ביטול</Button>
+              <Button onClick={handleAddColumn} disabled={!newColumnType} className="bg-blue-900 hover:bg-blue-800" dir="rtl">הוסף</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

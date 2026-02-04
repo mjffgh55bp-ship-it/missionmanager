@@ -112,15 +112,16 @@ export default function Qualifications() {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Qualifications</h1>
-            <p className="text-gray-600">Manage qualifications and track worker progress</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">הסמכות</h1>
+            <p className="text-gray-600" dir="rtl">נהל הסמכות ועקוב אחר התקדמות העובדים</p>
           </div>
           <Button 
             onClick={() => setShowQualDialog(true)}
             className="bg-blue-900 hover:bg-blue-800 text-white px-6"
+            dir="rtl"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add Qualification
+            הוסף הסמכה
           </Button>
         </div>
 
@@ -154,14 +155,14 @@ export default function Qualifications() {
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-gray-600" />
-                        <span className="text-sm font-medium">Workers</span>
+                        <span className="text-sm font-medium" dir="rtl">עובדים</span>
                       </div>
                       <span className="text-lg font-bold text-blue-900">{workersWithQual.length}</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg">
                       <div className="flex items-center gap-2">
                         <Clock className="w-4 h-4 text-amber-600" />
-                        <span className="text-sm font-medium">Newbie Threshold</span>
+                        <span className="text-sm font-medium" dir="rtl">סף חניך</span>
                       </div>
                       <span className="text-lg font-bold text-amber-600">{qual.newbie_threshold_hours}h</span>
                     </div>
@@ -174,14 +175,14 @@ export default function Qualifications() {
 
         <Card className="border-none shadow-lg">
           <CardHeader className="border-b bg-white">
-            <CardTitle>Worker Qualifications</CardTitle>
+            <CardTitle dir="rtl">הסמכות עובדים</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-3 font-semibold">Worker</th>
+                    <th className="text-left p-3 font-semibold" dir="rtl">עובד</th>
                     {qualifications.filter(q => q.active).map(qual => (
                       <th key={qual.id} className="text-center p-3 font-semibold">{qual.name}</th>
                     ))}
@@ -228,7 +229,7 @@ export default function Qualifications() {
         <Dialog open={showQualDialog} onOpenChange={setShowQualDialog}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>{editingQual ? "Edit Qualification" : "Add New Qualification"}</DialogTitle>
+              <DialogTitle dir="rtl">{editingQual ? "ערוך הסמכה" : "הוסף הסמכה חדשה"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>

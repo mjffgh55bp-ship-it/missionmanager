@@ -108,15 +108,15 @@ export default function Workers() {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Team Members</h1>
-            <p className="text-gray-600">Manage your chefs and sous-chefs</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">חברי צוות</h1>
+            <p className="text-gray-600" dir="rtl">נהל את הטבחים והעוזרים שלך</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => { setTempCategoryNames(categoryNames); setShowCategoryDialog(true); }}>
-              Edit Categories
+            <Button variant="outline" onClick={() => { setTempCategoryNames(categoryNames); setShowCategoryDialog(true); }} dir="rtl">
+              ערוך קטגוריות
             </Button>
-            <Button onClick={() => setShowDialog(true)} className="bg-blue-900 hover:bg-blue-800 text-white px-6">
-              <Plus className="w-4 h-4 mr-2" />Add Worker
+            <Button onClick={() => setShowDialog(true)} className="bg-blue-900 hover:bg-blue-800 text-white px-6" dir="rtl">
+              <Plus className="w-4 h-4 mr-2" />הוסף עובד
             </Button>
           </div>
         </div>
@@ -138,41 +138,41 @@ export default function Workers() {
                       <div>
                         <CardTitle className="text-lg">{worker.full_name}</CardTitle>
                         <div className="flex gap-2 mt-1 flex-wrap">
-                          <Badge className={worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'}>
-                            {worker.role === 'chef' ? 'Chef' : 'Sous-Chef'}
+                          <Badge className={worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'} dir="rtl">
+                           {worker.role === 'chef' ? 'טבח ראשי' : 'עוזר טבח'}
                           </Badge>
                           <Badge className={seniorityInfo.color}>{seniorityInfo.label}</Badge>
                           <Badge className={getCategoryColor(worker.category)}>
                             {categoryNames[worker.category] || worker.category}
                           </Badge>
-                          {worker.is_guide && <Badge className="bg-yellow-100 text-yellow-800"><Award className="w-3 h-3 mr-1" />Guide</Badge>}
+                          {worker.is_guide && <Badge className="bg-yellow-100 text-yellow-800" dir="rtl"><Award className="w-3 h-3 mr-1" />מדריך</Badge>}
                         </div>
                       </div>
                     </div>
-                    <Badge variant={worker.active ? "default" : "secondary"}>{worker.active ? "Active" : "Inactive"}</Badge>
+                    <Badge variant={worker.active ? "default" : "secondary"} dir="rtl">{worker.active ? "פעיל" : "לא פעיל"}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-6">
                   <div className="space-y-4">
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700">Progress to {progression.nextLevel ? getSeniorityInfo(progression.nextLevel).label : 'Max Level'}</span>
+                        <span className="text-sm font-medium text-gray-700" dir="rtl">התקדמות ל-{progression.nextLevel ? getSeniorityInfo(progression.nextLevel).label : 'דרגה מקסימלית'}</span>
                         <span className="text-xs text-gray-600">{totalHours}h total</span>
                       </div>
                       {progression.nextLevel ? (
                         <>
                           <Progress value={progression.progress} className="h-2 mb-2" />
                           <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <TrendingUp className="w-3 h-3" /><span>{progression.hoursRemaining}h until next rank</span>
+                            <TrendingUp className="w-3 h-3" /><span dir="rtl">{progression.hoursRemaining} שעות עד הדרגה הבאה</span>
                           </div>
                         </>
                       ) : (
-                        <p className="text-xs text-purple-600 font-medium">Maximum seniority achieved! 🎉</p>
+                        <p className="text-xs text-purple-600 font-medium" dir="rtl">הושגה הוותק המקסימלי! 🎉</p>
                       )}
                     </div>
 
                     <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                      <div className="flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span className="text-sm font-medium text-gray-900">Guide Status</span></div>
+                      <div className="flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span className="text-sm font-medium text-gray-900" dir="rtl">סטטוס מדריך</span></div>
                       <Switch checked={worker.is_guide} onCheckedChange={() => toggleGuide(worker)} />
                     </div>
 
@@ -182,9 +182,9 @@ export default function Workers() {
                   </div>
                   
                   <div className="flex gap-2 mt-4">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEdit(worker)}><Pencil className="w-3 h-3 mr-2" />Edit</Button>
-                    <Button variant={worker.active ? "destructive" : "default"} size="sm" className="flex-1" onClick={() => toggleActive(worker)}>
-                      {worker.active ? <><UserX className="w-3 h-3 mr-2" />Deactivate</> : <><UserCheck className="w-3 h-3 mr-2" />Activate</>}
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEdit(worker)} dir="rtl"><Pencil className="w-3 h-3 mr-2" />ערוך</Button>
+                    <Button variant={worker.active ? "destructive" : "default"} size="sm" className="flex-1" onClick={() => toggleActive(worker)} dir="rtl">
+                      {worker.active ? <><UserX className="w-3 h-3 mr-2" />השבת</> : <><UserCheck className="w-3 h-3 mr-2" />הפעל</>}
                     </Button>
                   </div>
                 </CardContent>
@@ -197,9 +197,9 @@ export default function Workers() {
           <Card className="border-none shadow-lg">
             <CardContent className="py-16 text-center">
               <ChefHat className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Workers Yet</h3>
-              <p className="text-gray-600 mb-6">Start by adding your first team member</p>
-              <Button onClick={() => setShowDialog(true)} className="bg-blue-900 hover:bg-blue-800"><Plus className="w-4 h-4 mr-2" />Add First Worker</Button>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2" dir="rtl">עדיין אין עובדים</h3>
+              <p className="text-gray-600 mb-6" dir="rtl">התחל בהוספת חבר הצוות הראשון שלך</p>
+              <Button onClick={() => setShowDialog(true)} className="bg-blue-900 hover:bg-blue-800" dir="rtl"><Plus className="w-4 h-4 mr-2" />הוסף עובד ראשון</Button>
             </CardContent>
           </Card>
         )}
@@ -207,7 +207,7 @@ export default function Workers() {
         {/* Worker Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>{editingWorker ? "Edit Worker" : "Add New Worker"}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">{editingWorker ? "ערוך עובד" : "הוסף עובד חדש"}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div><Label htmlFor="full_name">Full Name *</Label><Input id="full_name" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="John Doe" /></div>
               <div><Label htmlFor="role">Role *</Label>

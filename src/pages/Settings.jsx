@@ -189,14 +189,14 @@ export default function Settings() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Settings</h1>
-          <p className="text-gray-600">Configure system-wide settings</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">הגדרות</h1>
+          <p className="text-gray-600" dir="rtl">הגדר הגדרות כלל מערכת</p>
         </div>
 
         {/* Schedule Column Types */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2"><Columns className="w-5 h-5 text-green-600" />Schedule Column Types</CardTitle>
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Columns className="w-5 h-5 text-green-600" />סוגי עמודות בלוח התורים</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600 mb-3">Define column types that can be added to carts in the Schedule page</p>
@@ -319,12 +319,12 @@ export default function Settings() {
         {/* User Roles */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5 text-blue-600" />User Roles Management</CardTitle>
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-blue-600" />ניהול תפקידי משתמש</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-gray-700"><strong>Manager:</strong> Full access<br /><strong>User:</strong> Availability only</p>
+                <p className="text-sm text-gray-700" dir="rtl"><strong>מנהל:</strong> גישה מלאה<br /><strong>משתמש:</strong> זמינות בלבד</p>
               </div>
               <div className="space-y-3">
                 {workers.filter(w => w.email).map((worker) => (
@@ -336,15 +336,15 @@ export default function Settings() {
                     <Select value={userRoles[worker.email] || "user"} onValueChange={(value) => handleRoleChange(worker.email, value)}>
                       <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="user">User</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
+                        <SelectItem value="user" dir="rtl">משתמש</SelectItem>
+                        <SelectItem value="manager" dir="rtl">מנהל</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 ))}
               </div>
-              <Button onClick={handleSaveRoles} disabled={saving} className="bg-blue-900 hover:bg-blue-800">
-                <Save className="w-4 h-4 mr-2" />{saving ? "Saving..." : "Save User Roles"}
+              <Button onClick={handleSaveRoles} disabled={saving} className="bg-blue-900 hover:bg-blue-800" dir="rtl">
+                <Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור תפקידי משתמש"}
               </Button>
             </div>
           </CardContent>
@@ -354,13 +354,13 @@ export default function Settings() {
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
             <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center gap-2"><PartyPopper className="w-5 h-5 text-purple-600" />Company Events</CardTitle>
-              <p className="text-sm text-gray-500">Add events from Yearly page</p>
+              <CardTitle className="flex items-center gap-2" dir="rtl"><PartyPopper className="w-5 h-5 text-purple-600" />אירועי חברה</CardTitle>
+              <p className="text-sm text-gray-500" dir="rtl">הוסף אירועים מהעמוד השנתי</p>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
             {companyEvents.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">No events scheduled</p>
+              <p className="text-sm text-gray-500 text-center py-4" dir="rtl">אין אירועים מתוכננים</p>
             ) : (
               <div className="space-y-3">
                 {companyEvents.map((event) => (
@@ -380,16 +380,16 @@ export default function Settings() {
         {/* Tips & Policy */}
         <Card className="border-none shadow-lg">
           <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2"><Info className="w-5 h-5 text-blue-600" />Availability Tips & Policy</CardTitle>
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Info className="w-5 h-5 text-blue-600" />טיפים ומדיניות זמינות</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div><Label>Show as popup confirmation</Label><p className="text-xs text-gray-600">Display tips in a popup</p></div>
+                <div><Label dir="rtl">הצג כחלון קופץ לאישור</Label><p className="text-xs text-gray-600" dir="rtl">הצג טיפים בחלון קופץ</p></div>
                 <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
               </div>
-              <div><Label htmlFor="tips">Message for Workers</Label><Textarea id="tips" value={tipsMessage} onChange={(e) => setTipsMessage(e.target.value)} placeholder="Enter tips..." rows={10} className="font-mono text-sm mt-2" /></div>
-              <Button onClick={handleSaveTips} disabled={saving} className="bg-blue-900 hover:bg-blue-800"><Save className="w-4 h-4 mr-2" />{saving ? "Saving..." : "Save Tips"}</Button>
+              <div><Label htmlFor="tips" dir="rtl">הודעה לעובדים</Label><Textarea id="tips" value={tipsMessage} onChange={(e) => setTipsMessage(e.target.value)} placeholder="הזן טיפים..." rows={10} className="font-mono text-sm mt-2" dir="rtl" /></div>
+              <Button onClick={handleSaveTips} disabled={saving} className="bg-blue-900 hover:bg-blue-800" dir="rtl"><Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור טיפים"}</Button>
             </div>
           </CardContent>
         </Card>

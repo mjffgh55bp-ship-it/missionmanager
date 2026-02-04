@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { FoodCart } from "@/entities/FoodCart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,15 +69,16 @@ export default function FoodCarts() {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Food Carts</h1>
-            <p className="text-gray-600">Manage your fleet of mobile kitchens</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">עגלות מזון</h1>
+            <p className="text-gray-600" dir="rtl">נהל את צי המטבחים הנייד שלך</p>
           </div>
           <Button 
             onClick={() => setShowDialog(true)}
             className="bg-amber-500 hover:bg-amber-600 text-white px-6"
+            dir="rtl"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add Food Cart
+            הוסף עגלת מזון
           </Button>
         </div>
 
@@ -99,8 +99,8 @@ export default function FoodCarts() {
                       </div>
                     </div>
                   </div>
-                  <Badge variant={cart.active ? "default" : "secondary"} className={cart.active ? "bg-green-600" : ""}>
-                    {cart.active ? "Active" : "Inactive"}
+                  <Badge variant={cart.active ? "default" : "secondary"} className={cart.active ? "bg-green-600" : ""} dir="rtl">
+                    {cart.active ? "פעיל" : "לא פעיל"}
                   </Badge>
                 </div>
               </CardHeader>
@@ -129,9 +129,10 @@ export default function FoodCarts() {
                     size="sm" 
                     className="flex-1"
                     onClick={() => handleEdit(cart)}
+                    dir="rtl"
                   >
                     <Pencil className="w-3 h-3 mr-2" />
-                    Edit
+                    ערוך
                   </Button>
                   <Button 
                     variant={cart.active ? "destructive" : "default"}
@@ -140,15 +141,15 @@ export default function FoodCarts() {
                     onClick={() => toggleActive(cart)}
                   >
                     {cart.active ? (
-                      <>
+                      <span dir="rtl">
                         <PowerOff className="w-3 h-3 mr-2" />
-                        Deactivate
-                      </>
+                        השבת
+                      </span>
                     ) : (
-                      <>
+                      <span dir="rtl">
                         <Power className="w-3 h-3 mr-2" />
-                        Activate
-                      </>
+                        הפעל
+                      </span>
                     )}
                   </Button>
                 </div>
@@ -161,11 +162,11 @@ export default function FoodCarts() {
           <Card className="border-none shadow-lg">
             <CardContent className="py-16 text-center">
               <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Food Carts Yet</h3>
-              <p className="text-gray-600 mb-6">Add your first food cart to start scheduling missions</p>
-              <Button onClick={() => setShowDialog(true)} className="bg-amber-500 hover:bg-amber-600">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2" dir="rtl">עדיין אין עגלות מזון</h3>
+              <p className="text-gray-600 mb-6" dir="rtl">הוסף את עגלת המזון הראשונה שלך כדי להתחיל לתכנן משימות</p>
+              <Button onClick={() => setShowDialog(true)} className="bg-amber-500 hover:bg-amber-600" dir="rtl">
                 <Plus className="w-4 h-4 mr-2" />
-                Add First Food Cart
+                הוסף עגלה ראשונה
               </Button>
             </CardContent>
           </Card>
@@ -174,7 +175,7 @@ export default function FoodCarts() {
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>{editingCart ? "Edit Food Cart" : "Add New Food Cart"}</DialogTitle>
+              <DialogTitle dir="rtl">{editingCart ? "ערוך עגלת מזון" : "הוסף עגלת מזון חדשה"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">

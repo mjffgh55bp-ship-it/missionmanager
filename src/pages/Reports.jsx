@@ -227,15 +227,15 @@ export default function Reports() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Reports & Analytics</h1>
-          <p className="text-gray-600">Hours worked and team performance metrics</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">דוחות וניתוחים</h1>
+          <p className="text-gray-600" dir="rtl">שעות עבודה ומדדי ביצוע הצוות</p>
         </div>
 
         <div className="grid md:grid-cols-4 gap-6 mb-8">
           <Card className="border-none shadow-lg">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div><p className="text-sm text-gray-600">Total Hours Worked</p><p className="text-3xl font-bold text-gray-900 mt-1">{totalHours}</p></div>
+                <div><p className="text-sm text-gray-600" dir="rtl">סה"כ שעות עבודה</p><p className="text-3xl font-bold text-gray-900 mt-1">{totalHours}</p></div>
                 <div className="p-3 rounded-xl bg-blue-900 bg-opacity-15"><Clock className="w-6 h-6 text-blue-900" /></div>
               </div>
             </CardHeader>
@@ -244,7 +244,7 @@ export default function Reports() {
           <Card className="border-none shadow-lg">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div><p className="text-sm text-gray-600">Shift Coverage</p><p className="text-3xl font-bold text-gray-900 mt-1">{coveragePercentage}%</p><p className="text-xs text-gray-500 mt-1">{mannedShifts}/{totalShiftsNeeded} shifts</p></div>
+                <div><p className="text-sm text-gray-600" dir="rtl">כיסוי משמרות</p><p className="text-3xl font-bold text-gray-900 mt-1">{coveragePercentage}%</p><p className="text-xs text-gray-500 mt-1" dir="rtl">{mannedShifts}/{totalShiftsNeeded} משמרות</p></div>
                 <div className="p-3 rounded-xl bg-green-600 bg-opacity-15"><TrendingUp className="w-6 h-6 text-green-600" /></div>
               </div>
             </CardHeader>
@@ -253,7 +253,7 @@ export default function Reports() {
           <Card className="border-none shadow-lg">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div><p className="text-sm text-gray-600">Hours Coverage</p><p className="text-3xl font-bold text-gray-900 mt-1">{hoursCoveragePercentage}%</p><p className="text-xs text-gray-500 mt-1">{mannedHours}/{totalHoursNeeded}h</p></div>
+                <div><p className="text-sm text-gray-600" dir="rtl">כיסוי שעות</p><p className="text-3xl font-bold text-gray-900 mt-1">{hoursCoveragePercentage}%</p><p className="text-xs text-gray-500 mt-1" dir="rtl">{mannedHours}/{totalHoursNeeded} שעות</p></div>
                 <div className="p-3 rounded-xl bg-amber-500 bg-opacity-15"><Clock className="w-6 h-6 text-amber-600" /></div>
               </div>
             </CardHeader>
@@ -262,7 +262,7 @@ export default function Reports() {
           <Card className="border-none shadow-lg">
             <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div><p className="text-sm text-gray-600">Full-Time Workers</p><p className="text-3xl font-bold text-gray-900 mt-1">{fullTimeWorkerCount}</p></div>
+                <div><p className="text-sm text-gray-600" dir="rtl">עובדים במשרה מלאה</p><p className="text-3xl font-bold text-gray-900 mt-1">{fullTimeWorkerCount}</p></div>
                 <div className="p-3 rounded-xl bg-purple-600 bg-opacity-15"><Users className="w-6 h-6 text-purple-600" /></div>
               </div>
             </CardHeader>
