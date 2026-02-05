@@ -336,10 +336,10 @@ export default function Yearly() {
           <CardContent className="p-0 h-full">
             <div className="flex h-full">
               {/* Fixed Row Headers */}
-              <div className="flex-shrink-0 z-20 bg-white border-l overflow-y-auto" style={{ width: 160 }}>
-                <div className="bg-blue-900 text-white p-2 font-semibold text-right h-[36px] flex items-center sticky top-0 z-30">שורה</div>
-                <div className="bg-blue-800 text-white p-2 text-xs text-right h-[28px] flex items-center sticky top-[36px] z-30">שבוע</div>
-                <div className="bg-gray-100 p-2 text-xs font-medium text-right h-[52px] flex items-center sticky top-[64px] z-30">יום, תאריך</div>
+              <div className="flex-shrink-0 bg-white border-l overflow-y-auto sticky right-0 z-30" style={{ width: 160 }}>
+                <div className="bg-blue-900 text-white p-2 font-semibold text-right h-[36px] flex items-center sticky top-0 z-40">שורה</div>
+                <div className="bg-blue-800 text-white p-2 text-xs text-right h-[28px] flex items-center sticky top-[36px] z-40">שבוע</div>
+                <div className="bg-gray-100 p-2 text-xs font-medium text-right h-[52px] flex items-center sticky top-[64px] z-40">יום, תאריך</div>
 
                 <DragDropContext onDragEnd={handleDragEnd}>
                   <Droppable droppableId="rows">
