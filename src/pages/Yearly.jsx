@@ -36,7 +36,7 @@ export default function Yearly() {
   const [unavailabilities, setUnavailabilities] = useState([]);
   const [categoryNames, setCategoryNames] = useState({ category_1: "קטגוריה 1", category_2: "קטגוריה 2", category_3: "קטגוריה 3" });
   const [loading, setLoading] = useState(true);
-  const [viewOnly, setViewOnly] = useState(false);
+  const [viewOnly, setViewOnly] = useState(true);
   const [showAddRowDialog, setShowAddRowDialog] = useState(false);
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(null);
@@ -318,9 +318,9 @@ export default function Yearly() {
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border">
-              <Label className="text-sm">צפייה בלבד</Label>
-              <Switch checked={viewOnly} onCheckedChange={setViewOnly} />
-              {viewOnly ? <Eye className="w-4 h-4 text-gray-500" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
+              <Label className="text-sm">מצב עריכה</Label>
+              <Switch checked={!viewOnly} onCheckedChange={(checked) => setViewOnly(!checked)} />
+              {!viewOnly ? <EyeOff className="w-4 h-4 text-green-600" /> : <Eye className="w-4 h-4 text-gray-500" />}
             </div>
             <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}><ChevronRight className="w-4 h-4" /></Button>
             <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[100px] text-center">{currentYear}</div>
