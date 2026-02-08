@@ -157,7 +157,7 @@ export default function Workers() {
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm font-medium text-gray-700" dir="rtl">התקדמות ל-{progression.nextLevel ? getSeniorityInfo(progression.nextLevel).label : 'דרגה מקסימלית'}</span>
-                        <span className="text-xs text-gray-600">{totalHours}h total</span>
+                        <span className="text-xs text-gray-600" dir="rtl">{totalHours} שעות סה"כ</span>
                       </div>
                       {progression.nextLevel ? (
                         <>
@@ -178,7 +178,7 @@ export default function Workers() {
 
                     {worker.email && <p className="text-sm text-gray-600">📧 {worker.email}</p>}
                     {worker.phone && <p className="text-sm text-gray-600">📞 {worker.phone}</p>}
-                    {worker.hire_date && <p className="text-sm text-gray-600">📅 Hired: {format(new Date(worker.hire_date), "MMM d, yyyy")}</p>}
+                    {worker.hire_date && <p className="text-sm text-gray-600" dir="rtl">📅 גויס: {format(new Date(worker.hire_date), "MMM d, yyyy")}</p>}
                   </div>
                   
                   <div className="flex gap-2 mt-4">
@@ -209,17 +209,17 @@ export default function Workers() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle dir="rtl">{editingWorker ? "ערוך עובד" : "הוסף עובד חדש"}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
-              <div><Label htmlFor="full_name">Full Name *</Label><Input id="full_name" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="John Doe" /></div>
-              <div><Label htmlFor="role">Role *</Label>
+              <div><Label htmlFor="full_name" dir="rtl">שם מלא *</Label><Input id="full_name" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="שם מלא" dir="rtl" /></div>
+              <div><Label htmlFor="role" dir="rtl">תפקיד *</Label>
                 <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="chef">Chef</SelectItem>
-                    <SelectItem value="sous_chef">Sous-Chef</SelectItem>
+                    <SelectItem value="chef" dir="rtl">טבח ראשי</SelectItem>
+                    <SelectItem value="sous_chef" dir="rtl">עוזר טבח</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div><Label>Category</Label>
+              <div><Label dir="rtl">קטגוריה</Label>
                 <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -233,13 +233,13 @@ export default function Workers() {
                 <Label htmlFor="is_guide" className="cursor-pointer flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span>Qualified Guide</span></Label>
                 <Switch id="is_guide" checked={formData.is_guide} onCheckedChange={(checked) => setFormData({ ...formData, is_guide: checked })} />
               </div>
-              <div><Label htmlFor="email">Email</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="john@example.com" /></div>
-              <div><Label htmlFor="phone">Phone</Label><Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+1 234 567 8900" /></div>
-              <div><Label htmlFor="hire_date">Hire Date</Label><Input id="hire_date" type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
+              <div><Label htmlFor="email" dir="rtl">אימייל</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@mail.com" dir="rtl" /></div>
+              <div><Label htmlFor="phone" dir="rtl">טלפון</Label><Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="05x-xxxxxxx" dir="rtl" /></div>
+              <div><Label htmlFor="hire_date" dir="rtl">תאריך גיוס</Label><Input id="hire_date" type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => { setShowDialog(false); setEditingWorker(null); }}>Cancel</Button>
-              <Button onClick={handleSubmit} disabled={!formData.full_name} className="bg-blue-900 hover:bg-blue-800">{editingWorker ? "Update" : "Add"} Worker</Button>
+              <Button variant="outline" onClick={() => { setShowDialog(false); setEditingWorker(null); }} dir="rtl">ביטול</Button>
+              <Button onClick={handleSubmit} disabled={!formData.full_name} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -247,15 +247,15 @@ export default function Workers() {
         {/* Category Names Dialog */}
         <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Edit Category Names</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">ערוך שמות קטגוריות</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
-              <div><Label>Category 1 Name</Label><Input value={tempCategoryNames.category_1} onChange={(e) => setTempCategoryNames({ ...tempCategoryNames, category_1: e.target.value })} /></div>
-              <div><Label>Category 2 Name</Label><Input value={tempCategoryNames.category_2} onChange={(e) => setTempCategoryNames({ ...tempCategoryNames, category_2: e.target.value })} /></div>
-              <div><Label>Category 3 Name</Label><Input value={tempCategoryNames.category_3} onChange={(e) => setTempCategoryNames({ ...tempCategoryNames, category_3: e.target.value })} /></div>
+              <div><Label dir="rtl">שם קטגוריה 1</Label><Input value={tempCategoryNames.category_1} onChange={(e) => setTempCategoryNames({ ...tempCategoryNames, category_1: e.target.value })} dir="rtl" /></div>
+              <div><Label dir="rtl">שם קטגוריה 2</Label><Input value={tempCategoryNames.category_2} onChange={(e) => setTempCategoryNames({ ...tempCategoryNames, category_2: e.target.value })} dir="rtl" /></div>
+              <div><Label dir="rtl">שם קטגוריה 3</Label><Input value={tempCategoryNames.category_3} onChange={(e) => setTempCategoryNames({ ...tempCategoryNames, category_3: e.target.value })} dir="rtl" /></div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCategoryDialog(false)}>Cancel</Button>
-              <Button onClick={handleSaveCategoryNames} className="bg-blue-900 hover:bg-blue-800">Save</Button>
+              <Button variant="outline" onClick={() => setShowCategoryDialog(false)} dir="rtl">ביטול</Button>
+              <Button onClick={handleSaveCategoryNames} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שמור</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

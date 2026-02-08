@@ -487,10 +487,10 @@ export default function Schedule() {
                         <div className="flex-1">
                           <div className="font-medium text-gray-900">{worker.full_name}</div>
                           <div className="flex gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">{worker.seniority || 'unknown'}</Badge>
-                            {worker.is_guide && <Badge className="text-xs bg-yellow-100 text-yellow-800">Guide</Badge>}
-                            {availInfo && <Badge variant="outline" className="text-xs capitalize">{availInfo.type} #{availInfo.priority}</Badge>}
-                            {isUnavailable && <Badge className="text-xs bg-red-100 text-red-800">Unavailable</Badge>}
+                            <Badge variant="outline" className="text-xs" dir="rtl">{worker.seniority || 'לא ידוע'}</Badge>
+                            {worker.is_guide && <Badge className="text-xs bg-yellow-100 text-yellow-800" dir="rtl">מדריך</Badge>}
+                            {availInfo && <Badge variant="outline" className="text-xs capitalize" dir="rtl">{availInfo.type === 'wanted' ? 'רצוי' : availInfo.type === 'available' ? 'זמין' : 'לא זמין'} #{availInfo.priority}</Badge>}
+                            {isUnavailable && <Badge className="text-xs bg-red-100 text-red-800" dir="rtl">לא זמין</Badge>}
                           </div>
                         </div>
                       </div>
@@ -532,8 +532,8 @@ export default function Schedule() {
             <DialogHeader><DialogTitle dir="rtl">הוסף משמרת חדשה</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
-                <div><Label>Start Time</Label><Input type="time" value={newShiftData.start_time} onChange={(e) => setNewShiftData({ ...newShiftData, start_time: e.target.value })} /></div>
-                <div><Label>End Time</Label><Input type="time" value={newShiftData.end_time} onChange={(e) => setNewShiftData({ ...newShiftData, end_time: e.target.value })} /></div>
+                <div><Label dir="rtl">שעת התחלה</Label><Input type="time" value={newShiftData.start_time} onChange={(e) => setNewShiftData({ ...newShiftData, start_time: e.target.value })} /></div>
+                <div><Label dir="rtl">שעת סיום</Label><Input type="time" value={newShiftData.end_time} onChange={(e) => setNewShiftData({ ...newShiftData, end_time: e.target.value })} /></div>
               </div>
               <div className="flex flex-wrap gap-2"><p className="text-sm text-gray-600 w-full" dir="rtl">בחירה מהירה:</p>
                 {SHIFT_WINDOWS.map(w => (<Button key={w.start} variant="outline" size="sm" onClick={() => setNewShiftData({ start_time: w.start, end_time: w.end })} className={newShiftData.start_time === w.start ? "border-blue-500 bg-blue-50" : ""}>{w.start}-{w.end}</Button>))}

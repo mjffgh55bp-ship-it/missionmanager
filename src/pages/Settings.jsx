@@ -199,9 +199,9 @@ export default function Settings() {
             <CardTitle className="flex items-center gap-2" dir="rtl"><Columns className="w-5 h-5 text-green-600" />סוגי עמודות בלוח התורים</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3">Define column types that can be added to carts in the Schedule page</p>
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סוגי עמודות שניתן להוסיף לעגלות בעמוד לוח התורים</p>
             <div className="flex gap-2 mb-4">
-              <Input value={newColumnType} onChange={(e) => setNewColumnType(e.target.value)} placeholder="New column type name..." />
+              <Input value={newColumnType} onChange={(e) => setNewColumnType(e.target.value)} placeholder="שם סוג עמודה חדש..." dir="rtl" />
               <Button onClick={handleAddColumnType}><Plus className="w-4 h-4" /></Button>
             </div>
             <div className="flex flex-wrap gap-2 mb-6">
@@ -211,11 +211,11 @@ export default function Settings() {
                   <button onClick={() => handleRemoveColumnType(type)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
                 </Badge>
               ))}
-              {columnTypes.length === 0 && <p className="text-sm text-gray-400">No column types defined</p>}
+              {columnTypes.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סוגי עמודות</p>}
             </div>
             
             <div className="pt-4 border-t">
-              <p className="text-sm font-semibold mb-3">Column Sub-types (per column type)</p>
+              <p className="text-sm font-semibold mb-3" dir="rtl">תתי-סוגי עמודות (לכל סוג עמודה)</p>
               <div className="flex gap-2 mb-4">
                 <Select value={selectedColTypeForSubType} onValueChange={setSelectedColTypeForSubType}>
                   <SelectTrigger className="w-40"><SelectValue placeholder="Select type..." /></SelectTrigger>
@@ -223,7 +223,7 @@ export default function Settings() {
                     {columnTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                <Input value={newColSubType} onChange={(e) => setNewColSubType(e.target.value)} placeholder="New sub-type..." className="flex-1" />
+                <Input value={newColSubType} onChange={(e) => setNewColSubType(e.target.value)} placeholder="תת-סוג חדש..." className="flex-1" dir="rtl" />
                 <Button onClick={handleAddColSubType} disabled={!selectedColTypeForSubType}><Plus className="w-4 h-4" /></Button>
               </div>
               {Object.entries(columnSubTypes).filter(([_, subs]) => subs.length > 0).map(([type, subs]) => (
@@ -246,18 +246,18 @@ export default function Settings() {
         {/* Parameter Types */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5 text-purple-600" />Parameter Types (Reports)</CardTitle>
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Clock className="w-5 h-5 text-purple-600" />סוגי פרמטרים (דוחות)</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <Tabs defaultValue="time" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="time"><Clock className="w-3 h-3 mr-1" />Time Types</TabsTrigger>
-                <TabsTrigger value="count"><Hash className="w-3 h-3 mr-1" />Count Types</TabsTrigger>
+                <TabsTrigger value="time" dir="rtl"><Clock className="w-3 h-3 mr-1" />סוגי זמן</TabsTrigger>
+                <TabsTrigger value="count" dir="rtl"><Hash className="w-3 h-3 mr-1" />סוגי ספירה</TabsTrigger>
               </TabsList>
               <TabsContent value="time" className="mt-4">
-                <p className="text-sm text-gray-600 mb-3">Time parameters sum hours worked under each type</p>
+                <p className="text-sm text-gray-600 mb-3" dir="rtl">פרמטרי זמן מסכמים שעות עבודה תחת כל סוג</p>
                 <div className="flex gap-2 mb-4">
-                  <Input value={newTimeType} onChange={(e) => setNewTimeType(e.target.value)} placeholder="New time type name..." />
+                  <Input value={newTimeType} onChange={(e) => setNewTimeType(e.target.value)} placeholder="שם סוג זמן חדש..." dir="rtl" />
                   <Button onClick={handleAddTimeType}><Plus className="w-4 h-4" /></Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -267,13 +267,13 @@ export default function Settings() {
                       <button onClick={() => handleRemoveTimeType(type)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
                     </Badge>
                   ))}
-                  {timeParamTypes.length === 0 && <p className="text-sm text-gray-400">No time types defined</p>}
+                  {timeParamTypes.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סוגי זמן</p>}
                 </div>
               </TabsContent>
               <TabsContent value="count" className="mt-4">
-                <p className="text-sm text-gray-600 mb-3">Count parameters sum numeric values under each type</p>
+                <p className="text-sm text-gray-600 mb-3" dir="rtl">פרמטרי ספירה מסכמים ערכים מספריים תחת כל סוג</p>
                 <div className="flex gap-2 mb-4">
-                  <Input value={newCountType} onChange={(e) => setNewCountType(e.target.value)} placeholder="New count type name..." />
+                  <Input value={newCountType} onChange={(e) => setNewCountType(e.target.value)} placeholder="שם סוג ספירה חדש..." dir="rtl" />
                   <Button onClick={handleAddCountType}><Plus className="w-4 h-4" /></Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -283,11 +283,11 @@ export default function Settings() {
                       <button onClick={() => handleRemoveCountType(type)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
                     </Badge>
                   ))}
-                  {countParamTypes.length === 0 && <p className="text-sm text-gray-400">No count types defined</p>}
+                  {countParamTypes.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סוגי ספירה</p>}
                 </div>
               </TabsContent>
               <div className="mt-6 pt-6 border-t">
-                <p className="text-sm font-semibold mb-3">Sub-types (per parameter type)</p>
+                <p className="text-sm font-semibold mb-3" dir="rtl">תתי-סוגים (לכל סוג פרמטר)</p>
                 <div className="flex gap-2 mb-4">
                   <Select value={selectedTypeForSubType} onValueChange={setSelectedTypeForSubType}>
                     <SelectTrigger className="w-40"><SelectValue placeholder="Select type..." /></SelectTrigger>
@@ -295,7 +295,7 @@ export default function Settings() {
                       {[...timeParamTypes, ...countParamTypes].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Input value={newSubType} onChange={(e) => setNewSubType(e.target.value)} placeholder="New sub-type..." className="flex-1" />
+                  <Input value={newSubType} onChange={(e) => setNewSubType(e.target.value)} placeholder="תת-סוג חדש..." className="flex-1" dir="rtl" />
                   <Button onClick={handleAddSubType} disabled={!selectedTypeForSubType}><Plus className="w-4 h-4" /></Button>
                 </div>
                 {Object.entries(paramSubTypes).filter(([_, subs]) => subs.length > 0).map(([type, subs]) => (

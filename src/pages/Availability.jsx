@@ -507,12 +507,12 @@ END:VEVENT
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex flex-wrap gap-2 text-xs">
-                  <Badge className="bg-green-100 text-green-800"><Star className="w-3 h-3 mr-1" />Wanted</Badge>
-                  <Badge className="bg-blue-100 text-blue-800"><Check className="w-3 h-3 mr-1" />Available</Badge>
-                  <Badge className="bg-red-100 text-red-800"><Ban className="w-3 h-3 mr-1" />Unavailable</Badge>
+                  <Badge className="bg-green-100 text-green-800" dir="rtl"><Star className="w-3 h-3 mr-1" />רצוי</Badge>
+                  <Badge className="bg-blue-100 text-blue-800" dir="rtl"><Check className="w-3 h-3 mr-1" />זמין</Badge>
+                  <Badge className="bg-red-100 text-red-800" dir="rtl"><Ban className="w-3 h-3 mr-1" />לא זמין</Badge>
                 </div>
                 <div className="flex items-center gap-2 ml-auto">
-                  <Label className="text-xs text-gray-600">Desired shifts:</Label>
+                  <Label className="text-xs text-gray-600" dir="rtl">משמרות רצויות:</Label>
                   <Input 
                     type="number" 
                     className="w-16 h-7 text-xs" 
@@ -530,8 +530,8 @@ END:VEVENT
           <Card className="border-none shadow-lg">
             <CardContent className="py-16 text-center">
               <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Worker Profile Found</h3>
-              <p className="text-gray-600">Your email is not associated with a worker account.</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2" dir="rtl">לא נמצא פרופיל עובד</h3>
+              <p className="text-gray-600" dir="rtl">האימייל שלך לא משויך לחשבון עובד.</p>
             </CardContent>
           </Card>
         ) : (
@@ -540,7 +540,7 @@ END:VEVENT
             <Card className="border-none shadow-lg mb-4">
               <CardHeader className="border-b bg-white py-3 px-4">
                 <div className="flex justify-between items-center">
-                  <CardTitle className="text-base">Non-Available Times</CardTitle>
+                  <CardTitle className="text-base" dir="rtl">זמנים לא זמינים</CardTitle>
                   <Button onClick={() => setShowUnavailabilityDialog(true)} size="sm" className="bg-red-600 hover:bg-red-700">
                     <Plus className="w-4 h-4" />
                   </Button>
@@ -548,7 +548,7 @@ END:VEVENT
               </CardHeader>
               <CardContent className="py-3 px-4">
                 {unavailabilities.length === 0 ? (
-                  <p className="text-xs text-gray-500 text-center py-2">No unavailable times for this week</p>
+                  <p className="text-xs text-gray-500 text-center py-2" dir="rtl">אין זמנים לא זמינים השבוע</p>
                 ) : (
                   <div className="space-y-2">
                     {unavailabilities.map((unavail) => (
@@ -575,14 +575,14 @@ END:VEVENT
                     <div className="flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-blue-600" />
                       <span className="text-sm font-medium">
-                        {existingAvailability.status === "approved" ? "Approved" : 
-                         existingAvailability.status === "submitted" ? "Submitted" : 
-                         existingAvailability.status === "pending_change" ? "Change Pending" : "Draft"}
+                        {existingAvailability.status === "approved" ? "אושר" : 
+                         existingAvailability.status === "submitted" ? "נשלח" : 
+                         existingAvailability.status === "pending_change" ? "ממתין לשינוי" : "טיוטה"}
                       </span>
                     </div>
                     {isApproved && !showEditMode && (
                       <Button variant="outline" size="sm" onClick={() => setShowEditMode(true)}>
-                        <Pencil className="w-3 h-3 mr-1" />Edit Shifts
+                        <Pencil className="w-3 h-3 mr-1" />ערוך משמרות
                       </Button>
                     )}
                     {showEditMode && (
@@ -590,9 +590,9 @@ END:VEVENT
                         <Button variant="outline" size="sm" onClick={() => {
                           setShowEditMode(false);
                           setSelectedShifts(originalShifts);
-                        }}>Cancel</Button>
+                        }} dir="rtl">ביטול</Button>
                         <Button size="sm" onClick={() => setShowChangeRecap(true)} className="bg-blue-900 hover:bg-blue-800">
-                          Review Changes
+                          סקור שינויים
                         </Button>
                       </div>
                     )}
@@ -604,7 +604,7 @@ END:VEVENT
             {/* Shift Selection Grid */}
             <Card className="border-none shadow-lg mb-4">
               <CardHeader className="border-b bg-white py-3 px-4">
-                <CardTitle className="text-base">Select Shifts (Tap to cycle: Wanted → Available → Unavailable)</CardTitle>
+                <CardTitle className="text-base" dir="rtl">בחר משמרות (לחץ כדי להחליף: רצוי → זמין → לא זמין)</CardTitle>
               </CardHeader>
               <CardContent className="py-3 px-2">
                 <div className="space-y-3">
@@ -666,14 +666,14 @@ END:VEVENT
 
                 {!isApproved && !isPendingChange && (
                   <div className="flex justify-end gap-2 mt-4">
-                    <Button variant="outline" size="sm" onClick={() => setSelectedShifts([])}>Clear</Button>
+                    <Button variant="outline" size="sm" onClick={() => setSelectedShifts([])} dir="rtl">נקה</Button>
                     <Button
                       onClick={() => setShowSummary(true)}
                       disabled={selectedShifts.filter(s => s.type !== "unavailable").length === 0}
                       size="sm"
                       className="bg-blue-900 hover:bg-blue-800"
                     >
-                      Review & Submit
+                      סקור ושלח
                     </Button>
                   </div>
                 )}
@@ -684,7 +684,7 @@ END:VEVENT
             <Card className="border-none shadow-lg">
               <CardHeader className="border-b bg-white py-3 px-4">
                 <div className="flex justify-between items-center">
-                  <CardTitle className="text-base">My Schedule Calendar</CardTitle>
+                  <CardTitle className="text-base" dir="rtl">לוח השנה שלי</CardTitle>
                   <div className="flex gap-1 items-center">
                     <Button variant="outline" size="sm" onClick={generateICSFile} title="Sync to phone calendar">
                       <Download className="w-4 h-4" />
@@ -740,11 +740,11 @@ END:VEVENT
         {/* Dialogs */}
         <Dialog open={showUnavailabilityDialog} onOpenChange={setShowUnavailabilityDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Add Unavailable Time</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">הוסף זמן לא זמין</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="multiDay" checked={unavailabilityForm.multiDay} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, multiDay: e.target.checked })} />
-                <Label htmlFor="multiDay">Multiple Days</Label>
+                <Label htmlFor="multiDay" dir="rtl">מספר ימים</Label>
               </div>
               <div className={unavailabilityForm.multiDay ? "grid grid-cols-2 gap-4" : ""}>
                 <div><Label>{unavailabilityForm.multiDay ? "Start Date" : "Date"}</Label><Input type="date" value={unavailabilityForm.start_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_date: e.target.value })} /></div>
@@ -766,8 +766,8 @@ END:VEVENT
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowUnavailabilityDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddUnavailability} className="bg-red-600 hover:bg-red-700">Add</Button>
+              <Button variant="outline" onClick={() => setShowUnavailabilityDialog(false)} dir="rtl">ביטול</Button>
+              <Button onClick={handleAddUnavailability} className="bg-red-600 hover:bg-red-700" dir="rtl">הוסף</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -782,15 +782,15 @@ END:VEVENT
 
         <Dialog open={showSummary} onOpenChange={setShowSummary}>
           <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Review & Reorder Priority</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">סקור וסדר מחדש עדיפות</DialogTitle></DialogHeader>
             <div className="py-4">
               <Tabs defaultValue="wanted" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="wanted">Wanted ({wantedShifts.length})</TabsTrigger>
-                  <TabsTrigger value="available">Available ({availableShifts.length})</TabsTrigger>
+                  <TabsTrigger value="wanted" dir="rtl">רצוי ({wantedShifts.length})</TabsTrigger>
+                  <TabsTrigger value="available" dir="rtl">זמין ({availableShifts.length})</TabsTrigger>
                 </TabsList>
                 <TabsContent value="wanted" className="mt-4">
-                  <p className="text-sm text-gray-600 mb-2">Drag to reorder wanted shifts priority</p>
+                  <p className="text-sm text-gray-600 mb-2" dir="rtl">גרור כדי לשנות סדר עדיפות המשמרות הרצויות</p>
                   <DragDropContext onDragEnd={(r) => handleDragEnd(r, "wanted")}>
                     <Droppable droppableId="wanted-shifts">
                       {(provided) => (
@@ -817,7 +817,7 @@ END:VEVENT
                   </DragDropContext>
                 </TabsContent>
                 <TabsContent value="available" className="mt-4">
-                  <p className="text-sm text-gray-600 mb-2">Drag to reorder available shifts priority</p>
+                  <p className="text-sm text-gray-600 mb-2" dir="rtl">גרור כדי לשנות סדר עדיפות המשמרות הזמינות</p>
                   <DragDropContext onDragEnd={(r) => handleDragEnd(r, "available")}>
                     <Droppable droppableId="available-shifts">
                       {(provided) => (
@@ -846,15 +846,15 @@ END:VEVENT
               </Tabs>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowSummary(false)}><X className="w-4 h-4 mr-2" />Back</Button>
-              <Button onClick={handleSubmit} className="bg-blue-900 hover:bg-blue-800"><Check className="w-4 h-4 mr-2" />Submit</Button>
+              <Button variant="outline" onClick={() => setShowSummary(false)} dir="rtl"><X className="w-4 h-4 mr-2" />חזור</Button>
+              <Button onClick={handleSubmit} className="bg-blue-900 hover:bg-blue-800" dir="rtl"><Check className="w-4 h-4 mr-2" />שלח</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         <Dialog open={showChangeRecap} onOpenChange={setShowChangeRecap}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Change Request Summary</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">סיכום בקשת שינוי</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               {(() => {
                 const { added, removed } = getChanges();
@@ -862,7 +862,7 @@ END:VEVENT
                   <>
                     {added.length > 0 && (
                       <div>
-                        <p className="font-semibold text-green-700 mb-2">Added:</p>
+                        <p className="font-semibold text-green-700 mb-2" dir="rtl">נוסף:</p>
                         {added.map((s, i) => (
                           <div key={i} className="p-2 bg-green-50 rounded mb-1 text-sm">
                             {format(new Date(s.date), "EEE, MMM d")} {s.start_time}-{s.end_time} ({s.type})
@@ -872,7 +872,7 @@ END:VEVENT
                     )}
                     {removed.length > 0 && (
                       <div>
-                        <p className="font-semibold text-red-700 mb-2">Removed:</p>
+                        <p className="font-semibold text-red-700 mb-2" dir="rtl">הוסר:</p>
                         {removed.map((s, i) => (
                           <div key={i} className="p-2 bg-red-50 rounded mb-1 text-sm">
                             {format(new Date(s.date), "EEE, MMM d")} {s.start_time}-{s.end_time} ({s.type})
@@ -881,19 +881,19 @@ END:VEVENT
                       </div>
                     )}
                     {added.length === 0 && removed.length === 0 && (
-                      <p className="text-gray-500">No changes detected</p>
+                      <p className="text-gray-500" dir="rtl">לא זוהו שינויים</p>
                     )}
                   </>
                 );
               })()}
               <div>
-                <Label>Note to Admin (optional)</Label>
-                <Textarea value={changeNote} onChange={(e) => setChangeNote(e.target.value)} placeholder="Explain the reason for changes..." rows={3} />
+                <Label dir="rtl">הערה למנהל (אופציונלי)</Label>
+                <Textarea value={changeNote} onChange={(e) => setChangeNote(e.target.value)} placeholder="הסבר את הסיבה לשינויים..." rows={3} dir="rtl" />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowChangeRecap(false)}>Cancel</Button>
-              <Button onClick={handleSubmitChangeRequest} className="bg-blue-900 hover:bg-blue-800">Submit Change Request</Button>
+              <Button variant="outline" onClick={() => setShowChangeRecap(false)} dir="rtl">ביטול</Button>
+              <Button onClick={handleSubmitChangeRequest} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שלח בקשת שינוי</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -917,7 +917,7 @@ END:VEVENT
                 )}
                 {getYearlyEventsForDate(selectedDate).length > 0 && (
                   <div>
-                    <p className="font-semibold mb-2">Your Yearly Events:</p>
+                    <p className="font-semibold mb-2" dir="rtl">האירועים השנתיים שלך:</p>
                     {getYearlyEventsForDate(selectedDate).map((e, i) => (
                       <div key={i} className="p-3 bg-green-50 border border-green-200 rounded-lg mb-2">
                         <p className="font-medium text-green-800">{e.title}</p>
@@ -927,9 +927,9 @@ END:VEVENT
                   </div>
                 )}
                 <div>
-                  <p className="font-semibold mb-2">Your Shifts:</p>
+                  <p className="font-semibold mb-2" dir="rtl">המשמרות שלך:</p>
                   {getAssignmentForDate(selectedDate).length === 0 ? (
-                    <p className="text-sm text-gray-500">No shifts scheduled</p>
+                    <p className="text-sm text-gray-500" dir="rtl">אין משמרות מתוזמנות</p>
                   ) : (
                     getAssignmentForDate(selectedDate).map((a, i) => (
                       <div key={i} className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
@@ -943,7 +943,7 @@ END:VEVENT
               </div>
             )}
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDateDetails(false)}>Close</Button>
+              <Button variant="outline" onClick={() => setShowDateDetails(false)} dir="rtl">סגור</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
