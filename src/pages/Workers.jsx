@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, UserX, UserCheck, ChefHat, TrendingUp, Award } from "lucide-react";
+import { Plus, Pencil, UserX, UserCheck, ChefHat, TrendingUp, Award, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { getSeniorityInfo, calculateProgression } from "../components/utils/SeniorityUtils";
 import { Progress } from "@/components/ui/progress";
@@ -92,6 +92,12 @@ export default function Workers() {
 
   const toggleGuide = async (worker) => {
     await base44.entities.Worker.update(worker.id, { is_guide: !worker.is_guide });
+    loadData();
+  };
+
+  const handleDeleteWorker = async (workerId) => {
+    if (!confirm("האם אתה בטוח שברצונך למחוק עובד זה?")) return;
+    await base44.entities.Worker.delete(workerId);
     loadData();
   };
 
@@ -198,6 +204,7 @@ export default function Workers() {
                     <Button variant={worker.active ? "destructive" : "default"} size="sm" className="flex-1" onClick={() => toggleActive(worker)} dir="rtl">
                       {worker.active ? <><UserX className="w-3 h-3 mr-2" />השבת</> : <><UserCheck className="w-3 h-3 mr-2" />הפעל</>}
                     </Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleDeleteWorker(worker.id)} dir="rtl"><Trash2 className="w-3 h-3" /></Button>
                   </div>
                 </CardContent>
               </Card>
