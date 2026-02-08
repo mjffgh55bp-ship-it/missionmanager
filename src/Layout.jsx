@@ -72,19 +72,8 @@ export default function Layout({ children }) {
 
   return (
     <SidebarProvider defaultOpen={false}>
-      <style>{`
-        * {
-          font-family: Calibri, sans-serif !important;
-        }
-        body {
-          background-color: #d4f1d4 !important;
-        }
-        .bg-gray-50 {
-          background-color: #d4f1d4 !important;
-        }
-      `}</style>
-      <div className="min-h-screen flex w-full" style={{backgroundColor: '#d4f1d4'}}>
-        <Sidebar collapsible="offcanvas" className="border-r border-gray-200 z-50 bg-white">
+      <div className="min-h-screen flex w-full bg-gray-50">
+        <Sidebar collapsible="offcanvas" className="border-r border-gray-200 z-50">
           <SidebarHeader className="border-b border-gray-200 p-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-900 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
