@@ -142,10 +142,6 @@ export default function Workers() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">חברי צוות</h1>
-            <p className="text-gray-600" dir="rtl">נהל את הטבחים והעוזרים שלך</p>
-          </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => { setTempCategoryNames(categoryNames); setShowCategoryDialog(true); }} dir="rtl">
               ערוך קטגוריות
