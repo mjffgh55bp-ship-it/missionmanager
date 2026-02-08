@@ -22,13 +22,17 @@ export default function Workers() {
   const [editingWorker, setEditingWorker] = useState(null);
   const [formData, setFormData] = useState({
     full_name: "",
+    nickname: "",
     role: "chef",
     category: "category_1",
     phone: "",
     email: "",
     hire_date: format(new Date(), "yyyy-MM-dd"),
     is_guide: false,
-    active: true
+    active: true,
+    population: "",
+    training: "",
+    additional_training: ""
   });
   const [tempCategoryNames, setTempCategoryNames] = useState({ category_1: "", category_2: "", category_3: "" });
 
@@ -58,7 +62,7 @@ export default function Workers() {
     else await base44.entities.Worker.create(formData);
     setShowDialog(false);
     setEditingWorker(null);
-    setFormData({ full_name: "", role: "chef", category: "category_1", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true });
+    setFormData({ full_name: "", nickname: "", role: "chef", category: "category_1", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
     loadData();
   };
 
@@ -66,13 +70,17 @@ export default function Workers() {
     setEditingWorker(worker);
     setFormData({
       full_name: worker.full_name,
+      nickname: worker.nickname || "",
       role: worker.role,
       category: worker.category || "category_1",
       phone: worker.phone || "",
       email: worker.email || "",
       hire_date: worker.hire_date || format(new Date(), "yyyy-MM-dd"),
       is_guide: worker.is_guide || false,
-      active: worker.active
+      active: worker.active,
+      population: worker.population || "",
+      training: worker.training || "",
+      additional_training: worker.additional_training || ""
     });
     setShowDialog(true);
   };
@@ -176,8 +184,12 @@ export default function Workers() {
                       <Switch checked={worker.is_guide} onCheckedChange={() => toggleGuide(worker)} />
                     </div>
 
+                    {worker.nickname && <p className="text-sm text-gray-600" dir="rtl">🏷️ {worker.nickname}</p>}
                     {worker.email && <p className="text-sm text-gray-600">📧 {worker.email}</p>}
                     {worker.phone && <p className="text-sm text-gray-600">📞 {worker.phone}</p>}
+                    {worker.population && <p className="text-sm text-gray-600" dir="rtl">👥 {worker.population}</p>}
+                    {worker.training && <p className="text-sm text-gray-600" dir="rtl">🎓 {worker.training}</p>}
+                    {worker.additional_training && <p className="text-sm text-gray-600" dir="rtl">⭐ {worker.additional_training}</p>}
                     {worker.hire_date && <p className="text-sm text-gray-600" dir="rtl">📅 גויס: {format(new Date(worker.hire_date), "MMM d, yyyy")}</p>}
                   </div>
                   
@@ -208,8 +220,9 @@ export default function Workers() {
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle dir="rtl">{editingWorker ? "ערוך עובד" : "הוסף עובד חדש"}</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
               <div><Label htmlFor="full_name" dir="rtl">שם מלא *</Label><Input id="full_name" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="שם מלא" dir="rtl" /></div>
+              <div><Label htmlFor="nickname" dir="rtl">כינוי</Label><Input id="nickname" value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="כינוי" dir="rtl" /></div>
               <div><Label htmlFor="role" dir="rtl">תפקיד *</Label>
                 <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -235,6 +248,50 @@ export default function Workers() {
               </div>
               <div><Label htmlFor="email" dir="rtl">אימייל</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@mail.com" dir="rtl" /></div>
               <div><Label htmlFor="phone" dir="rtl">טלפון</Label><Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="05x-xxxxxxx" dir="rtl" /></div>
+              
+              <div>
+                <Label dir="rtl">אוכלוסייה</Label>
+                <Select value={formData.population} onValueChange={(value) => setFormData({ ...formData, population: value })}>
+                  <SelectTrigger><SelectValue placeholder="בחר אוכלוסייה..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="מנהל">מנהל</SelectItem>
+                    <SelectItem value="קבוע בכיר">קבוע בכיר</SelectItem>
+                    <SelectItem value="קבוע">קבוע</SelectItem>
+                    <SelectItem value="קבלן בכיר">קבלן בכיר</SelectItem>
+                    <SelectItem value="קבלן">קבלן</SelectItem>
+                    <SelectItem value="קבלן מיוחד">קבלן מיוחד</SelectItem>
+                    <SelectItem value="ותיק">ותיק</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label dir="rtl">הכשרה</Label>
+                <Select value={formData.training} onValueChange={(value) => setFormData({ ...formData, training: value })}>
+                  <SelectTrigger><SelectValue placeholder="בחר הכשרה..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="שף">שף</SelectItem>
+                    <SelectItem value="שף 2">שף 2</SelectItem>
+                    <SelectItem value="סו שף">סו שף</SelectItem>
+                    <SelectItem value="מארחת">מארחת</SelectItem>
+                    <SelectItem value="מאיישת סידור עבודה">מאיישת סידור עבודה</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label dir="rtl">הכשרה נוספת</Label>
+                <Select value={formData.additional_training} onValueChange={(value) => setFormData({ ...formData, additional_training: value })}>
+                  <SelectTrigger><SelectValue placeholder="בחר הכשרה נוספת..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={null}>ללא</SelectItem>
+                    <SelectItem value="מדריך">מדריך</SelectItem>
+                    <SelectItem value="בוחן">בוחן</SelectItem>
+                    <SelectItem value="מתלמד">מתלמד</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div><Label htmlFor="hire_date" dir="rtl">תאריך גיוס</Label><Input id="hire_date" type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
             </div>
             <DialogFooter>
