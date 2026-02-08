@@ -71,9 +71,9 @@ export default function Layout({ children }) {
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <div className="min-h-screen flex w-full bg-gray-50">
-        <Sidebar className="border-r border-gray-200 z-50">
+        <Sidebar collapsible="offcanvas" className="border-r border-gray-200 z-50">
           <SidebarHeader className="border-b border-gray-200 p-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-900 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
@@ -115,7 +115,7 @@ export default function Layout({ children }) {
         </Sidebar>
 
         <main className="flex-1 flex flex-col relative z-0">
-          <header className="bg-white border-b border-gray-200 px-6 py-4 md:hidden">
+          <header className="bg-white border-b border-gray-200 px-6 py-4">
             <div className="flex items-center gap-4">
               <SidebarTrigger className="hover:bg-gray-100 p-2 rounded-lg transition-colors duration-200" />
               <h1 className="text-xl font-bold text-gray-900" dir="rtl">מנהל משימות</h1>
