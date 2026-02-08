@@ -35,9 +35,31 @@ export default function Layout({ children }) {
   const location = useLocation();
   const [userRole, setUserRole] = useState("user");
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     checkUserRole();
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      const threshold = 50; // pixels from the right edge
+      const isNearRightEdge = window.innerWidth - e.clientX < threshold;
+      
+      if (isNearRightEdge) {
+        setSidebarOpen(true);
+      }
+    };
+
+    const handleMouseLeave = () => {
+      setSidebarOpen(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+    };
   }, []);
 
   const checkUserRole = async () => {
@@ -75,9 +97,14 @@ export default function Layout({ children }) {
   }
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
       <div className="min-h-screen flex w-full bg-gray-50">
-        <Sidebar side="right" collapsible="offcanvas" className="border-l border-gray-200 z-50">
+        <Sidebar 
+          side="right" 
+          collapsible="offcanvas" 
+          className="border-l border-gray-200 z-50"
+          onMouseLeave={() => setSidebarOpen(false)}
+        >
           <SidebarHeader className="border-b border-gray-200 p-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex items-center justify-center shadow-lg">
