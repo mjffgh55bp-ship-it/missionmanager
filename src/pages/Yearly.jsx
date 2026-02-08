@@ -313,7 +313,7 @@ export default function Yearly() {
       <div className="fixed top-0 left-64 right-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 pb-2">
         <div className="max-w-full mx-auto flex flex-wrap justify-between items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">לוח שנתי</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">תצוגה תקופתית</h1>
             <p className="text-gray-600 text-sm">{viewOnly ? "מצב צפייה בלבד" : "לחץ פעמיים על אירוע לעריכה"}</p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -404,7 +404,7 @@ export default function Yearly() {
                 {unavailabilities.length > 0 && (
                   <div className="p-2 border-b bg-red-50 flex items-center gap-2" style={{ height: ROW_HEIGHT }}>
                     <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                    <span className="text-xs font-medium text-red-700">אי זמינות</span>
+                    <span className="text-xs font-medium text-red-700">אנשים</span>
                   </div>
                 )}
               </div>

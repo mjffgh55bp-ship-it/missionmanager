@@ -21,17 +21,17 @@ const managerNavigationItems = [
   { title: "לוח בקרה", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
   { title: "לוח תורים", url: createPageUrl("Schedule"), icon: Calendar },
   { title: "מטריצה", url: createPageUrl("Matrix"), icon: Grid },
-  { title: "זמינות", url: createPageUrl("Availability"), icon: Clock },
+  { title: "האיזור האישי", url: createPageUrl("Availability"), icon: Clock },
   { title: "עובדים", url: createPageUrl("Workers"), icon: Users },
   { title: "עגלות", url: createPageUrl("FoodCarts"), icon: Truck },
   { title: "הסמכות", url: createPageUrl("Qualifications"), icon: Award },
   { title: "דוחות", url: createPageUrl("Reports"), icon: BarChart3 },
-  { title: "תצוגה שנתית", url: createPageUrl("Yearly"), icon: BarChart3 },
+  { title: "תצוגה תקופתית", url: createPageUrl("Yearly"), icon: BarChart3 },
   { title: "הגדרות", url: createPageUrl("Settings"), icon: Settings },
 ];
 
 const userNavigationItems = [
-  { title: "זמינות", url: createPageUrl("Availability"), icon: Clock },
+  { title: "האיזור האישי", url: createPageUrl("Availability"), icon: Clock },
 ];
 
 export default function Layout({ children }) {
