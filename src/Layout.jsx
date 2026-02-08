@@ -24,7 +24,7 @@ const managerNavigationItems = [
   { title: "האיזור האישי", url: createPageUrl("Availability"), icon: Clock },
   { title: "עובדים", url: createPageUrl("Workers"), icon: Users },
   { title: "עגלות", url: createPageUrl("FoodCarts"), icon: Truck },
-  { title: "הסמכות", url: createPageUrl("Qualifications"), icon: Award },
+  { title: "כשירויות", url: createPageUrl("Qualifications"), icon: Award },
   { title: "דוחות", url: createPageUrl("Reports"), icon: BarChart3 },
   { title: "תצוגה תקופתית", url: createPageUrl("Yearly"), icon: BarChart3 },
   { title: "הגדרות", url: createPageUrl("Settings"), icon: Settings },
