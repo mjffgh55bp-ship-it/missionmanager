@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, UserX, UserCheck, ChefHat, TrendingUp, Award, Trash2 } from "lucide-react";
+import { Plus, Pencil, UserX, UserCheck, ChefHat, TrendingUp, Award, Trash2, Users, Save } from "lucide-react";
 import { format } from "date-fns";
 import { getSeniorityInfo, calculateProgression } from "../components/utils/SeniorityUtils";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Workers() {
   const [workers, setWorkers] = useState([]);
@@ -20,6 +21,8 @@ export default function Workers() {
   const [showDialog, setShowDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [editingWorker, setEditingWorker] = useState(null);
+  const [userRoles, setUserRoles] = useState({});
+  const [savingRoles, setSavingRoles] = useState(false);
   const [formData, setFormData] = useState({
     full_name: "",
     nickname: "",
@@ -39,10 +42,11 @@ export default function Workers() {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, catSettings] = await Promise.all([
+    const [workersData, assignmentsData, catSettings, rolesSettings] = await Promise.all([
       base44.entities.Worker.list("-created_date"),
       base44.entities.Assignment.list(),
-      base44.entities.AppSettings.filter({ setting_key: "worker_category_names" })
+      base44.entities.AppSettings.filter({ setting_key: "worker_category_names" }),
+      base44.entities.AppSettings.filter({ setting_key: "user_roles" })
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -50,6 +54,9 @@ export default function Workers() {
       const names = JSON.parse(catSettings[0].setting_value);
       setCategoryNames(names);
       setTempCategoryNames(names);
+    }
+    if (rolesSettings.length > 0) {
+      setUserRoles(JSON.parse(rolesSettings[0].setting_value));
     }
   };
 
@@ -117,6 +124,20 @@ export default function Workers() {
     return "bg-gray-100 text-gray-800";
   };
 
+  const handleRoleChange = (email, role) => {
+    if (!email) return;
+    setUserRoles({ ...userRoles, [email]: role });
+  };
+
+  const saveUserRoles = async () => {
+    setSavingRoles(true);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "user_roles" });
+    const data = { setting_key: "user_roles", setting_value: JSON.stringify(userRoles) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setSavingRoles(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -135,8 +156,15 @@ export default function Workers() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {workers.map((worker) => {
+        <Tabs defaultValue="workers" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="workers" className="gap-2"><ChefHat className="w-4 h-4" />עובדים</TabsTrigger>
+            <TabsTrigger value="roles" className="gap-2"><Users className="w-4 h-4" />תפקידי משתמשים</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="workers">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {workers.map((worker) => {
             const totalHours = getWorkerTotalHours(worker.id);
             const seniorityInfo = getSeniorityInfo(worker.seniority);
             const progression = calculateProgression(totalHours, worker.seniority);
@@ -210,9 +238,9 @@ export default function Workers() {
               </Card>
             );
           })}
-        </div>
+            </div>
 
-        {workers.length === 0 && (
+            {workers.length === 0 && (
           <Card className="border-none shadow-lg">
             <CardContent className="py-16 text-center">
               <ChefHat className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -221,7 +249,45 @@ export default function Workers() {
               <Button onClick={() => setShowDialog(true)} className="bg-blue-900 hover:bg-blue-800" dir="rtl"><Plus className="w-4 h-4 mr-2" />הוסף עובד ראשון</Button>
             </CardContent>
           </Card>
-        )}
+            )}
+          </TabsContent>
+
+          <TabsContent value="roles">
+            <Card className="border-none shadow-lg">
+              <CardHeader className="border-b">
+                <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5 text-blue-600" />ניהול תפקידי משתמש</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-gray-700" dir="rtl"><strong>מנהל:</strong> גישה מלאה לכל התכונות<br /><strong>משתמש:</strong> גישה לזמינות בלבד</p>
+                  </div>
+                  <div className="space-y-3">
+                    {workers.filter(w => w.email).map((worker) => (
+                      <div key={worker.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{worker.full_name}</p>
+                          <p className="text-sm text-gray-600">{worker.email}</p>
+                        </div>
+                        <Select value={userRoles[worker.email] || "user"} onValueChange={(value) => handleRoleChange(worker.email, value)}>
+                          <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="user" dir="rtl">משתמש</SelectItem>
+                            <SelectItem value="manager" dir="rtl">מנהל</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
+                  </div>
+                  <Button onClick={saveUserRoles} disabled={savingRoles} className="bg-blue-900 hover:bg-blue-800 gap-2" dir="rtl">
+                    <Save className="w-4 h-4" />{savingRoles ? "שומר..." : "שמור תפקידי משתמש"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+        }
 
         {/* Worker Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
