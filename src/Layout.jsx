@@ -22,7 +22,6 @@ const managerNavigationItems = [
   { title: "מטריצה", url: createPageUrl("Matrix"), icon: Grid },
   { title: "זמינות אישית", url: createPageUrl("Availability"), icon: Clock },
   { title: "עובדים", url: createPageUrl("Workers"), icon: Users },
-  { title: "עגלות", url: createPageUrl("FoodCarts"), icon: Truck },
   { title: "דוחות", url: createPageUrl("Reports"), icon: BarChart3 },
   { title: "תקופתית", url: createPageUrl("Yearly"), icon: BarChart3 },
   { title: "הגדרות", url: createPageUrl("Settings"), icon: Settings },
