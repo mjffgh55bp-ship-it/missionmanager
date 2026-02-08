@@ -102,7 +102,7 @@ export default function Layout({ children }) {
         /* Sidebar styling */
         [data-sidebar] {
           background-color: #d9f99d !important;
-          border-right: 3px solid black !important;
+          border-left: 3px solid black !important;
         }
         [data-sidebar] button[data-active="true"], [data-sidebar] a[class*="bg-blue"] {
           background-color: #84cc16 !important;
@@ -115,7 +115,7 @@ export default function Layout({ children }) {
         }
       `}</style>
       <div className="min-h-screen flex w-full" style={{backgroundColor: '#d9f99d'}}>
-        <Sidebar collapsible="offcanvas" className="z-50" style={{backgroundColor: '#d9f99d', borderRight: '3px solid black'}}>
+        <Sidebar side="right" collapsible="offcanvas" className="z-50" style={{backgroundColor: '#d9f99d', borderLeft: '3px solid black'}}>
           <SidebarHeader className="p-6" style={{borderBottom: '3px solid black'}}>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{backgroundColor: '#84cc16', border: '2px solid black'}}>
@@ -161,16 +161,16 @@ export default function Layout({ children }) {
 
         <main className="flex-1 flex flex-col relative z-0">
           <header className="px-6 py-4 flex items-center justify-between" style={{backgroundColor: '#d9f99d', borderBottom: '3px solid black'}}>
-            <SidebarTrigger 
-              className="p-2 rounded-lg transition-colors duration-200" 
-              style={{backgroundColor: '#84cc16', border: '2px solid black', color: 'black'}}
-            />
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-bold text-black" dir="rtl">מערכת ניהול משמרות</h1>
               <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{backgroundColor: 'black'}}>
                 <Users className="w-5 h-5 text-white" />
               </div>
             </div>
+            <SidebarTrigger 
+              className="p-2 rounded-lg transition-colors duration-200" 
+              style={{backgroundColor: '#84cc16', border: '2px solid black', color: 'black'}}
+            />
           </header>
 
           <div className="flex-1 overflow-auto">
