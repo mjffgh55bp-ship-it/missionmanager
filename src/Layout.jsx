@@ -22,6 +22,7 @@ const managerNavigationItems = [
   { title: "לוח תורים", url: createPageUrl("Schedule"), icon: Calendar },
   { title: "מטריצה", url: createPageUrl("Matrix"), icon: Grid },
   { title: "האיזור האישי", url: createPageUrl("Availability"), icon: Clock },
+  { title: "תעודות זהות", url: createPageUrl("IdentityCards"), icon: Users },
   { title: "עובדים", url: createPageUrl("Workers"), icon: Users },
   { title: "עגלות", url: createPageUrl("FoodCarts"), icon: Truck },
   { title: "כשירויות", url: createPageUrl("Qualifications"), icon: Award },

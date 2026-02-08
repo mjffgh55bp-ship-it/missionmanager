@@ -58,6 +58,7 @@ import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
 import Workers from './pages/Workers';
 import Yearly from './pages/Yearly';
+import IdentityCards from './pages/IdentityCards';
 import __Layout from './Layout.jsx';
 
 
@@ -73,6 +74,7 @@ export const PAGES = {
     "Settings": Settings,
     "Workers": Workers,
     "Yearly": Yearly,
+    "IdentityCards": IdentityCards,
 }
 
 export const pagesConfig = {
