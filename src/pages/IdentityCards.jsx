@@ -9,6 +9,7 @@ export default function IdentityCards() {
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedWorkerId, setSelectedWorkerId] = useState(null);
 
   useEffect(() => {
     loadWorkers();
@@ -48,28 +49,80 @@ export default function IdentityCards() {
     );
   }
 
+  const scrollToWorker = (workerId) => {
+    setSelectedWorkerId(workerId);
+    const element = document.getElementById(`worker-${workerId}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6" dir="rtl">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">תעודות זהות</h1>
-          <p className="text-gray-600">כרטיסי זיהוי של כל העובדים</p>
+      <div className="max-w-7xl mx-auto flex gap-6">
+        {/* Sidebar - Table of Contents */}
+        <div className="hidden lg:block w-64 flex-shrink-0">
+          <div className="sticky top-6">
+            <Card className="border-none shadow-lg">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">תוכן עניינים</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
+                  {filteredWorkers.map((worker) => (
+                    <button
+                      key={worker.id}
+                      onClick={() => scrollToWorker(worker.id)}
+                      className={`w-full text-right px-4 py-3 hover:bg-blue-50 transition-colors border-r-4 ${
+                        selectedWorkerId === worker.id 
+                          ? 'border-blue-600 bg-blue-50 font-semibold' 
+                          : 'border-transparent'
+                      }`}
+                    >
+                      <div className="text-sm text-gray-900">{worker.full_name}</div>
+                      {worker.nickname && (
+                        <div className="text-xs text-gray-500 mt-0.5">{worker.nickname}</div>
+                      )}
+                    </button>
+                  ))}
+                  {filteredWorkers.length === 0 && (
+                    <div className="px-4 py-8 text-center text-sm text-gray-500">
+                      אין עובדים להצגה
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        <div className="mb-6 relative">
-          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            type="text"
-            placeholder="חפש עובד לפי שם, כינוי או אימייל..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pr-10"
-          />
-        </div>
+        {/* Main Content */}
+        <div className="flex-1">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">תעודות זהות</h1>
+            <p className="text-gray-600">כרטיסי זיהוי של כל העובדים</p>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredWorkers.map((worker) => (
-            <Card key={worker.id} className="hover:shadow-lg transition-shadow duration-200 overflow-hidden">
+          <div className="mb-6 relative">
+            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="חפש עובד לפי שם, כינוי או אימייל..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pr-10"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredWorkers.map((worker) => (
+              <Card 
+                key={worker.id} 
+                id={`worker-${worker.id}`}
+                className={`hover:shadow-lg transition-all duration-200 overflow-hidden ${
+                  selectedWorkerId === worker.id ? 'ring-2 ring-blue-500' : ''
+                }`}
+              >
               <div className="h-2 bg-gradient-to-r from-blue-500 to-blue-600" />
               
               <CardHeader className="pb-4">
@@ -145,16 +198,17 @@ export default function IdentityCards() {
                   </div>
                 )}
               </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {filteredWorkers.length === 0 && (
-          <div className="text-center py-12">
-            <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">לא נמצאו עובדים</p>
+              </Card>
+            ))}
           </div>
-        )}
+
+          {filteredWorkers.length === 0 && (
+            <div className="text-center py-12">
+              <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">לא נמצאו עובדים</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
