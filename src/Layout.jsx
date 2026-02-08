@@ -76,7 +76,7 @@ export default function Layout({ children }) {
         <Sidebar collapsible="offcanvas" className="border-r border-gray-200 z-50">
           <SidebarHeader className="border-b border-gray-200 p-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-900 to-blue-700 rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex items-center justify-center shadow-lg">
                 <ChefHat className="w-6 h-6 text-white" />
               </div>
               <div dir="rtl">
@@ -97,8 +97,8 @@ export default function Layout({ children }) {
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton 
                         asChild 
-                        className={`hover:bg-blue-50 hover:text-blue-900 transition-all duration-200 rounded-lg mb-1 ${
-                          location.pathname === item.url ? 'bg-blue-900 text-white hover:bg-blue-800 hover:text-white' : ''
+                        className={`hover:bg-green-50 hover:text-green-700 transition-all duration-200 rounded-lg mb-1 ${
+                          location.pathname === item.url ? 'bg-green-500 text-white hover:bg-green-600 hover:text-white' : ''
                         }`}
                       >
                         <Link to={item.url} className="flex items-center gap-3 px-3 py-2.5">
