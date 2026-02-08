@@ -47,6 +47,14 @@ export default function Layout({ children }) {
   const checkUserRole = async () => {
     try {
       const user = await base44.auth.me();
+      
+      // Check if user is admin in the system
+      if (user.role === "admin") {
+        setUserRole("manager");
+        setLoading(false);
+        return;
+      }
+      
       const settings = await base44.entities.AppSettings.filter({ setting_key: "user_roles" });
       
       if (settings.length > 0) {
