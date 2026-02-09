@@ -19,6 +19,7 @@ import {
 
 const managerNavigationItems = [
   { title: "לוח", url: createPageUrl("Schedule"), icon: Calendar },
+  { title: "שלדית", url: createPageUrl("Skeletons"), icon: Grid },
   { title: "מטריצה", url: createPageUrl("Matrix"), icon: Grid },
   { title: "זמינות אישית", url: createPageUrl("Availability"), icon: Clock },
   { title: "עובדים", url: createPageUrl("Workers"), icon: Users },

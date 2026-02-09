@@ -55,6 +55,7 @@ import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
 import Workers from './pages/Workers';
 import Yearly from './pages/Yearly';
+import Skeletons from './pages/Skeletons';
 import __Layout from './Layout.jsx';
 
 
@@ -67,6 +68,7 @@ export const PAGES = {
     "Settings": Settings,
     "Workers": Workers,
     "Yearly": Yearly,
+    "Skeletons": Skeletons,
 }
 
 export const pagesConfig = {
