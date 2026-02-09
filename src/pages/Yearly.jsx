@@ -341,12 +341,13 @@ export default function Yearly() {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={handlePreviousWeek}
+                onClick={handleNextWeek}
                 disabled={loading}
+                title="שבוע קדימה"
               >
                 <ChevronRight className="w-6 h-6" />
               </Button>
-              
+
               <div className="text-center">
                 <p className="text-xl font-bold text-black" dir="rtl">
                   {format(currentWeekStart, "d", { locale: he })} {format(currentWeekStart, "MMMM", { locale: he })} - {format(weekEnd, "d MMMM yyyy", { locale: he })}
@@ -356,8 +357,9 @@ export default function Yearly() {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={handleNextWeek}
+                onClick={handlePreviousWeek}
                 disabled={loading}
+                title="שבוע אחורה"
               >
                 <ChevronLeft className="w-6 h-6" />
               </Button>
