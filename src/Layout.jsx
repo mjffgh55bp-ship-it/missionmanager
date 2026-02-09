@@ -29,7 +29,7 @@ const managerNavigationItems = [
 ];
 
 const userNavigationItems = [
-  { title: "זמינות אישית", url: createPageUrl("PersonalAvailability"), icon: Clock },
+  { title: "זמינות אישית", url: createPageUrl("Availability"), icon: Clock },
 ];
 
 export default function Layout({ children }) {
