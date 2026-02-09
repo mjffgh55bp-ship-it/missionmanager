@@ -47,6 +47,21 @@ export default function Yearly() {
     loadData();
   }, [currentWeekStart]);
 
+  useEffect(() => {
+    // Restore selected category from localStorage
+    const saved = localStorage.getItem("yearlySelectedCategory");
+    if (saved) setSelectedCategory(saved);
+  }, []);
+
+  useEffect(() => {
+    // Save selected category to localStorage
+    if (selectedCategory) {
+      localStorage.setItem("yearlySelectedCategory", selectedCategory);
+    } else {
+      localStorage.removeItem("yearlySelectedCategory");
+    }
+  }, [selectedCategory]);
+
   const loadData = async () => {
     if (loading) return; // Prevent multiple simultaneous loads
     setLoading(true);

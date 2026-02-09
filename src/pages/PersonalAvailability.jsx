@@ -117,8 +117,19 @@ export default function PersonalAvailability() {
       });
     }
 
+    // Save to localStorage for persistence
+    localStorage.setItem(`availability_${worker.id}_${weekStartStr}`, JSON.stringify(availability));
     alert('הזמינות נשמרה בהצלחה!');
   };
+
+  useEffect(() => {
+    if (!worker) return;
+    const weekStartStr = format(currentWeekStart, 'yyyy-MM-dd');
+    const saved = localStorage.getItem(`availability_${worker.id}_${weekStartStr}`);
+    if (saved) {
+      setAvailability(JSON.parse(saved));
+    }
+  }, [worker, currentWeekStart]);
 
   const getSummary = () => {
     const counts = { wanted: 0, available: 0, unavailable: 0 };
