@@ -48,6 +48,7 @@ export default function Matrix() {
   const [showManualDialog, setShowManualDialog] = useState(false);
   const [selectedWorkerForManual, setSelectedWorkerForManual] = useState(null);
   const [manualShiftData, setManualShiftData] = useState({ start_time: '', end_time: '', type: 'available' });
+  const [editingShift, setEditingShift] = useState(null);
   const timelineRefs = useRef({});
 
   useEffect(() => { loadData(); }, [currentDate, viewMode]);
