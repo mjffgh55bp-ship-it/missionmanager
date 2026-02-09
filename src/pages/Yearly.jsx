@@ -10,6 +10,8 @@ import { ChevronLeft, ChevronRight, Plus, FileDown, Pencil, Trash2, Calendar, Se
 import { format, addDays, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { he } from "date-fns/locale";
 import { getHebrewDate } from "../components/utils/HebrewDate";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const DEFAULT_CATEGORIES = [
   { name: "אירוע", color: "#ffc9e3" },
