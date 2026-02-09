@@ -553,7 +553,10 @@ export default function Matrix() {
                               <WeeklySummary worker={worker} />
                             </div>
                           </div>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSendNotification(worker)}><Send className="w-3 h-3" /></Button>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSendNotification(worker)}><Send className="w-3 h-3" /></Button>
+                          </div>
                         </div>
                         <div 
                           data-worker-id={worker.id}
