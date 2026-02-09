@@ -30,6 +30,7 @@ const managerNavigationItems = [
 
 const userNavigationItems = [
   { title: "בית", url: createPageUrl("Home"), icon: LayoutDashboard },
+  { title: "זמינות אישית", url: createPageUrl("PersonalAvailability"), icon: Clock },
 ];
 
 export default function Layout({ children }) {
