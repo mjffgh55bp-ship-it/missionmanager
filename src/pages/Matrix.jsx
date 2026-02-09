@@ -334,6 +334,43 @@ export default function Matrix() {
     loadData();
   };
 
+  const handleManualShiftAdd = (worker) => {
+    setSelectedWorkerForManual(worker);
+    setManualShiftData({ start_time: '', end_time: '', type: 'available' });
+    setShowManualDialog(true);
+  };
+
+  const submitManualShift = async () => {
+    if (!selectedWorkerForManual || !manualShiftData.start_time || !manualShiftData.end_time) return;
+
+    const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForManual.id && a.week_start_date === weekStartDate);
+    let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
+
+    updatedShifts.push({
+      date: dateString,
+      start_time: manualShiftData.start_time,
+      end_time: manualShiftData.end_time,
+      type: manualShiftData.type,
+      priority: updatedShifts.length + 1
+    });
+
+    const availData = {
+      worker_id: selectedWorkerForManual.id,
+      worker_name: selectedWorkerForManual.full_name,
+      week_start_date: weekStartDate,
+      shifts: updatedShifts,
+      status: workerAvail?.status || "approved"
+    };
+
+    if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
+    else await base44.entities.Availability.create(availData);
+
+    setShowManualDialog(false);
+    setSelectedWorkerForManual(null);
+    setManualShiftData({ start_time: '', end_time: '', type: 'available' });
+    loadData();
+  };
+
   const AssignmentBar = ({ assignment }) => {
     const startPercent = timeToPercentage(assignment.start_time);
     const endPercent = timeToPercentage(assignment.end_time);
