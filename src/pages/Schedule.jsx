@@ -394,10 +394,11 @@ export default function Schedule() {
           </CardHeader>
           <CardContent className="p-4">
             <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-3 font-semibold text-sm text-gray-700 pb-2 border-b" dir="rtl">
+              <div className="grid grid-cols-4 gap-3 font-semibold text-sm text-gray-700 pb-2 border-b" dir="rtl">
                 <div>תפקיד</div>
                 <div>התחלה</div>
                 <div>סיום</div>
+                <div>שם</div>
               </div>
               {nightManagers.map((item, index) => (
                 <div key={index} className="grid grid-cols-4 gap-3" dir="rtl">
