@@ -145,6 +145,11 @@ export default function Yearly() {
     setCurrentWeekStart(addWeeks(currentWeekStart, 1));
   };
 
+  const handleDateSelect = (date) => {
+    setCurrentWeekStart(startOfWeek(date, { weekStartsOn: 0 }));
+    setCalendarOpen(false);
+  };
+
   const handleAddEvent = (date) => {
     setEditingEvent(null);
     setEventForm({
