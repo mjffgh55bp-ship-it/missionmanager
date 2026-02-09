@@ -13,6 +13,7 @@ import { getSeniorityInfo, calculateProgression } from "../components/utils/Seni
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import MenuButton from "../components/MenuButton";
 
 export default function Workers() {
   const [workers, setWorkers] = useState([]);
@@ -185,6 +186,7 @@ export default function Workers() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+      <MenuButton />
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div className="flex gap-2">

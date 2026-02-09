@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ColumnCell from "../components/schedule/ColumnCell";
+import MenuButton from "../components/MenuButton";
 
 
 const SHIFT_WINDOWS = [
@@ -337,6 +338,7 @@ export default function Schedule() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+      <MenuButton />
       <div className="max-w-screen-2xl mx-auto">
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b bg-white">
