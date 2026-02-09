@@ -689,10 +689,10 @@ export default function Matrix() {
           </DialogContent>
         </Dialog>
 
-        {/* Manual Shift Add Dialog */}
+        {/* Manual Shift Add/Edit Dialog */}
         <Dialog open={showManualDialog} onOpenChange={setShowManualDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">הוספת חלון זמינות ידנית - {selectedWorkerForManual?.full_name}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">{editingShift ? 'עריכת' : 'הוספת'} חלון זמינות - {selectedWorkerForManual?.full_name}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div>
                 <Label dir="rtl">שעת התחלה (HH:MM)</Label>
