@@ -294,12 +294,8 @@ export default function Schedule() {
 
   const handleAddWindow = () => {
     setWindows([...windows, { 
-      time: "06:00-10:00", 
-      guide_id: null, 
-      chef_id: null, 
-      sous_chef_id: null, 
-      additional_id: null, 
-      notes: "",
+      time: "06:00-10:00",
+      rows: [{ hours: "06:00-10:00", guide_id: null, chef_id: null, sous_chef_id: null, additional_id: null, notes: "" }],
       color: "#fef3c7",
       header_color: "#fde68a"
     }]);
@@ -313,6 +309,29 @@ export default function Schedule() {
 
   const handleDeleteWindow = (index) => {
     setWindows(windows.filter((_, i) => i !== index));
+  };
+
+  const handleAddRow = (windowIndex) => {
+    const updated = [...windows];
+    updated[windowIndex].rows = [...(updated[windowIndex].rows || []), { hours: "", guide_id: null, chef_id: null, sous_chef_id: null, additional_id: null, notes: "" }];
+    setWindows(updated);
+  };
+
+  const handleUpdateRow = (windowIndex, rowIndex, field, value) => {
+    const updated = [...windows];
+    updated[windowIndex].rows[rowIndex] = { ...updated[windowIndex].rows[rowIndex], [field]: value };
+    setWindows(updated);
+  };
+
+  const handleDeleteRow = (windowIndex, rowIndex) => {
+    const updated = [...windows];
+    updated[windowIndex].rows = updated[windowIndex].rows.filter((_, i) => i !== rowIndex);
+    setWindows(updated);
+  };
+
+  const handleDeleteTemplate = async (templateId) => {
+    await base44.entities.WindowTemplate.delete(templateId);
+    loadData();
   };
 
   const handleSaveTemplate = async () => {
@@ -445,85 +464,150 @@ export default function Schedule() {
         {/* Windows Display */}
         {windows.length > 0 && (
           <div className="space-y-4 mb-6">
-            {windows.map((window, index) => (
-              <Card key={index} className="border-none shadow-lg overflow-hidden" style={{ backgroundColor: window.color }}>
+            {windows.map((window, windowIndex) => (
+              <Card key={windowIndex} className="border-none shadow-lg overflow-hidden" style={{ backgroundColor: window.color }}>
                 <CardHeader className="py-3 px-4" style={{ backgroundColor: window.header_color }}>
                   <div className="flex justify-between items-center">
                     <CardTitle className="text-lg font-bold" dir="rtl">{window.time}</CardTitle>
+                    <Button size="sm" onClick={() => handleAddRow(windowIndex)} dir="rtl">
+                      <Plus className="w-3 h-3 mr-1" />הוסף שורה
+                    </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="p-4">
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4" dir="rtl">
-                    <div>
-                      <Label className="text-xs mb-1">מדריך</Label>
-                      <Select value={window.guide_id || ""} onValueChange={(v) => handleUpdateWindow(index, 'guide_id', v)}>
-                        <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={null}>ללא</SelectItem>
-                          {workers.filter(w => w.additional_training === "מדריך").map(w => (
-                            <SelectItem key={w.id} value={w.id}>
-                              <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                <CardContent className="p-4 space-y-3">
+                  {(window.rows || []).map((row, rowIndex) => (
+                    <div key={rowIndex} className="grid grid-cols-2 md:grid-cols-7 gap-3 pb-3 border-b last:border-0" dir="rtl">
+                      <div>
+                        <Label className="text-xs mb-1">שעות</Label>
+                        <Input 
+                          value={row.hours || ""} 
+                          onChange={(e) => handleUpdateRow(windowIndex, rowIndex, 'hours', e.target.value)}
+                          className="h-9"
+                          dir="rtl"
+                          placeholder="06:00-10:00"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1">מדריך</Label>
+                        <Select value={row.guide_id || ""} onValueChange={(v) => handleUpdateRow(windowIndex, rowIndex, 'guide_id', v)}>
+                          <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={null}>ללא</SelectItem>
+                            {workers.filter(w => w.additional_training === "מדריך").map(w => (
+                              <SelectItem key={w.id} value={w.id}>
+                                <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1">שף / שף 2</Label>
+                        <Select value={row.chef_id || ""} onValueChange={(v) => handleUpdateRow(windowIndex, rowIndex, 'chef_id', v)}>
+                          <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={null}>ללא</SelectItem>
+                            {workers.filter(w => w.training === "שף" || w.training === "שף 2").map(w => (
+                              <SelectItem key={w.id} value={w.id}>
+                                <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1">סו שף</Label>
+                        <Select value={row.sous_chef_id || ""} onValueChange={(v) => handleUpdateRow(windowIndex, rowIndex, 'sous_chef_id', v)}>
+                          <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={null}>ללא</SelectItem>
+                            {workers.filter(w => w.training === "סו שף").map(w => (
+                              <SelectItem key={w.id} value={w.id}>
+                                <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1">נוסף</Label>
+                        <Select value={row.additional_id || ""} onValueChange={(v) => handleUpdateRow(windowIndex, rowIndex, 'additional_id', v)}>
+                          <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={null}>ללא</SelectItem>
+                            {workers.map(w => (
+                              <SelectItem key={w.id} value={w.id}>
+                                <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1">הערות</Label>
+                        <Input 
+                          value={row.notes || ""} 
+                          onChange={(e) => handleUpdateRow(windowIndex, rowIndex, 'notes', e.target.value)}
+                          className="h-9"
+                          dir="rtl"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleDeleteRow(windowIndex, rowIndex)}
+                          className="h-9 text-red-500"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <Label className="text-xs mb-1">שף / שף 2</Label>
-                      <Select value={window.chef_id || ""} onValueChange={(v) => handleUpdateWindow(index, 'chef_id', v)}>
-                        <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={null}>ללא</SelectItem>
-                          {workers.filter(w => w.training === "שף" || w.training === "שף 2").map(w => (
-                            <SelectItem key={w.id} value={w.id}>
-                              <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs mb-1">סו שף</Label>
-                      <Select value={window.sous_chef_id || ""} onValueChange={(v) => handleUpdateWindow(index, 'sous_chef_id', v)}>
-                        <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={null}>ללא</SelectItem>
-                          {workers.filter(w => w.training === "סו שף").map(w => (
-                            <SelectItem key={w.id} value={w.id}>
-                              <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs mb-1">נוסף</Label>
-                      <Select value={window.additional_id || ""} onValueChange={(v) => handleUpdateWindow(index, 'additional_id', v)}>
-                        <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={null}>ללא</SelectItem>
-                          {workers.map(w => (
-                            <SelectItem key={w.id} value={w.id}>
-                              <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-xs mb-1">הערות</Label>
-                      <Input 
-                        value={window.notes || ""} 
-                        onChange={(e) => handleUpdateWindow(index, 'notes', e.target.value)}
-                        className="h-9"
-                        dir="rtl"
-                      />
-                    </div>
-                  </div>
+                  ))}
                 </CardContent>
               </Card>
             ))}
           </div>
+        )}
+
+        {/* Templates Library */}
+        {templates.length > 0 && (
+          <Card className="border-none shadow-lg mb-6">
+            <CardHeader className="border-b bg-green-50">
+              <CardTitle className="text-lg" dir="rtl">מאגר תבניות</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {templates.map((template) => (
+                  <div key={template.id} className="p-4 border rounded-lg bg-white hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-semibold text-gray-900" dir="rtl">{template.name}</h3>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleDeleteTemplate(template.id)}
+                        className="text-red-500 h-7 w-7 p-0"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3" dir="rtl">
+                      {(template.windows || []).length} חלונות
+                    </p>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => handleLoadTemplate(template.id)}
+                      className="w-full"
+                      dir="rtl"
+                    >
+                      טען תבנית
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {carts.length === 0 ? (
@@ -732,9 +816,9 @@ export default function Schedule() {
                 <div className="space-y-3">
                   {windows.map((window, index) => (
                     <div key={index} className="p-3 border rounded-lg" style={{ backgroundColor: window.color }}>
-                      <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
                         <div>
-                          <Label className="text-xs">שעה</Label>
+                          <Label className="text-xs">כותרת חלון</Label>
                           <Input value={window.time} onChange={(e) => handleUpdateWindow(index, 'time', e.target.value)} className="h-8" dir="rtl" />
                         </div>
                         <div>
@@ -745,11 +829,45 @@ export default function Schedule() {
                           <Label className="text-xs">צבע כותרת</Label>
                           <Input type="color" value={window.header_color} onChange={(e) => handleUpdateWindow(index, 'header_color', e.target.value)} className="h-8" />
                         </div>
-                        <div className="col-span-4 flex items-end">
+                        <div className="flex items-end">
                           <Button variant="destructive" size="sm" onClick={() => handleDeleteWindow(index)} dir="rtl">
-                            <Trash2 className="w-3 h-3 mr-1" />מחק
+                            <Trash2 className="w-3 h-3 mr-1" />מחק חלון
                           </Button>
                         </div>
+                      </div>
+                      
+                      <div className="border-t pt-3 mt-3">
+                        <div className="flex justify-between items-center mb-2">
+                          <Label className="text-xs font-semibold">שורות</Label>
+                          <Button size="sm" variant="outline" onClick={() => handleAddRow(index)} dir="rtl">
+                            <Plus className="w-3 h-3 mr-1" />הוסף שורה
+                          </Button>
+                        </div>
+                        {(window.rows || []).map((row, rowIndex) => (
+                          <div key={rowIndex} className="grid grid-cols-7 gap-2 mb-2 pb-2 border-b last:border-0">
+                            <Input 
+                              value={row.hours || ""} 
+                              onChange={(e) => handleUpdateRow(index, rowIndex, 'hours', e.target.value)}
+                              placeholder="שעות"
+                              className="h-8 text-xs"
+                              dir="rtl"
+                            />
+                            <Input value={row.guide_id || ""} placeholder="מדריך" className="h-8 text-xs" disabled />
+                            <Input value={row.chef_id || ""} placeholder="שף" className="h-8 text-xs" disabled />
+                            <Input value={row.sous_chef_id || ""} placeholder="סו שף" className="h-8 text-xs" disabled />
+                            <Input value={row.additional_id || ""} placeholder="נוסף" className="h-8 text-xs" disabled />
+                            <Input 
+                              value={row.notes || ""} 
+                              onChange={(e) => handleUpdateRow(index, rowIndex, 'notes', e.target.value)}
+                              placeholder="הערות"
+                              className="h-8 text-xs"
+                              dir="rtl"
+                            />
+                            <Button variant="ghost" size="sm" onClick={() => handleDeleteRow(index, rowIndex)} className="h-8 text-red-500">
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ))}
