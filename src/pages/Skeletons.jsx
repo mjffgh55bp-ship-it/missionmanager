@@ -13,6 +13,9 @@ export default function Skeletons() {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [templateName, setTemplateName] = useState("");
   const [activeTemplate, setActiveTemplate] = useState(null);
+  const [showEditTemplateDialog, setShowEditTemplateDialog] = useState(false);
+  const [editingTemplateName, setEditingTemplateName] = useState("");
+  const [editingTemplateColor, setEditingTemplateColor] = useState("#fef3c7");
 
   useEffect(() => {
     loadTemplates();
