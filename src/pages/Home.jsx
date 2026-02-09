@@ -111,15 +111,15 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <Card className="border-4 border-black bg-gradient-to-r from-green-300 to-green-400 shadow-2xl">
+        <Card className="border-4 border-black bg-gradient-to-r from-green-100 to-white shadow-2xl">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-white border-4 border-black rounded-full flex items-center justify-center">
-                <User className="w-8 h-8 text-green-600" />
+              <div className="w-16 h-16 bg-green-300 border-4 border-black rounded-full flex items-center justify-center">
+                <User className="w-8 h-8 text-black" />
               </div>
               <div className="flex-1">
                 <h1 className="text-3xl font-bold text-black" dir="rtl">שלום, {worker.nickname || user.full_name}!</h1>
-                <p className="text-black/80 text-sm mt-1" dir="rtl">{user.email}</p>
+                <p className="text-gray-700 text-sm mt-1" dir="rtl">{user.email}</p>
               </div>
             </div>
           </CardContent>
@@ -127,7 +127,7 @@ export default function Home() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-4 border-black bg-white shadow-xl">
+          <Card className="border-4 border-black bg-gradient-to-r from-green-100 to-white shadow-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -141,21 +141,21 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <Card className="border-4 border-black bg-white shadow-xl">
+          <Card className="border-4 border-black bg-gradient-to-r from-green-100 to-white shadow-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600" dir="rtl">סה"כ משמרות</p>
                   <p className="text-4xl font-bold text-black mt-2">{stats.totalShifts}</p>
                 </div>
-                <div className="w-16 h-16 bg-blue-400 border-2 border-black rounded-xl flex items-center justify-center">
+                <div className="w-16 h-16 bg-green-300 border-2 border-black rounded-xl flex items-center justify-center">
                   <BarChart3 className="w-8 h-8 text-black" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-4 border-black bg-white shadow-xl">
+          <Card className="border-4 border-black bg-gradient-to-r from-green-100 to-white shadow-xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -164,7 +164,7 @@ export default function Home() {
                     {stats.lastShift ? format(parseISO(stats.lastShift), 'd/M/yy', { locale: he }) : '-'}
                   </p>
                 </div>
-                <div className="w-16 h-16 bg-yellow-400 border-2 border-black rounded-xl flex items-center justify-center">
+                <div className="w-16 h-16 bg-green-300 border-2 border-black rounded-xl flex items-center justify-center">
                   <Calendar className="w-8 h-8 text-black" />
                 </div>
               </div>
@@ -174,8 +174,8 @@ export default function Home() {
 
         {/* Availability Status */}
         {thisWeekAvailability && (
-          <Card className="border-4 border-black bg-white shadow-xl">
-            <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-green-200">
+          <Card className="border-4 border-black bg-gradient-to-r from-green-100 to-white shadow-xl">
+            <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
               <CardTitle className="text-xl font-bold text-black" dir="rtl">זמינות השבוע</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
@@ -202,8 +202,8 @@ export default function Home() {
         )}
 
         {/* Upcoming Assignments */}
-        <Card className="border-4 border-black bg-white shadow-xl">
-          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-green-200">
+        <Card className="border-4 border-black bg-gradient-to-r from-green-100 to-white shadow-xl">
+          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
             <CardTitle className="text-xl font-bold text-black" dir="rtl">משמרות קרובות</CardTitle>
           </CardHeader>
           <CardContent className="p-6">

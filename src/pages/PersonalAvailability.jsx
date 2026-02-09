@@ -159,7 +159,7 @@ export default function PersonalAvailability() {
     <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-4">
       <div className="max-w-7xl mx-auto space-y-4">
         {/* Summary Cards */}
-        <div className="bg-gradient-to-r from-green-300 to-green-400 border-4 border-black rounded-xl p-6">
+        <div className="bg-gradient-to-r from-green-100 to-white border-4 border-black rounded-xl p-6">
           <h2 className="text-2xl font-bold text-black text-center mb-4" dir="rtl">סיכום זמינות השבוע</h2>
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-white border-4 border-black rounded-xl p-4 flex items-center justify-between" dir="rtl">
@@ -195,7 +195,7 @@ export default function PersonalAvailability() {
         </div>
 
         {/* Week Navigation */}
-        <div className="bg-white border-4 border-black rounded-xl p-4 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-green-100 to-white border-4 border-black rounded-xl p-4 flex items-center justify-between">
           <Button 
             onClick={handleNextWeek}
             variant="ghost" 
@@ -218,7 +218,7 @@ export default function PersonalAvailability() {
         </div>
 
         {/* Availability Table */}
-        <div className="bg-white border-4 border-black rounded-xl overflow-hidden">
+        <div className="bg-gradient-to-r from-green-100 to-white border-4 border-black rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse" dir="rtl">
               <thead>

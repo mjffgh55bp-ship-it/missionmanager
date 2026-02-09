@@ -310,7 +310,7 @@ export default function Yearly() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-green-50 flex flex-col" dir="rtl">
       {/* Fixed Header */}
-      <div className="fixed top-0 left-64 right-0 z-30 bg-gradient-to-br from-white to-green-50 p-4 md:p-6 pb-2">
+      <div className="fixed top-0 left-64 right-0 z-20 bg-gradient-to-br from-white to-green-50 p-4 md:p-6 pb-2">
         <div className="max-w-full mx-auto flex flex-wrap justify-between items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold text-black mb-1">תקופתית</h1>
@@ -418,22 +418,23 @@ export default function Yearly() {
 
                   {/* Week Header */}
                   <div className="flex bg-green-200 text-gray-800 h-[28px] sticky top-[36px] z-10">
-                    {weekGroups.map((group, idx) => (
-                      <div key={idx} className="text-center text-xs py-1 border-l flex items-center justify-center" style={{ width: `${group.count * CELL_WIDTH}px` }}>
-                        {group.week}
-                      </div>
-                    ))}
+                   {weekGroups.map((group, idx) => (
+                     <div key={idx} className="text-center text-xs py-1 border-l-2 border-black flex items-center justify-center" style={{ width: `${group.count * CELL_WIDTH}px` }}>
+                       {group.week}
+                     </div>
+                   ))}
                   </div>
 
                   {/* Day/Date Header */}
                   <div className="flex bg-gray-100 h-[52px] sticky top-[64px] z-10">
-                    {yearDays.map((day, idx) => {
-                      const dayOfWeek = getDay(day);
-                      const isShabbat = dayOfWeek === 6;
-                      const isFriday = dayOfWeek === 5;
-                      const hebDate = getHebrewDate(day);
-                      return (
-                        <div key={idx} className={`text-center text-[8px] py-1 border-l leading-tight flex flex-col justify-center ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}>
+                   {yearDays.map((day, idx) => {
+                     const dayOfWeek = getDay(day);
+                     const isShabbat = dayOfWeek === 6;
+                     const isFriday = dayOfWeek === 5;
+                     const hebDate = getHebrewDate(day);
+                     const isWeekStart = dayOfWeek === 0;
+                     return (
+                       <div key={idx} className={`text-center text-[8px] py-1 leading-tight flex flex-col justify-center ${isWeekStart ? 'border-l-2 border-black' : 'border-l'} ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}>
                           <div className="font-semibold">{HEBREW_DAYS[dayOfWeek]}</div>
                           <div>{day.getDate()}</div>
                           <div className="text-gray-500">{hebDate.dayHeb}</div>
@@ -467,9 +468,10 @@ export default function Yearly() {
                                         const dayOfWeek = getDay(day);
                                         const isShabbat = dayOfWeek === 6;
                                         const isFriday = dayOfWeek === 5;
+                                        const isWeekStart = dayOfWeek === 0;
                                         return (
                                           <div key={idx}
-                                            className={`h-full border-l ${viewOnly ? '' : 'cursor-pointer hover:bg-blue-50'} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
+                                            className={`h-full ${isWeekStart ? 'border-l-2 border-black' : 'border-l'} ${viewOnly ? '' : 'cursor-pointer hover:bg-blue-50'} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
                                             style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}
                                             onClick={() => handleCellClick(row.id, dateStr)} />
                                         );
