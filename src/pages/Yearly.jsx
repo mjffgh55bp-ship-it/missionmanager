@@ -11,7 +11,6 @@ import { ChevronLeft, ChevronRight, Plus, Trash2, Palette, Eye, EyeOff, GripVert
 import { format, addDays, getDay, differenceInDays, parseISO } from "date-fns";
 import { getHebrewDate } from "../components/utils/HebrewDate";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import MenuButton from "../components/MenuButton";
 
 const HEBREW_DAYS = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
@@ -310,7 +309,6 @@ export default function Yearly() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col" dir="rtl">
-      <MenuButton />
       {/* Fixed Header */}
       <div className="fixed top-0 left-64 right-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 pb-2">
         <div className="max-w-full mx-auto flex flex-wrap justify-between items-center gap-4">
