@@ -88,7 +88,7 @@ export default function Layout({ children }) {
             onClick={() => setSidebarOpen(false)}
           />
           <div 
-            className="fixed top-0 right-0 h-full w-56 bg-white border-l border-green-100 shadow-xl z-50 transform transition-transform duration-300"
+            className="fixed top-0 right-0 h-full w-56 bg-white border-l border-green-100 shadow-xl z-50 transform transition-transform duration-300 animate-in slide-in-from-right"
           >
             <div className="border-b border-green-100 p-4 bg-gradient-to-br from-green-50 to-white">
               <div className="flex flex-col items-end gap-2" dir="rtl">
