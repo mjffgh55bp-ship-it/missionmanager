@@ -239,7 +239,7 @@ export default function Workers() {
                     {workers.filter(w => w.email).map((worker) => (
                       <div key={worker.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900">{worker.full_name}</p>
+                          <p className="font-medium text-gray-900">{worker.nickname || 'ללא כינוי'}</p>
                           <p className="text-sm text-gray-600">{worker.email}</p>
                         </div>
                         <Select value={userRoles[worker.email] || "user"} onValueChange={(value) => handleRoleChange(worker.email, value)}>
