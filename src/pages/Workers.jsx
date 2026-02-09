@@ -24,18 +24,13 @@ export default function Workers() {
   const [userRoles, setUserRoles] = useState({});
   const [savingRoles, setSavingRoles] = useState(false);
   const [formData, setFormData] = useState({
-    full_name: "",
     nickname: "",
-    role: "chef",
-    category: "category_1",
-    phone: "",
     email: "",
-    hire_date: format(new Date(), "yyyy-MM-dd"),
-    is_guide: false,
-    active: true,
     population: "",
     training: "",
-    additional_training: ""
+    additional_training: "",
+    birth_date: "",
+    active: true
   });
   const [tempCategoryNames, setTempCategoryNames] = useState({ category_1: "", category_2: "", category_3: "" });
 
@@ -65,29 +60,51 @@ export default function Workers() {
   };
 
   const handleSubmit = async () => {
-    if (editingWorker) await base44.entities.Worker.update(editingWorker.id, formData);
-    else await base44.entities.Worker.create(formData);
+    if (editingWorker) {
+      await base44.entities.Worker.update(editingWorker.id, formData);
+    } else {
+      const newWorker = await base44.entities.Worker.create(formData);
+      
+      // Create birthday event if birth_date is provided
+      if (formData.birth_date && formData.nickname) {
+        const yearlyRows = await base44.entities.YearlyRow.list();
+        let birthdayRow = yearlyRows.find(r => r.name === "ימי הולדת");
+        
+        if (!birthdayRow) {
+          birthdayRow = await base44.entities.YearlyRow.create({
+            name: "ימי הולדת",
+            order: yearlyRows.length,
+            color: "#ec4899"
+          });
+        }
+        
+        await base44.entities.YearlyEvent.create({
+          row_id: birthdayRow.id,
+          start_date: formData.birth_date,
+          end_date: formData.birth_date,
+          title: `יום הולדת ל: ${formData.nickname}`,
+          worker_id: newWorker.id,
+          worker_name: formData.nickname
+        });
+      }
+    }
+    
     setShowDialog(false);
     setEditingWorker(null);
-    setFormData({ full_name: "", nickname: "", role: "chef", category: "category_1", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
+    setFormData({ nickname: "", email: "", population: "", training: "", additional_training: "", birth_date: "", active: true });
     loadData();
   };
 
   const handleEdit = (worker) => {
     setEditingWorker(worker);
     setFormData({
-      full_name: worker.full_name,
       nickname: worker.nickname || "",
-      role: worker.role,
-      category: worker.category || "category_1",
-      phone: worker.phone || "",
       email: worker.email || "",
-      hire_date: worker.hire_date || format(new Date(), "yyyy-MM-dd"),
-      is_guide: worker.is_guide || false,
-      active: worker.active,
       population: worker.population || "",
       training: worker.training || "",
-      additional_training: worker.additional_training || ""
+      additional_training: worker.additional_training || "",
+      birth_date: worker.birth_date || "",
+      active: worker.active
     });
     setShowDialog(true);
   };
@@ -160,67 +177,28 @@ export default function Workers() {
 
           <TabsContent value="workers">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {workers.map((worker) => {
-            const totalHours = getWorkerTotalHours(worker.id);
-            const seniorityInfo = getSeniorityInfo(worker.seniority);
-            const progression = calculateProgression(totalHours, worker.seniority);
-
-            return (
+              {workers.map((worker) => (
               <Card key={worker.id} className="border-none shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardHeader className="border-b bg-white">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${worker.role === 'chef' ? 'bg-blue-900' : 'bg-amber-500'}`}>
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-900">
                         <ChefHat className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg">{worker.full_name}</CardTitle>
-                        <div className="flex gap-2 mt-1 flex-wrap">
-                          <Badge className={worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'} dir="rtl">
-                           {worker.role === 'chef' ? 'טבח ראשי' : 'עוזר טבח'}
-                          </Badge>
-                          <Badge className={seniorityInfo.color}>{seniorityInfo.label}</Badge>
-                          <Badge className={getCategoryColor(worker.category)}>
-                            {categoryNames[worker.category] || worker.category}
-                          </Badge>
-                          {worker.is_guide && <Badge className="bg-yellow-100 text-yellow-800" dir="rtl"><Award className="w-3 h-3 mr-1" />מדריך</Badge>}
-                        </div>
+                        <CardTitle className="text-lg">{worker.nickname || 'ללא כינוי'}</CardTitle>
                       </div>
                     </div>
                     <Badge variant={worker.active ? "default" : "secondary"} dir="rtl">{worker.active ? "פעיל" : "לא פעיל"}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-6">
-                  <div className="space-y-4">
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700" dir="rtl">התקדמות ל-{progression.nextLevel ? getSeniorityInfo(progression.nextLevel).label : 'דרגה מקסימלית'}</span>
-                        <span className="text-xs text-gray-600" dir="rtl">{totalHours} שעות סה"כ</span>
-                      </div>
-                      {progression.nextLevel ? (
-                        <>
-                          <Progress value={progression.progress} className="h-2 mb-2" />
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <TrendingUp className="w-3 h-3" /><span dir="rtl">{progression.hoursRemaining} שעות עד הדרגה הבאה</span>
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-xs text-purple-600 font-medium" dir="rtl">הושגה הוותק המקסימלי! 🎉</p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                      <div className="flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span className="text-sm font-medium text-gray-900" dir="rtl">סטטוס מדריך</span></div>
-                      <Switch checked={worker.is_guide} onCheckedChange={() => toggleGuide(worker)} />
-                    </div>
-
-                    {worker.nickname && <p className="text-sm text-gray-600" dir="rtl">🏷️ {worker.nickname}</p>}
+                  <div className="space-y-3">
                     {worker.email && <p className="text-sm text-gray-600">📧 {worker.email}</p>}
-                    {worker.phone && <p className="text-sm text-gray-600">📞 {worker.phone}</p>}
                     {worker.population && <p className="text-sm text-gray-600" dir="rtl">👥 {worker.population}</p>}
                     {worker.training && <p className="text-sm text-gray-600" dir="rtl">🎓 {worker.training}</p>}
                     {worker.additional_training && <p className="text-sm text-gray-600" dir="rtl">⭐ {worker.additional_training}</p>}
-                    {worker.hire_date && <p className="text-sm text-gray-600" dir="rtl">📅 גויס: {format(new Date(worker.hire_date), "MMM d, yyyy")}</p>}
+                    {worker.birth_date && <p className="text-sm text-gray-600" dir="rtl">🎂 {format(new Date(worker.birth_date), "MMM d, yyyy")}</p>}
                   </div>
                   
                   <div className="flex gap-2 mt-4">
@@ -232,8 +210,7 @@ export default function Workers() {
                   </div>
                 </CardContent>
               </Card>
-            );
-          })}
+            ))}
             </div>
 
             {workers.length === 0 && (
@@ -290,33 +267,9 @@ export default function Workers() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle dir="rtl">{editingWorker ? "ערוך עובד" : "הוסף עובד חדש"}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-              <div><Label htmlFor="full_name" dir="rtl">שם מלא *</Label><Input id="full_name" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="שם מלא" dir="rtl" /></div>
               <div><Label htmlFor="nickname" dir="rtl">כינוי</Label><Input id="nickname" value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="כינוי" dir="rtl" /></div>
-              <div><Label htmlFor="role" dir="rtl">תפקיד *</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="chef" dir="rtl">טבח ראשי</SelectItem>
-                    <SelectItem value="sous_chef" dir="rtl">עוזר טבח</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div><Label dir="rtl">קטגוריה</Label>
-                <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="category_1">{categoryNames.category_1}</SelectItem>
-                    <SelectItem value="category_2">{categoryNames.category_2}</SelectItem>
-                    <SelectItem value="category_3">{categoryNames.category_3}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <Label htmlFor="is_guide" className="cursor-pointer flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span>Qualified Guide</span></Label>
-                <Switch id="is_guide" checked={formData.is_guide} onCheckedChange={(checked) => setFormData({ ...formData, is_guide: checked })} />
-              </div>
+              
               <div><Label htmlFor="email" dir="rtl">אימייל</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@mail.com" dir="rtl" /></div>
-              <div><Label htmlFor="phone" dir="rtl">טלפון</Label><Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="05x-xxxxxxx" dir="rtl" /></div>
               
               <div>
                 <Label dir="rtl">אוכלוסייה</Label>
@@ -361,11 +314,11 @@ export default function Workers() {
                 </Select>
               </div>
 
-              <div><Label htmlFor="hire_date" dir="rtl">תאריך גיוס</Label><Input id="hire_date" type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
+              <div><Label htmlFor="birth_date" dir="rtl">תאריך יום הולדת</Label><Input id="birth_date" type="date" value={formData.birth_date} onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })} /></div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setShowDialog(false); setEditingWorker(null); }} dir="rtl">ביטול</Button>
-              <Button onClick={handleSubmit} disabled={!formData.full_name} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
+              <Button onClick={handleSubmit} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
