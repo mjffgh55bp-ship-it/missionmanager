@@ -54,6 +54,26 @@ export default function Skeletons() {
     });
   };
 
+  const handleOpenEditTemplateDialog = (template) => {
+    setEditingTemplate(template);
+    setEditingTemplateName(template.name);
+    setEditingTemplateColor(template.color || "#fef3c7");
+    setShowEditTemplateDialog(true);
+  };
+
+  const handleSaveTemplateSettings = async () => {
+    if (!editingTemplate || !editingTemplateName.trim()) return;
+    
+    await base44.entities.WindowTemplate.update(editingTemplate.id, {
+      name: editingTemplateName.trim(),
+      color: editingTemplateColor
+    });
+    
+    loadTemplates();
+    setShowEditTemplateDialog(false);
+    setEditingTemplate(null);
+  };
+
   const handleSaveTemplate = async () => {
     if (!activeTemplate) return;
     
