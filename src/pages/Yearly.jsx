@@ -48,19 +48,29 @@ export default function Yearly() {
   }, [currentWeekStart]);
 
   useEffect(() => {
-    // Restore selected category from localStorage
+    // Restore selected category from localStorage on mount
     const saved = localStorage.getItem("yearlySelectedCategory");
     if (saved) setSelectedCategory(saved);
   }, []);
 
   useEffect(() => {
-    // Save selected category to localStorage
+    // Save selected category to localStorage when it changes
     if (selectedCategory) {
       localStorage.setItem("yearlySelectedCategory", selectedCategory);
     } else {
       localStorage.removeItem("yearlySelectedCategory");
     }
   }, [selectedCategory]);
+
+  useEffect(() => {
+    // Save all state to localStorage whenever it changes
+    const state = {
+      selectedCategory,
+      categories,
+      events
+    };
+    localStorage.setItem("yearlyPageState", JSON.stringify(state));
+  }, [selectedCategory, categories, events]);
 
   const loadData = async () => {
     if (loading) return; // Prevent multiple simultaneous loads
@@ -209,11 +219,16 @@ export default function Yearly() {
     if (!confirm("האם למחוק קטגוריה זו?")) return;
     
     const newCategories = categories.filter((_, i) => i !== index);
+    await saveCategoriesToDB(newCategories);
     setCategories(newCategories);
-    
+  };
+
+  const saveCategoriesToDB = async (categoriesToSave) => {
     const settings = await base44.entities.AppSettings.filter({ setting_key: "event_categories" });
     if (settings.length > 0) {
-      await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(newCategories) });
+      await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(categoriesToSave) });
+    } else {
+      await base44.entities.AppSettings.create({ setting_key: "event_categories", setting_value: JSON.stringify(categoriesToSave) });
     }
   };
 
