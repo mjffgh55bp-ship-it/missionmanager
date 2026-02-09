@@ -405,66 +405,45 @@ export default function Yearly() {
           })}
         </div>
 
-        {/* Legend */}
-        <Card className="border-4 border-black shadow-xl mb-6 bg-white">
-          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white py-3">
-            <div className="flex items-center justify-between">
-              <Button 
-                size="sm"
-                onClick={handleAddCategory}
-                className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
-              >
-                <Plus className="w-3 h-3 ml-1" />
-                הוסף קטגוריה
-              </Button>
-              <CardTitle className="text-lg text-black" dir="rtl">מקרא</CardTitle>
+        {/* Legend - Compact */}
+        <div className="mb-6 flex items-center justify-center gap-2 flex-wrap" dir="rtl">
+          <div className="text-sm font-semibold text-gray-600">מקרא:</div>
+          {categories.map((category, index) => (
+            <div 
+              key={index}
+              className="flex items-center gap-1.5 px-2 py-1 bg-white border border-gray-300 rounded-md group hover:shadow-sm transition-shadow"
+            >
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => handleEditCategory(category, index)}
+                  className="p-0.5 hover:bg-gray-200 rounded text-xs"
+                >
+                  <Pencil className="w-2.5 h-2.5 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => handleDeleteCategory(index)}
+                  className="p-0.5 hover:bg-gray-200 rounded text-xs"
+                >
+                  <Trash2 className="w-2.5 h-2.5 text-red-600" />
+                </button>
+              </div>
+              <span className="text-xs text-black font-semibold">{category.name}</span>
+              <div 
+                className="w-3.5 h-3.5 rounded border border-gray-400" 
+                style={{ backgroundColor: category.color }}
+              ></div>
             </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-end gap-3 flex-wrap" dir="rtl">
-              {categories.map((category, index) => {
-                const count = getCategorySummary(category.name);
-                const isSelected = selectedCategory === category.name;
-                return (
-                  <button 
-                    key={index}
-                    onClick={() => setSelectedCategory(isSelected ? null : category.name)}
-                    className={`flex items-center gap-2 p-2 px-3 rounded-lg border-2 transition-all group ${
-                      isSelected ? 'border-black bg-gray-100' : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditCategory(category, index);
-                        }}
-                        className="p-1 hover:bg-gray-200 rounded"
-                      >
-                        <Pencil className="w-3 h-3 text-gray-600" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteCategory(index);
-                        }}
-                        className="p-1 hover:bg-gray-200 rounded"
-                      >
-                        <Trash2 className="w-3 h-3 text-red-600" />
-                      </button>
-                    </div>
-                    <span className="text-sm font-bold text-gray-600">({count})</span>
-                    <span className="text-sm text-black font-bold">{category.name}</span>
-                    <div 
-                      className="w-5 h-5 rounded-full border-2 border-black" 
-                      style={{ backgroundColor: category.color }}
-                    ></div>
-                  </button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+          ))}
+          <Button 
+            size="sm"
+            onClick={handleAddCategory}
+            className="bg-green-400 hover:bg-green-500 text-black border border-black h-8"
+            variant="outline"
+          >
+            <Plus className="w-3 h-3 ml-1" />
+            הוסף
+          </Button>
+        </div>
 
         {/* Events List */}
         <Card className="border-4 border-black shadow-xl bg-white">
