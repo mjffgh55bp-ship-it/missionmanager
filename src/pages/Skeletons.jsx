@@ -167,6 +167,14 @@ export default function Skeletons() {
                 <CardContent className="p-4">
                   <div className="flex gap-2">
                     <Button 
+                      onClick={() => handleOpenEditTemplateDialog(template)}
+                      variant="outline"
+                      className="w-8 h-8 p-0"
+                      title="הגדרות תבנית"
+                    >
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                    <Button 
                       onClick={() => handleEditTemplate(template)}
                       variant="outline"
                       className="flex-1"
