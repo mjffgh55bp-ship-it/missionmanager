@@ -148,20 +148,20 @@ export default function Schedule() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-4 md:p-8">
       <div className="max-w-screen-2xl mx-auto">
         {/* Header */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b bg-white">
+        <Card className="border-none shadow-md mb-6 border border-green-100">
+          <CardHeader className="border-b border-green-100 bg-gradient-to-r from-white to-green-50">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <CardTitle className="text-2xl" dir="rtl">דרום אאא צפון</CardTitle>
               <div className="flex items-center gap-3">
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <div className="px-4 py-2 bg-green-300 text-gray-800 rounded-lg font-semibold min-w-[200px] text-center" dir="rtl">
+                <div className="px-4 py-2 bg-gradient-to-r from-green-400 to-green-300 text-white rounded-lg font-semibold min-w-[200px] text-center shadow-md" dir="rtl">
                   <div>{format(currentDate, "EEEE", { locale: he })}</div>
-                  <div className="text-sm">{format(currentDate, "d MMMM yyyy", { locale: he })}</div>
+                  <div className="text-sm opacity-90">{format(currentDate, "d MMMM yyyy", { locale: he })}</div>
                 </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}>
                   <ChevronRight className="w-4 h-4" />
@@ -173,9 +173,9 @@ export default function Schedule() {
         </Card>
 
         {/* Day Managers */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="py-3 px-4 bg-blue-50 border-b">
-            <CardTitle className="text-lg" dir="rtl">מנהלי מסעדה יום</CardTitle>
+        <Card className="border-none shadow-md mb-6 border border-green-100">
+          <CardHeader className="py-3 px-4 bg-gradient-to-r from-green-50 to-white border-b border-green-100">
+            <CardTitle className="text-lg text-green-800" dir="rtl">מנהלי מסעדה יום</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
             <div className="space-y-3">
@@ -196,9 +196,9 @@ export default function Schedule() {
         </Card>
 
         {/* Night Managers */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="py-3 px-4 bg-indigo-50 border-b">
-            <CardTitle className="text-lg" dir="rtl">מנהלי מסעדה לילה</CardTitle>
+        <Card className="border-none shadow-md mb-6 border border-green-100">
+          <CardHeader className="py-3 px-4 bg-gradient-to-r from-green-50 to-white border-b border-green-100">
+            <CardTitle className="text-lg text-green-800" dir="rtl">מנהלי מסעדה לילה</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
             <div className="space-y-3">
@@ -219,9 +219,9 @@ export default function Schedule() {
         </Card>
 
         {/* On-Call */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="py-3 px-4 bg-amber-50 border-b">
-            <CardTitle className="text-lg" dir="rtl">כוננויות</CardTitle>
+        <Card className="border-none shadow-md mb-6 border border-green-100">
+          <CardHeader className="py-3 px-4 bg-gradient-to-r from-green-50 to-white border-b border-green-100">
+            <CardTitle className="text-lg text-green-800" dir="rtl">כוננויות</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
             <div className="space-y-3">
@@ -251,9 +251,9 @@ export default function Schedule() {
           if (!activeTemplate) return null;
           
           return (
-            <Card key={template.id} className="border-none shadow-lg mb-6">
-              <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between" style={{ backgroundColor: template.windows?.[0]?.header_color || "#e5e7eb" }}>
-                <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
+            <Card key={template.id} className="border-none shadow-md mb-6 border border-green-100">
+              <CardHeader className="py-3 px-4 border-b border-green-100 flex flex-row items-center justify-between bg-gradient-to-r from-green-50 to-white">
+                <CardTitle className="text-lg text-green-800" dir="rtl">{template.name}</CardTitle>
                 <Button 
                   size="sm" 
                   onClick={() => {
@@ -261,7 +261,7 @@ export default function Schedule() {
                     setSaveTemplateName(template.name);
                     setShowSaveDialog(true);
                   }}
-                  className="bg-blue-900 hover:bg-blue-800"
+                  className="bg-gradient-to-r from-green-400 to-green-300 hover:from-green-500 hover:to-green-400 text-white shadow-sm"
                   dir="rtl"
                 >
                   <Save className="w-4 h-4 ml-2" />
@@ -398,7 +398,7 @@ export default function Schedule() {
             </Button>
             <Button 
               onClick={handleSaveTemplate} 
-              className="bg-blue-900 hover:bg-blue-800"
+              className="bg-gradient-to-r from-green-400 to-green-300 hover:from-green-500 hover:to-green-400 text-white"
               disabled={!saveTemplateName.trim()}
               dir="rtl"
             >
