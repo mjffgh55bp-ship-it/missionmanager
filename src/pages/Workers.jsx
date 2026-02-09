@@ -86,7 +86,7 @@ export default function Workers() {
         else await base44.entities.AppSettings.create(data);
       }
       
-      // Create birthday event if birth_date is provided
+      // Create/Update birthday event if birth_date is provided
       if (formData.birth_date && formData.nickname) {
         const yearlyRows = await base44.entities.YearlyRow.list();
         let birthdayRow = yearlyRows.find(r => r.name === "ימי הולדת");
@@ -99,10 +99,16 @@ export default function Workers() {
           });
         }
         
+        // Get month and day from birth_date
+        const birthDate = new Date(formData.birth_date);
+        const currentYear = new Date().getFullYear();
+        const thisYearBirthday = new Date(currentYear, birthDate.getMonth(), birthDate.getDate());
+        const birthdayStr = format(thisYearBirthday, "yyyy-MM-dd");
+        
         await base44.entities.YearlyEvent.create({
           row_id: birthdayRow.id,
-          start_date: formData.birth_date,
-          end_date: formData.birth_date,
+          start_date: birthdayStr,
+          end_date: birthdayStr,
           title: `יום הולדת ל: ${formData.nickname}`,
           worker_id: newWorker.id,
           worker_name: formData.nickname
