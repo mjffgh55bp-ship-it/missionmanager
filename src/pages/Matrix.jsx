@@ -44,6 +44,9 @@ export default function Matrix() {
   const [showTypeDialog, setShowTypeDialog] = useState(false);
   const [selectedShiftForType, setSelectedShiftForType] = useState(null);
   const [selectedWorkerForType, setSelectedWorkerForType] = useState(null);
+  const [showManualDialog, setShowManualDialog] = useState(false);
+  const [selectedWorkerForManual, setSelectedWorkerForManual] = useState(null);
+  const [manualShiftData, setManualShiftData] = useState({ start_time: '', end_time: '', type: 'available' });
   const timelineRefs = useRef({});
 
   useEffect(() => { loadData(); }, [currentDate, viewMode]);
