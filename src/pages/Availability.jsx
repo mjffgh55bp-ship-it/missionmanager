@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { formatHebrewDate } from "../components/utils/HebrewDate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import MenuButton from "../components/MenuButton";
 
 const SHIFT_BLOCKS = [
   { start: "06:00", end: "10:00" },
@@ -469,7 +468,6 @@ END:VEVENT
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 md:p-8">
-      <MenuButton />
       <div className="max-w-7xl mx-auto">
         {/* Tips Section */}
         {tipsMessage && (
