@@ -12,10 +12,10 @@ import { he } from "date-fns/locale";
 import { getHebrewDate } from "../components/utils/HebrewDate";
 
 const DEFAULT_CATEGORIES = [
-  { name: "אירוע", color: "#ec4899" },
-  { name: "משמרת", color: "#8b5cf6" },
-  { name: "פגישה", color: "#3b82f6" },
-  { name: "יום הולדת", color: "#f59e0b" },
+  { name: "אירוע", color: "#ffc9e3" },
+  { name: "משמרת", color: "#d4c5f9" },
+  { name: "פגישה", color: "#bfdbfe" },
+  { name: "יום הולדת", color: "#fed7aa" },
 ];
 
 export default function Yearly() {
@@ -37,10 +37,11 @@ export default function Yearly() {
     end_time: "16:00",
     category: "אירוע"
   });
-  const [categoryForm, setCategoryForm] = useState({ name: "", color: "#ec4899" });
+  const [categoryForm, setCategoryForm] = useState({ name: "", color: "#ffc9e3" });
   const [editingCategoryIndex, setEditingCategoryIndex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -203,7 +204,17 @@ export default function Yearly() {
 
   const getCategoryColor = (categoryName) => {
     const category = categories.find(c => c.name === categoryName);
-    return category?.color || "#ec4899";
+    return category?.color || "#ffc9e3";
+  };
+
+  const getFilteredEvents = () => {
+    if (!selectedCategory) return events;
+    return events.filter(e => e.description === selectedCategory);
+  };
+
+  const getCategorySummary = (categoryName) => {
+    const categoryEvents = events.filter(e => e.description === categoryName);
+    return categoryEvents.length;
   };
 
   const handleDeleteEvent = async (eventId) => {
@@ -378,30 +389,47 @@ export default function Yearly() {
             </div>
           </CardHeader>
           <CardContent className="p-4">
-            <div className="flex items-center justify-end gap-4 flex-wrap" dir="rtl">
-              {categories.map((category, index) => (
-                <div key={index} className="flex items-center gap-2 group">
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleEditCategory(category, index)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <Pencil className="w-3 h-3 text-gray-600" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCategory(index)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <Trash2 className="w-3 h-3 text-red-600" />
-                    </button>
-                  </div>
-                  <span className="text-sm text-black">{category.name}</span>
-                  <div 
-                    className="w-4 h-4 rounded-full border-2 border-black" 
-                    style={{ backgroundColor: category.color }}
-                  ></div>
-                </div>
-              ))}
+            <div className="flex items-center justify-end gap-3 flex-wrap" dir="rtl">
+              {categories.map((category, index) => {
+                const count = getCategorySummary(category.name);
+                const isSelected = selectedCategory === category.name;
+                return (
+                  <button 
+                    key={index}
+                    onClick={() => setSelectedCategory(isSelected ? null : category.name)}
+                    className={`flex items-center gap-2 p-2 px-3 rounded-lg border-2 transition-all group ${
+                      isSelected ? 'border-black bg-gray-100' : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditCategory(category, index);
+                        }}
+                        className="p-1 hover:bg-gray-200 rounded"
+                      >
+                        <Pencil className="w-3 h-3 text-gray-600" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCategory(index);
+                        }}
+                        className="p-1 hover:bg-gray-200 rounded"
+                      >
+                        <Trash2 className="w-3 h-3 text-red-600" />
+                      </button>
+                    </div>
+                    <span className="text-sm font-bold text-gray-600">({count})</span>
+                    <span className="text-sm text-black font-bold">{category.name}</span>
+                    <div 
+                      className="w-5 h-5 rounded-full border-2 border-black" 
+                      style={{ backgroundColor: category.color }}
+                    ></div>
+                  </button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -409,14 +437,31 @@ export default function Yearly() {
         {/* Events List */}
         <Card className="border-4 border-black shadow-xl bg-white">
           <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
-            <CardTitle className="text-xl text-black" dir="rtl">אירועים בשבוע הנוכחי</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl text-black" dir="rtl">
+                {selectedCategory ? `אירועים: ${selectedCategory}` : 'אירועים בשבוע הנוכחי'}
+              </CardTitle>
+              {selectedCategory && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setSelectedCategory(null)}
+                  className="border-2 border-black"
+                  dir="rtl"
+                >
+                  הצג הכל
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="p-6">
-            {events.length === 0 ? (
-              <p className="text-center text-gray-500 py-8" dir="rtl">אין אירועים השבוע</p>
+            {getFilteredEvents().length === 0 ? (
+              <p className="text-center text-gray-500 py-8" dir="rtl">
+                {selectedCategory ? `אין אירועים בקטגוריה "${selectedCategory}"` : 'אין אירועים השבוע'}
+              </p>
             ) : (
               <div className="space-y-3">
-                {events.map((event) => {
+                {getFilteredEvents().map((event) => {
                   const eventColor = getCategoryColor(event.description);
                   return (
                     <div 

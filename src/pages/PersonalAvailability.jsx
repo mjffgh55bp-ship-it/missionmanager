@@ -122,12 +122,18 @@ export default function PersonalAvailability() {
 
   const getSummary = () => {
     const counts = { wanted: 0, available: 0, unavailable: 0 };
-    Object.values(availability).forEach(type => {
+    const byDay = {};
+    
+    Object.entries(availability).forEach(([key, type]) => {
       if (type && counts.hasOwnProperty(type)) {
         counts[type]++;
+        const [date, timeSlot] = key.split('_');
+        if (!byDay[date]) byDay[date] = [];
+        byDay[date].push({ timeSlot, type });
       }
     });
-    return counts;
+    
+    return { counts, byDay };
   };
 
   if (loading) {
@@ -152,7 +158,7 @@ export default function PersonalAvailability() {
     );
   }
 
-  const summary = getSummary();
+  const { counts, byDay } = getSummary();
   const weekEnd = addDays(currentWeekStart, 6);
 
   return (
@@ -161,14 +167,16 @@ export default function PersonalAvailability() {
         {/* Summary Cards */}
         <div className="bg-gradient-to-r from-green-100 to-white border-4 border-black rounded-xl p-6">
           <h2 className="text-2xl font-bold text-black text-center mb-4" dir="rtl">סיכום זמינות השבוע</h2>
-          <div className="grid grid-cols-3 gap-4">
+          
+          {/* Total Summary */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-white border-4 border-black rounded-xl p-4 flex items-center justify-between" dir="rtl">
               <div>
                 <p className="text-black font-bold">יכול</p>
                 <p className="text-sm text-gray-600">משמרות</p>
               </div>
-              <div className="w-12 h-12 bg-yellow-200 border-2 border-black rounded-lg flex items-center justify-center">
-                <span className="text-2xl font-bold text-black">{summary.available}</span>
+              <div className="w-12 h-12 bg-yellow-100 border-2 border-black rounded-lg flex items-center justify-center">
+                <span className="text-2xl font-bold text-black">{counts.available}</span>
               </div>
             </div>
 
@@ -177,8 +185,8 @@ export default function PersonalAvailability() {
                 <p className="text-black font-bold">לא יכול</p>
                 <p className="text-sm text-gray-600">משמרות</p>
               </div>
-              <div className="w-12 h-12 bg-red-200 border-2 border-black rounded-lg flex items-center justify-center">
-                <span className="text-2xl font-bold text-black">{summary.unavailable}</span>
+              <div className="w-12 h-12 bg-red-100 border-2 border-black rounded-lg flex items-center justify-center">
+                <span className="text-2xl font-bold text-black">{counts.unavailable}</span>
               </div>
             </div>
 
@@ -187,9 +195,44 @@ export default function PersonalAvailability() {
                 <p className="text-black font-bold">רוצה</p>
                 <p className="text-sm text-gray-600">משמרות</p>
               </div>
-              <div className="w-12 h-12 bg-green-200 border-2 border-black rounded-lg flex items-center justify-center">
-                <span className="text-2xl font-bold text-black">{summary.wanted}</span>
+              <div className="w-12 h-12 bg-green-100 border-2 border-black rounded-lg flex items-center justify-center">
+                <span className="text-2xl font-bold text-black">{counts.wanted}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Daily Summary */}
+          <div className="space-y-2">
+            <h3 className="text-lg font-bold text-black text-center mb-3" dir="rtl">פירוט לפי ימים</h3>
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
+              {Array.from({ length: DAYS_IN_WEEK }).map((_, dayIndex) => {
+                const currentDay = addDays(currentWeekStart, dayIndex);
+                const dateStr = format(currentDay, 'yyyy-MM-dd');
+                const dayName = format(currentDay, 'EEE', { locale: he });
+                const dayShifts = byDay[dateStr] || [];
+                
+                return (
+                  <div key={dayIndex} className="bg-white border-2 border-black rounded-lg p-2" dir="rtl">
+                    <p className="text-sm font-bold text-center text-black mb-2">{dayName}</p>
+                    <div className="space-y-1">
+                      {dayShifts.map((shift, i) => {
+                        const bgColor = shift.type === 'wanted' ? 'bg-green-100' : 
+                                       shift.type === 'available' ? 'bg-yellow-100' : 'bg-red-100';
+                        const text = shift.type === 'wanted' ? 'רוצה' : 
+                                    shift.type === 'available' ? 'יכול' : 'לא יכול';
+                        return (
+                          <div key={i} className={`text-xs p-1 rounded ${bgColor} border border-black text-center`}>
+                            {text}
+                          </div>
+                        );
+                      })}
+                      {dayShifts.length === 0 && (
+                        <p className="text-xs text-gray-400 text-center">-</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -246,32 +289,40 @@ export default function PersonalAvailability() {
                       </td>
                       {TIME_SLOTS.map(slot => {
                         const key = `${dateStr}_${slot}`;
+                        const currentValue = availability[key] || 'none';
+                        const bgColor = currentValue === 'wanted' ? 'bg-green-100' : 
+                                       currentValue === 'available' ? 'bg-yellow-100' : 
+                                       currentValue === 'unavailable' ? 'bg-red-100' : 'bg-white';
                         return (
-                          <td key={slot} className="border-l-2 border-black p-2">
+                          <td key={slot} className={`border-l-2 border-black p-2 ${bgColor}`}>
                             <Select
-                              value={availability[key] || 'none'}
+                              value={currentValue}
                               onValueChange={(value) => handleAvailabilityChange(dateStr, slot, value)}
                             >
-                              <SelectTrigger className="w-full border-2 border-gray-300">
-                                <SelectValue placeholder="בחר..." />
+                              <SelectTrigger className="w-full border-2 border-black bg-white">
+                                <SelectValue placeholder="→" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="none">בחר...</SelectItem>
+                                <SelectItem value="none">
+                                  <span className="inline-flex items-center gap-2">
+                                    בחר...
+                                  </span>
+                                </SelectItem>
                                 <SelectItem value="wanted">
                                   <span className="inline-flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full bg-green-200 border border-black"></span>
+                                    <span className="w-3 h-3 rounded-full bg-green-100 border border-black"></span>
                                     רוצה
                                   </span>
                                 </SelectItem>
                                 <SelectItem value="available">
                                   <span className="inline-flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full bg-yellow-200 border border-black"></span>
+                                    <span className="w-3 h-3 rounded-full bg-yellow-100 border border-black"></span>
                                     יכול
                                   </span>
                                 </SelectItem>
                                 <SelectItem value="unavailable">
                                   <span className="inline-flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full bg-red-200 border border-black"></span>
+                                    <span className="w-3 h-3 rounded-full bg-red-100 border border-black"></span>
                                     לא יכול
                                   </span>
                                 </SelectItem>
