@@ -659,6 +659,55 @@ export default function Matrix() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Manual Shift Add Dialog */}
+        <Dialog open={showManualDialog} onOpenChange={setShowManualDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle dir="rtl">הוספת חלון זמינות ידנית - {selectedWorkerForManual?.full_name}</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label dir="rtl">שעת התחלה (HH:MM)</Label>
+                <Input 
+                  type="time" 
+                  value={manualShiftData.start_time} 
+                  onChange={(e) => setManualShiftData({ ...manualShiftData, start_time: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label dir="rtl">שעת סיום (HH:MM)</Label>
+                <Input 
+                  type="time" 
+                  value={manualShiftData.end_time} 
+                  onChange={(e) => setManualShiftData({ ...manualShiftData, end_time: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label dir="rtl">סוג זמינות</Label>
+                <Select value={manualShiftData.type} onValueChange={(value) => setManualShiftData({ ...manualShiftData, type: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="wanted">רצוי (Wanted)</SelectItem>
+                    <SelectItem value="available">זמין (Available)</SelectItem>
+                    <SelectItem value="unavailable">לא זמין (Unavailable)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowManualDialog(false)} dir="rtl">ביטול</Button>
+              <Button 
+                onClick={submitManualShift} 
+                className="bg-blue-900 hover:bg-blue-800"
+                disabled={!manualShiftData.start_time || !manualShiftData.end_time}
+                dir="rtl"
+              >
+                <Plus className="w-4 h-4 mr-2" />הוסף
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
