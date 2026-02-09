@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react";
-import { format, addDays, subDays, startOfWeek } from "date-fns";
+import { format, addDays, subDays, startOfWeek, getWeek } from "date-fns";
+import { he } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Check, Star, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -47,6 +48,12 @@ export default function Schedule() {
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [selectedCartId, setSelectedCartId] = useState(null);
   const [newColumnType, setNewColumnType] = useState("");
+  const [templates, setTemplates] = useState([]);
+  const [currentTemplate, setCurrentTemplate] = useState(null);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [windows, setWindows] = useState([]);
+  const [editingWindow, setEditingWindow] = useState(null);
   
   const [editFormData, setEditFormData] = useState({
     start_time: "",
@@ -69,7 +76,7 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     
-    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData, colTypesSettings, colSubTypesSettings, cartColsSettings] = await Promise.all([
+    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData, colTypesSettings, colSubTypesSettings, cartColsSettings, templatesData] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.FoodCart.filter({ active: true }),
       base44.entities.Assignment.filter({ date: dateString }),
@@ -77,7 +84,8 @@ export default function Schedule() {
       base44.entities.Unavailability.filter({ date: dateString }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
-      base44.entities.AppSettings.filter({ setting_key: "cart_columns" })
+      base44.entities.AppSettings.filter({ setting_key: "cart_columns" }),
+      base44.entities.WindowTemplate.list()
     ]);
     setWorkers(workersData);
     setCarts(cartsData);
@@ -87,6 +95,11 @@ export default function Schedule() {
     if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     if (cartColsSettings.length > 0) setCartColumns(JSON.parse(cartColsSettings[0].setting_value) || {});
+    setTemplates(templatesData);
+    if (templatesData.length > 0) {
+      setCurrentTemplate(templatesData[0]);
+      setWindows(templatesData[0].windows || []);
+    }
     setLoading(false);
   };
 
@@ -279,6 +292,62 @@ export default function Schedule() {
     return "text-gray-900";
   };
 
+  const handleAddWindow = () => {
+    setWindows([...windows, { 
+      time: "06:00-10:00", 
+      guide_id: null, 
+      chef_id: null, 
+      sous_chef_id: null, 
+      additional_id: null, 
+      notes: "",
+      color: "#fef3c7",
+      header_color: "#fde68a"
+    }]);
+  };
+
+  const handleUpdateWindow = (index, field, value) => {
+    const updated = [...windows];
+    updated[index] = { ...updated[index], [field]: value };
+    setWindows(updated);
+  };
+
+  const handleDeleteWindow = (index) => {
+    setWindows(windows.filter((_, i) => i !== index));
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim()) return;
+    
+    const templateData = {
+      name: templateName,
+      windows: windows
+    };
+
+    if (currentTemplate) {
+      await base44.entities.WindowTemplate.update(currentTemplate.id, templateData);
+    } else {
+      const created = await base44.entities.WindowTemplate.create(templateData);
+      setCurrentTemplate(created);
+    }
+    
+    setShowTemplateDialog(false);
+    loadData();
+  };
+
+  const handleLoadTemplate = async (templateId) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      setCurrentTemplate(template);
+      setWindows(template.windows || []);
+      setTemplateName(template.name);
+    }
+  };
+
+  const isVeteran = (workerId) => {
+    const worker = workers.find(w => w.id === workerId);
+    return worker?.population === "ותיק";
+  };
+
   const handleExportToExcel = () => {
     const exportData = [];
     
@@ -343,12 +412,27 @@ export default function Schedule() {
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b bg-white">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <CardTitle className="text-2xl" dir="rtl">לוח תורים יומי</CardTitle>
+              <CardTitle className="text-2xl" dir="rtl">לוח</CardTitle>
               <div className="flex items-center gap-3 flex-wrap">
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
-                <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center">{format(currentDate, "MMM d, yyyy")}</div>
+                <div className="px-4 py-2 bg-green-300 text-gray-800 rounded-lg font-semibold min-w-[200px] text-center" dir="rtl">
+                  <div>{format(currentDate, "EEEE", { locale: he })}</div>
+                  <div className="text-sm">{format(currentDate, "d MMMM yyyy", { locale: he })} • שבוע {getWeek(currentDate)}</div>
+                </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
                 <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
+                {templates.length > 0 && (
+                  <Select value={currentTemplate?.id || ""} onValueChange={handleLoadTemplate}>
+                    <SelectTrigger className="w-40"><SelectValue placeholder="בחר תבנית..." /></SelectTrigger>
+                    <SelectContent>
+                      {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button onClick={() => { setTemplateName(currentTemplate?.name || ""); setShowTemplateDialog(true); }} dir="rtl">
+                  <Plus className="w-4 h-4 mr-2" />
+                  ערוך תבנית
+                </Button>
                 <Button variant="outline" onClick={handleExportToExcel} className="gap-2" dir="rtl">
                   <Download className="w-4 h-4" />
                   ייצא
@@ -357,6 +441,90 @@ export default function Schedule() {
             </div>
           </CardHeader>
         </Card>
+
+        {/* Windows Display */}
+        {windows.length > 0 && (
+          <div className="space-y-4 mb-6">
+            {windows.map((window, index) => (
+              <Card key={index} className="border-none shadow-lg overflow-hidden" style={{ backgroundColor: window.color }}>
+                <CardHeader className="py-3 px-4" style={{ backgroundColor: window.header_color }}>
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-lg font-bold" dir="rtl">{window.time}</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4" dir="rtl">
+                    <div>
+                      <Label className="text-xs mb-1">מדריך</Label>
+                      <Select value={window.guide_id || ""} onValueChange={(v) => handleUpdateWindow(index, 'guide_id', v)}>
+                        <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={null}>ללא</SelectItem>
+                          {workers.filter(w => w.additional_training === "מדריך").map(w => (
+                            <SelectItem key={w.id} value={w.id}>
+                              <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs mb-1">שף / שף 2</Label>
+                      <Select value={window.chef_id || ""} onValueChange={(v) => handleUpdateWindow(index, 'chef_id', v)}>
+                        <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={null}>ללא</SelectItem>
+                          {workers.filter(w => w.training === "שף" || w.training === "שף 2").map(w => (
+                            <SelectItem key={w.id} value={w.id}>
+                              <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs mb-1">סו שף</Label>
+                      <Select value={window.sous_chef_id || ""} onValueChange={(v) => handleUpdateWindow(index, 'sous_chef_id', v)}>
+                        <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={null}>ללא</SelectItem>
+                          {workers.filter(w => w.training === "סו שף").map(w => (
+                            <SelectItem key={w.id} value={w.id}>
+                              <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs mb-1">נוסף</Label>
+                      <Select value={window.additional_id || ""} onValueChange={(v) => handleUpdateWindow(index, 'additional_id', v)}>
+                        <SelectTrigger className="h-9"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={null}>ללא</SelectItem>
+                          {workers.map(w => (
+                            <SelectItem key={w.id} value={w.id}>
+                              <span className={isVeteran(w.id) ? "font-bold" : ""}>{w.nickname || w.full_name}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs mb-1">הערות</Label>
+                      <Input 
+                        value={window.notes || ""} 
+                        onChange={(e) => handleUpdateWindow(index, 'notes', e.target.value)}
+                        className="h-9"
+                        dir="rtl"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {carts.length === 0 ? (
           <Card className="border-none shadow-lg"><CardContent className="py-16 text-center" dir="rtl"><h3 className="text-xl font-semibold text-gray-900 mb-2">נדרשת הגדרה</h3><p className="text-gray-600">אנא הוסף עגלות מזון תחילה.</p></CardContent></Card>
@@ -542,6 +710,59 @@ export default function Schedule() {
               </div>
             </div>
             <DialogFooter><Button variant="outline" onClick={() => setShowAddShiftDialog(false)} dir="rtl">ביטול</Button><Button onClick={handleAddShift} className="bg-blue-900 hover:bg-blue-800" dir="rtl">הוסף משמרת</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Template Dialog */}
+        <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle dir="rtl">ערוך תבנית חלונות</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label dir="rtl">שם התבנית</Label>
+                <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="שם התבנית..." dir="rtl" />
+              </div>
+              
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center mb-3">
+                  <Label className="text-lg font-semibold" dir="rtl">חלונות זמן</Label>
+                  <Button onClick={handleAddWindow} size="sm" dir="rtl"><Plus className="w-4 h-4 mr-1" />הוסף חלון</Button>
+                </div>
+                
+                <div className="space-y-3">
+                  {windows.map((window, index) => (
+                    <div key={index} className="p-3 border rounded-lg" style={{ backgroundColor: window.color }}>
+                      <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+                        <div>
+                          <Label className="text-xs">שעה</Label>
+                          <Input value={window.time} onChange={(e) => handleUpdateWindow(index, 'time', e.target.value)} className="h-8" dir="rtl" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">צבע רקע</Label>
+                          <Input type="color" value={window.color} onChange={(e) => handleUpdateWindow(index, 'color', e.target.value)} className="h-8" />
+                        </div>
+                        <div>
+                          <Label className="text-xs">צבע כותרת</Label>
+                          <Input type="color" value={window.header_color} onChange={(e) => handleUpdateWindow(index, 'header_color', e.target.value)} className="h-8" />
+                        </div>
+                        <div className="col-span-4 flex items-end">
+                          <Button variant="destructive" size="sm" onClick={() => handleDeleteWindow(index)} dir="rtl">
+                            <Trash2 className="w-3 h-3 mr-1" />מחק
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {windows.length === 0 && <p className="text-sm text-gray-500 text-center py-4" dir="rtl">לא הוגדרו חלונות. לחץ "הוסף חלון" להתחלה.</p>}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowTemplateDialog(false)} dir="rtl">ביטול</Button>
+              <Button onClick={handleSaveTemplate} className="bg-blue-900 hover:bg-blue-800" disabled={!templateName.trim()} dir="rtl">
+                <Save className="w-4 h-4 mr-2" />שמור תבנית
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
