@@ -468,7 +468,24 @@ export default function Schedule() {
               <Card key={windowIndex} className="border-none shadow-lg overflow-hidden" style={{ backgroundColor: window.color }}>
                 <CardHeader className="py-3 px-4" style={{ backgroundColor: window.header_color }}>
                   <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg font-bold" dir="rtl">{window.time}</CardTitle>
+                    {editingWindow === windowIndex ? (
+                      <Input 
+                        value={window.time} 
+                        onChange={(e) => handleUpdateWindow(windowIndex, 'time', e.target.value)}
+                        onBlur={() => setEditingWindow(null)}
+                        autoFocus
+                        className="h-9 font-bold text-lg max-w-xs"
+                        dir="rtl"
+                      />
+                    ) : (
+                      <CardTitle 
+                        className="text-lg font-bold cursor-pointer hover:text-blue-600" 
+                        onClick={() => setEditingWindow(windowIndex)}
+                        dir="rtl"
+                      >
+                        {window.time}
+                      </CardTitle>
+                    )}
                     <Button size="sm" onClick={() => handleAddRow(windowIndex)} dir="rtl">
                       <Plus className="w-3 h-3 mr-1" />הוסף שורה
                     </Button>
