@@ -323,7 +323,7 @@ export default function Yearly() {
               {!viewOnly ? <EyeOff className="w-4 h-4 text-green-600" /> : <Eye className="w-4 h-4 text-gray-500" />}
             </div>
             <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}><ChevronRight className="w-4 h-4" /></Button>
-            <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[100px] text-center">{currentYear}</div>
+            <div className="px-4 py-2 bg-green-300 text-gray-800 rounded-lg font-semibold min-w-[100px] text-center">{currentYear}</div>
             <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronLeft className="w-4 h-4" /></Button>
             <Button variant="outline" onClick={() => setCurrentYear(new Date().getFullYear())}>השנה</Button>
             </div>
@@ -337,8 +337,8 @@ export default function Yearly() {
             <div className="flex h-full">
               {/* Fixed Row Headers */}
               <div className="flex-shrink-0 bg-white border-l overflow-y-auto sticky right-0 z-40 shadow-lg" style={{ width: 160 }}>
-                <div className="bg-blue-900 text-white p-2 font-semibold text-right h-[36px] flex items-center sticky top-0 z-50">שורה</div>
-                <div className="bg-blue-800 text-white p-2 text-xs text-right h-[28px] flex items-center sticky top-[36px] z-50">שבוע</div>
+                <div className="bg-green-300 text-gray-800 p-2 font-semibold text-right h-[36px] flex items-center sticky top-0 z-50">שורה</div>
+                <div className="bg-green-200 text-gray-800 p-2 text-xs text-right h-[28px] flex items-center sticky top-[36px] z-50">שבוע</div>
                 <div className="bg-gray-100 p-2 text-xs font-medium text-right h-[52px] flex items-center sticky top-[64px] z-50 border-b">יום, תאריך</div>
 
                 <DragDropContext onDragEnd={handleDragEnd}>
@@ -401,19 +401,14 @@ export default function Yearly() {
                         </button>
                         )}
                 
-                {unavailabilities.length > 0 && (
-                  <div className="p-2 border-b bg-red-50 flex items-center gap-2" style={{ height: ROW_HEIGHT }}>
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                    <span className="text-xs font-medium text-red-700">אנשים</span>
-                  </div>
-                )}
+
               </div>
 
               {/* Scrollable Grid */}
               <div className="overflow-auto flex-1" ref={scrollContainerRef}>
                 <div style={{ minWidth: `${yearDays.length * CELL_WIDTH}px` }}>
                   {/* Month Header */}
-                  <div className="flex bg-blue-900 text-white h-[36px] sticky top-0 z-10">
+                  <div className="flex bg-green-300 text-gray-800 h-[36px] sticky top-0 z-10">
                     {monthGroups.map((group, idx) => (
                       <div key={idx} className="text-center font-semibold text-xs py-2 border-l flex items-center justify-center" style={{ width: `${group.count * CELL_WIDTH}px` }}>
                         {HEBREW_MONTHS[group.month]}
@@ -422,7 +417,7 @@ export default function Yearly() {
                   </div>
 
                   {/* Week Header */}
-                  <div className="flex bg-blue-800 text-white h-[28px] sticky top-[36px] z-10">
+                  <div className="flex bg-green-200 text-gray-800 h-[28px] sticky top-[36px] z-10">
                     {weekGroups.map((group, idx) => (
                       <div key={idx} className="text-center text-xs py-1 border-l flex items-center justify-center" style={{ width: `${group.count * CELL_WIDTH}px` }}>
                         {group.week}
@@ -492,31 +487,7 @@ export default function Yearly() {
                           </Droppable>
                           </DragDropContext>
 
-                  {/* Unavailability Row */}
-                  {unavailabilities.length > 0 && (
-                    <div className="flex border-b bg-red-50" style={{ height: ROW_HEIGHT }}>
-                      <div className="relative flex" style={{ width: `${yearDays.length * CELL_WIDTH}px` }}>
-                        {yearDays.map((day, idx) => {
-                          const dayOfWeek = getDay(day);
-                          const isShabbat = dayOfWeek === 6;
-                          const isFriday = dayOfWeek === 5;
-                          return <div key={idx} className={`h-full border-l ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }} />;
-                        })}
-                        {unavailabilities.map((unavail, idx) => {
-                          const dateIdx = yearDaysMap[unavail.date];
-                          if (dateIdx === undefined) return null;
-                          const worker = workers.find(w => w.id === unavail.worker_id);
-                          return (
-                            <div key={unavail.id || idx} className="absolute top-1 rounded bg-red-500 flex items-center justify-center text-white text-[8px] font-medium px-1 z-10"
-                              style={{ right: `${dateIdx * CELL_WIDTH}px`, width: `${CELL_WIDTH - 2}px`, height: EVENT_HEIGHT }}
-                              title={`${worker?.full_name || 'Unknown'}: ${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}>
-                              <span className="truncate">{worker?.full_name?.split(' ')[0] || '?'}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+
                 </div>
               </div>
             </div>
