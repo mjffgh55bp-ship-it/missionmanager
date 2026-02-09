@@ -732,7 +732,7 @@ export default function Matrix() {
                 disabled={!manualShiftData.start_time || !manualShiftData.end_time}
                 dir="rtl"
               >
-                <Plus className="w-4 h-4 mr-2" />הוסף
+                {editingShift ? 'עדכן' : <><Plus className="w-4 h-4 mr-2" />הוסף</>}
               </Button>
             </DialogFooter>
           </DialogContent>
