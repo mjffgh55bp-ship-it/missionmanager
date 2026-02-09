@@ -68,7 +68,11 @@ export default function Availability() {
     setCurrentUser(user);
     
     const workersData = await base44.entities.Worker.filter({ active: true });
-    setWorkers(workersData.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')));
+    setWorkers(workersData.sort((a, b) => {
+      const nameA = a.nickname || a.email || '';
+      const nameB = b.nickname || a.email || '';
+      return nameA.localeCompare(nameB);
+    }));
     
     const worker = workersData.find(w => w.email === user.email);
     setCurrentWorker(worker);
