@@ -355,11 +355,23 @@ export default function Yearly() {
                 <ChevronRight className="w-6 h-6" />
               </Button>
 
-              <div className="text-center">
-                <p className="text-xl font-bold text-black" dir="rtl">
-                  {format(currentWeekStart, "d", { locale: he })} {format(currentWeekStart, "MMMM", { locale: he })} - {format(weekEnd, "d MMMM yyyy", { locale: he })}
-                </p>
-              </div>
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <button className="text-center hover:bg-gray-100 p-2 rounded-lg transition-colors cursor-pointer">
+                    <p className="text-xl font-bold text-black" dir="rtl">
+                      {format(currentWeekStart, "d", { locale: he })} {format(currentWeekStart, "MMMM", { locale: he })} - {format(weekEnd, "d MMMM yyyy", { locale: he })}
+                    </p>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-3">
+                  <CalendarComponent
+                    mode="single"
+                    selected={currentWeekStart}
+                    onSelect={handleDateSelect}
+                    disabled={loading}
+                  />
+                </PopoverContent>
+              </Popover>
 
               <Button 
                 variant="ghost" 
