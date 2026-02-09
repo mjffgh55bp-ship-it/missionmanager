@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { he } from "date-fns/locale";
-import MenuButton from "../components/MenuButton";
 
 export default function Schedule() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -27,7 +26,6 @@ export default function Schedule() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
-      <MenuButton />
       <div className="max-w-screen-2xl mx-auto">
         {/* Header */}
         <Card className="border-none shadow-lg mb-6">
