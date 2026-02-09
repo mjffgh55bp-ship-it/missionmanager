@@ -193,6 +193,10 @@ export default function Matrix() {
   const handleMouseDown = (e, worker, shift, action) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Don't start dragging if it's a double-click on an existing shift
+    if (action === 'move' && e.detail === 2) return;
+    
     const timeline = timelineRefs.current[worker.id];
     if (!timeline) return;
     
