@@ -50,48 +50,49 @@ export default function Yearly() {
     if (loading) return; // Prevent multiple simultaneous loads
     setLoading(true);
     setError(null);
-    const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
-    const weekStartStr = format(currentWeekStart, "yyyy-MM-dd");
-    const weekEndStr = format(weekEnd, "yyyy-MM-dd");
+    try {
+      const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
+      const weekStartStr = format(currentWeekStart, "yyyy-MM-dd");
+      const weekEndStr = format(weekEnd, "yyyy-MM-dd");
 
-    const [eventsData, workersData, categoriesSettings] = await Promise.all([
-      base44.entities.CompanyEvent.list("-date"),
-      base44.entities.Worker.filter({ active: true }),
-      base44.entities.AppSettings.filter({ setting_key: "event_categories" })
-    ]);
+      const [eventsData, workersData, categoriesSettings] = await Promise.all([
+        base44.entities.CompanyEvent.list("-date"),
+        base44.entities.Worker.filter({ active: true }),
+        base44.entities.AppSettings.filter({ setting_key: "event_categories" })
+      ]);
 
-    // Create birthday events for workers
-    const currentYear = new Date().getFullYear();
-    const birthdayEvents = workersData
-      .filter(w => w.birth_date)
-      .map(w => {
-        const birthDate = new Date(w.birth_date);
-        const thisYearBirthday = `${currentYear}-${String(birthDate.getMonth() + 1).padStart(2, '0')}-${String(birthDate.getDate()).padStart(2, '0')}`;
-        return {
-          id: `birthday-${w.id}`,
-          title: `יום הולדת ל${w.nickname || w.email}`,
-          date: thisYearBirthday,
-          description: "יום הולדת",
-          all_day: true,
-          isBirthday: true
-        };
-      });
+      // Create birthday events for workers
+      const currentYear = new Date().getFullYear();
+      const birthdayEvents = workersData
+        .filter(w => w.birth_date)
+        .map(w => {
+          const birthDate = new Date(w.birth_date);
+          const thisYearBirthday = `${currentYear}-${String(birthDate.getMonth() + 1).padStart(2, '0')}-${String(birthDate.getDate()).padStart(2, '0')}`;
+          return {
+            id: `birthday-${w.id}`,
+            title: `יום הולדת ל${w.nickname || w.email}`,
+            date: thisYearBirthday,
+            description: "יום הולדת",
+            all_day: true,
+            isBirthday: true
+          };
+        });
 
-    const allEvents = [...eventsData, ...birthdayEvents];
-    const weekEvents = allEvents.filter(e => e.date >= weekStartStr && e.date <= weekEndStr);
-    setEvents(weekEvents);
-    setWorkers(workersData);
-    
-    if (categoriesSettings.length > 0) {
-      setCategories(JSON.parse(categoriesSettings[0].setting_value));
+      const allEvents = [...eventsData, ...birthdayEvents];
+      const weekEvents = allEvents.filter(e => e.date >= weekStartStr && e.date <= weekEndStr);
+      setEvents(weekEvents);
+      setWorkers(workersData);
+      
+      if (categoriesSettings.length > 0) {
+        setCategories(JSON.parse(categoriesSettings[0].setting_value));
+      }
+      
+      setLoading(false);
+    } catch (err) {
+      console.error("Error loading data:", err);
+      setError("אירעה שגיאה בטעינת הנתונים. אנא המתן מספר שניות ונסה שוב.");
+      setLoading(false);
     }
-    
-    setLoading(false);
-  } catch (err) {
-    console.error("Error loading data:", err);
-    setError("אירעה שגיאה בטעינת הנתונים. אנא המתן מספר שניות ונסה שוב.");
-    setLoading(false);
-  }
   };
 
   const handlePreviousWeek = () => {
