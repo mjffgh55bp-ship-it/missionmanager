@@ -1,13 +1,136 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, FileDown } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
 import { he } from "date-fns/locale";
+import { base44 } from "@/api/base44Client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+
+const DEFAULT_TEMPLATES = {
+  "מאוב": {
+    name: "מאוב",
+    color: "#d1d5db",
+    rows: []
+  },
+  "נהש בקרון": {
+    name: "נהש בקרון",
+    color: "#bbf7d0",
+    rows: [
+      { start: "05:15", end: "06:00", type: "10:00" },
+      { start: "09:15", end: "10:00", type: "14:00" },
+      { start: "13:15", end: "14:00", type: "18:00" },
+      { start: "17:15", end: "18:00", type: "22:00" },
+      { start: "21:15", end: "22:00", type: "02:00" },
+      { start: "01:15", end: "02:00", type: "06:00" }
+    ]
+  },
+  "ציפור בקרון": {
+    name: "ציפור בקרון",
+    color: "#fed7aa",
+    rows: [
+      { start: "05:15", end: "06:00", type: "10:00" },
+      { start: "09:15", end: "10:00", type: "14:00" },
+      { start: "13:15", end: "14:00", type: "18:00" },
+      { start: "17:15", end: "18:00", type: "22:00" },
+      { start: "21:15", end: "22:00", type: "02:00" },
+      { start: "01:15", end: "02:00", type: "06:00" }
+    ]
+  },
+  "הבשרה": {
+    name: "הבשרה",
+    color: "#dbeafe",
+    rows: []
+  }
+};
 
 export default function Schedule() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [templates, setTemplates] = useState([]);
+  const [activeTemplates, setActiveTemplates] = useState({});
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveTemplateName, setSaveTemplateName] = useState("");
+  const [editingTemplate, setEditingTemplate] = useState(null);
+
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    const templatesData = await base44.entities.WindowTemplate.list();
+    if (templatesData.length === 0) {
+      // Create default templates
+      for (const [key, template] of Object.entries(DEFAULT_TEMPLATES)) {
+        await base44.entities.WindowTemplate.create({
+          name: template.name,
+          windows: template.rows.map(row => ({
+            time: row.type,
+            rows: [{ hours: `${row.start}-${row.end}`, guide_id: "", chef_id: "", sous_chef_id: "", additional_id: "", notes: "" }],
+            color: template.color,
+            header_color: template.color
+          }))
+        });
+      }
+      loadTemplates();
+    } else {
+      setTemplates(templatesData);
+      // Initialize active templates with loaded data
+      const initialActive = {};
+      templatesData.forEach(t => {
+        initialActive[t.id] = {
+          name: t.name,
+          windows: t.windows || []
+        };
+      });
+      setActiveTemplates(initialActive);
+    }
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!editingTemplate || !saveTemplateName.trim()) return;
+    
+    const templateData = activeTemplates[editingTemplate];
+    await base44.entities.WindowTemplate.update(editingTemplate, {
+      name: saveTemplateName.trim(),
+      windows: templateData.windows
+    });
+    
+    setShowSaveDialog(false);
+    setSaveTemplateName("");
+    setEditingTemplate(null);
+    loadTemplates();
+  };
+
+  const updateTemplateWindow = (templateId, windowIndex, field, value) => {
+    setActiveTemplates(prev => ({
+      ...prev,
+      [templateId]: {
+        ...prev[templateId],
+        windows: prev[templateId].windows.map((w, i) => 
+          i === windowIndex ? { ...w, [field]: value } : w
+        )
+      }
+    }));
+  };
+
+  const updateTemplateRow = (templateId, windowIndex, rowIndex, field, value) => {
+    setActiveTemplates(prev => ({
+      ...prev,
+      [templateId]: {
+        ...prev[templateId],
+        windows: prev[templateId].windows.map((w, wIdx) => 
+          wIdx === windowIndex ? {
+            ...w,
+            rows: w.rows.map((r, rIdx) => 
+              rIdx === rowIndex ? { ...r, [field]: value } : r
+            )
+          } : w
+        )
+      }
+    }));
+  };
 
   const daySchedule = [
     { role: 'מנל"ח', start: '08:00', end: '18:00' },
@@ -121,7 +244,170 @@ export default function Schedule() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Templates */}
+        {templates.map((template) => {
+          const activeTemplate = activeTemplates[template.id];
+          if (!activeTemplate) return null;
+          
+          return (
+            <Card key={template.id} className="border-none shadow-lg mb-6">
+              <CardHeader className="py-3 px-4 border-b flex flex-row items-center justify-between" style={{ backgroundColor: template.windows?.[0]?.header_color || "#e5e7eb" }}>
+                <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    setEditingTemplate(template.id);
+                    setSaveTemplateName(template.name);
+                    setShowSaveDialog(true);
+                  }}
+                  className="bg-blue-900 hover:bg-blue-800"
+                  dir="rtl"
+                >
+                  <Save className="w-4 h-4 ml-2" />
+                  שמור תבנית
+                </Button>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse" dir="rtl">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="p-2 text-sm font-semibold text-right">תדריך</th>
+                        <th className="p-2 text-sm font-semibold text-right">התחלה</th>
+                        <th className="p-2 text-sm font-semibold text-right">סיום</th>
+                        <th className="p-2 text-sm font-semibold text-right">מדריך</th>
+                        <th className="p-2 text-sm font-semibold text-right">שף / שף 2</th>
+                        <th className="p-2 text-sm font-semibold text-right">סו שף</th>
+                        <th className="p-2 text-sm font-semibold text-right">נפסה</th>
+                        <th className="p-2 text-sm font-semibold text-right">נפסד</th>
+                        <th className="p-2 text-sm font-semibold text-right">התרוע</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeTemplate.windows?.map((window, wIdx) => (
+                        window.rows?.map((row, rIdx) => (
+                          <tr key={`${wIdx}-${rIdx}`} className="border-b hover:bg-gray-50">
+                            <td className="p-2">
+                              <Input 
+                                value={window.time || ""} 
+                                onChange={(e) => updateTemplateWindow(template.id, wIdx, "time", e.target.value)}
+                                className="h-8 text-sm" 
+                                dir="rtl" 
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input 
+                                value={row.hours?.split('-')[0] || ""} 
+                                onChange={(e) => {
+                                  const end = row.hours?.split('-')[1] || "";
+                                  updateTemplateRow(template.id, wIdx, rIdx, "hours", `${e.target.value}-${end}`);
+                                }}
+                                type="time"
+                                className="h-8 text-sm" 
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input 
+                                value={row.hours?.split('-')[1] || ""} 
+                                onChange={(e) => {
+                                  const start = row.hours?.split('-')[0] || "";
+                                  updateTemplateRow(template.id, wIdx, rIdx, "hours", `${start}-${e.target.value}`);
+                                }}
+                                type="time"
+                                className="h-8 text-sm" 
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input 
+                                value={row.guide_id || ""} 
+                                onChange={(e) => updateTemplateRow(template.id, wIdx, rIdx, "guide_id", e.target.value)}
+                                className="h-8 text-sm" 
+                                dir="rtl" 
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input 
+                                value={row.chef_id || ""} 
+                                onChange={(e) => updateTemplateRow(template.id, wIdx, rIdx, "chef_id", e.target.value)}
+                                className="h-8 text-sm" 
+                                dir="rtl" 
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input 
+                                value={row.sous_chef_id || ""} 
+                                onChange={(e) => updateTemplateRow(template.id, wIdx, rIdx, "sous_chef_id", e.target.value)}
+                                className="h-8 text-sm" 
+                                dir="rtl" 
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input 
+                                value={row.additional_id || ""} 
+                                onChange={(e) => updateTemplateRow(template.id, wIdx, rIdx, "additional_id", e.target.value)}
+                                className="h-8 text-sm" 
+                                dir="rtl" 
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input 
+                                value={row.notes || ""} 
+                                onChange={(e) => updateTemplateRow(template.id, wIdx, rIdx, "notes", e.target.value)}
+                                className="h-8 text-sm" 
+                                dir="rtl" 
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input 
+                                className="h-8 text-sm" 
+                                dir="rtl" 
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
+
+      {/* Save Template Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle dir="rtl">שמור תבנית</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Label dir="rtl">שם התבנית</Label>
+            <Input 
+              value={saveTemplateName} 
+              onChange={(e) => setSaveTemplateName(e.target.value)}
+              className="mt-2"
+              dir="rtl"
+              placeholder="הכנס שם..."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveDialog(false)} dir="rtl">
+              ביטול
+            </Button>
+            <Button 
+              onClick={handleSaveTemplate} 
+              className="bg-blue-900 hover:bg-blue-800"
+              disabled={!saveTemplateName.trim()}
+              dir="rtl"
+            >
+              <Save className="w-4 h-4 ml-2" />
+              שמור
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
