@@ -44,6 +44,7 @@ export default function Yearly() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
     loadData();
