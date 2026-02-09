@@ -65,10 +65,17 @@ export default function Skeletons() {
   const handleSaveTemplateSettings = async () => {
     if (!editingTemplate || !editingTemplateName.trim()) return;
     
-    await base44.entities.WindowTemplate.update(editingTemplate.id, {
+    const updatedTemplate = {
       name: editingTemplateName.trim(),
-      color: editingTemplateColor
-    });
+      color: editingTemplateColor,
+      windows: (editingTemplate.windows || []).map(window => ({
+        ...window,
+        color: editingTemplateColor,
+        header_color: editingTemplateColor
+      }))
+    };
+    
+    await base44.entities.WindowTemplate.update(editingTemplate.id, updatedTemplate);
     
     loadTemplates();
     setShowEditTemplateDialog(false);
@@ -89,6 +96,7 @@ export default function Skeletons() {
   };
 
   const addWindow = () => {
+    const templateColor = activeTemplate.color || "#fef3c7";
     setActiveTemplate({
       ...activeTemplate,
       windows: [
@@ -96,8 +104,8 @@ export default function Skeletons() {
         {
           time: "",
           rows: [{ hours: "-", guide_id: "", chef_id: "", sous_chef_id: "", additional_id: "", notes: "" }],
-          color: "#fef3c7",
-          header_color: "#fde68a"
+          color: templateColor,
+          header_color: templateColor
         }
       ]
     });
