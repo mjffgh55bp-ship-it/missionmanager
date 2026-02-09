@@ -97,67 +97,77 @@ export default function Layout({ children }) {
   }
 
   return (
-    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
-      <div className="min-h-screen w-full bg-gray-50 relative">
-        <Sidebar 
-          side="right" 
-          collapsible="offcanvas" 
-          className="border-l border-gray-200 z-50 fixed w-56"
-          onMouseLeave={() => setSidebarOpen(false)}
-        >
-          <SidebarHeader className="border-b border-gray-200 p-4">
-            <div className="flex flex-col items-end gap-2" dir="rtl">
-              <div className="flex items-center gap-2">
-                <h2 className="font-bold text-gray-900 text-lg">מנהל משימות</h2>
-                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex items-center justify-center shadow-lg">
-                  <ChefHat className="w-5 h-5 text-white" />
+    <div className="min-h-screen w-full bg-gray-50 relative">
+      {/* Floating Sidebar */}
+      {sidebarOpen && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/20 z-40"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <div 
+            className="fixed top-0 right-0 h-full w-56 bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-300"
+            onMouseLeave={() => setSidebarOpen(false)}
+          >
+            <div className="border-b border-gray-200 p-4">
+              <div className="flex flex-col items-end gap-2" dir="rtl">
+                <div className="flex items-center gap-2">
+                  <h2 className="font-bold text-gray-900 text-lg">מנהל משימות</h2>
+                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex items-center justify-center shadow-lg">
+                    <ChefHat className="w-5 h-5 text-white" />
+                  </div>
                 </div>
+                <p className="text-xs text-gray-500">ניהול עגלות מזון</p>
               </div>
-              <p className="text-xs text-gray-500">ניהול עגלות מזון</p>
             </div>
-          </SidebarHeader>
-          
-          <SidebarContent className="p-2">
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 py-2 text-right" dir="rtl">
+            
+            <div className="p-2">
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 py-2 text-right" dir="rtl">
                 ניווט
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {navigationItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton 
-                        asChild 
-                        className={`hover:bg-green-50 hover:text-green-700 transition-all duration-200 rounded-lg mb-1 ${
-                          location.pathname === item.url ? 'bg-green-500 text-white hover:bg-green-600 hover:text-white' : ''
-                        }`}
-                      >
-                        <Link to={item.url} onClick={() => setSidebarOpen(false)} className="flex items-center gap-2 px-2 py-2 flex-row-reverse justify-end" dir="rtl">
-                          <span className="font-medium">{item.title}</span>
-                          <item.icon className="w-4 h-4" />
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </SidebarContent>
-        </Sidebar>
-
-        <main className="min-h-screen flex flex-col w-full relative z-0">
-          <header className="bg-white border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center gap-4 justify-end">
-              <h1 className="text-xl font-bold text-gray-900 flex-1 text-right" dir="rtl">מנהל משימות</h1>
-              <SidebarTrigger className="hover:bg-gray-100 p-2 rounded-lg transition-colors duration-200" />
+              </div>
+              <div className="space-y-1">
+                {navigationItems.map((item) => (
+                  <Link
+                    key={item.title}
+                    to={item.url}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center gap-2 px-2 py-2 rounded-lg transition-all duration-200 flex-row-reverse justify-end ${
+                      location.pathname === item.url 
+                        ? 'bg-green-500 text-white hover:bg-green-600' 
+                        : 'hover:bg-green-50 hover:text-green-700'
+                    }`}
+                    dir="rtl"
+                  >
+                    <span className="font-medium">{item.title}</span>
+                    <item.icon className="w-4 h-4" />
+                  </Link>
+                ))}
+              </div>
             </div>
-          </header>
-
-          <div className="flex-1 overflow-auto">
-            {children}
           </div>
-        </main>
-      </div>
-    </SidebarProvider>
+        </>
+      )}
+
+      {/* Main Content */}
+      <main className="min-h-screen flex flex-col w-full">
+        <header className="bg-white border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center gap-4 justify-end">
+            <h1 className="text-xl font-bold text-gray-900 flex-1 text-right" dir="rtl">מנהל משימות</h1>
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="hover:bg-gray-100 p-2 rounded-lg transition-colors duration-200"
+            >
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1.5 3C1.22386 3 1 3.22386 1 3.5C1 3.77614 1.22386 4 1.5 4H13.5C13.7761 4 14 3.77614 14 3.5C14 3.22386 13.7761 3 13.5 3H1.5ZM1 7.5C1 7.22386 1.22386 7 1.5 7H13.5C13.7761 7 14 7.22386 14 7.5C14 7.77614 13.7761 8 13.5 8H1.5C1.22386 8 1 7.77614 1 7.5ZM1 11.5C1 11.2239 1.22386 11 1.5 11H13.5C13.7761 11 14 11.2239 14 11.5C14 11.7761 13.7761 12 13.5 12H1.5C1.22386 12 1 11.7761 1 11.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-auto">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }
