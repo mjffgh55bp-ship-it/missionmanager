@@ -43,7 +43,7 @@ export default function PersonalAvailability() {
     setIsAdmin(user?.role === 'admin');
 
     if (user?.email) {
-      const profiles = await base44.entities.Worker.filter({ email: user.email });
+      const profiles = await base44.entities.UserProfile.filter({ email: user.email });
       if (profiles.length > 0) {
         setUserProfile(profiles[0]);
       }
@@ -149,7 +149,7 @@ export default function PersonalAvailability() {
 
   if (!currentUser) {
     return (
-      <div className="flex justify-center items-center h-full min-h-screen bg-gradient-to-br from-white to-green-50 p-8">
+      <div className="flex justify-center items-center h-full">
         <p className="text-xl font-bold">טוען נתוני משתמש...</p>
       </div>
     );
@@ -157,137 +157,131 @@ export default function PersonalAvailability() {
 
   if (!userProfile) {
     return (
-      <div className="flex justify-center items-center h-full min-h-screen bg-gradient-to-br from-white to-green-50 p-8">
+      <div className="flex justify-center items-center h-full">
         <p className="text-xl font-bold">פרופיל משתמש לא נמצא. אנא פנה למנהל המערכת.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-4 md:p-8">
-      <div className="max-w-screen-2xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-5xl font-bold text-black mb-2" dir="rtl">זמינות אישית</h1>
-            <p className="text-xl text-gray-700" dir="rtl">נהלי רישום שבועיים</p>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              onClick={saveAvailability}
-              className="bg-gradient-to-r from-green-400 to-green-300 hover:from-green-500 hover:to-green-400 text-white font-bold text-lg px-6 py-3 shadow-md border border-green-200"
-              dir="rtl"
-            >
-              <Save className="w-5 h-5 ml-2" />
-              שמור זמינות
-            </Button>
-            <Button
-              onClick={handleToday}
-              variant="outline"
-              className="border-2 border-green-300 text-black hover:bg-green-50 font-bold"
-              dir="rtl"
-            >
-              השבוע הנוכחי
-            </Button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-5xl font-bold text-black mb-2">זמינות אישית</h1>
+          <p className="text-xl text-gray-700">נהלי רישום שבועיים</p>
         </div>
-
-        <Card className="border border-green-100 bg-white shadow-md">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <Button onClick={handlePrevWeek} variant="ghost" size="icon" className="text-black hover:bg-green-50">
-                <ChevronRight className="w-6 h-6" />
-              </Button>
-              <div className="text-center">
-                <h2 className="text-2xl font-bold text-black">
-                  {format(weekDays[0], 'd MMM', { locale: he })} - {format(weekDays[6], 'd MMM yyyy', { locale: he })}
-                </h2>
-                <p className="text-sm text-gray-600">שבוע {format(currentWeekStart, 'w', { locale: he })}</p>
-              </div>
-              <Button onClick={handleNextWeek} variant="ghost" size="icon" className="text-black hover:bg-green-50">
-                <ChevronLeft className="w-6 h-6" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border border-green-100 bg-white shadow-md overflow-hidden">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gradient-to-r from-green-50 to-white border-b-2 border-green-100">
-                    <th className="p-2 text-center font-bold text-green-800 border-l border-green-100 w-32 sticky right-0 bg-gradient-to-r from-green-50 to-white z-10" dir="rtl">
-                      יום / משמרת
-                    </th>
-                    {SHIFTS.map((shift, idx) => (
-                      <th key={idx} className="p-2 text-center font-bold text-green-800 border-l border-green-100">
-                        {shift.start}-{shift.end}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {weekDays.map((day, dayIdx) => (
-                    <tr key={dayIdx} className="border-b border-green-100 hover:bg-green-50">
-                      <td className="p-2 border-l border-green-100 bg-gradient-to-r from-green-50 to-white sticky right-0 z-10">
-                        <div className="font-bold text-green-800 text-sm" dir="rtl">{format(day, 'EEEE', { locale: he })}</div>
-                        <div className="text-xs text-gray-600">{format(day, 'd/M', { locale: he })}</div>
-                      </td>
-                      {SHIFTS.map((shift, shiftIdx) => {
-                        const key = getAvailabilityKey(day, shiftIdx);
-                        const currentStatus = availability[key];
-
-                        return (
-                          <td key={shiftIdx} className="border-l border-green-100 p-1">
-                            <div className="flex flex-col gap-1">
-                              {STATUS_OPTIONS.map((option) => (
-                                <Button
-                                  key={option.value}
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setStatus(day, shiftIdx, currentStatus === option.value ? '' : option.value)}
-                                  className={cn(
-                                    "w-full text-xs font-semibold py-1 px-2 h-auto",
-                                    option.color,
-                                    currentStatus === option.value && `border-2 ${option.borderColor} ${option.textColor} shadow-md`,
-                                    currentStatus !== option.value && "opacity-50 hover:opacity-100",
-                                  )}
-                                  dir="rtl"
-                                >
-                                  {option.label}
-                                </Button>
-                              ))}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-
-        {isAdmin && (
-          <Card className="border border-green-100 bg-green-50 shadow-md">
-            <CardHeader>
-              <CardTitle className="text-green-800" dir="rtl">הערות מנהל</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <textarea
-                className="w-full p-2 border border-green-200 rounded-lg min-h-[100px] bg-white"
-                value={weeklyNote}
-                onChange={(e) => setWeeklyNote(e.target.value)}
-                placeholder="הערות שבועיות למנהל..."
-                disabled
-                dir="rtl"
-              />
-            </CardContent>
-          </Card>
-        )}
+        <div className="flex gap-3">
+          <Button
+            onClick={saveAvailability}
+            className="bg-lime-400 text-black hover:bg-lime-500 font-bold text-lg px-6 py-3 shadow-xl border-2 border-black"
+          >
+            <Save className="w-5 h-5 ml-2" />
+            שמור זמינות
+          </Button>
+          <Button
+            onClick={handleToday}
+            variant="outline"
+            className="border-2 border-black text-black hover:bg-lime-300 font-bold"
+          >
+            השבוע הנוכחי
+          </Button>
+        </div>
       </div>
+
+      <Card className="border-4 border-black bg-white shadow-xl">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <Button onClick={handlePrevWeek} variant="ghost" size="icon" className="text-black hover:bg-lime-300">
+              <ChevronRight className="w-6 h-6" />
+            </Button>
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-black">
+                {format(weekDays[0], 'd MMM', { locale: he })} - {format(weekDays[6], 'd MMM yyyy', { locale: he })}
+              </h2>
+              <p className="text-sm text-gray-600">שבוע {format(currentWeekStart, 'w', { locale: he })}</p>
+            </div>
+            <Button onClick={handleNextWeek} variant="ghost" size="icon" className="text-black hover:bg-lime-300">
+              <ChevronLeft className="w-6 h-6" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-4 border-black bg-white shadow-xl overflow-hidden">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-lime-300 border-b-4 border-black">
+                  <th className="p-2 text-center font-bold text-black border-l-4 border-black w-32 sticky right-0 bg-lime-300 z-10">
+                    יום / משמרת
+                  </th>
+                  {SHIFTS.map((shift, idx) => (
+                    <th key={idx} className="p-2 text-center font-bold text-black border-l-4 border-black">
+                      {shift.start}-{shift.end}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {weekDays.map((day, dayIdx) => (
+                  <tr key={dayIdx} className="border-b-2 border-black hover:bg-lime-50">
+                    <td className="p-2 border-l-4 border-black bg-lime-100 sticky right-0 z-10">
+                      <div className="font-bold text-black text-sm">{format(day, 'EEEE', { locale: he })}</div>
+                      <div className="text-xs text-gray-600">{format(day, 'd/M', { locale: he })}</div>
+                    </td>
+                    {SHIFTS.map((shift, shiftIdx) => {
+                      const key = getAvailabilityKey(day, shiftIdx);
+                      const currentStatus = availability[key];
+
+                      return (
+                        <td key={shiftIdx} className="border-l border-black p-1">
+                          <div className="flex flex-col gap-1">
+                            {STATUS_OPTIONS.map((option) => (
+                              <Button
+                                key={option.value}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setStatus(day, shiftIdx, currentStatus === option.value ? '' : option.value)}
+                                className={cn(
+                                  "w-full text-xs font-semibold py-1 px-2 h-auto",
+                                  option.color,
+                                  currentStatus === option.value && `border-2 ${option.borderColor} ${option.textColor} shadow-md`,
+                                  currentStatus !== option.value && "opacity-50 hover:opacity-100",
+                                )}
+                              >
+                                {option.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {isAdmin && (
+        <Card className="border-4 border-black bg-yellow-50 shadow-xl">
+          <CardHeader>
+            <CardTitle className="text-black">הערות מנהל</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <textarea
+              className="w-full p-2 border-2 border-black rounded-lg min-h-[100px]"
+              value={weeklyNote}
+              onChange={(e) => setWeeklyNote(e.target.value)}
+              placeholder="הערות שבועיות למנהל..."
+              disabled
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
