@@ -573,31 +573,13 @@ END:VEVENT
             {existingAvailability && (
               <Card className="border-none shadow-lg mb-4">
                 <CardContent className="py-3 px-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm font-medium">
-                        {existingAvailability.status === "approved" ? "אושר" : 
-                         existingAvailability.status === "submitted" ? "נשלח" : 
-                         existingAvailability.status === "pending_change" ? "ממתין לשינוי" : "טיוטה"}
-                      </span>
-                    </div>
-                    {isApproved && !showEditMode && (
-                      <Button variant="outline" size="sm" onClick={() => setShowEditMode(true)}>
-                        <Pencil className="w-3 h-3 mr-1" />ערוך משמרות
-                      </Button>
-                    )}
-                    {showEditMode && (
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => {
-                          setShowEditMode(false);
-                          setSelectedShifts(originalShifts);
-                        }} dir="rtl">ביטול</Button>
-                        <Button size="sm" onClick={() => setShowChangeRecap(true)} className="bg-blue-900 hover:bg-blue-800">
-                          סקור שינויים
-                        </Button>
-                      </div>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium">
+                      {existingAvailability.status === "approved" ? "אושר" : 
+                       existingAvailability.status === "submitted" ? "נשלח" : 
+                       existingAvailability.status === "pending_change" ? "ממתין לשינוי" : "טיוטה"}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
