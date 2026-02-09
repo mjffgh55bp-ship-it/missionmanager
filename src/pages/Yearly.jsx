@@ -180,7 +180,7 @@ export default function Yearly() {
 
   const handleAddCategory = () => {
     setEditingCategoryIndex(null);
-    setCategoryForm({ name: "", color: "#ec4899" });
+    setCategoryForm({ name: "", color: "#ffc9e3" });
     setShowCategoryDialog(true);
   };
 
@@ -219,8 +219,8 @@ export default function Yearly() {
     if (!confirm("האם למחוק קטגוריה זו?")) return;
     
     const newCategories = categories.filter((_, i) => i !== index);
-    await saveCategoriesToDB(newCategories);
     setCategories(newCategories);
+    await saveCategoriesToDB(newCategories);
   };
 
   const saveCategoriesToDB = async (categoriesToSave) => {
