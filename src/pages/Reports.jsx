@@ -224,7 +224,7 @@ export default function Reports() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">דוחות וניתוחים</h1>
@@ -232,38 +232,38 @@ export default function Reports() {
         </div>
 
         <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-4 border-black shadow-xl">
-            <CardHeader className="pb-3 bg-gradient-to-r from-green-100 to-white">
+          <Card className="border-none shadow-lg">
+            <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div><p className="text-sm text-gray-600" dir="rtl">סה"כ שעות עבודה</p><p className="text-3xl font-bold text-black mt-1">{totalHours}</p></div>
-                <div className="p-3 rounded-xl bg-green-300 border-2 border-black"><Clock className="w-6 h-6 text-black" /></div>
+                <div><p className="text-sm text-gray-600" dir="rtl">סה"כ שעות עבודה</p><p className="text-3xl font-bold text-gray-900 mt-1">{totalHours}</p></div>
+                <div className="p-3 rounded-xl bg-blue-900 bg-opacity-15"><Clock className="w-6 h-6 text-blue-900" /></div>
               </div>
             </CardHeader>
           </Card>
 
-          <Card className="border-4 border-black shadow-xl">
-            <CardHeader className="pb-3 bg-gradient-to-r from-green-100 to-white">
+          <Card className="border-none shadow-lg">
+            <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div><p className="text-sm text-gray-600" dir="rtl">כיסוי משמרות</p><p className="text-3xl font-bold text-black mt-1">{coveragePercentage}%</p><p className="text-xs text-gray-500 mt-1" dir="rtl">{mannedShifts}/{totalShiftsNeeded} משמרות</p></div>
-                <div className="p-3 rounded-xl bg-green-300 border-2 border-black"><TrendingUp className="w-6 h-6 text-black" /></div>
+                <div><p className="text-sm text-gray-600" dir="rtl">כיסוי משמרות</p><p className="text-3xl font-bold text-gray-900 mt-1">{coveragePercentage}%</p><p className="text-xs text-gray-500 mt-1" dir="rtl">{mannedShifts}/{totalShiftsNeeded} משמרות</p></div>
+                <div className="p-3 rounded-xl bg-green-600 bg-opacity-15"><TrendingUp className="w-6 h-6 text-green-600" /></div>
               </div>
             </CardHeader>
           </Card>
 
-          <Card className="border-4 border-black shadow-xl">
-            <CardHeader className="pb-3 bg-gradient-to-r from-green-100 to-white">
+          <Card className="border-none shadow-lg">
+            <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div><p className="text-sm text-gray-600" dir="rtl">כיסוי שעות</p><p className="text-3xl font-bold text-black mt-1">{hoursCoveragePercentage}%</p><p className="text-xs text-gray-500 mt-1" dir="rtl">{mannedHours}/{totalHoursNeeded} שעות</p></div>
-                <div className="p-3 rounded-xl bg-green-300 border-2 border-black"><Clock className="w-6 h-6 text-black" /></div>
+                <div><p className="text-sm text-gray-600" dir="rtl">כיסוי שעות</p><p className="text-3xl font-bold text-gray-900 mt-1">{hoursCoveragePercentage}%</p><p className="text-xs text-gray-500 mt-1" dir="rtl">{mannedHours}/{totalHoursNeeded} שעות</p></div>
+                <div className="p-3 rounded-xl bg-amber-500 bg-opacity-15"><Clock className="w-6 h-6 text-amber-600" /></div>
               </div>
             </CardHeader>
           </Card>
 
-          <Card className="border-4 border-black shadow-xl">
-            <CardHeader className="pb-3 bg-gradient-to-r from-green-100 to-white">
+          <Card className="border-none shadow-lg">
+            <CardHeader className="pb-3">
               <div className="flex justify-between items-start">
-                <div><p className="text-sm text-gray-600" dir="rtl">עובדים במשרה מלאה</p><p className="text-3xl font-bold text-black mt-1">{fullTimeWorkerCount}</p></div>
-                <div className="p-3 rounded-xl bg-green-300 border-2 border-black"><Users className="w-6 h-6 text-black" /></div>
+                <div><p className="text-sm text-gray-600" dir="rtl">עובדים במשרה מלאה</p><p className="text-3xl font-bold text-gray-900 mt-1">{fullTimeWorkerCount}</p></div>
+                <div className="p-3 rounded-xl bg-purple-600 bg-opacity-15"><Users className="w-6 h-6 text-purple-600" /></div>
               </div>
             </CardHeader>
           </Card>
@@ -273,8 +273,8 @@ export default function Reports() {
 
         {/* Hours by SubType per Worker */}
         {allSubTypes.length > 0 && (
-          <Card className="border-4 border-black shadow-xl mb-8">
-            <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
+          <Card className="border-none shadow-lg mb-8">
+            <CardHeader className="border-b">
               <div className="flex justify-between items-start flex-wrap gap-4">
                 <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5 text-green-600" />Hours by Sub-Type</CardTitle>
 
@@ -394,8 +394,8 @@ export default function Reports() {
         )}
 
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          <Card className="border-4 border-black shadow-xl">
-            <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white"><CardTitle className="flex items-center gap-2 text-black"><Calculator className="w-5 h-5 text-black" />Full-Time Calculator (Manual)</CardTitle></CardHeader>
+          <Card className="border-none shadow-lg">
+            <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><Calculator className="w-5 h-5 text-blue-900" />Full-Time Calculator (Manual)</CardTitle></CardHeader>
             <CardContent className="pt-6">
               <div className="space-y-4">
                 <div><Label>Hours from Full-Time Workers</Label><Input type="number" value={fullTimeHours} onChange={(e) => setFullTimeHours(parseFloat(e.target.value) || 0)} /></div>
@@ -409,8 +409,8 @@ export default function Reports() {
             </CardContent>
           </Card>
 
-          <Card className="border-4 border-black shadow-xl">
-            <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white"><CardTitle className="flex items-center gap-2 text-black"><Calculator className="w-5 h-5 text-black" />Full-Time Calculator (Auto)</CardTitle></CardHeader>
+          <Card className="border-none shadow-lg">
+            <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><Calculator className="w-5 h-5 text-green-600" />Full-Time Calculator (Auto)</CardTitle></CardHeader>
             <CardContent className="pt-6">
               <div className="space-y-4">
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
@@ -429,8 +429,8 @@ export default function Reports() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          <Card className="border-4 border-black shadow-xl">
-            <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white"><CardTitle className="text-black">Hours by Worker</CardTitle></CardHeader>
+          <Card className="border-none shadow-lg">
+            <CardHeader className="border-b"><CardTitle>Hours by Worker</CardTitle></CardHeader>
             <CardContent className="pt-6">
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
@@ -444,8 +444,8 @@ export default function Reports() {
             </CardContent>
           </Card>
 
-          <Card className="border-4 border-black shadow-xl">
-            <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white"><CardTitle className="text-black">Team Composition</CardTitle></CardHeader>
+          <Card className="border-none shadow-lg">
+            <CardHeader className="border-b"><CardTitle>Team Composition</CardTitle></CardHeader>
             <CardContent className="pt-6">
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
@@ -459,8 +459,8 @@ export default function Reports() {
           </Card>
         </div>
 
-        <Card className="border-4 border-black shadow-xl">
-          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white"><CardTitle className="flex items-center gap-2 text-black"><Calendar className="w-5 h-5 text-black" />Hours Matrix - All Workers</CardTitle></CardHeader>
+        <Card className="border-none shadow-lg">
+          <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><Calendar className="w-5 h-5 text-blue-900" />Hours Matrix - All Workers</CardTitle></CardHeader>
           <CardContent className="pt-6">
             <div className="overflow-x-auto">
               <Table>

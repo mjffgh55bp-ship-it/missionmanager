@@ -84,7 +84,7 @@ export default function Matrix() {
       });
     }
     
-    setWorkers(workersData.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || '')));
+    setWorkers(workersData.sort((a, b) => a.full_name.localeCompare(b.full_name)));
     setAssignments(filteredAssignments);
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
@@ -515,13 +515,13 @@ export default function Matrix() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-4 md:p-8" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" dir="rtl">
       <div className="max-w-screen-2xl mx-auto">
-        <Card className="border-4 border-black shadow-xl mb-6">
-          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b bg-white">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div dir="rtl">
-                <CardTitle className="text-2xl text-black">מטריצת שעות {viewMode === "weekly" ? "שבועית" : "יומית"}</CardTitle>
+                <CardTitle className="text-2xl">מטריצת שעות {viewMode === "weekly" ? "שבועית" : "יומית"}</CardTitle>
                 <p className="text-sm text-gray-600 mt-1">גרור קצוות לשינוי גודל, גרור אמצע להזזה, לחץ על עיגול הסוג לשינוי</p>
                 <div className="flex gap-2 mt-2 flex-wrap">
                   <Badge className="bg-green-100 text-green-800" dir="rtl"><Star className="w-3 h-3 mr-1 fill-current" />רצוי</Badge>
@@ -539,7 +539,7 @@ export default function Matrix() {
                   <span className="text-sm" dir="rtl">שבועי</span>
                 </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronLeft className="w-4 h-4" /></Button>
-                <div className="px-4 py-2 bg-green-300 text-black rounded-lg font-semibold min-w-[160px] text-center border-2 border-black">
+                <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center">
                   {viewMode === "weekly" ? `Week of ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "MMM d")}` : format(currentDate, "MMM d, yyyy")}
                 </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronRight className="w-4 h-4" /></Button>
@@ -549,7 +549,7 @@ export default function Matrix() {
           </CardHeader>
         </Card>
 
-        <Card className="border-4 border-black shadow-xl">
+        <Card className="border-none shadow-lg">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <div className="min-w-[1400px]">
@@ -673,7 +673,7 @@ export default function Matrix() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowNotificationDialog(false)} dir="rtl">ביטול</Button>
-              <Button onClick={sendNotification} className="bg-green-400 hover:bg-green-500 text-black border-2 border-black" disabled={!selectedWorkerForNotification?.email} dir="rtl"><Send className="w-4 h-4 mr-2" />שלח</Button>
+              <Button onClick={sendNotification} className="bg-blue-900 hover:bg-blue-800" disabled={!selectedWorkerForNotification?.email} dir="rtl"><Send className="w-4 h-4 mr-2" />שלח</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -735,7 +735,7 @@ export default function Matrix() {
               <Button variant="outline" onClick={() => setShowManualDialog(false)} dir="rtl">ביטול</Button>
               <Button 
                 onClick={submitManualShift} 
-                className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
+                className="bg-blue-900 hover:bg-blue-800"
                 disabled={!manualShiftData.start_time || !manualShiftData.end_time}
                 dir="rtl"
               >

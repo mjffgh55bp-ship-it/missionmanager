@@ -186,17 +186,17 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-black mb-2" dir="rtl">הגדרות</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">הגדרות</h1>
           <p className="text-gray-600" dir="rtl">הגדר הגדרות כלל מערכת</p>
         </div>
 
         {/* Schedule Column Types */}
-        <Card className="border-4 border-black shadow-xl mb-6">
-          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
-            <CardTitle className="flex items-center gap-2 text-black" dir="rtl"><Columns className="w-5 h-5 text-black" />סוגי עמודות בלוח התורים</CardTitle>
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Columns className="w-5 h-5 text-green-600" />סוגי עמודות בלוח התורים</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סוגי עמודות שניתן להוסיף לעגלות בעמוד לוח התורים</p>
@@ -244,9 +244,9 @@ export default function Settings() {
         </Card>
 
         {/* Parameter Types */}
-        <Card className="border-4 border-black shadow-xl mb-6">
-          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
-            <CardTitle className="flex items-center gap-2 text-black" dir="rtl"><Clock className="w-5 h-5 text-black" />סוגי פרמטרים (דוחות)</CardTitle>
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Clock className="w-5 h-5 text-purple-600" />סוגי פרמטרים (דוחות)</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <Tabs defaultValue="time" className="w-full">
@@ -317,9 +317,9 @@ export default function Settings() {
         </Card>
 
         {/* User Roles */}
-        <Card className="border-4 border-black shadow-xl mb-6">
-          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
-            <CardTitle className="flex items-center gap-2 text-black" dir="rtl"><Users className="w-5 h-5 text-black" />ניהול תפקידי משתמש</CardTitle>
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-blue-600" />ניהול תפקידי משתמש</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
@@ -343,7 +343,7 @@ export default function Settings() {
                   </div>
                 ))}
               </div>
-              <Button onClick={handleSaveRoles} disabled={saving} className="bg-green-400 hover:bg-green-500 text-black border-2 border-black" dir="rtl">
+              <Button onClick={handleSaveRoles} disabled={saving} className="bg-blue-900 hover:bg-blue-800" dir="rtl">
                 <Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור תפקידי משתמש"}
               </Button>
             </div>
@@ -351,10 +351,10 @@ export default function Settings() {
         </Card>
 
         {/* Company Events (View Only) */}
-        <Card className="border-4 border-black shadow-xl mb-6">
-          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
             <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center gap-2 text-black" dir="rtl"><PartyPopper className="w-5 h-5 text-black" />אירועי חברה</CardTitle>
+              <CardTitle className="flex items-center gap-2" dir="rtl"><PartyPopper className="w-5 h-5 text-purple-600" />אירועי חברה</CardTitle>
               <p className="text-sm text-gray-500" dir="rtl">הוסף אירועים מהעמוד השנתי</p>
             </div>
           </CardHeader>
@@ -378,9 +378,9 @@ export default function Settings() {
         </Card>
 
         {/* Tips & Policy */}
-        <Card className="border-4 border-black shadow-xl">
-          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
-            <CardTitle className="flex items-center gap-2 text-black" dir="rtl"><Info className="w-5 h-5 text-black" />טיפים ומדיניות זמינות</CardTitle>
+        <Card className="border-none shadow-lg">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Info className="w-5 h-5 text-blue-600" />טיפים ומדיניות זמינות</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
@@ -389,7 +389,7 @@ export default function Settings() {
                 <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
               </div>
               <div><Label htmlFor="tips" dir="rtl">הודעה לעובדים</Label><Textarea id="tips" value={tipsMessage} onChange={(e) => setTipsMessage(e.target.value)} placeholder="הזן טיפים..." rows={10} className="font-mono text-sm mt-2" dir="rtl" /></div>
-              <Button onClick={handleSaveTips} disabled={saving} className="bg-green-400 hover:bg-green-500 text-black border-2 border-black" dir="rtl"><Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור טיפים"}</Button>
+              <Button onClick={handleSaveTips} disabled={saving} className="bg-blue-900 hover:bg-blue-800" dir="rtl"><Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור טיפים"}</Button>
             </div>
           </CardContent>
         </Card>
