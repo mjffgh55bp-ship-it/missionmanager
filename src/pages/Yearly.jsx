@@ -15,6 +15,7 @@ const DEFAULT_CATEGORIES = [
   { name: "אירוע", color: "#ec4899" },
   { name: "משמרת", color: "#8b5cf6" },
   { name: "פגישה", color: "#3b82f6" },
+  { name: "יום הולדת", color: "#f59e0b" },
 ];
 
 export default function Yearly() {
@@ -24,6 +25,9 @@ export default function Yearly() {
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [showDayEventsDialog, setShowDayEventsDialog] = useState(false);
+  const [selectedDayEvents, setSelectedDayEvents] = useState([]);
+  const [selectedDate, setSelectedDate] = useState("");
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventForm, setEventForm] = useState({
     title: "",
@@ -53,7 +57,25 @@ export default function Yearly() {
       base44.entities.AppSettings.filter({ setting_key: "event_categories" })
     ]);
 
-    const weekEvents = eventsData.filter(e => e.date >= weekStartStr && e.date <= weekEndStr);
+    // Create birthday events for workers
+    const currentYear = new Date().getFullYear();
+    const birthdayEvents = workersData
+      .filter(w => w.birth_date)
+      .map(w => {
+        const birthDate = new Date(w.birth_date);
+        const thisYearBirthday = `${currentYear}-${String(birthDate.getMonth() + 1).padStart(2, '0')}-${String(birthDate.getDate()).padStart(2, '0')}`;
+        return {
+          id: `birthday-${w.id}`,
+          title: `יום הולדת ל${w.nickname || w.email}`,
+          date: thisYearBirthday,
+          description: "יום הולדת",
+          all_day: true,
+          isBirthday: true
+        };
+      });
+
+    const allEvents = [...eventsData, ...birthdayEvents];
+    const weekEvents = allEvents.filter(e => e.date >= weekStartStr && e.date <= weekEndStr);
     setEvents(weekEvents);
     setWorkers(workersData);
     
@@ -176,7 +198,15 @@ export default function Yearly() {
   const handleDeleteEvent = async (eventId) => {
     if (!confirm("האם למחוק אירוע זה?")) return;
     await base44.entities.CompanyEvent.delete(eventId);
+    setShowDayEventsDialog(false);
     loadData();
+  };
+
+  const handleDayClick = (date) => {
+    const dayEvents = getEventsForDay(date);
+    setSelectedDate(format(date, "yyyy-MM-dd"));
+    setSelectedDayEvents(dayEvents);
+    setShowDayEventsDialog(true);
   };
 
   const getWeekDays = () => {
@@ -263,27 +293,31 @@ export default function Yearly() {
                 className={`border-4 shadow-lg cursor-pointer hover:shadow-xl transition-shadow ${
                   isToday ? 'border-green-400 bg-green-100' : 'border-black bg-white'
                 }`}
-                onClick={() => handleAddEvent(format(day, "yyyy-MM-dd"))}
+                onClick={() => handleDayClick(day)}
               >
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <div className="text-center">
                     <p className="text-xs text-gray-600" dir="rtl">{HEBREW_DAYS_LONG[dayOfWeek]}</p>
                     <p className="text-2xl font-bold text-black mb-1">{format(day, "d")}</p>
                     <p className="text-xs text-gray-500" dir="rtl">{hebDate.dayHeb} {hebDate.monthHeb}</p>
                     
-                    {/* Event dots */}
+                    {/* Events list */}
                     {dayEvents.length > 0 && (
-                      <div className="mt-3 flex justify-center gap-1 flex-wrap">
-                        {dayEvents.slice(0, 3).map((event, i) => (
+                      <div className="mt-3 space-y-1">
+                        {dayEvents.slice(0, 2).map((event, i) => (
                           <div 
                             key={i} 
-                            className="w-2 h-2 rounded-full border border-black"
+                            className="text-xs px-2 py-1 rounded border-2 border-black truncate"
                             style={{ backgroundColor: getCategoryColor(event.description) }}
                             title={event.title}
-                          />
+                          >
+                            {event.title}
+                          </div>
                         ))}
-                        {dayEvents.length > 3 && (
-                          <span className="text-xs text-gray-500">+{dayEvents.length - 3}</span>
+                        {dayEvents.length > 2 && (
+                          <div className="text-xs text-gray-600 font-bold">
+                            +{dayEvents.length - 2} נוספים
+                          </div>
                         )}
                       </div>
                     )}
@@ -368,22 +402,26 @@ export default function Yearly() {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <Button 
-                          size="icon" 
-                          variant="ghost"
-                          onClick={() => handleEditEvent(event)}
-                          className="h-8 w-8 hover:bg-black/10"
-                        >
-                          <Pencil className="w-4 h-4 text-black" />
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="ghost"
-                          onClick={() => handleDeleteEvent(event.id)}
-                          className="h-8 w-8 hover:bg-red-400"
-                        >
-                          <Trash2 className="w-4 h-4 text-black" />
-                        </Button>
+                       {!event.isBirthday && (
+                         <>
+                           <Button 
+                             size="icon" 
+                             variant="ghost"
+                             onClick={() => handleEditEvent(event)}
+                             className="h-8 w-8 hover:bg-black/10"
+                           >
+                             <Pencil className="w-4 h-4 text-black" />
+                           </Button>
+                           <Button 
+                             size="icon" 
+                             variant="ghost"
+                             onClick={() => handleDeleteEvent(event.id)}
+                             className="h-8 w-8 hover:bg-red-400"
+                           >
+                             <Trash2 className="w-4 h-4 text-black" />
+                           </Button>
+                         </>
+                       )}
                       </div>
                     </div>
                   );
@@ -536,6 +574,83 @@ export default function Yearly() {
               </Button>
               <Button variant="outline" onClick={() => setShowCategoryDialog(false)}>
                 ביטול
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Day Events Dialog */}
+        <Dialog open={showDayEventsDialog} onOpenChange={setShowDayEventsDialog}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle dir="rtl">
+                אירועים ב-{selectedDate && format(new Date(selectedDate), "d MMMM yyyy", { locale: he })}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              {selectedDayEvents.length === 0 ? (
+                <p className="text-center text-gray-500 py-8" dir="rtl">אין אירועים ביום זה</p>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {selectedDayEvents.map((event, idx) => {
+                    const eventColor = getCategoryColor(event.description);
+                    return (
+                      <div 
+                        key={idx}
+                        className="p-4 border-4 border-black rounded-xl"
+                        style={{ background: `linear-gradient(to right, ${eventColor}dd, ${eventColor})` }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <p className="font-bold text-black text-lg">{event.title}</p>
+                            <p className="text-sm text-black mt-1">
+                              {!event.all_day && `${event.start_time}-${event.end_time} • `}
+                              {event.description}
+                            </p>
+                          </div>
+                          {!event.isBirthday && (
+                            <div className="flex gap-2">
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                onClick={() => {
+                                  handleEditEvent(event);
+                                  setShowDayEventsDialog(false);
+                                }}
+                                className="h-8 w-8 hover:bg-black/10"
+                              >
+                                <Pencil className="w-4 h-4 text-black" />
+                              </Button>
+                              <Button 
+                                size="icon" 
+                                variant="ghost"
+                                onClick={() => handleDeleteEvent(event.id)}
+                                className="h-8 w-8 hover:bg-red-400"
+                              >
+                                <Trash2 className="w-4 h-4 text-black" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <DialogFooter className="flex-row-reverse gap-2">
+              <Button 
+                onClick={() => {
+                  setShowDayEventsDialog(false);
+                  handleAddEvent(selectedDate);
+                }}
+                className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
+              >
+                <Plus className="w-4 h-4 ml-2" />
+                הוסף אירוע
+              </Button>
+              <Button variant="outline" onClick={() => setShowDayEventsDialog(false)}>
+                סגור
               </Button>
             </DialogFooter>
           </DialogContent>
