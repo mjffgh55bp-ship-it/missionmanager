@@ -98,11 +98,11 @@ export default function Layout({ children }) {
 
   return (
     <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
-      <div className="min-h-screen flex w-full bg-gray-50">
+      <div className="min-h-screen w-full bg-gray-50 relative">
         <Sidebar 
           side="right" 
           collapsible="offcanvas" 
-          className="border-l border-gray-200 z-50"
+          className="border-l border-gray-200 z-50 fixed"
           onMouseLeave={() => setSidebarOpen(false)}
         >
           <SidebarHeader className="border-b border-gray-200 p-6">
@@ -145,7 +145,7 @@ export default function Layout({ children }) {
           </SidebarContent>
         </Sidebar>
 
-        <main className="flex-1 flex flex-col relative z-0">
+        <main className="min-h-screen flex flex-col w-full relative z-0">
           <header className="bg-white border-b border-gray-200 px-6 py-4">
             <div className="flex items-center gap-4 justify-end">
               <h1 className="text-xl font-bold text-gray-900 flex-1 text-right" dir="rtl">מנהל משימות</h1>
