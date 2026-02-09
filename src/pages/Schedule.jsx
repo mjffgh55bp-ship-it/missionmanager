@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react";
+import { Search, AlertTriangle, Plus, Trash2, Pencil, Save } from "lucide-react";
 import { format, addDays, subDays, startOfWeek, getWeek } from "date-fns";
 import { he } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Check, Star, Download } from "lucide-react";
