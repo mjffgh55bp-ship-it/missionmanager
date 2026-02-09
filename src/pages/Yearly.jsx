@@ -341,9 +341,9 @@ export default function Yearly() {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={handleNextWeek}
+                onClick={handlePreviousWeek}
                 disabled={loading}
-                title="שבוע קדימה"
+                title="שבוע אחורה"
               >
                 <ChevronRight className="w-6 h-6" />
               </Button>
@@ -357,9 +357,9 @@ export default function Yearly() {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                onClick={handlePreviousWeek}
+                onClick={handleNextWeek}
                 disabled={loading}
-                title="שבוע אחורה"
+                title="שבוע קדימה"
               >
                 <ChevronLeft className="w-6 h-6" />
               </Button>
