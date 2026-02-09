@@ -50,6 +50,7 @@ export default function Skeletons() {
   const handleEditTemplate = (template) => {
     setActiveTemplate({
       ...template,
+      color: template.color || "#fef3c7",
       windows: JSON.parse(JSON.stringify(template.windows || []))
     });
   };
@@ -79,6 +80,7 @@ export default function Skeletons() {
     
     await base44.entities.WindowTemplate.update(activeTemplate.id, {
       name: activeTemplate.name,
+      color: activeTemplate.color,
       windows: activeTemplate.windows
     });
     
