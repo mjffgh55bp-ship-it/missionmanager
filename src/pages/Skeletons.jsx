@@ -77,6 +77,20 @@ export default function Skeletons() {
     
     await base44.entities.WindowTemplate.update(editingTemplate.id, updatedTemplate);
     
+    // אם תבנית זו בעריכה כרגע, עדכן גם את activeTemplate
+    if (activeTemplate?.id === editingTemplate.id) {
+      setActiveTemplate({
+        ...activeTemplate,
+        name: editingTemplateName.trim(),
+        color: editingTemplateColor,
+        windows: (activeTemplate.windows || []).map(window => ({
+          ...window,
+          color: editingTemplateColor,
+          header_color: editingTemplateColor
+        }))
+      });
+    }
+    
     loadTemplates();
     setShowEditTemplateDialog(false);
     setEditingTemplate(null);
@@ -85,10 +99,17 @@ export default function Skeletons() {
   const handleSaveTemplate = async () => {
     if (!activeTemplate) return;
     
+    const templateColor = activeTemplate.color || "#fef3c7";
+    const updatedWindows = (activeTemplate.windows || []).map(window => ({
+      ...window,
+      color: templateColor,
+      header_color: templateColor
+    }));
+    
     await base44.entities.WindowTemplate.update(activeTemplate.id, {
       name: activeTemplate.name,
-      color: activeTemplate.color,
-      windows: activeTemplate.windows
+      color: templateColor,
+      windows: updatedWindows
     });
     
     loadTemplates();
@@ -209,7 +230,15 @@ export default function Skeletons() {
           <Card className="border-none shadow-md mb-6 border border-green-100">
             <CardHeader className="py-3 px-4 border-b border-green-100 bg-gradient-to-r from-green-50 to-white">
               <div className="flex justify-between items-center">
-                <CardTitle className="text-lg text-green-800" dir="rtl">{activeTemplate.name}</CardTitle>
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-6 h-6 rounded border-2 border-black cursor-pointer hover:opacity-80"
+                    style={{ backgroundColor: activeTemplate.color || "#fef3c7" }}
+                    onClick={() => setShowEditTemplateDialog(true)}
+                    title="לחץ כדי לשנות צבע"
+                  />
+                  <CardTitle className="text-lg text-green-800" dir="rtl">{activeTemplate.name}</CardTitle>
+                </div>
                 <div className="flex gap-2">
                   <Button 
                     onClick={() => setActiveTemplate(null)}
