@@ -5,24 +5,36 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus, FileDown, Pencil, Trash2, Calendar } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronLeft, ChevronRight, Plus, FileDown, Pencil, Trash2, Calendar, Settings } from "lucide-react";
 import { format, addDays, startOfWeek, endOfWeek, addWeeks, subWeeks } from "date-fns";
 import { he } from "date-fns/locale";
 import { getHebrewDate } from "../components/utils/HebrewDate";
+
+const DEFAULT_CATEGORIES = [
+  { name: "אירוע", color: "#ec4899" },
+  { name: "משמרת", color: "#8b5cf6" },
+  { name: "פגישה", color: "#3b82f6" },
+];
 
 export default function Yearly() {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [events, setEvents] = useState([]);
   const [workers, setWorkers] = useState([]);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [showEventDialog, setShowEventDialog] = useState(false);
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventForm, setEventForm] = useState({
     title: "",
     date: "",
     all_day: true,
     start_time: "08:00",
-    end_time: "16:00"
+    end_time: "16:00",
+    category: "אירוע"
   });
+  const [categoryForm, setCategoryForm] = useState({ name: "", color: "#ec4899" });
+  const [editingCategoryIndex, setEditingCategoryIndex] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,14 +47,20 @@ export default function Yearly() {
     const weekStartStr = format(currentWeekStart, "yyyy-MM-dd");
     const weekEndStr = format(weekEnd, "yyyy-MM-dd");
 
-    const [eventsData, workersData] = await Promise.all([
+    const [eventsData, workersData, categoriesSettings] = await Promise.all([
       base44.entities.CompanyEvent.list("-date"),
-      base44.entities.Worker.filter({ active: true })
+      base44.entities.Worker.filter({ active: true }),
+      base44.entities.AppSettings.filter({ setting_key: "event_categories" })
     ]);
 
     const weekEvents = eventsData.filter(e => e.date >= weekStartStr && e.date <= weekEndStr);
     setEvents(weekEvents);
     setWorkers(workersData);
+    
+    if (categoriesSettings.length > 0) {
+      setCategories(JSON.parse(categoriesSettings[0].setting_value));
+    }
+    
     setLoading(false);
   };
 
@@ -61,7 +79,8 @@ export default function Yearly() {
       date: date || format(new Date(), "yyyy-MM-dd"),
       all_day: true,
       start_time: "08:00",
-      end_time: "16:00"
+      end_time: "16:00",
+      category: categories[0]?.name || "אירוע"
     });
     setShowEventDialog(true);
   };
@@ -73,7 +92,8 @@ export default function Yearly() {
       date: event.date,
       all_day: event.all_day !== false,
       start_time: event.start_time || "08:00",
-      end_time: event.end_time || "16:00"
+      end_time: event.end_time || "16:00",
+      category: event.description || categories[0]?.name || "אירוע"
     });
     setShowEventDialog(true);
   };
@@ -84,7 +104,8 @@ export default function Yearly() {
       date: eventForm.date,
       all_day: eventForm.all_day,
       start_time: eventForm.all_day ? null : eventForm.start_time,
-      end_time: eventForm.all_day ? null : eventForm.end_time
+      end_time: eventForm.all_day ? null : eventForm.end_time,
+      description: eventForm.category
     };
 
     if (editingEvent) {
@@ -96,6 +117,60 @@ export default function Yearly() {
     setShowEventDialog(false);
     setEditingEvent(null);
     loadData();
+  };
+
+  const handleAddCategory = () => {
+    setEditingCategoryIndex(null);
+    setCategoryForm({ name: "", color: "#ec4899" });
+    setShowCategoryDialog(true);
+  };
+
+  const handleEditCategory = (category, index) => {
+    setEditingCategoryIndex(index);
+    setCategoryForm({ name: category.name, color: category.color });
+    setShowCategoryDialog(true);
+  };
+
+  const handleSaveCategory = async () => {
+    let newCategories;
+    if (editingCategoryIndex !== null) {
+      newCategories = [...categories];
+      newCategories[editingCategoryIndex] = categoryForm;
+    } else {
+      newCategories = [...categories, categoryForm];
+    }
+    
+    setCategories(newCategories);
+    
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "event_categories" });
+    const data = { setting_key: "event_categories", setting_value: JSON.stringify(newCategories) };
+    
+    if (settings.length > 0) {
+      await base44.entities.AppSettings.update(settings[0].id, data);
+    } else {
+      await base44.entities.AppSettings.create(data);
+    }
+    
+    setShowCategoryDialog(false);
+    setCategoryForm({ name: "", color: "#ec4899" });
+    setEditingCategoryIndex(null);
+  };
+
+  const handleDeleteCategory = async (index) => {
+    if (!confirm("האם למחוק קטגוריה זו?")) return;
+    
+    const newCategories = categories.filter((_, i) => i !== index);
+    setCategories(newCategories);
+    
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "event_categories" });
+    if (settings.length > 0) {
+      await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(newCategories) });
+    }
+  };
+
+  const getCategoryColor = (categoryName) => {
+    const category = categories.find(c => c.name === categoryName);
+    return category?.color || "#ec4899";
   };
 
   const handleDeleteEvent = async (eventId) => {
@@ -198,11 +273,12 @@ export default function Yearly() {
                     
                     {/* Event dots */}
                     {dayEvents.length > 0 && (
-                      <div className="mt-3 flex justify-center gap-1">
+                      <div className="mt-3 flex justify-center gap-1 flex-wrap">
                         {dayEvents.slice(0, 3).map((event, i) => (
                           <div 
                             key={i} 
-                            className="w-2 h-2 rounded-full bg-pink-400"
+                            className="w-2 h-2 rounded-full border border-black"
+                            style={{ backgroundColor: getCategoryColor(event.description) }}
                             title={event.title}
                           />
                         ))}
@@ -220,17 +296,44 @@ export default function Yearly() {
 
         {/* Legend */}
         <Card className="border-4 border-black shadow-xl mb-6 bg-white">
+          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white py-3">
+            <div className="flex items-center justify-between">
+              <Button 
+                size="sm"
+                onClick={handleAddCategory}
+                className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
+              >
+                <Plus className="w-3 h-3 ml-1" />
+                הוסף קטגוריה
+              </Button>
+              <CardTitle className="text-lg text-black" dir="rtl">מקרא</CardTitle>
+            </div>
+          </CardHeader>
           <CardContent className="p-4">
-            <div className="flex items-center justify-end gap-6" dir="rtl">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-black">זכר</span>
-                <div className="w-4 h-4 rounded-full bg-pink-200 border-2 border-black"></div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-black">נקבה</span>
-                <div className="w-4 h-4 rounded-full bg-purple-200 border-2 border-black"></div>
-              </div>
-              <span className="text-sm font-bold text-black">מקרא - היום לפי:</span>
+            <div className="flex items-center justify-end gap-4 flex-wrap" dir="rtl">
+              {categories.map((category, index) => (
+                <div key={index} className="flex items-center gap-2 group">
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleEditCategory(category, index)}
+                      className="p-1 hover:bg-gray-100 rounded"
+                    >
+                      <Pencil className="w-3 h-3 text-gray-600" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCategory(index)}
+                      className="p-1 hover:bg-gray-100 rounded"
+                    >
+                      <Trash2 className="w-3 h-3 text-red-600" />
+                    </button>
+                  </div>
+                  <span className="text-sm text-black">{category.name}</span>
+                  <div 
+                    className="w-4 h-4 rounded-full border-2 border-black" 
+                    style={{ backgroundColor: category.color }}
+                  ></div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -245,41 +348,46 @@ export default function Yearly() {
               <p className="text-center text-gray-500 py-8" dir="rtl">אין אירועים השבוע</p>
             ) : (
               <div className="space-y-3">
-                {events.map((event) => (
-                  <div 
-                    key={event.id} 
-                    className="p-4 bg-gradient-to-r from-pink-300 to-pink-400 border-4 border-black rounded-xl flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Calendar className="w-5 h-5 text-black" />
-                      <div>
-                        <p className="font-bold text-black">{event.title}</p>
-                        <p className="text-sm text-black">
-                          {format(new Date(event.date), "d.M.yy")}
-                          {!event.all_day && ` • ${event.start_time}-${event.end_time}`}
-                        </p>
+                {events.map((event) => {
+                  const eventColor = getCategoryColor(event.description);
+                  return (
+                    <div 
+                      key={event.id} 
+                      className="p-4 border-4 border-black rounded-xl flex items-center justify-between"
+                      style={{ background: `linear-gradient(to right, ${eventColor}dd, ${eventColor})` }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-5 h-5 text-black" />
+                        <div>
+                          <p className="font-bold text-black">{event.title}</p>
+                          <p className="text-sm text-black">
+                            {format(new Date(event.date), "d.M.yy")}
+                            {!event.all_day && ` • ${event.start_time}-${event.end_time}`}
+                            {event.description && ` • ${event.description}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="icon" 
+                          variant="ghost"
+                          onClick={() => handleEditEvent(event)}
+                          className="h-8 w-8 hover:bg-black/10"
+                        >
+                          <Pencil className="w-4 h-4 text-black" />
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="ghost"
+                          onClick={() => handleDeleteEvent(event.id)}
+                          className="h-8 w-8 hover:bg-red-400"
+                        >
+                          <Trash2 className="w-4 h-4 text-black" />
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="icon" 
-                        variant="ghost"
-                        onClick={() => handleEditEvent(event)}
-                        className="h-8 w-8 hover:bg-pink-500"
-                      >
-                        <Pencil className="w-4 h-4 text-black" />
-                      </Button>
-                      <Button 
-                        size="icon" 
-                        variant="ghost"
-                        onClick={() => handleDeleteEvent(event.id)}
-                        className="h-8 w-8 hover:bg-red-400"
-                      >
-                        <Trash2 className="w-4 h-4 text-black" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -310,6 +418,30 @@ export default function Yearly() {
                   onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })}
                   className="mt-1"
                 />
+              </div>
+              <div>
+                <Label dir="rtl">קטגוריה</Label>
+                <Select 
+                  value={eventForm.category} 
+                  onValueChange={(value) => setEventForm({ ...eventForm, category: value })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat, idx) => (
+                      <SelectItem key={idx} value={cat.name}>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full border border-black" 
+                            style={{ backgroundColor: cat.color }}
+                          />
+                          {cat.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -351,6 +483,58 @@ export default function Yearly() {
                 {editingEvent ? "עדכן" : "הוסף"}
               </Button>
               <Button variant="outline" onClick={() => setShowEventDialog(false)}>
+                ביטול
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Category Dialog */}
+        <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle dir="rtl">{editingCategoryIndex !== null ? "עריכת קטגוריה" : "קטגוריה חדשה"}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label dir="rtl">שם הקטגוריה</Label>
+                <Input
+                  value={categoryForm.name}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                  placeholder="שם"
+                  className="mt-1"
+                  dir="rtl"
+                />
+              </div>
+              <div>
+                <Label dir="rtl">צבע</Label>
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {['#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'].map(color => (
+                    <button
+                      key={color}
+                      className={`w-10 h-10 rounded-full border-4 ${categoryForm.color === color ? 'border-black' : 'border-gray-300'}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => setCategoryForm({ ...categoryForm, color })}
+                    />
+                  ))}
+                </div>
+                <Input
+                  type="color"
+                  value={categoryForm.color}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, color: e.target.value })}
+                  className="mt-2 h-10"
+                />
+              </div>
+            </div>
+            <DialogFooter className="flex-row-reverse gap-2">
+              <Button 
+                onClick={handleSaveCategory}
+                className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
+                disabled={!categoryForm.name.trim()}
+              >
+                {editingCategoryIndex !== null ? "עדכן" : "הוסף"}
+              </Button>
+              <Button variant="outline" onClick={() => setShowCategoryDialog(false)}>
                 ביטול
               </Button>
             </DialogFooter>

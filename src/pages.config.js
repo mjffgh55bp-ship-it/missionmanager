@@ -49,12 +49,12 @@
  */
 import Home from './pages/Home';
 import Matrix from './pages/Matrix';
+import PersonalAvailability from './pages/PersonalAvailability';
 import Reports from './pages/Reports';
 import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
-import Workers from './pages/Workers';
 import Skeletons from './pages/Skeletons';
-import PersonalAvailability from './pages/PersonalAvailability';
+import Workers from './pages/Workers';
 import Yearly from './pages/Yearly';
 import __Layout from './Layout.jsx';
 
@@ -62,12 +62,12 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "Home": Home,
     "Matrix": Matrix,
+    "PersonalAvailability": PersonalAvailability,
     "Reports": Reports,
     "Schedule": Schedule,
     "Settings": Settings,
-    "Workers": Workers,
     "Skeletons": Skeletons,
-    "PersonalAvailability": PersonalAvailability,
+    "Workers": Workers,
     "Yearly": Yearly,
 }
 
