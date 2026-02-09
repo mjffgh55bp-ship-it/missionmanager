@@ -16,7 +16,7 @@ const TIME_SLOTS = [
   '02:00-06:00',
 ];
 
-const DAYS_IN_WEEK = 5; // Sunday to Thursday
+const DAYS_IN_WEEK = 7; // Sunday to Saturday
 
 export default function PersonalAvailability() {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => 
@@ -167,7 +167,7 @@ export default function PersonalAvailability() {
                 <p className="text-black font-bold">יכול</p>
                 <p className="text-sm text-gray-600">משמרות</p>
               </div>
-              <div className="w-12 h-12 bg-green-400 border-2 border-black rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-yellow-200 border-2 border-black rounded-lg flex items-center justify-center">
                 <span className="text-2xl font-bold text-black">{summary.available}</span>
               </div>
             </div>
@@ -177,7 +177,7 @@ export default function PersonalAvailability() {
                 <p className="text-black font-bold">לא יכול</p>
                 <p className="text-sm text-gray-600">משמרות</p>
               </div>
-              <div className="w-12 h-12 bg-red-300 border-2 border-black rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-red-200 border-2 border-black rounded-lg flex items-center justify-center">
                 <span className="text-2xl font-bold text-black">{summary.unavailable}</span>
               </div>
             </div>
@@ -187,7 +187,7 @@ export default function PersonalAvailability() {
                 <p className="text-black font-bold">רוצה</p>
                 <p className="text-sm text-gray-600">משמרות</p>
               </div>
-              <div className="w-12 h-12 bg-yellow-300 border-2 border-black rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-green-200 border-2 border-black rounded-lg flex items-center justify-center">
                 <span className="text-2xl font-bold text-black">{summary.wanted}</span>
               </div>
             </div>
@@ -257,9 +257,24 @@ export default function PersonalAvailability() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="none">בחר...</SelectItem>
-                                <SelectItem value="wanted">רוצה</SelectItem>
-                                <SelectItem value="available">יכול</SelectItem>
-                                <SelectItem value="unavailable">לא יכול</SelectItem>
+                                <SelectItem value="wanted">
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-green-200 border border-black"></span>
+                                    רוצה
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="available">
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-yellow-200 border border-black"></span>
+                                    יכול
+                                  </span>
+                                </SelectItem>
+                                <SelectItem value="unavailable">
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-red-200 border border-black"></span>
+                                    לא יכול
+                                  </span>
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                           </td>

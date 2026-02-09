@@ -118,13 +118,13 @@ export default function Skeletons() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-4 md:p-8">
       <div className="max-w-screen-2xl mx-auto">
-        <Card className="border-none shadow-md mb-6 border border-green-100">
-          <CardHeader className="border-b border-green-100 bg-gradient-to-r from-white to-green-50">
+        <Card className="border-4 border-black shadow-xl mb-6">
+          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
             <div className="flex justify-between items-center">
-              <CardTitle className="text-2xl text-green-800" dir="rtl">שלדית - ניהול תבניות</CardTitle>
+              <CardTitle className="text-2xl text-black" dir="rtl">שלדית - ניהול תבניות</CardTitle>
               <Button 
                 onClick={() => setShowCreateDialog(true)}
-                className="bg-gradient-to-r from-green-400 to-green-300 hover:from-green-500 hover:to-green-400 text-white"
+                className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
                 dir="rtl"
               >
                 <Plus className="w-4 h-4 ml-2" />
@@ -137,9 +137,9 @@ export default function Skeletons() {
         {!activeTemplate ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {templates.map(template => (
-              <Card key={template.id} className="border border-green-100 shadow-md hover:shadow-lg transition-shadow">
-                <CardHeader className="bg-gradient-to-r from-green-50 to-white border-b border-green-100">
-                  <CardTitle className="text-lg text-green-800" dir="rtl">{template.name}</CardTitle>
+              <Card key={template.id} className="border-4 border-black shadow-lg hover:shadow-xl transition-shadow">
+                <CardHeader className="bg-gradient-to-r from-green-100 to-white border-b-4 border-black">
+                  <CardTitle className="text-lg text-black" dir="rtl">{template.name}</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
                   <div className="flex gap-2">
@@ -187,7 +187,7 @@ export default function Skeletons() {
                   </Button>
                   <Button 
                     onClick={handleSaveTemplate}
-                    className="bg-gradient-to-r from-green-400 to-green-300 hover:from-green-500 hover:to-green-400 text-white"
+                    className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
                     dir="rtl"
                   >
                     <Save className="w-4 h-4 ml-2" />
@@ -356,7 +356,7 @@ export default function Skeletons() {
             </Button>
             <Button 
               onClick={handleCreateTemplate} 
-              className="bg-gradient-to-r from-green-400 to-green-300 hover:from-green-500 hover:to-green-400 text-white"
+              className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
               disabled={!templateName.trim()}
               dir="rtl"
             >

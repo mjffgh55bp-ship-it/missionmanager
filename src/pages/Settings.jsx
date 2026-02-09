@@ -189,7 +189,7 @@ export default function Settings() {
     <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">הגדרות</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-black mb-2" dir="rtl">הגדרות</h1>
           <p className="text-gray-600" dir="rtl">הגדר הגדרות כלל מערכת</p>
         </div>
 
@@ -343,7 +343,7 @@ export default function Settings() {
                   </div>
                 ))}
               </div>
-              <Button onClick={handleSaveRoles} disabled={saving} className="bg-blue-900 hover:bg-blue-800" dir="rtl">
+              <Button onClick={handleSaveRoles} disabled={saving} className="bg-green-400 hover:bg-green-500 text-black border-2 border-black" dir="rtl">
                 <Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור תפקידי משתמש"}
               </Button>
             </div>
@@ -389,7 +389,7 @@ export default function Settings() {
                 <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
               </div>
               <div><Label htmlFor="tips" dir="rtl">הודעה לעובדים</Label><Textarea id="tips" value={tipsMessage} onChange={(e) => setTipsMessage(e.target.value)} placeholder="הזן טיפים..." rows={10} className="font-mono text-sm mt-2" dir="rtl" /></div>
-              <Button onClick={handleSaveTips} disabled={saving} className="bg-blue-900 hover:bg-blue-800" dir="rtl"><Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור טיפים"}</Button>
+              <Button onClick={handleSaveTips} disabled={saving} className="bg-green-400 hover:bg-green-500 text-black border-2 border-black" dir="rtl"><Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור טיפים"}</Button>
             </div>
           </CardContent>
         </Card>

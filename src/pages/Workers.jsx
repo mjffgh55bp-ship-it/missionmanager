@@ -184,11 +184,11 @@ export default function Workers() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div className="flex gap-2">
-            <Button onClick={() => setShowDialog(true)} className="bg-blue-900 hover:bg-blue-800 text-white px-6" dir="rtl">
+            <Button onClick={() => setShowDialog(true)} className="bg-green-400 hover:bg-green-500 text-black border-2 border-black px-6" dir="rtl">
               <Plus className="w-4 h-4 mr-2" />הוסף עובד
             </Button>
           </div>
@@ -197,12 +197,12 @@ export default function Workers() {
         <div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {workers.map((worker) => (
-              <Card key={worker.id} className="border-none shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader className="border-b bg-white">
+              <Card key={worker.id} className="border-4 border-black shadow-lg hover:shadow-2xl transition-all duration-300">
+                <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-900">
-                        <ChefHat className="w-6 h-6 text-white" />
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center bg-green-300 border-2 border-black">
+                        <ChefHat className="w-6 h-6 text-black" />
                       </div>
                       <div>
                         <CardTitle className="text-lg">{worker.nickname || 'ללא כינוי'}</CardTitle>
@@ -322,7 +322,7 @@ export default function Workers() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setShowDialog(false); setEditingWorker(null); }} dir="rtl">ביטול</Button>
-              <Button onClick={handleSubmit} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
+              <Button onClick={handleSubmit} className="bg-green-400 hover:bg-green-500 text-black border-2 border-black" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -338,7 +338,7 @@ export default function Workers() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowCategoryDialog(false)} dir="rtl">ביטול</Button>
-              <Button onClick={handleSaveCategoryNames} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שמור</Button>
+              <Button onClick={handleSaveCategoryNames} className="bg-green-400 hover:bg-green-500 text-black border-2 border-black" dir="rtl">שמור</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

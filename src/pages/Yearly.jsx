@@ -308,12 +308,12 @@ export default function Yearly() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 flex flex-col" dir="rtl">
       {/* Fixed Header */}
-      <div className="fixed top-0 left-64 right-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 pb-2">
+      <div className="fixed top-0 left-64 right-0 z-30 bg-gradient-to-br from-white to-green-50 p-4 md:p-6 pb-2">
         <div className="max-w-full mx-auto flex flex-wrap justify-between items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">תקופתית</h1>
+            <h1 className="text-3xl font-bold text-black mb-1">תקופתית</h1>
             <p className="text-gray-600 text-sm">{viewOnly ? "מצב צפייה בלבד" : "לחץ פעמיים על אירוע לעריכה"}</p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -332,7 +332,7 @@ export default function Yearly() {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-hidden px-4 md:px-6 pb-4 pt-24">
-        <Card className="border-none shadow-lg overflow-hidden h-full">
+        <Card className="border-4 border-black shadow-xl overflow-hidden h-full">
           <CardContent className="p-0 h-full">
             <div className="flex h-full">
               {/* Fixed Row Headers */}
