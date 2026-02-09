@@ -618,7 +618,6 @@ END:VEVENT
                           <div>
                             <span className="font-semibold text-sm">{day}</span>
                             <span className="text-xs text-gray-500 ml-2">{format(addDays(weekStart, dayIndex), "MMM d")}</span>
-                            <span className="text-xs text-gray-400 ml-1">({formatHebrewDate(addDays(weekStart, dayIndex))})</span>
                           </div>
                           {event && (
                             <Badge className="bg-purple-100 text-purple-800 text-xs">
