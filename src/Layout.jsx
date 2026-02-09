@@ -132,7 +132,7 @@ export default function Layout({ children }) {
                           location.pathname === item.url ? 'bg-green-500 text-white hover:bg-green-600 hover:text-white' : ''
                         }`}
                       >
-                        <Link to={item.url} className="flex items-center gap-2 px-2 py-2 flex-row-reverse justify-end" dir="rtl">
+                        <Link to={item.url} onClick={() => setSidebarOpen(false)} className="flex items-center gap-2 px-2 py-2 flex-row-reverse justify-end" dir="rtl">
                           <span className="font-medium">{item.title}</span>
                           <item.icon className="w-4 h-4" />
                         </Link>
