@@ -43,37 +43,11 @@ export default function Yearly() {
   const [editingCategoryIndex, setEditingCategoryIndex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   useEffect(() => {
     loadData();
   }, [currentWeekStart]);
-
-  useEffect(() => {
-    // Restore selected category from localStorage on mount
-    const saved = localStorage.getItem("yearlySelectedCategory");
-    if (saved) setSelectedCategory(saved);
-  }, []);
-
-  useEffect(() => {
-    // Save selected category to localStorage when it changes
-    if (selectedCategory) {
-      localStorage.setItem("yearlySelectedCategory", selectedCategory);
-    } else {
-      localStorage.removeItem("yearlySelectedCategory");
-    }
-  }, [selectedCategory]);
-
-  useEffect(() => {
-    // Save all state to localStorage whenever it changes
-    const state = {
-      selectedCategory,
-      categories,
-      events
-    };
-    localStorage.setItem("yearlyPageState", JSON.stringify(state));
-  }, [selectedCategory, categories, events]);
 
   const loadData = async () => {
     setLoading(true);
