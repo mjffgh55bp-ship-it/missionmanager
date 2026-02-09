@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const managerNavigationItems = [
+  { title: "בית", url: createPageUrl("Home"), icon: LayoutDashboard },
   { title: "לוח", url: createPageUrl("Schedule"), icon: Calendar },
   { title: "שלדית", url: createPageUrl("Skeletons"), icon: Grid },
   { title: "מטריצה", url: createPageUrl("Matrix"), icon: Grid },
@@ -27,7 +28,9 @@ const managerNavigationItems = [
   { title: "הגדרות", url: createPageUrl("Settings"), icon: Settings },
 ];
 
-const userNavigationItems = [];
+const userNavigationItems = [
+  { title: "בית", url: createPageUrl("Home"), icon: LayoutDashboard },
+];
 
 export default function Layout({ children }) {
   const location = useLocation();
@@ -85,7 +88,7 @@ export default function Layout({ children }) {
             onClick={() => setSidebarOpen(false)}
           />
           <div 
-            className="fixed top-0 left-0 h-full w-56 bg-white border-r border-green-100 shadow-xl z-50 transform transition-transform duration-300"
+            className="fixed top-0 right-0 h-full w-56 bg-white border-l border-green-100 shadow-xl z-50 transform transition-transform duration-300"
           >
             <div className="border-b border-green-100 p-4 bg-gradient-to-br from-green-50 to-white">
               <div className="flex flex-col items-end gap-2" dir="rtl">
@@ -129,7 +132,8 @@ export default function Layout({ children }) {
       {/* Main Content */}
       <main className="min-h-screen flex flex-col w-full">
         <header className="bg-gradient-to-r from-white to-green-50 border-b border-green-100 px-6 py-4 shadow-sm">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4" dir="rtl">
+            <h1 className="text-xl font-bold text-green-800 flex-1 text-right">מנהל משימות</h1>
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="hover:bg-green-100 p-2 rounded-lg transition-colors duration-200 text-green-700"
@@ -138,7 +142,6 @@ export default function Layout({ children }) {
                 <path d="M1.5 3C1.22386 3 1 3.22386 1 3.5C1 3.77614 1.22386 4 1.5 4H13.5C13.7761 4 14 3.77614 14 3.5C14 3.22386 13.7761 3 13.5 3H1.5ZM1 7.5C1 7.22386 1.22386 7 1.5 7H13.5C13.7761 7 14 7.22386 14 7.5C14 7.77614 13.7761 8 13.5 8H1.5C1.22386 8 1 7.77614 1 7.5ZM1 11.5C1 11.2239 1.22386 11 1.5 11H13.5C13.7761 11 14 11.2239 14 11.5C14 11.7761 13.7761 12 13.5 12H1.5C1.22386 12 1 11.7761 1 11.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"></path>
               </svg>
             </button>
-            <h1 className="text-xl font-bold text-green-800 flex-1 text-right" dir="rtl">מנהל משימות</h1>
           </div>
         </header>
 
