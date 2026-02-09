@@ -73,7 +73,6 @@ export default function Yearly() {
   }, [selectedCategory, categories, events]);
 
   const loadData = async () => {
-    if (loading) return; // Prevent multiple simultaneous loads
     setLoading(true);
     setError(null);
     try {
