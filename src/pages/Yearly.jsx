@@ -40,13 +40,16 @@ export default function Yearly() {
   const [categoryForm, setCategoryForm] = useState({ name: "", color: "#ec4899" });
   const [editingCategoryIndex, setEditingCategoryIndex] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadData();
   }, [currentWeekStart]);
 
   const loadData = async () => {
+    if (loading) return; // Prevent multiple simultaneous loads
     setLoading(true);
+    setError(null);
     const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 0 });
     const weekStartStr = format(currentWeekStart, "yyyy-MM-dd");
     const weekEndStr = format(weekEnd, "yyyy-MM-dd");
@@ -84,13 +87,20 @@ export default function Yearly() {
     }
     
     setLoading(false);
+  } catch (err) {
+    console.error("Error loading data:", err);
+    setError("אירעה שגיאה בטעינת הנתונים. אנא המתן מספר שניות ונסה שוב.");
+    setLoading(false);
+  }
   };
 
   const handlePreviousWeek = () => {
+    if (loading) return;
     setCurrentWeekStart(subWeeks(currentWeekStart, 1));
   };
 
   const handleNextWeek = () => {
+    if (loading) return;
     setCurrentWeekStart(addWeeks(currentWeekStart, 1));
   };
 
@@ -257,11 +267,29 @@ export default function Yearly() {
           </Button>
         </div>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-100 border-4 border-red-500 rounded-xl" dir="rtl">
+            <p className="text-red-800 font-bold">{error}</p>
+            <Button 
+              onClick={loadData}
+              className="mt-2 bg-red-500 hover:bg-red-600 text-white"
+            >
+              נסה שוב
+            </Button>
+          </div>
+        )}
+
         {/* Week Navigation */}
         <Card className="border-4 border-black shadow-xl mb-6">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <Button variant="ghost" size="icon" onClick={handlePreviousWeek}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handlePreviousWeek}
+                disabled={loading}
+              >
                 <ChevronRight className="w-6 h-6" />
               </Button>
               
@@ -271,7 +299,12 @@ export default function Yearly() {
                 </p>
               </div>
 
-              <Button variant="ghost" size="icon" onClick={handleNextWeek}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleNextWeek}
+                disabled={loading}
+              >
                 <ChevronLeft className="w-6 h-6" />
               </Button>
             </div>
