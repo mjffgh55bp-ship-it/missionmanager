@@ -230,11 +230,6 @@ export default function Yearly() {
     return category?.color || "#ffc9e3";
   };
 
-  const getFilteredEvents = () => {
-    if (!selectedCategory) return events;
-    return events.filter(e => e.description === selectedCategory);
-  };
-
   const getCategorySummary = (categoryName) => {
     const categoryEvents = events.filter(e => e.description === categoryName);
     return categoryEvents.length;
