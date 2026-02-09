@@ -53,7 +53,6 @@ import Reports from './pages/Reports';
 import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
 import Workers from './pages/Workers';
-import Yearly from './pages/Yearly';
 import Skeletons from './pages/Skeletons';
 import PersonalAvailability from './pages/PersonalAvailability';
 import __Layout from './Layout.jsx';
@@ -66,7 +65,6 @@ export const PAGES = {
     "Schedule": Schedule,
     "Settings": Settings,
     "Workers": Workers,
-    "Yearly": Yearly,
     "Skeletons": Skeletons,
     "PersonalAvailability": PersonalAvailability,
 }
