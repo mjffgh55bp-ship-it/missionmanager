@@ -515,7 +515,7 @@ export default function Matrix() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" dir="rtl">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} dir="rtl">
       <div className="max-w-screen-2xl mx-auto">
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b bg-white">
@@ -605,9 +605,6 @@ export default function Matrix() {
                               handleMouseDown(e, worker, null, 'create');
                             }
                           }}
-                          onMouseMove={handleMouseMove}
-                          onMouseUp={handleMouseUp}
-                          onMouseLeave={handleMouseUp}
                         >
                           <div className="absolute inset-0 flex h-16">
                             {timeSlots.map(hour => (<div key={hour} className="flex-1 border-r time-slot h-16"></div>))}
