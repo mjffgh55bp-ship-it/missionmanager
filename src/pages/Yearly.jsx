@@ -623,9 +623,9 @@ export default function Yearly() {
                   dir="rtl"
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label dir="rtl">צבע</Label>
-                <div className="flex gap-2 mt-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap">
                   {['#ec4899', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#84cc16'].map(color => (
                     <button
                       key={color}
