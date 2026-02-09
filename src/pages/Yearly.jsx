@@ -87,25 +87,37 @@ export default function Yearly() {
         base44.entities.AppSettings.filter({ setting_key: "event_categories" })
       ]);
 
-      // Create birthday events for workers
+      // Create birthday events automatically for the current year
       const currentYear = new Date().getFullYear();
-      const birthdayEvents = workersData
+      const birthdayPromises = workersData
         .filter(w => w.birth_date)
-        .map(w => {
+        .map(async (w) => {
           const birthDate = new Date(w.birth_date);
-          const thisYearBirthday = `${currentYear}-${String(birthDate.getMonth() + 1).padStart(2, '0')}-${String(birthDate.getDate()).padStart(2, '0')}`;
-          return {
-            id: `birthday-${w.id}`,
-            title: `יום הולדת ל${w.nickname || w.email}`,
-            date: thisYearBirthday,
-            description: "יום הולדת",
-            all_day: true,
-            isBirthday: true
-          };
+          const birthdayStr = `${currentYear}-${String(birthDate.getMonth() + 1).padStart(2, '0')}-${String(birthDate.getDate()).padStart(2, '0')}`;
+          
+          // Check if birthday event exists for this year
+          const existingBirthday = eventsData.find(e => 
+            e.date === birthdayStr && 
+            e.title.includes(w.nickname || w.email)
+          );
+          
+          if (!existingBirthday) {
+            // Create the birthday event
+            await base44.entities.CompanyEvent.create({
+              title: `יום הולדת ל${w.nickname || w.email}`,
+              date: birthdayStr,
+              description: "יום הולדת",
+              all_day: true
+            });
+          }
         });
 
-      const allEvents = [...eventsData, ...birthdayEvents];
-      const weekEvents = allEvents.filter(e => e.date >= weekStartStr && e.date <= weekEndStr);
+      await Promise.all(birthdayPromises);
+
+      // Reload events after creating birthdays
+      const updatedEvents = await base44.entities.CompanyEvent.list("-date");
+      const weekEvents = updatedEvents.filter(e => e.date >= weekStartStr && e.date <= weekEndStr);
+      
       setEvents(weekEvents);
       setWorkers(workersData);
       
