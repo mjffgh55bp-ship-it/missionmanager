@@ -41,26 +41,7 @@ export default function Layout({ children }) {
     checkUserRole();
   }, []);
 
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      const threshold = 50; // pixels from the right edge
-      const isNearRightEdge = window.innerWidth - e.clientX < threshold;
-      
-      if (isNearRightEdge) {
-        setSidebarOpen(true);
-      }
-    };
 
-    const handleMouseLeave = () => {
-      setSidebarOpen(false);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-    };
-  }, []);
 
   const checkUserRole = async () => {
     try {
