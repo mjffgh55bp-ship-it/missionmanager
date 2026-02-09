@@ -194,9 +194,9 @@ export default function Settings() {
         </div>
 
         {/* Schedule Column Types */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Columns className="w-5 h-5 text-green-600" />סוגי עמודות בלוח התורים</CardTitle>
+        <Card className="border-4 border-black shadow-xl mb-6">
+          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
+            <CardTitle className="flex items-center gap-2 text-black" dir="rtl"><Columns className="w-5 h-5 text-black" />סוגי עמודות בלוח התורים</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סוגי עמודות שניתן להוסיף לעגלות בעמוד לוח התורים</p>
@@ -244,9 +244,9 @@ export default function Settings() {
         </Card>
 
         {/* Parameter Types */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Clock className="w-5 h-5 text-purple-600" />סוגי פרמטרים (דוחות)</CardTitle>
+        <Card className="border-4 border-black shadow-xl mb-6">
+          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
+            <CardTitle className="flex items-center gap-2 text-black" dir="rtl"><Clock className="w-5 h-5 text-black" />סוגי פרמטרים (דוחות)</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <Tabs defaultValue="time" className="w-full">
@@ -317,9 +317,9 @@ export default function Settings() {
         </Card>
 
         {/* User Roles */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-blue-600" />ניהול תפקידי משתמש</CardTitle>
+        <Card className="border-4 border-black shadow-xl mb-6">
+          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
+            <CardTitle className="flex items-center gap-2 text-black" dir="rtl"><Users className="w-5 h-5 text-black" />ניהול תפקידי משתמש</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
@@ -351,10 +351,10 @@ export default function Settings() {
         </Card>
 
         {/* Company Events (View Only) */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
+        <Card className="border-4 border-black shadow-xl mb-6">
+          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
             <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center gap-2" dir="rtl"><PartyPopper className="w-5 h-5 text-purple-600" />אירועי חברה</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-black" dir="rtl"><PartyPopper className="w-5 h-5 text-black" />אירועי חברה</CardTitle>
               <p className="text-sm text-gray-500" dir="rtl">הוסף אירועים מהעמוד השנתי</p>
             </div>
           </CardHeader>
@@ -378,9 +378,9 @@ export default function Settings() {
         </Card>
 
         {/* Tips & Policy */}
-        <Card className="border-none shadow-lg">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Info className="w-5 h-5 text-blue-600" />טיפים ומדיניות זמינות</CardTitle>
+        <Card className="border-4 border-black shadow-xl">
+          <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
+            <CardTitle className="flex items-center gap-2 text-black" dir="rtl"><Info className="w-5 h-5 text-black" />טיפים ומדיניות זמינות</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
