@@ -339,6 +339,16 @@ export default function Matrix() {
   const handleManualShiftAdd = (worker) => {
     setSelectedWorkerForManual(worker);
     setManualShiftData({ start_time: '', end_time: '', type: 'available' });
+    setEditingShift(null);
+    setShowManualDialog(true);
+  };
+
+  const handleShiftDoubleClick = (e, worker, shift) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setSelectedWorkerForManual(worker);
+    setManualShiftData({ start_time: shift.start_time, end_time: shift.end_time, type: shift.type });
+    setEditingShift(shift);
     setShowManualDialog(true);
   };
 
