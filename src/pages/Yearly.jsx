@@ -448,31 +448,14 @@ export default function Yearly() {
         {/* Events List */}
         <Card className="border-4 border-black shadow-xl bg-white">
           <CardHeader className="border-b-4 border-black bg-gradient-to-r from-green-100 to-white">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-xl text-black" dir="rtl">
-                {selectedCategory ? `אירועים: ${selectedCategory}` : 'אירועים בשבוע הנוכחי'}
-              </CardTitle>
-              {selectedCategory && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setSelectedCategory(null)}
-                  className="border-2 border-black"
-                  dir="rtl"
-                >
-                  הצג הכל
-                </Button>
-              )}
-            </div>
+            <CardTitle className="text-xl text-black" dir="rtl">אירועים בשבוע הנוכחי</CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            {getFilteredEvents().length === 0 ? (
-              <p className="text-center text-gray-500 py-8" dir="rtl">
-                {selectedCategory ? `אין אירועים בקטגוריה "${selectedCategory}"` : 'אין אירועים השבוע'}
-              </p>
+            {events.length === 0 ? (
+              <p className="text-center text-gray-500 py-8" dir="rtl">אין אירועים השבוע</p>
             ) : (
               <div className="space-y-3">
-                {getFilteredEvents().map((event) => {
+                {events.map((event) => {
                   const eventColor = getCategoryColor(event.description);
                   return (
                     <div 
