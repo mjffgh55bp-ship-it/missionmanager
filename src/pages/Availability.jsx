@@ -467,14 +467,14 @@ END:VEVENT
   const availableShifts = selectedShifts.filter(s => s.type === "available").sort((a, b) => (a.priority || 0) - (b.priority || 0));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-white to-green-50 p-2 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Tips Section */}
         {tipsMessage && (
-          <Card className="border-none shadow-lg mb-4">
+          <Card className="border-none shadow-md mb-4 border border-green-100">
             <CardContent className="py-4">
               <div className="flex items-start gap-3">
-                <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <Info className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-semibold text-gray-900 mb-1">נהלי הרשמה ועדכונים</p>
                   <p className="text-sm text-gray-600 whitespace-pre-wrap">{tipsMessage}</p>
@@ -485,8 +485,8 @@ END:VEVENT
         )}
 
         {/* Header */}
-        <Card className="border-none shadow-lg mb-4">
-          <CardHeader className="border-b bg-white py-3 px-4">
+        <Card className="border-none shadow-md mb-4 border border-green-100">
+          <CardHeader className="border-b border-green-100 bg-gradient-to-r from-white to-green-50 py-3 px-4">
             <div className="flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
@@ -527,9 +527,9 @@ END:VEVENT
         </Card>
 
         {!currentWorker ? (
-          <Card className="border-none shadow-lg">
+          <Card className="border-none shadow-md border border-green-100">
             <CardContent className="py-16 text-center">
-              <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <CalendarIcon className="w-16 h-16 text-green-200 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2" dir="rtl">לא נמצא פרופיל עובד</h3>
               <p className="text-gray-600" dir="rtl">האימייל שלך לא משויך לחשבון עובד.</p>
             </CardContent>
@@ -537,8 +537,8 @@ END:VEVENT
         ) : (
           <>
             {/* Unavailable Times Section */}
-            <Card className="border-none shadow-lg mb-4">
-              <CardHeader className="border-b bg-white py-3 px-4">
+            <Card className="border-none shadow-md mb-4 border border-green-100">
+              <CardHeader className="border-b border-green-100 bg-gradient-to-r from-green-50 to-white py-3 px-4">
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-base" dir="rtl">זמנים לא זמינים</CardTitle>
                   <Button onClick={() => setShowUnavailabilityDialog(true)} size="sm" className="bg-red-600 hover:bg-red-700">
@@ -569,10 +569,10 @@ END:VEVENT
 
             {/* Status */}
             {existingAvailability && (
-              <Card className="border-none shadow-lg mb-4">
+              <Card className="border-none shadow-md mb-4 border border-green-100">
                 <CardContent className="py-3 px-4">
                   <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-blue-600" />
+                    <AlertCircle className="w-4 h-4 text-green-600" />
                     <span className="text-sm font-medium">
                       {existingAvailability.status === "approved" ? "אושר" : 
                        existingAvailability.status === "submitted" ? "נשלח" : 
@@ -584,8 +584,8 @@ END:VEVENT
             )}
 
             {/* Shift Selection Grid */}
-            <Card className="border-none shadow-lg mb-4">
-              <CardHeader className="border-b bg-white py-3 px-4">
+            <Card className="border-none shadow-md mb-4 border border-green-100">
+              <CardHeader className="border-b border-green-100 bg-gradient-to-r from-green-50 to-white py-3 px-4">
                 <CardTitle className="text-base" dir="rtl">בחר משמרות (לחץ כדי להחליף: רצוי → זמין → לא זמין)</CardTitle>
               </CardHeader>
               <CardContent className="py-3 px-2">
@@ -652,7 +652,7 @@ END:VEVENT
                       onClick={() => setShowSummary(true)}
                       disabled={selectedShifts.filter(s => s.type !== "unavailable").length === 0}
                       size="sm"
-                      className="bg-blue-900 hover:bg-blue-800"
+                      className="bg-gradient-to-r from-green-400 to-green-300 hover:from-green-500 hover:to-green-400 text-white"
                     >
                       סקור ושלח
                     </Button>
@@ -662,8 +662,8 @@ END:VEVENT
             </Card>
 
             {/* Summary Calendar */}
-            <Card className="border-none shadow-lg">
-              <CardHeader className="border-b bg-white py-3 px-4">
+            <Card className="border-none shadow-md border border-green-100">
+              <CardHeader className="border-b border-green-100 bg-gradient-to-r from-green-50 to-white py-3 px-4">
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-base" dir="rtl">לוח השנה שלי</CardTitle>
                   <div className="flex gap-1 items-center">
@@ -757,7 +757,7 @@ END:VEVENT
           <DialogContent className="sm:max-w-lg">
             <DialogHeader><DialogTitle className="flex items-center gap-2"><Info className="w-5 h-5 text-blue-600" />נהלי הרשמה ועדכונים</DialogTitle></DialogHeader>
             <div className="py-4"><div className="bg-blue-50 border border-blue-200 rounded-lg p-4 whitespace-pre-wrap">{tipsMessage}</div></div>
-            <DialogFooter><Button onClick={() => setShowTipsPopup(false)} className="bg-blue-900 hover:bg-blue-800">Got it</Button></DialogFooter>
+            <DialogFooter><Button onClick={() => setShowTipsPopup(false)} className="bg-gradient-to-r from-green-400 to-green-300 hover:from-green-500 hover:to-green-400 text-white">Got it</Button></DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -828,7 +828,7 @@ END:VEVENT
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowSummary(false)} dir="rtl"><X className="w-4 h-4 mr-2" />חזור</Button>
-              <Button onClick={handleSubmit} className="bg-blue-900 hover:bg-blue-800" dir="rtl"><Check className="w-4 h-4 mr-2" />שלח</Button>
+              <Button onClick={handleSubmit} className="bg-gradient-to-r from-green-400 to-green-300 hover:from-green-500 hover:to-green-400 text-white" dir="rtl"><Check className="w-4 h-4 mr-2" />שלח</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -874,7 +874,7 @@ END:VEVENT
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowChangeRecap(false)} dir="rtl">ביטול</Button>
-              <Button onClick={handleSubmitChangeRequest} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שלח בקשת שינוי</Button>
+              <Button onClick={handleSubmitChangeRequest} className="bg-gradient-to-r from-green-400 to-green-300 hover:from-green-500 hover:to-green-400 text-white" dir="rtl">שלח בקשת שינוי</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
