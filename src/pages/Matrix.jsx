@@ -358,13 +358,29 @@ export default function Matrix() {
     const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForManual.id && a.week_start_date === weekStartDate);
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
 
-    updatedShifts.push({
-      date: dateString,
-      start_time: manualShiftData.start_time,
-      end_time: manualShiftData.end_time,
-      type: manualShiftData.type,
-      priority: updatedShifts.length + 1
-    });
+    if (editingShift) {
+      // Update existing shift
+      updatedShifts = updatedShifts.map(s => {
+        if (s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type) {
+          return {
+            ...s,
+            start_time: manualShiftData.start_time,
+            end_time: manualShiftData.end_time,
+            type: manualShiftData.type
+          };
+        }
+        return s;
+      });
+    } else {
+      // Add new shift
+      updatedShifts.push({
+        date: dateString,
+        start_time: manualShiftData.start_time,
+        end_time: manualShiftData.end_time,
+        type: manualShiftData.type,
+        priority: updatedShifts.length + 1
+      });
+    }
 
     const availData = {
       worker_id: selectedWorkerForManual.id,
@@ -380,6 +396,7 @@ export default function Matrix() {
     setShowManualDialog(false);
     setSelectedWorkerForManual(null);
     setManualShiftData({ start_time: '', end_time: '', type: 'available' });
+    setEditingShift(null);
     loadData();
   };
 
