@@ -102,24 +102,24 @@ export default function Layout({ children }) {
         <Sidebar 
           side="right" 
           collapsible="offcanvas" 
-          className="border-l border-gray-200 z-50 fixed"
+          className="border-l border-gray-200 z-50 fixed w-56"
           onMouseLeave={() => setSidebarOpen(false)}
         >
-          <SidebarHeader className="border-b border-gray-200 p-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex items-center justify-center shadow-lg">
-                <ChefHat className="w-6 h-6 text-white" />
-              </div>
-              <div dir="rtl">
+          <SidebarHeader className="border-b border-gray-200 p-4">
+            <div className="flex flex-col items-end gap-2" dir="rtl">
+              <div className="flex items-center gap-2">
                 <h2 className="font-bold text-gray-900 text-lg">מנהל משימות</h2>
-                <p className="text-xs text-gray-500">ניהול עגלות מזון</p>
+                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex items-center justify-center shadow-lg">
+                  <ChefHat className="w-5 h-5 text-white" />
+                </div>
               </div>
+              <p className="text-xs text-gray-500">ניהול עגלות מזון</p>
             </div>
           </SidebarHeader>
           
-          <SidebarContent className="p-3">
+          <SidebarContent className="p-2">
             <SidebarGroup>
-              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2" dir="rtl">
+              <SidebarGroupLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 py-2 text-right" dir="rtl">
                 ניווט
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -132,9 +132,9 @@ export default function Layout({ children }) {
                           location.pathname === item.url ? 'bg-green-500 text-white hover:bg-green-600 hover:text-white' : ''
                         }`}
                       >
-                        <Link to={item.url} className="flex items-center gap-3 px-3 py-2.5">
-                          <item.icon className="w-5 h-5" />
+                        <Link to={item.url} className="flex items-center gap-2 px-2 py-2 flex-row-reverse justify-end" dir="rtl">
                           <span className="font-medium">{item.title}</span>
+                          <item.icon className="w-4 h-4" />
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
