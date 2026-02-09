@@ -56,7 +56,6 @@ import Settings from './pages/Settings';
 import Workers from './pages/Workers';
 import Yearly from './pages/Yearly';
 import Skeletons from './pages/Skeletons';
-import PersonalAvailability from './pages/PersonalAvailability';
 import __Layout from './Layout.jsx';
 
 
@@ -70,7 +69,6 @@ export const PAGES = {
     "Workers": Workers,
     "Yearly": Yearly,
     "Skeletons": Skeletons,
-    "PersonalAvailability": PersonalAvailability,
 }
 
 export const pagesConfig = {
