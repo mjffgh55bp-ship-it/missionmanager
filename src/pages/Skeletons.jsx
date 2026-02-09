@@ -367,36 +367,83 @@ export default function Skeletons() {
       </div>
 
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle dir="rtl">תבנית חדשה</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <Label dir="rtl">שם התבנית</Label>
-            <Input 
-              value={templateName} 
-              onChange={(e) => setTemplateName(e.target.value)}
-              className="mt-2"
-              dir="rtl"
-              placeholder="הכנס שם..."
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)} dir="rtl">
-              ביטול
-            </Button>
-            <Button 
-              onClick={handleCreateTemplate} 
-              className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
-              disabled={!templateName.trim()}
-              dir="rtl"
-            >
-              <Plus className="w-4 h-4 ml-2" />
-              צור
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
+         <DialogContent className="sm:max-w-md">
+           <DialogHeader>
+             <DialogTitle dir="rtl">תבנית חדשה</DialogTitle>
+           </DialogHeader>
+           <div className="py-4">
+             <Label dir="rtl">שם התבנית</Label>
+             <Input 
+               value={templateName} 
+               onChange={(e) => setTemplateName(e.target.value)}
+               className="mt-2"
+               dir="rtl"
+               placeholder="הכנס שם..."
+             />
+           </div>
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setShowCreateDialog(false)} dir="rtl">
+               ביטול
+             </Button>
+             <Button 
+               onClick={handleCreateTemplate} 
+               className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
+               disabled={!templateName.trim()}
+               dir="rtl"
+             >
+               <Plus className="w-4 h-4 ml-2" />
+               צור
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+
+       <Dialog open={showEditTemplateDialog} onOpenChange={setShowEditTemplateDialog}>
+         <DialogContent className="sm:max-w-md">
+           <DialogHeader>
+             <DialogTitle dir="rtl">הגדרות התבנית</DialogTitle>
+           </DialogHeader>
+           <div className="space-y-4 py-4">
+             <div>
+               <Label dir="rtl">שם התבנית</Label>
+               <Input 
+                 value={editingTemplateName} 
+                 onChange={(e) => setEditingTemplateName(e.target.value)}
+                 className="mt-2"
+                 dir="rtl"
+                 placeholder="שם התבנית..."
+               />
+             </div>
+             <div>
+               <Label dir="rtl">צבע</Label>
+               <div className="flex gap-2 flex-wrap mt-2">
+                 {['#fef3c7', '#fde68a', '#fed7aa', '#d4c5f9', '#bfdbfe', '#c7d2fe', '#dbeafe', '#dcfce7', '#fecaca'].map(color => (
+                   <button
+                     key={color}
+                     className={`w-8 h-8 rounded border-2 ${editingTemplateColor === color ? 'border-black' : 'border-gray-300'}`}
+                     style={{ backgroundColor: color }}
+                     onClick={() => setEditingTemplateColor(color)}
+                   />
+                 ))}
+               </div>
+             </div>
+           </div>
+           <DialogFooter>
+             <Button variant="outline" onClick={() => setShowEditTemplateDialog(false)} dir="rtl">
+               ביטול
+             </Button>
+             <Button 
+               onClick={handleSaveTemplateSettings}
+               className="bg-green-400 hover:bg-green-500 text-black border-2 border-black"
+               disabled={!editingTemplateName.trim()}
+               dir="rtl"
+             >
+               <Save className="w-4 h-4 ml-2" />
+               שמור
+             </Button>
+           </DialogFooter>
+         </DialogContent>
+       </Dialog>
+      </div>
+      );
+      }
