@@ -88,13 +88,12 @@ export default function Layout({ children }) {
           />
           <div 
             className="fixed top-0 right-0 h-full w-56 bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-300"
-            onMouseLeave={() => setSidebarOpen(false)}
           >
             <div className="border-b border-gray-200 p-4">
               <div className="flex flex-col items-end gap-2" dir="rtl">
                 <div className="flex items-center gap-2">
                   <h2 className="font-bold text-gray-900 text-lg">מנהל משימות</h2>
-                  <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex items-center justify-center shadow-lg">
+                  <div className="w-8 h-8 bg-gradient-to-br from-green-300 to-green-200 rounded-xl flex items-center justify-center shadow-lg">
                     <ChefHat className="w-5 h-5 text-white" />
                   </div>
                 </div>
@@ -114,7 +113,7 @@ export default function Layout({ children }) {
                     onClick={() => setSidebarOpen(false)}
                     className={`flex items-center gap-2 px-2 py-2 rounded-lg transition-all duration-200 flex-row-reverse justify-end ${
                       location.pathname === item.url 
-                        ? 'bg-green-500 text-white hover:bg-green-600' 
+                        ? 'bg-green-300 text-gray-800 hover:bg-green-400' 
                         : 'hover:bg-green-50 hover:text-green-700'
                     }`}
                     dir="rtl"
