@@ -99,7 +99,10 @@ export default function Layout({ children }) {
   return (
     <>
       <style>{`
-        * {
+        html, body, * {
+          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        }
+        input, textarea, select, button, div, span, p, h1, h2, h3, h4, h5, h6, a, label, td, th, li {
           font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
       `}</style>
