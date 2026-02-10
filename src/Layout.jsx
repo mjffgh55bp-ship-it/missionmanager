@@ -98,23 +98,42 @@ export default function Layout({ children }) {
 
   return (
     <>
-      <style>{`
-        html, body, *, *::before, *::after {
+      <style dangerouslySetInnerHTML={{__html: `
+        @import url('https://fonts.googleapis.com/css2?family=Calibri&display=swap');
+        
+        html {
           font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
-        input, textarea, select, button, div, span, p, h1, h2, h3, h4, h5, h6, a, label, td, th, li, ul, ol {
+        
+        body {
           font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
-        [class*="text"], [class*="font"], [class*="title"], [class*="label"], [class*="badge"], [class*="button"] {
+        
+        * {
           font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
-        .text-xs, .text-sm, .text-base, .text-lg, .text-xl, .text-2xl, .text-3xl {
+        
+        *::before, *::after {
           font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
-        .font-normal, .font-medium, .font-semibold, .font-bold {
+        
+        div, span, p, a, label, input, textarea, select, button, 
+        h1, h2, h3, h4, h5, h6, 
+        td, th, tr, table,
+        li, ul, ol,
+        header, footer, section, article, nav,
+        form, fieldset, legend {
           font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
-      `}</style>
+        
+        [class] {
+          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        }
+        
+        [style] {
+          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        }
+      `}} />
       <div className="min-h-screen w-full bg-gray-50 relative" dir="rtl">
       {/* Floating Sidebar */}
       {sidebarOpen && (
