@@ -157,7 +157,7 @@ export default function Yearly() {
   };
 
   const handleSaveEvent = async () => {
-    const workerNames = eventForm.worker_ids.map(id => workers.find(w => w.id === id)?.full_name).filter(Boolean);
+    const workerNames = eventForm.worker_ids.map(id => workers.find(w => w.id === id)?.nickname).filter(Boolean);
     const data = {
       row_id: selectedCell.rowId,
       start_date: eventForm.start_date,
@@ -544,8 +544,8 @@ export default function Yearly() {
                           return (
                             <div key={unavail.id || idx} className="absolute top-1 rounded bg-red-500 flex items-center justify-center text-white text-[8px] font-medium px-1 z-10"
                               style={{ right: `${dateIdx * CELL_WIDTH}px`, width: `${CELL_WIDTH - 2}px`, height: EVENT_HEIGHT }}
-                              title={`${worker?.full_name || 'Unknown'}: ${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}>
-                              <span className="truncate">{worker?.full_name?.split(' ')[0] || '?'}</span>
+                              title={`${worker?.nickname || 'Unknown'}: ${unavail.start_time}-${unavail.end_time} (${unavail.reason})`}>
+                              <span className="truncate">{worker?.nickname?.split(' ')[0] || '?'}</span>
                             </div>
                           );
                         })}
@@ -641,7 +641,7 @@ export default function Yearly() {
                       }}
                       className="rounded"
                     />
-                    <span className="text-sm">{w.full_name}</span>
+                    <span className="text-sm">{w.nickname}</span>
                   </label>
                 ))}
                 {filteredWorkersForDialog.length === 0 && <p className="text-xs text-gray-500">אין עובדים תואמים</p>}
