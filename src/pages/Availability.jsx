@@ -68,10 +68,10 @@ export default function Availability() {
     setCurrentUser(user);
     
     const workersData = await base44.entities.Worker.filter({ active: true });
-    // Sort workers by full_name, handling undefined values
+    // Sort workers by nickname, handling undefined values
     workersData.sort((a, b) => {
-      const nameA = a.full_name || "";
-      const nameB = b.full_name || "";
+      const nameA = a.nickname || "";
+      const nameB = b.nickname || "";
       return nameA.localeCompare(nameB);
     });
     setWorkers(workersData);
@@ -206,7 +206,7 @@ export default function Availability() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const availabilityData = {
       worker_id: currentWorker.id,
-      worker_name: currentWorker.full_name,
+      worker_name: currentWorker.nickname,
       week_start_date: weekStartStr,
       shifts: selectedShifts,
       status: "submitted",
@@ -275,7 +275,7 @@ export default function Availability() {
     for (const dateStr of datesToAdd) {
       const created = await base44.entities.Unavailability.create({
         worker_id: currentWorker.id,
-        worker_name: currentWorker.full_name,
+        worker_name: currentWorker.nickname,
         date: dateStr,
         start_time: unavailabilityForm.start_time,
         end_time: unavailabilityForm.end_time,
