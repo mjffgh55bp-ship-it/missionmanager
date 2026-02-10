@@ -472,15 +472,15 @@ export default function Reports() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50">
-                    <TableHead><SortButton column="name" label="שם עובד" /></TableHead>
-                    <TableHead><SortButton column="role" label="תפקיד" /></TableHead>
-                    <TableHead><SortButton column="seniority" label="וותק" /></TableHead>
-                    <TableHead><SortButton column="isFullTime" label="סוג" /></TableHead>
-                    <TableHead><SortButton column="totalHours" label="סה\"כ שעות" /></TableHead>
-                    <TableHead><SortButton column="shifts" label="סה\"כ משמרות" /></TableHead>
-                    <TableHead><SortButton column="avgHoursPerShift" label="ממוצע שעות/משמרת" /></TableHead>
-                    <TableHead><SortButton column="lastShift" label="משמרת אחרונה" /></TableHead>
-                    <TableHead><SortButton column="active" label="סטטוס" /></TableHead>
+                    <TableHead><SortButton column="name" label='שם עובד' /></TableHead>
+                    <TableHead><SortButton column="role" label='תפקיד' /></TableHead>
+                    <TableHead><SortButton column="seniority" label='וותק' /></TableHead>
+                    <TableHead><SortButton column="isFullTime" label='סוג' /></TableHead>
+                    <TableHead><SortButton column="totalHours" label='סה"כ שעות' /></TableHead>
+                    <TableHead><SortButton column="shifts" label='סה"כ משמרות' /></TableHead>
+                    <TableHead><SortButton column="avgHoursPerShift" label='ממוצע שעות/משמרת' /></TableHead>
+                    <TableHead><SortButton column="lastShift" label='משמרת אחרונה' /></TableHead>
+                    <TableHead><SortButton column="active" label='סטטוס' /></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
