@@ -218,7 +218,7 @@ export default function Settings() {
               <p className="text-sm font-semibold mb-3" dir="rtl">תתי-סוגי עמודות (לכל סוג עמודה)</p>
               <div className="flex gap-2 mb-4">
                 <Select value={selectedColTypeForSubType} onValueChange={setSelectedColTypeForSubType}>
-                  <SelectTrigger className="w-40"><SelectValue placeholder="Select type..." /></SelectTrigger>
+                  <SelectTrigger className="w-40"><SelectValue placeholder="בחר סוג..." /></SelectTrigger>
                   <SelectContent>
                     {columnTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
@@ -290,7 +290,7 @@ export default function Settings() {
                 <p className="text-sm font-semibold mb-3" dir="rtl">תתי-סוגים (לכל סוג פרמטר)</p>
                 <div className="flex gap-2 mb-4">
                   <Select value={selectedTypeForSubType} onValueChange={setSelectedTypeForSubType}>
-                    <SelectTrigger className="w-40"><SelectValue placeholder="Select type..." /></SelectTrigger>
+                    <SelectTrigger className="w-40"><SelectValue placeholder="בחר סוג..." /></SelectTrigger>
                     <SelectContent>
                       {[...timeParamTypes, ...countParamTypes].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
@@ -330,7 +330,7 @@ export default function Settings() {
                 {workers.filter(w => w.email).map((worker) => (
                   <div key={worker.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">{worker.full_name}</p>
+                      <p className="font-medium text-gray-900">{worker.nickname}</p>
                       <p className="text-sm text-gray-600">{worker.email}</p>
                     </div>
                     <Select value={userRoles[worker.email] || "user"} onValueChange={(value) => handleRoleChange(worker.email, value)}>

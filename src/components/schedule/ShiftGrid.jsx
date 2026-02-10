@@ -71,9 +71,9 @@ export default function ShiftGrid({ carts, shiftTimes, assignments, onAddShift, 
                         className={`cursor-pointer border rounded-lg p-3 hover:opacity-90 transition-all ${getShiftBackgroundColor(assignment)}`}
                       >
                         {assignment.has_trainee && (
-                          <div className="flex items-center gap-1 mb-2 text-xs text-orange-700 font-medium">
+                          <div className="flex items-center gap-1 mb-2 text-xs text-orange-700 font-medium" dir="rtl">
                             <GraduationCap className="w-3 h-3" />
-                            Training Session
+                            הכשרה
                           </div>
                         )}
                         {assignment.menu && (
@@ -90,11 +90,11 @@ export default function ShiftGrid({ carts, shiftTimes, assignments, onAddShift, 
                                 <span className={`font-medium text-sm ${getWorkerNameColor(assignment.chef_seniority)}`}>
                                   {assignment.chef_name}
                                 </span>
-                                <Badge variant="outline" className="text-xs">Chef</Badge>
+                                <Badge variant="outline" className="text-xs" dir="rtl">טבח ראשי</Badge>
                               </>
                             ) : (
                               <>
-                                <span className="text-sm text-gray-400">No chef</span>
+                                <span className="text-sm text-gray-400" dir="rtl">אין טבח ראשי</span>
                                 <AlertTriangle className="w-4 h-4 text-red-500" />
                               </>
                             )}
@@ -107,11 +107,11 @@ export default function ShiftGrid({ carts, shiftTimes, assignments, onAddShift, 
                                 <span className={`font-medium text-sm ${getWorkerNameColor(assignment.sous_chef_seniority)}`}>
                                   {assignment.sous_chef_name}
                                 </span>
-                                <Badge variant="outline" className="text-xs">Sous-Chef</Badge>
+                                <Badge variant="outline" className="text-xs" dir="rtl">עוזר טבח</Badge>
                               </>
                             ) : (
                               <>
-                                <span className="text-sm text-gray-400">No sous-chef</span>
+                                <span className="text-sm text-gray-400" dir="rtl">אין עוזר טבח</span>
                                 <AlertTriangle className="w-4 h-4 text-red-500" />
                               </>
                             )}
@@ -123,7 +123,7 @@ export default function ShiftGrid({ carts, shiftTimes, assignments, onAddShift, 
                               <span className="font-medium text-sm text-gray-700">
                                 {assignment.additional_chef_name}
                               </span>
-                              <Badge variant="outline" className="text-xs">Additional</Badge>
+                              <Badge variant="outline" className="text-xs" dir="rtl">נוסף</Badge>
                             </div>
                           )}
                         </div>
@@ -132,8 +132,8 @@ export default function ShiftGrid({ carts, shiftTimes, assignments, onAddShift, 
                         </Badge>
                       </div>
                     ) : (
-                      <div className="text-center py-4 text-gray-400 text-sm">
-                        Not assigned
+                      <div className="text-center py-4 text-gray-400 text-sm" dir="rtl">
+                        לא משובץ
                       </div>
                     )}
                   </div>

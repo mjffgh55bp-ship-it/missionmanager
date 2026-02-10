@@ -100,7 +100,7 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
     const guides = allWorkers.filter(w => w.is_guide);
 
     if (trainees.length > 0 && guides.length === 0) {
-      setValidationError("Trainees must work with a Guide");
+      setValidationError("מתלמדים חייבים לעבוד עם מדריך");
       return false;
     }
 
@@ -163,13 +163,13 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
     const assignmentData = {
       date: selectedShift.date,
       chef_id: formData.chef_id || null,
-      chef_name: chef ? chef.full_name : null,
+      chef_name: chef ? chef.nickname : null,
       chef_seniority: chef ? chef.seniority : null,
       sous_chef_id: formData.sous_chef_id || null,
-      sous_chef_name: sousChef ? sousChef.full_name : null,
+      sous_chef_name: sousChef ? sousChef.nickname : null,
       sous_chef_seniority: sousChef ? sousChef.seniority : null,
       additional_chef_id: formData.additional_chef_id || null,
-      additional_chef_name: additionalChef ? additionalChef.full_name : null,
+      additional_chef_name: additionalChef ? additionalChef.nickname : null,
       additional_chef_role: additionalChef ? additionalChef.role : null,
       food_cart_id: selectedShift.food_cart_id,
       food_cart_name: selectedCart.name,
@@ -216,9 +216,9 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
         <div className="flex items-center gap-2">
           {available && <Check className="w-3 h-3 text-green-600" />}
           {priority && priority <= 3 && <Star className="w-3 h-3 text-amber-500 fill-amber-500" />}
-          <span>{worker.full_name}</span>
-          <Badge variant="outline" className="text-xs ml-2">{worker.seniority}</Badge>
-          {worker.is_guide && <Badge className="text-xs bg-yellow-100 text-yellow-800">Guide</Badge>}
+          <span>{worker.nickname}</span>
+          <Badge variant="outline" className="text-xs ml-2" dir="rtl">{worker.seniority}</Badge>
+          {worker.is_guide && <Badge className="text-xs bg-yellow-100 text-yellow-800" dir="rtl">מדריך</Badge>}
           {priority && <Badge variant="outline" className="text-xs">P{priority}</Badge>}
         </div>
       </SelectItem>
@@ -229,8 +229,8 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {selectedShift.id ? "Edit Assignment" : "New Assignment"}
+          <DialogTitle dir="rtl">
+            {selectedShift.id ? "עריכת שיבוץ" : "שיבוץ חדש"}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -242,16 +242,16 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
           )}
 
           <div>
-            <Label>Chef *</Label>
+            <Label dir="rtl">טבח ראשי *</Label>
             <Select 
               value={formData.chef_id} 
               onValueChange={(value) => setFormData({ ...formData, chef_id: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select chef" />
+                <SelectValue placeholder="בחר טבח ראשי" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={null}>None</SelectItem>
+                <SelectItem value={null} dir="rtl">ללא</SelectItem>
                 {chefs.map((worker) => (
                   <WorkerSelectItem key={worker.id} worker={worker} />
                 ))}
@@ -260,16 +260,16 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
           </div>
 
           <div>
-            <Label>Sous-Chef *</Label>
+            <Label dir="rtl">עוזר טבח *</Label>
             <Select 
               value={formData.sous_chef_id} 
               onValueChange={(value) => setFormData({ ...formData, sous_chef_id: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select sous-chef" />
+                <SelectValue placeholder="בחר עוזר טבח" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={null}>None</SelectItem>
+                <SelectItem value={null} dir="rtl">ללא</SelectItem>
                 {sousChefs.map((worker) => (
                   <WorkerSelectItem key={worker.id} worker={worker} />
                 ))}
@@ -278,16 +278,16 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
           </div>
 
           <div>
-            <Label>Additional Chef (Optional)</Label>
+            <Label dir="rtl">טבח נוסף (אופציונלי)</Label>
             <Select 
               value={formData.additional_chef_id} 
               onValueChange={(value) => setFormData({ ...formData, additional_chef_id: value })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select additional chef (optional)" />
+                <SelectValue placeholder="בחר טבח נוסף (אופציונלי)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={null}>None</SelectItem>
+                <SelectItem value={null} dir="rtl">ללא</SelectItem>
                 {additionalOptions.map((worker) => (
                   <WorkerSelectItem key={worker.id} worker={worker} />
                 ))}
@@ -296,18 +296,19 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
           </div>
 
           <div>
-            <Label>Menu (One Word)</Label>
+            <Label dir="rtl">תפריט (מילה אחת)</Label>
             <Input
               value={formData.menu}
               onChange={(e) => setFormData({ ...formData, menu: e.target.value })}
-              placeholder="e.g., Tacos, Burgers, Sushi"
+              placeholder="לדוגמה: טאקו, המבורגרים, סושי"
               maxLength={20}
+              dir="rtl"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Start Time *</Label>
+              <Label dir="rtl">שעת התחלה *</Label>
               <Input
                 type="time"
                 value={formData.start_time}
@@ -315,7 +316,7 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
               />
             </div>
             <div>
-              <Label>End Time *</Label>
+              <Label dir="rtl">שעת סיום *</Label>
               <Input
                 type="time"
                 value={formData.end_time}
@@ -324,7 +325,7 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
             </div>
           </div>
           <div>
-            <Label>Hours</Label>
+            <Label dir="rtl">שעות</Label>
             <Input
               type="number"
               step="0.5"
@@ -334,12 +335,13 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
             />
           </div>
           <div>
-            <Label>Notes</Label>
+            <Label dir="rtl">הערות</Label>
             <Textarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Any additional notes..."
+              placeholder="הערות נוספות..."
               rows={3}
+              dir="rtl"
             />
           </div>
         </div>
@@ -349,8 +351,9 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
               variant="destructive" 
               onClick={handleDelete}
               className="w-full sm:w-auto"
+              dir="rtl"
             >
-              Delete
+              מחק
             </Button>
           )}
           <div className="flex gap-2 w-full sm:w-auto">
@@ -358,15 +361,17 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
               variant="outline" 
               onClick={() => onOpenChange(false)}
               className="flex-1 sm:flex-none"
+              dir="rtl"
             >
-              Cancel
+              ביטול
             </Button>
             <Button 
               onClick={handleSubmit}
               disabled={!formData.start_time || !formData.end_time || !!validationError}
               className="bg-blue-900 hover:bg-blue-800 flex-1 sm:flex-none"
+              dir="rtl"
             >
-              {selectedShift.id ? "Update" : "Create"}
+              {selectedShift.id ? "עדכן" : "צור"}
             </Button>
           </div>
         </DialogFooter>

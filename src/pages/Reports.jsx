@@ -81,7 +81,7 @@ export default function Reports() {
     const totalShifts = workerAssignments.length;
     return {
       id: worker.id,
-      name: worker.full_name,
+      name: worker.nickname,
       role: worker.role,
       seniority: worker.seniority,
       isFullTime: worker.is_full_time,
@@ -107,8 +107,8 @@ export default function Reports() {
   const chartData = workerHours.sort((a, b) => b.totalHours - a.totalHours).slice(0, 10).map(w => ({ name: w.name, hours: w.totalHours }));
 
   const roleData = [
-    { name: 'Chefs', value: workers.filter(w => w.role === 'chef' && w.active).length },
-    { name: 'Sous-Chefs', value: workers.filter(w => w.role === 'sous_chef' && w.active).length }
+    { name: 'טבחים ראשיים', value: workers.filter(w => w.role === 'chef' && w.active).length },
+    { name: 'עוזרי טבח', value: workers.filter(w => w.role === 'sous_chef' && w.active).length }
   ];
 
   const totalHours = assignments.reduce((sum, a) => sum + (a.hours || 0), 0);
@@ -218,7 +218,7 @@ export default function Reports() {
   });
 
   const SortButton = ({ column, label }) => (
-    <Button variant="ghost" size="sm" className="h-8 hover:bg-gray-100" onClick={() => handleSort(column)}>
+    <Button variant="ghost" size="sm" className="h-8 hover:bg-gray-100" onClick={() => handleSort(column)} dir="rtl">
       {label}<ArrowUpDown className="ml-2 h-3 w-3" />
     </Button>
   );
@@ -276,58 +276,64 @@ export default function Reports() {
           <Card className="border-none shadow-lg mb-8">
             <CardHeader className="border-b">
               <div className="flex justify-between items-start flex-wrap gap-4">
-                <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5 text-green-600" />Hours by Sub-Type</CardTitle>
+                <CardTitle className="flex items-center gap-2" dir="rtl"><Clock className="w-5 h-5 text-green-600" />שעות לפי תת-סוג</CardTitle>
 
                 <div className="flex flex-wrap gap-2">
                   <Button 
                     variant={dateFilterMode === 'all' ? 'default' : 'outline'} 
                     size="sm"
                     onClick={() => setDateFilterMode('all')}
+                    dir="rtl"
                   >
-                    All Time
+                    כל הזמן
                   </Button>
                   <Button 
                     variant={dateFilterMode === 'daily' ? 'default' : 'outline'} 
                     size="sm"
                     onClick={() => setDateFilterMode('daily')}
+                    dir="rtl"
                   >
-                    Today
+                    היום
                   </Button>
                   <Button 
                     variant={dateFilterMode === 'week' ? 'default' : 'outline'} 
                     size="sm"
                     onClick={() => setDateFilterMode('week')}
+                    dir="rtl"
                   >
-                    This Week
+                    השבוע
                   </Button>
                   <Button 
                     variant={dateFilterMode === 'month' ? 'default' : 'outline'} 
                     size="sm"
                     onClick={() => setDateFilterMode('month')}
+                    dir="rtl"
                   >
-                    This Month
+                    החודש
                   </Button>
                   <Button 
                     variant={dateFilterMode === 'half_year' ? 'default' : 'outline'} 
                     size="sm"
                     onClick={() => setDateFilterMode('half_year')}
+                    dir="rtl"
                   >
-                    Half Year
+                    חצי שנה
                   </Button>
                   <Button 
                     variant={dateFilterMode === 'custom' ? 'default' : 'outline'} 
                     size="sm"
                     onClick={() => setDateFilterMode('custom')}
+                    dir="rtl"
                   >
-                    Custom
+                    מותאם אישית
                   </Button>
                 </div>
               </div>
 
               {dateFilterMode === 'custom' && (
                 <div className="flex gap-2 mt-3">
-                  <div><Label className="text-xs">Start Date</Label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-8" /></div>
-                  <div><Label className="text-xs">End Date</Label><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-8" /></div>
+                  <div><Label className="text-xs" dir="rtl">תאריך התחלה</Label><Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-8" /></div>
+                  <div><Label className="text-xs" dir="rtl">תאריך סיום</Label><Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-8" /></div>
                 </div>
               )}
 
@@ -335,28 +341,28 @@ export default function Reports() {
                 <Select value={workerFilters.category} onValueChange={(v) => setWorkerFilters({...workerFilters, category: v})}>
                   <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">All Categories</SelectItem>
-                    <SelectItem value="category_1">{categoryNames.category_1}</SelectItem>
-                    <SelectItem value="category_2">{categoryNames.category_2}</SelectItem>
-                    <SelectItem value="category_3">{categoryNames.category_3}</SelectItem>
+                    <SelectItem value="__all__" dir="rtl">כל הקטגוריות</SelectItem>
+                    <SelectItem value="category_1" dir="rtl">{categoryNames.category_1}</SelectItem>
+                    <SelectItem value="category_2" dir="rtl">{categoryNames.category_2}</SelectItem>
+                    <SelectItem value="category_3" dir="rtl">{categoryNames.category_3}</SelectItem>
                   </SelectContent>
                 </Select>
 
                 <Select value={workerFilters.guide} onValueChange={(v) => setWorkerFilters({...workerFilters, guide: v})}>
                   <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">All Guides</SelectItem>
-                    <SelectItem value="yes">Guides Only</SelectItem>
-                    <SelectItem value="no">Non-Guides</SelectItem>
+                    <SelectItem value="__all__" dir="rtl">כל המדריכים</SelectItem>
+                    <SelectItem value="yes" dir="rtl">מדריכים בלבד</SelectItem>
+                    <SelectItem value="no" dir="rtl">לא מדריכים</SelectItem>
                   </SelectContent>
                 </Select>
 
                 <Select value={workerFilters.role} onValueChange={(v) => setWorkerFilters({...workerFilters, role: v})}>
                   <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">All Roles</SelectItem>
-                    <SelectItem value="chef">Chef</SelectItem>
-                    <SelectItem value="sous_chef">Sous-Chef</SelectItem>
+                    <SelectItem value="__all__" dir="rtl">כל התפקידים</SelectItem>
+                    <SelectItem value="chef" dir="rtl">טבח ראשי</SelectItem>
+                    <SelectItem value="sous_chef" dir="rtl">עוזר טבח</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -366,21 +372,21 @@ export default function Reports() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Worker</TableHead>
-                      {allSubTypes.map(st => <TableHead key={st}>{st}</TableHead>)}
+                      <TableHead dir="rtl">עובד</TableHead>
+                      {allSubTypes.map(st => <TableHead key={st} dir="rtl">{st}</TableHead>)}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredWorkersForSubTypes.map(worker => (
                       <TableRow key={worker.id}>
-                        <TableCell className="font-medium">{worker.full_name}</TableCell>
+                        <TableCell className="font-medium">{worker.nickname}</TableCell>
                         {allSubTypes.map(st => (
                           <TableCell key={st}>{getWorkerHoursBySubType(worker.id, st)}h</TableCell>
                         ))}
                       </TableRow>
                     ))}
                     <TableRow className="bg-gray-100 font-semibold">
-                      <TableCell>Total</TableCell>
+                      <TableCell dir="rtl">סה"כ</TableCell>
                       {allSubTypes.map(st => {
                         const total = filteredWorkersForSubTypes.reduce((sum, w) => sum + getWorkerHoursBySubType(w.id, st), 0);
                         return <TableCell key={st}>{total}h</TableCell>;
@@ -395,33 +401,33 @@ export default function Reports() {
 
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
           <Card className="border-none shadow-lg">
-            <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><Calculator className="w-5 h-5 text-blue-900" />Full-Time Calculator (Manual)</CardTitle></CardHeader>
+            <CardHeader className="border-b"><CardTitle className="flex items-center gap-2" dir="rtl"><Calculator className="w-5 h-5 text-blue-900" />מחשבון משרה מלאה (ידני)</CardTitle></CardHeader>
             <CardContent className="pt-6">
               <div className="space-y-4">
-                <div><Label>Hours from Full-Time Workers</Label><Input type="number" value={fullTimeHours} onChange={(e) => setFullTimeHours(parseFloat(e.target.value) || 0)} /></div>
-                <div><Label>Shifts from Full-Time Workers</Label><Input type="number" value={fullTimeShifts} onChange={(e) => setFullTimeShifts(parseInt(e.target.value) || 0)} /></div>
+                <div><Label dir="rtl">שעות מעובדי משרה מלאה</Label><Input type="number" value={fullTimeHours} onChange={(e) => setFullTimeHours(parseFloat(e.target.value) || 0)} dir="rtl" /></div>
+                <div><Label dir="rtl">משמרות מעובדי משרה מלאה</Label><Input type="number" value={fullTimeShifts} onChange={(e) => setFullTimeShifts(parseInt(e.target.value) || 0)} dir="rtl" /></div>
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-sm font-semibold text-gray-900 mb-2">Part-Time Needed:</p>
+                  <p className="text-sm font-semibold text-gray-900 mb-2" dir="rtl">נדרש משרה חלקית:</p>
                   <p className="text-2xl font-bold text-blue-900">{Math.max(0, manualPartTimeHours)}h</p>
-                  <p className="text-sm text-gray-600 mt-1">{Math.max(0, manualPartTimeShifts)} shifts</p>
+                  <p className="text-sm text-gray-600 mt-1" dir="rtl">{Math.max(0, manualPartTimeShifts)} משמרות</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="border-none shadow-lg">
-            <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><Calculator className="w-5 h-5 text-green-600" />Full-Time Calculator (Auto)</CardTitle></CardHeader>
+            <CardHeader className="border-b"><CardTitle className="flex items-center gap-2" dir="rtl"><Calculator className="w-5 h-5 text-green-600" />מחשבון משרה מלאה (אוטומטי)</CardTitle></CardHeader>
             <CardContent className="pt-6">
               <div className="space-y-4">
                 <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-sm font-semibold mb-2">Full-Time ({fullTimeWorkerCount}):</p>
+                  <p className="text-sm font-semibold mb-2" dir="rtl">משרה מלאה ({fullTimeWorkerCount}):</p>
                   <p className="text-2xl font-bold text-green-600">{fullTimeHoursTotal}h</p>
-                  <p className="text-sm text-gray-600 mt-1">{fullTimeShiftsTotal} shifts</p>
+                  <p className="text-sm text-gray-600 mt-1" dir="rtl">{fullTimeShiftsTotal} משמרות</p>
                 </div>
                 <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <p className="text-sm font-semibold mb-2">Part-Time Needed:</p>
+                  <p className="text-sm font-semibold mb-2" dir="rtl">נדרש משרה חלקית:</p>
                   <p className="text-2xl font-bold text-amber-600">{Math.max(0, partTimeHoursNeeded)}h</p>
-                  <p className="text-sm text-gray-600 mt-1">{Math.max(0, partTimeShiftsNeeded)} shifts</p>
+                  <p className="text-sm text-gray-600 mt-1" dir="rtl">{Math.max(0, partTimeShiftsNeeded)} משמרות</p>
                 </div>
               </div>
             </CardContent>
@@ -430,7 +436,7 @@ export default function Reports() {
 
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
           <Card className="border-none shadow-lg">
-            <CardHeader className="border-b"><CardTitle>Hours by Worker</CardTitle></CardHeader>
+            <CardHeader className="border-b"><CardTitle dir="rtl">שעות לפי עובד</CardTitle></CardHeader>
             <CardContent className="pt-6">
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData}>
@@ -445,7 +451,7 @@ export default function Reports() {
           </Card>
 
           <Card className="border-none shadow-lg">
-            <CardHeader className="border-b"><CardTitle>Team Composition</CardTitle></CardHeader>
+            <CardHeader className="border-b"><CardTitle dir="rtl">הרכב צוות</CardTitle></CardHeader>
             <CardContent className="pt-6">
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
@@ -460,35 +466,35 @@ export default function Reports() {
         </div>
 
         <Card className="border-none shadow-lg">
-          <CardHeader className="border-b"><CardTitle className="flex items-center gap-2"><Calendar className="w-5 h-5 text-blue-900" />Hours Matrix - All Workers</CardTitle></CardHeader>
+          <CardHeader className="border-b"><CardTitle className="flex items-center gap-2" dir="rtl"><Calendar className="w-5 h-5 text-blue-900" />מטריצת שעות - כל העובדים</CardTitle></CardHeader>
           <CardContent className="pt-6">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50">
-                    <TableHead><SortButton column="name" label="Worker Name" /></TableHead>
-                    <TableHead><SortButton column="role" label="Role" /></TableHead>
-                    <TableHead><SortButton column="seniority" label="Seniority" /></TableHead>
-                    <TableHead><SortButton column="isFullTime" label="Type" /></TableHead>
-                    <TableHead><SortButton column="totalHours" label="Total Hours" /></TableHead>
-                    <TableHead><SortButton column="shifts" label="Total Shifts" /></TableHead>
-                    <TableHead><SortButton column="avgHoursPerShift" label="Avg Hours/Shift" /></TableHead>
-                    <TableHead><SortButton column="lastShift" label="Last Shift" /></TableHead>
-                    <TableHead><SortButton column="active" label="Status" /></TableHead>
+                    <TableHead><SortButton column="name" label="שם עובד" /></TableHead>
+                    <TableHead><SortButton column="role" label="תפקיד" /></TableHead>
+                    <TableHead><SortButton column="seniority" label="וותק" /></TableHead>
+                    <TableHead><SortButton column="isFullTime" label="סוג" /></TableHead>
+                    <TableHead><SortButton column="totalHours" label="סה\"כ שעות" /></TableHead>
+                    <TableHead><SortButton column="shifts" label="סה\"כ משמרות" /></TableHead>
+                    <TableHead><SortButton column="avgHoursPerShift" label="ממוצע שעות/משמרת" /></TableHead>
+                    <TableHead><SortButton column="lastShift" label="משמרת אחרונה" /></TableHead>
+                    <TableHead><SortButton column="active" label="סטטוס" /></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedWorkerHours.map((worker) => (
                     <TableRow key={worker.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">{worker.name}</TableCell>
-                      <TableCell><Badge className={worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'}>{worker.role === 'chef' ? 'Chef' : 'Sous-Chef'}</Badge></TableCell>
+                      <TableCell><Badge className={worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'} dir="rtl">{worker.role === 'chef' ? 'טבח ראשי' : 'עוזר טבח'}</Badge></TableCell>
                       <TableCell><Badge className={getSeniorityInfo(worker.seniority).color}>{getSeniorityInfo(worker.seniority).label}</Badge></TableCell>
-                      <TableCell><Badge variant={worker.isFullTime ? "default" : "outline"} className={worker.isFullTime ? "bg-green-600" : ""}>{worker.isFullTime ? "Full-Time" : "Part-Time"}</Badge></TableCell>
+                      <TableCell><Badge variant={worker.isFullTime ? "default" : "outline"} className={worker.isFullTime ? "bg-green-600" : ""} dir="rtl">{worker.isFullTime ? "משרה מלאה" : "משרה חלקית"}</Badge></TableCell>
                       <TableCell className="font-semibold text-blue-900">{worker.totalHours}h</TableCell>
                       <TableCell>{worker.shifts}</TableCell>
                       <TableCell>{worker.avgHoursPerShift.toFixed(1)}h</TableCell>
-                      <TableCell>{worker.lastShift ? <div className="flex items-center gap-2"><Calendar className="w-3 h-3 text-gray-400" /><span className="text-sm">{format(parseISO(worker.lastShift), "MMM d, yyyy")}</span></div> : <span className="text-sm text-gray-400">No shifts</span>}</TableCell>
-                      <TableCell><Badge variant={worker.active ? "default" : "secondary"}>{worker.active ? "Active" : "Inactive"}</Badge></TableCell>
+                      <TableCell>{worker.lastShift ? <div className="flex items-center gap-2"><Calendar className="w-3 h-3 text-gray-400" /><span className="text-sm">{format(parseISO(worker.lastShift), "MMM d, yyyy")}</span></div> : <span className="text-sm text-gray-400" dir="rtl">אין משמרות</span>}</TableCell>
+                      <TableCell><Badge variant={worker.active ? "default" : "secondary"} dir="rtl">{worker.active ? "פעיל" : "לא פעיל"}</Badge></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
