@@ -525,11 +525,11 @@ END:VEVENT
                   </p>
                 </div>
                 <div className="flex gap-1">
-                  <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(addDays(weekStart, -7), { weekStartsOn: 0 }))}>
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
                   <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(addDays(weekStart, 7), { weekStartsOn: 0 }))}>
                     <ChevronRight className="w-4 h-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(addDays(weekStart, -7), { weekStartsOn: 0 }))}>
+                    <ChevronLeft className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
@@ -717,12 +717,12 @@ END:VEVENT
                     <Button variant="outline" size="sm" onClick={generateICSFile} title="סנכרן ללוח השנה בטלפון">
                       <Download className="w-4 h-4" />
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
-                      <ChevronLeft className="w-4 h-4" />
-                    </Button>
-                    <span className="px-2 py-1 text-sm font-medium" dir="rtl">{formatDateHebrew(calendarMonth, "monthYear")}</span>
                     <Button variant="outline" size="sm" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
                       <ChevronRight className="w-4 h-4" />
+                    </Button>
+                    <span className="px-2 py-1 text-sm font-medium" dir="rtl">{formatDateHebrew(calendarMonth, "monthYear")}</span>
+                    <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
+                      <ChevronLeft className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
