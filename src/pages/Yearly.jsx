@@ -55,17 +55,45 @@ export default function Yearly() {
   useEffect(() => {
     if (!loading && scrollContainerRef.current) {
       setTimeout(() => {
-        const today = format(new Date(), "yyyy-MM-dd");
-        const yearStart = new Date(currentYear, 0, 1);
-        const todayDate = new Date();
-        const daysDiff = Math.floor((todayDate - yearStart) / (1000 * 60 * 60 * 24));
-        if (daysDiff >= 0 && todayDate.getFullYear() === currentYear) {
-          const scrollPosition = daysDiff * CELL_WIDTH - (scrollContainerRef.current.clientWidth / 2) + (CELL_WIDTH / 2);
-          scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
+        // Load saved scroll position from localStorage
+        const savedScrollPosition = localStorage.getItem(`yearly_scroll_${currentYear}`);
+        if (savedScrollPosition !== null) {
+          scrollContainerRef.current.scrollLeft = parseInt(savedScrollPosition, 10);
+        } else {
+          // If no saved position, center on today
+          scrollToToday();
         }
       }, 100);
     }
   }, [loading, currentYear]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (scrollContainerRef.current) {
+        localStorage.setItem(`yearly_scroll_${currentYear}`, scrollContainerRef.current.scrollLeft.toString());
+      }
+    };
+
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [currentYear, loading]);
+
+  const scrollToToday = () => {
+    if (!scrollContainerRef.current) return;
+    const yearStart = new Date(currentYear, 0, 1);
+    const todayDate = new Date();
+    const daysDiff = Math.floor((todayDate - yearStart) / (1000 * 60 * 60 * 24));
+    if (daysDiff >= 0 && todayDate.getFullYear() === currentYear) {
+      // Center from the right (RTL): total width - day position - half viewport width + half cell width
+      const totalWidth = scrollContainerRef.current.scrollWidth;
+      const dayPosition = (yearDays.length - daysDiff - 1) * CELL_WIDTH;
+      const scrollPosition = totalWidth - dayPosition - (scrollContainerRef.current.clientWidth / 2) - (CELL_WIDTH / 2);
+      scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -326,6 +354,7 @@ export default function Yearly() {
             <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[100px] text-center">{currentYear}</div>
             <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronLeft className="w-4 h-4" /></Button>
             <Button variant="outline" onClick={() => setCurrentYear(new Date().getFullYear())}>השנה</Button>
+            <Button variant="outline" onClick={scrollToToday}>היום</Button>
             </div>
         </div>
       </div>
