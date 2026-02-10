@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
-const timeSlots = Array.from({ length: 24 }, (_, i) => i);
+const timeSlots = Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
 const timeToPercentage = (timeStr) => {
