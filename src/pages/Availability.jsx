@@ -831,7 +831,7 @@ END:VEVENT
                                   <GripVertical className="w-5 h-5 text-gray-400" />
                                   <div className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full font-bold text-sm">{index + 1}</div>
                                   <div className="flex-1">
-                                    <p className="font-semibold text-gray-900" dir="rtl">{format(new Date(shift.date), "EEE, d MMM")}</p>
+                                    <p className="font-semibold text-gray-900" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
                                     <p className="text-sm text-gray-600">{shift.start_time} - {shift.end_time}</p>
                                   </div>
                                 </div>
@@ -858,7 +858,7 @@ END:VEVENT
                                   <GripVertical className="w-5 h-5 text-gray-400" />
                                   <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-bold text-sm">{index + 1}</div>
                                   <div className="flex-1">
-                                    <p className="font-semibold text-gray-900" dir="rtl">{format(new Date(shift.date), "EEE, d MMM")}</p>
+                                    <p className="font-semibold text-gray-900" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
                                     <p className="text-sm text-gray-600">{shift.start_time} - {shift.end_time}</p>
                                   </div>
                                 </div>
