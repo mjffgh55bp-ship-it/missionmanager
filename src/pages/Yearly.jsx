@@ -339,11 +339,13 @@ export default function Yearly() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col" dir="rtl">
       {/* Fixed Header */}
-      <div className="fixed top-0 left-64 right-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 pb-2">
+      <div className="fixed top-0 left-0 right-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 pb-2 border-b border-gray-200">
         <div className="max-w-full mx-auto flex flex-wrap justify-between items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">תצוגה תקופתית</h1>
-            <p className="text-gray-600 text-sm">{viewOnly ? "מצב צפייה בלבד" : "לחץ פעמיים על אירוע לעריכה"}</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-1">תצוגה תקופתית</h1>
+              <p className="text-gray-600 text-sm">{viewOnly ? "מצב צפייה בלבד" : "לחץ פעמיים על אירוע לעריכה"}</p>
+            </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border">
