@@ -422,7 +422,7 @@ export default function Matrix() {
           </TooltipTrigger>
           <TooltipContent className="bg-gray-800 text-white border-none">
             <p className="font-bold">{assignment.food_cart_name}</p>
-            <p>Time: {assignment.start_time} - {assignment.end_time}</p>
+            <p>זמן: {assignment.start_time} - {assignment.end_time}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -506,7 +506,7 @@ export default function Matrix() {
     return (
       <div className="flex gap-1 ml-2">
         {summary.map((d, i) => (
-          <div key={i} className={`w-5 h-5 rounded text-[8px] flex items-center justify-center font-medium ${d.working ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`} title={`${d.day}: ${d.working ? 'Working' : 'Off'}`}>
+          <div key={i} className={`w-5 h-5 rounded text-[8px] flex items-center justify-center font-medium ${d.working ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`} title={`${d.day}: ${d.working ? 'עובד' : 'חופש'}`}>
             {d.day.charAt(0)}
           </div>
         ))}
@@ -540,7 +540,7 @@ export default function Matrix() {
                 </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronRight className="w-4 h-4" /></Button>
                 <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center">
-                  {viewMode === "weekly" ? `Week of ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "MMM d")}` : format(currentDate, "MMM d, yyyy")}
+                  {viewMode === "weekly" ? `שבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "MMM d")}` : format(currentDate, "MMM d, yyyy")}
                 </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronLeft className="w-4 h-4" /></Button>
                 <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
@@ -637,7 +637,7 @@ export default function Matrix() {
             <div className="space-y-4 py-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-h-60 overflow-y-auto">
                 <p className="text-sm font-semibold mb-2">
-                  {viewMode === "weekly" ? `Shifts for week of ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "MMM d, yyyy")}:` : `Shifts for ${format(currentDate, "MMM d, yyyy")}:`}
+                  {viewMode === "weekly" ? `משמרות לשבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "MMM d, yyyy")}:` : `משמרות ל-${format(currentDate, "MMM d, yyyy")}:`}
                 </p>
                 {viewMode === "weekly" && selectedWorkerForNotification ? (
                   Array.from({ length: 7 }).map((_, i) => {
@@ -648,7 +648,7 @@ export default function Matrix() {
                       <div key={i} className="mb-2">
                         <p className="text-xs font-semibold">{format(d, "EEEE, MMM d")}</p>
                         {dayAssignments.length === 0 ? (
-                          <p className="text-xs text-gray-500 ml-2">No shifts</p>
+                          <p className="text-xs text-gray-500 ml-2">אין משמרות</p>
                         ) : dayAssignments.map((a, idx) => (
                           <div key={idx} className="text-xs bg-white p-1 rounded border ml-2 mt-1">{a.food_cart_name}: {a.start_time}-{a.end_time}</div>
                         ))}
@@ -663,7 +663,7 @@ export default function Matrix() {
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-gray-600">No shifts scheduled</p>
+                  <p className="text-sm text-gray-600">אין משמרות מתוכננות</p>
                 )}
               </div>
               <div><Label dir="rtl">הערות נוספות</Label><Textarea value={notificationNotes} onChange={(e) => setNotificationNotes(e.target.value)} rows={4} dir="rtl" /></div>
@@ -678,16 +678,16 @@ export default function Matrix() {
         {/* Type Change Dialog */}
         <Dialog open={showTypeDialog} onOpenChange={setShowTypeDialog}>
           <DialogContent className="sm:max-w-xs">
-            <DialogHeader><DialogTitle>Change Availability Type</DialogTitle></DialogHeader>
-            <div className="py-4 space-y-2">
+            <DialogHeader><DialogTitle dir="rtl">שינוי סוג זמינות</DialogTitle></DialogHeader>
+            <div className="py-4 space-y-2" dir="rtl">
               <Button variant="outline" className="w-full justify-start" onClick={() => handleChangeType('wanted')}>
-                <Star className="w-4 h-4 mr-2 text-green-600 fill-green-600" />Wanted
+                <Star className="w-4 h-4 ml-2 text-green-600 fill-green-600" />רצוי
               </Button>
               <Button variant="outline" className="w-full justify-start" onClick={() => handleChangeType('available')}>
-                <Check className="w-4 h-4 mr-2 text-blue-600" />Available
+                <Check className="w-4 h-4 ml-2 text-blue-600" />זמין
               </Button>
               <Button variant="outline" className="w-full justify-start" onClick={() => handleChangeType('unavailable')}>
-                <Ban className="w-4 h-4 mr-2 text-red-600" />Unavailable
+                <Ban className="w-4 h-4 ml-2 text-red-600" />לא זמין
               </Button>
             </div>
           </DialogContent>
