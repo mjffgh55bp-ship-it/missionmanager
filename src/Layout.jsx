@@ -99,25 +99,24 @@ export default function Layout({ children }) {
   return (
     <>
       <style dangerouslySetInnerHTML={{__html: `
+        @font-face {
+          font-family: 'Calibri';
+          src: local('Calibri'), local('Calibri Regular');
+        }
+        
         * {
-          font-family: Calibri !important;
+          font-family: 'Calibri', sans-serif !important;
         }
         
         *::before, *::after {
-          font-family: Calibri !important;
+          font-family: 'Calibri', sans-serif !important;
         }
         
         html, body, div, span, p, a, label, input, textarea, select, button, 
         h1, h2, h3, h4, h5, h6, td, th, tr, table, li, ul, ol,
         header, footer, section, article, nav, form, fieldset, legend,
-        main, aside, figure, figcaption {
-          font-family: Calibri !important;
-        }
-        
-        [class*="text-"], [class*="font-"], [class*="tracking-"], 
-        [class*="leading-"], [class*="uppercase"], [class*="lowercase"],
-        [class*="capitalize"] {
-          font-family: Calibri !important;
+        main, aside, figure, figcaption, svg, text {
+          font-family: 'Calibri', sans-serif !important;
         }
       `}} />
       <div className="min-h-screen w-full bg-gray-50 relative" dir="rtl">
