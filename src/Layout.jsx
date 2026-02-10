@@ -97,7 +97,7 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 relative">
+    <div className="min-h-screen w-full bg-gray-50 relative" dir="rtl">
       {/* Floating Sidebar */}
       {sidebarOpen && (
         <>
