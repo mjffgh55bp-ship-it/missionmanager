@@ -140,19 +140,20 @@ export default function Matrix() {
   const sendNotification = async () => {
     if (!selectedWorkerForNotification) return;
     
-    let emailBody = `Hi ${selectedWorkerForNotification.nickname},\n\n`;
+    let emailBody = `שלום ${selectedWorkerForNotification.nickname},\n\n`;
     
     if (viewMode === "weekly") {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-      emailBody += `Here is your shift schedule for the week of ${format(weekStart, "MMMM d, yyyy")}:\n\n`;
+      emailBody += `הנה לוח המשמרות שלך לשבוע של ${format(weekStart, "d.M.yyyy")}:\n\n`;
       
       for (let i = 0; i < 7; i++) {
         const d = addDays(weekStart, i);
         const dStr = format(d, "yyyy-MM-dd");
         const dayAssignments = getWorkerAssignments(selectedWorkerForNotification.id, dStr);
-        emailBody += `${format(d, "EEEE, MMM d")}:\n`;
+        const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+        emailBody += `${hebrewDays[d.getDay()]}, ${format(d, "d.M")}:\n`;
         if (dayAssignments.length === 0) {
-          emailBody += "  No shifts\n";
+          emailBody += "  אין משמרות\n";
         } else {
           dayAssignments.forEach(a => {
             emailBody += `  ${a.food_cart_name}: ${a.start_time} - ${a.end_time} (${a.hours}h)\n`;
@@ -162,25 +163,25 @@ export default function Matrix() {
       }
     } else {
       const workerAssignments = getWorkerAssignments(selectedWorkerForNotification.id);
-      emailBody += `Here is your shift schedule for ${format(currentDate, "MMMM d, yyyy")}:\n\n`;
+      emailBody += `הנה לוח המשמרות שלך ל-${format(currentDate, "d.M.yyyy")}:\n\n`;
       if (workerAssignments.length === 0) {
-        emailBody += "No shifts scheduled for this day.\n\n";
+        emailBody += "אין משמרות מתוכננות ליום זה.\n\n";
       } else {
         workerAssignments.forEach((a, i) => {
-          emailBody += `Shift ${i + 1}: ${a.food_cart_name}\n  Time: ${a.start_time} - ${a.end_time} (${a.hours}h)\n\n`;
+          emailBody += `משמרת ${i + 1}: ${a.food_cart_name}\n  זמן: ${a.start_time} - ${a.end_time} (${a.hours}h)\n\n`;
         });
       }
     }
     
-    if (notificationNotes.trim()) emailBody += `Notes from management:\n${notificationNotes}\n\n`;
-    emailBody += "Best regards,\nManagement";
+    if (notificationNotes.trim()) emailBody += `הערות מההנהלה:\n${notificationNotes}\n\n`;
+    emailBody += "בברכה,\nההנהלה";
     
     if (selectedWorkerForNotification.email) {
       await base44.integrations.Core.SendEmail({
         to: selectedWorkerForNotification.email,
         subject: viewMode === "weekly" 
-          ? `Your Weekly Schedule - Week of ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "MMM d, yyyy")}`
-          : `Your Shift Schedule - ${format(currentDate, "MMM d, yyyy")}`,
+          ? `לוח משמרות שבועי - שבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "d.M.yyyy")}`
+          : `לוח משמרות - ${format(currentDate, "d.M.yyyy")}`,
         body: emailBody
       });
     }
@@ -540,7 +541,7 @@ export default function Matrix() {
                 </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronRight className="w-4 h-4" /></Button>
                 <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center">
-                  {viewMode === "weekly" ? `שבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "MMM d")}` : format(currentDate, "MMM d, yyyy")}
+                  {viewMode === "weekly" ? `שבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "d")}` : format(currentDate, "d.M.yyyy")}
                 </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronLeft className="w-4 h-4" /></Button>
                 <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
@@ -637,7 +638,7 @@ export default function Matrix() {
             <div className="space-y-4 py-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-h-60 overflow-y-auto">
                 <p className="text-sm font-semibold mb-2">
-                  {viewMode === "weekly" ? `משמרות לשבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "MMM d, yyyy")}:` : `משמרות ל-${format(currentDate, "MMM d, yyyy")}:`}
+                  {viewMode === "weekly" ? `משמרות לשבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "d.M.yyyy")}:` : `משמרות ל-${format(currentDate, "d.M.yyyy")}:`}
                 </p>
                 {viewMode === "weekly" && selectedWorkerForNotification ? (
                   Array.from({ length: 7 }).map((_, i) => {
@@ -646,7 +647,10 @@ export default function Matrix() {
                     const dayAssignments = getWorkerAssignments(selectedWorkerForNotification.id, dStr);
                     return (
                       <div key={i} className="mb-2">
-                        <p className="text-xs font-semibold">{format(d, "EEEE, MMM d")}</p>
+                        <p className="text-xs font-semibold">{(() => {
+                          const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+                          return `${hebrewDays[d.getDay()]}, ${format(d, "d.M")}`;
+                        })()}</p>
                         {dayAssignments.length === 0 ? (
                           <p className="text-xs text-gray-500 ml-2">אין משמרות</p>
                         ) : dayAssignments.map((a, idx) => (
