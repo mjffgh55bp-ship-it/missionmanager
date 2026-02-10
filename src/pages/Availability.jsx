@@ -684,7 +684,7 @@ END:VEVENT
             <Card className="border-none shadow-lg">
               <CardHeader className="border-b bg-white py-3 px-4">
                 <div className="flex justify-between items-center">
-                  <CardTitle className="text-base" dir="rtl">לוח השנה שלי</CardTitle>
+                  <CardTitle className="text-base" dir="rtl">לוח</CardTitle>
                   <div className="flex gap-1 items-center">
                     <Button variant="outline" size="sm" onClick={generateICSFile} title="Sync to phone calendar">
                       <Download className="w-4 h-4" />

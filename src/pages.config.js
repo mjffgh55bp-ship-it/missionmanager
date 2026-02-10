@@ -47,26 +47,26 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
+import Availability from './pages/Availability';
 import Home from './pages/Home';
 import Matrix from './pages/Matrix';
 import Reports from './pages/Reports';
 import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
-import Yearly from './pages/Yearly';
-import Availability from './pages/Availability';
 import Workers from './pages/Workers';
+import Yearly from './pages/Yearly';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "Availability": Availability,
     "Home": Home,
     "Matrix": Matrix,
     "Reports": Reports,
     "Schedule": Schedule,
     "Settings": Settings,
-    "Yearly": Yearly,
-    "Availability": Availability,
     "Workers": Workers,
+    "Yearly": Yearly,
 }
 
 export const pagesConfig = {
