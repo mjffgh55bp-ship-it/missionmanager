@@ -957,7 +957,7 @@ END:VEVENT
                 <div>
                   <p className="font-semibold mb-2" dir="rtl">המשמרות שלך:</p>
                   {getAssignmentForDate(selectedDate).length === 0 ? (
-                    <p className="text-sm text-gray-500" dir="rtl">אין משמרות מתוזמנות</p>
+                    <p className="text-sm text-gray-500" dir="rtl">אין משמרות מתוכננות</p>
                   ) : (
                     getAssignmentForDate(selectedDate).map((a, i) => (
                       <div key={i} className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
