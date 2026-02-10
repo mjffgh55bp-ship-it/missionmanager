@@ -99,39 +99,25 @@ export default function Layout({ children }) {
   return (
     <>
       <style dangerouslySetInnerHTML={{__html: `
-        @import url('https://fonts.googleapis.com/css2?family=Calibri&display=swap');
-        
-        html {
-          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-        }
-        
-        body {
-          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-        }
-        
         * {
-          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          font-family: Calibri !important;
         }
         
         *::before, *::after {
-          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+          font-family: Calibri !important;
         }
         
-        div, span, p, a, label, input, textarea, select, button, 
-        h1, h2, h3, h4, h5, h6, 
-        td, th, tr, table,
-        li, ul, ol,
-        header, footer, section, article, nav,
-        form, fieldset, legend {
-          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        html, body, div, span, p, a, label, input, textarea, select, button, 
+        h1, h2, h3, h4, h5, h6, td, th, tr, table, li, ul, ol,
+        header, footer, section, article, nav, form, fieldset, legend,
+        main, aside, figure, figcaption {
+          font-family: Calibri !important;
         }
         
-        [class] {
-          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-        }
-        
-        [style] {
-          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        [class*="text-"], [class*="font-"], [class*="tracking-"], 
+        [class*="leading-"], [class*="uppercase"], [class*="lowercase"],
+        [class*="capitalize"] {
+          font-family: Calibri !important;
         }
       `}} />
       <div className="min-h-screen w-full bg-gray-50 relative" dir="rtl">
