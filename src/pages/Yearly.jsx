@@ -81,18 +81,6 @@ export default function Yearly() {
     }
   }, [currentYear, loading]);
 
-  const scrollToToday = () => {
-    if (!scrollContainerRef.current) return;
-    const yearStart = new Date(currentYear, 0, 1);
-    const todayDate = new Date();
-    const daysDiff = Math.floor((todayDate - yearStart) / (1000 * 60 * 60 * 24));
-    if (daysDiff >= 0 && todayDate.getFullYear() === currentYear) {
-      // In RTL, scroll to center today from the right
-      const scrollPosition = daysDiff * CELL_WIDTH - (scrollContainerRef.current.clientWidth / 2) + (CELL_WIDTH / 2);
-      scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
-    }
-  };
-
   const loadData = async () => {
     setLoading(true);
     const [rowsData, eventsData, workersData, unavailData, catSettings] = await Promise.all([
@@ -205,6 +193,21 @@ export default function Yearly() {
   const yearDays = generateYearDays();
   const yearDaysMap = {};
   yearDays.forEach((d, i) => { yearDaysMap[format(d, "yyyy-MM-dd")] = i; });
+
+  const scrollToToday = () => {
+    if (!scrollContainerRef.current) return;
+    const todayDate = new Date();
+    if (todayDate.getFullYear() !== currentYear) return;
+    
+    const todayStr = format(todayDate, "yyyy-MM-dd");
+    const todayIndex = yearDaysMap[todayStr];
+    
+    if (todayIndex !== undefined) {
+      // Center today in the viewport
+      const scrollPosition = todayIndex * CELL_WIDTH - (scrollContainerRef.current.clientWidth / 2) + (CELL_WIDTH / 2);
+      scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
+    }
+  };
 
   const getEventsForRow = (rowId) => events.filter(e => e.row_id === rowId);
 
