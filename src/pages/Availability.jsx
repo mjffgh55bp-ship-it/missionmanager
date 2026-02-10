@@ -15,6 +15,28 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { formatHebrewDate } from "../components/utils/HebrewDate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+const HEBREW_DAYS_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
+const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+
+const formatDateHebrew = (date, formatType = "short") => {
+  const d = new Date(date);
+  const dayName = HEBREW_DAYS[d.getDay()];
+  const dayNameShort = HEBREW_DAYS_SHORT[d.getDay()];
+  const monthName = HEBREW_MONTHS[d.getMonth()];
+  const day = d.getDate();
+  const year = d.getFullYear();
+  
+  if (formatType === "short") {
+    return `${dayNameShort}, ${day} ${monthName}`;
+  } else if (formatType === "long") {
+    return `${dayName}, ${day} ${monthName}, ${year}`;
+  } else if (formatType === "monthYear") {
+    return `${monthName} ${year}`;
+  }
+  return `${day} ${monthName}`;
+};
+
 const SHIFT_BLOCKS = [
   { start: "06:00", end: "10:00" },
   { start: "10:00", end: "14:00" },
@@ -560,7 +582,7 @@ END:VEVENT
                     {unavailabilities.map((unavail) => (
                       <div key={unavail.id} className="flex items-center justify-between p-2 bg-red-50 border border-red-200 rounded-lg">
                         <div className="flex-1">
-                          <p className="font-medium text-sm text-gray-900" dir="rtl">{format(new Date(unavail.date), "EEE, d MMM")}</p>
+                          <p className="font-medium text-sm text-gray-900" dir="rtl">{formatDateHebrew(unavail.date, "short")}</p>
                           <p className="text-xs text-gray-600" dir="rtl">{unavail.start_time} - {unavail.end_time} • {unavail.reason === 'overseas' ? 'בחו"ל' : 'תפוס'}</p>
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteUnavailability(unavail.id)} className="text-red-600 hover:text-red-700 hover:bg-red-100 h-8 w-8">
@@ -698,7 +720,7 @@ END:VEVENT
                     <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
-                    <span className="px-2 py-1 text-sm font-medium" dir="rtl">{format(calendarMonth, "MMM yyyy")}</span>
+                    <span className="px-2 py-1 text-sm font-medium" dir="rtl">{formatDateHebrew(calendarMonth, "monthYear")}</span>
                     <Button variant="outline" size="sm" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
                       <ChevronRight className="w-4 h-4" />
                     </Button>
@@ -871,7 +893,7 @@ END:VEVENT
                         <p className="font-semibold text-green-700 mb-2" dir="rtl">נוסף:</p>
                         {added.map((s, i) => (
                           <div key={i} className="p-2 bg-green-50 rounded mb-1 text-sm" dir="rtl">
-                            {format(new Date(s.date), "EEE, d MMM")} {s.start_time}-{s.end_time} ({s.type === 'wanted' ? 'רצוי' : s.type === 'available' ? 'זמין' : 'לא זמין'})
+                            {formatDateHebrew(s.date, "short")} {s.start_time}-{s.end_time} ({s.type === 'wanted' ? 'רצוי' : s.type === 'available' ? 'זמין' : 'לא זמין'})
                           </div>
                         ))}
                       </div>
@@ -881,7 +903,7 @@ END:VEVENT
                         <p className="font-semibold text-red-700 mb-2" dir="rtl">הוסר:</p>
                         {removed.map((s, i) => (
                           <div key={i} className="p-2 bg-red-50 rounded mb-1 text-sm" dir="rtl">
-                            {format(new Date(s.date), "EEE, d MMM")} {s.start_time}-{s.end_time} ({s.type === 'wanted' ? 'רצוי' : s.type === 'available' ? 'זמין' : 'לא זמין'})
+                            {formatDateHebrew(s.date, "short")} {s.start_time}-{s.end_time} ({s.type === 'wanted' ? 'רצוי' : s.type === 'available' ? 'זמין' : 'לא זמין'})
                           </div>
                         ))}
                       </div>
@@ -907,7 +929,7 @@ END:VEVENT
         <Dialog open={showDateDetails} onOpenChange={setShowDateDetails}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle dir="rtl">{selectedDate && format(selectedDate, "EEEE, d MMMM, yyyy")}</DialogTitle>
+              <DialogTitle dir="rtl">{selectedDate && formatDateHebrew(selectedDate, "long")}</DialogTitle>
             </DialogHeader>
             {selectedDate && (
               <div className="space-y-4 py-4">
