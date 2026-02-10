@@ -92,7 +92,7 @@ export default function Schedule() {
   const dateString = format(currentDate, "yyyy-MM-dd");
   
   const filteredWorkers = workers.filter(w => 
-    w.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    w.nickname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     w.role?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -138,11 +138,11 @@ export default function Schedule() {
     
     let updateData = {};
     if (selectedPosition.position === 'chef') {
-      updateData = { chef_id: workerId, chef_name: worker.full_name, chef_seniority: worker.seniority };
+      updateData = { chef_id: workerId, chef_name: worker.nickname, chef_seniority: worker.seniority };
     } else if (selectedPosition.position === 'sous_chef') {
-      updateData = { sous_chef_id: workerId, sous_chef_name: worker.full_name, sous_chef_seniority: worker.seniority };
+      updateData = { sous_chef_id: workerId, sous_chef_name: worker.nickname, sous_chef_seniority: worker.seniority };
     } else if (selectedPosition.position === 'additional') {
-      updateData = { additional_chef_id: workerId, additional_chef_name: worker.full_name, additional_chef_role: worker.role };
+      updateData = { additional_chef_id: workerId, additional_chef_name: worker.nickname, additional_chef_role: worker.role };
     }
 
     await base44.entities.Assignment.update(currentAssignment.id, updateData);
@@ -485,7 +485,7 @@ export default function Schedule() {
                         {availInfo?.type === "wanted" && <Star className="w-4 h-4 text-green-600 fill-green-600" />}
                         {availInfo?.type === "available" && <Check className="w-4 h-4 text-blue-600" />}
                         <div className="flex-1">
-                          <div className="font-medium text-gray-900">{worker.full_name}</div>
+                          <div className="font-medium text-gray-900">{worker.nickname}</div>
                           <div className="flex gap-2 mt-1">
                             <Badge variant="outline" className="text-xs" dir="rtl">{worker.seniority || 'לא ידוע'}</Badge>
                             {worker.is_guide && <Badge className="text-xs bg-yellow-100 text-yellow-800" dir="rtl">מדריך</Badge>}

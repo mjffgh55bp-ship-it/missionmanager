@@ -84,7 +84,7 @@ export default function Matrix() {
       });
     }
     
-    setWorkers(workersData.sort((a, b) => a.full_name.localeCompare(b.full_name)));
+    setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
     setAssignments(filteredAssignments);
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
@@ -140,7 +140,7 @@ export default function Matrix() {
   const sendNotification = async () => {
     if (!selectedWorkerForNotification) return;
     
-    let emailBody = `Hi ${selectedWorkerForNotification.full_name},\n\n`;
+    let emailBody = `Hi ${selectedWorkerForNotification.nickname},\n\n`;
     
     if (viewMode === "weekly") {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
@@ -281,7 +281,7 @@ export default function Matrix() {
     
     const availData = {
       worker_id: workerId,
-      worker_name: worker.full_name,
+      worker_name: worker.nickname,
       week_start_date: weekStartDate,
       shifts: updatedShifts,
       status: workerAvail?.status || "approved"
@@ -388,7 +388,7 @@ export default function Matrix() {
 
     const availData = {
       worker_id: selectedWorkerForManual.id,
-      worker_name: selectedWorkerForManual.full_name,
+      worker_name: selectedWorkerForManual.nickname,
       week_start_date: weekStartDate,
       shifts: updatedShifts,
       status: workerAvail?.status || "approved"
@@ -572,7 +572,7 @@ export default function Matrix() {
                     const workerAssignments = getWorkerAssignments(worker.id);
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
                     
-                    console.log(`Row ${index}: ${worker.full_name} (${worker.id}) - Assignments:`, workerAssignments.length, 'Availability:', availabilityShifts.length);
+                    console.log(`Row ${index}: ${worker.nickname} (${worker.id}) - Assignments:`, workerAssignments.length, 'Availability:', availabilityShifts.length);
                     
                     return (
                       <div key={worker.id} className={`flex border-b h-16 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
@@ -582,7 +582,7 @@ export default function Matrix() {
                               <ChefHat className="w-4 h-4" />
                             </div>
                             <div>
-                              <span className="truncate block">{worker.full_name}</span>
+                              <span className="truncate block">{worker.nickname}</span>
                               <WeeklySummary worker={worker} />
                             </div>
                           </div>
@@ -596,7 +596,7 @@ export default function Matrix() {
                           ref={el => {
                             if (el) {
                               timelineRefs.current[worker.id] = el;
-                              console.log(`Assigned ref for ${worker.full_name} (${worker.id}):`, el);
+                              console.log(`Assigned ref for ${worker.nickname} (${worker.id}):`, el);
                             }
                           }}
                           className="flex-1 relative border-r cursor-crosshair h-16"
@@ -612,10 +612,10 @@ export default function Matrix() {
                           <div className="absolute inset-0">
                             {availabilityShifts.map((shift, idx) => (<AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />))}
                             {workerUnavailabilities.map(unavail => (<UnavailabilityBar key={unavail.id} unavail={unavail} />))}
-                            {workerAssignments.length > 0 && console.log(`Rendering ${workerAssignments.length} assignments for ${worker.full_name}:`, workerAssignments.map(a => `${a.chef_id || a.sous_chef_id || a.additional_chef_id}`).join(', '))}
+                            {workerAssignments.length > 0 && console.log(`Rendering ${workerAssignments.length} assignments for ${worker.nickname}:`, workerAssignments.map(a => `${a.chef_id || a.sous_chef_id || a.additional_chef_id}`).join(', '))}
                             {workerAssignments.map(ass => {
                               const actualChefId = ass.chef_id || ass.sous_chef_id || ass.additional_chef_id;
-                              if (actualChefId !== worker.id) console.warn(`MISMATCH: Assignment for ${actualChefId} rendering in ${worker.full_name}'s row!`);
+                              if (actualChefId !== worker.id) console.warn(`MISMATCH: Assignment for ${actualChefId} rendering in ${worker.nickname}'s row!`);
                               return <AssignmentBar key={ass.id} assignment={ass} />;
                             })}
                             <DragPreviewBar preview={dragPreview} workerId={worker.id} />
@@ -633,7 +633,7 @@ export default function Matrix() {
         {/* Notification Dialog */}
         <Dialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">שלח לוח זמנים {viewMode === "weekly" ? "שבועי" : "יומי"} - {selectedWorkerForNotification?.full_name}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">שלח לוח זמנים {viewMode === "weekly" ? "שבועי" : "יומי"} - {selectedWorkerForNotification?.nickname}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-h-60 overflow-y-auto">
                 <p className="text-sm font-semibold mb-2">
@@ -696,7 +696,7 @@ export default function Matrix() {
         {/* Manual Shift Add/Edit Dialog */}
         <Dialog open={showManualDialog} onOpenChange={setShowManualDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">{editingShift ? 'עריכת' : 'הוספת'} חלון זמינות - {selectedWorkerForManual?.full_name}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle dir="rtl">{editingShift ? 'עריכת' : 'הוספת'} חלון זמינות - {selectedWorkerForManual?.nickname}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div>
                 <Label dir="rtl">שעת התחלה (HH:MM)</Label>
