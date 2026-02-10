@@ -97,7 +97,13 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 relative" dir="rtl">
+    <>
+      <style>{`
+        * {
+          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        }
+      `}</style>
+      <div className="min-h-screen w-full bg-gray-50 relative" dir="rtl">
       {/* Floating Sidebar */}
       {sidebarOpen && (
         <>
@@ -169,5 +175,6 @@ export default function Layout({ children }) {
         </div>
       </main>
     </div>
+    </>
   );
 }
