@@ -353,9 +353,9 @@ export default function Yearly() {
               <Switch checked={!viewOnly} onCheckedChange={(checked) => setViewOnly(!checked)} />
               {!viewOnly ? <EyeOff className="w-4 h-4 text-green-600" /> : <Eye className="w-4 h-4 text-gray-500" />}
             </div>
-            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}><ChevronRight className="w-4 h-4" /></Button>
+            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}><ChevronLeft className="w-4 h-4" /></Button>
             <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[100px] text-center">{currentYear}</div>
-            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronLeft className="w-4 h-4" /></Button>
+            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronRight className="w-4 h-4" /></Button>
             <Button variant="outline" onClick={() => setCurrentYear(new Date().getFullYear())}>השנה</Button>
             <Button variant="outline" onClick={scrollToToday}>היום</Button>
             </div>
