@@ -24,7 +24,6 @@ export default function Workers() {
   const [userRoles, setUserRoles] = useState({});
   const [savingRoles, setSavingRoles] = useState(false);
   const [formData, setFormData] = useState({
-    full_name: "",
     nickname: "",
     role: "chef",
     category: "category_1",
@@ -69,14 +68,13 @@ export default function Workers() {
     else await base44.entities.Worker.create(formData);
     setShowDialog(false);
     setEditingWorker(null);
-    setFormData({ full_name: "", nickname: "", role: "chef", category: "category_1", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
+    setFormData({ nickname: "", role: "chef", category: "category_1", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
     loadData();
   };
 
   const handleEdit = (worker) => {
     setEditingWorker(worker);
     setFormData({
-      full_name: worker.full_name,
       nickname: worker.nickname || "",
       role: worker.role,
       category: worker.category || "category_1",
@@ -174,7 +172,7 @@ export default function Workers() {
                         <ChefHat className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg">{worker.full_name}</CardTitle>
+                        <CardTitle className="text-lg">{worker.nickname}</CardTitle>
                         <div className="flex gap-2 mt-1 flex-wrap">
                           <Badge className={worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'} dir="rtl">
                            {worker.role === 'chef' ? 'טבח ראשי' : 'עוזר טבח'}
@@ -214,7 +212,6 @@ export default function Workers() {
                       <Switch checked={worker.is_guide} onCheckedChange={() => toggleGuide(worker)} />
                     </div>
 
-                    {worker.nickname && <p className="text-sm text-gray-600" dir="rtl">🏷️ {worker.nickname}</p>}
                     {worker.email && <p className="text-sm text-gray-600">📧 {worker.email}</p>}
                     {worker.phone && <p className="text-sm text-gray-600">📞 {worker.phone}</p>}
                     {worker.population && <p className="text-sm text-gray-600" dir="rtl">👥 {worker.population}</p>}
@@ -262,7 +259,7 @@ export default function Workers() {
                     {workers.filter(w => w.email).map((worker) => (
                       <div key={worker.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                         <div className="flex-1">
-                          <p className="font-medium text-gray-900">{worker.full_name}</p>
+                          <p className="font-medium text-gray-900">{worker.nickname}</p>
                           <p className="text-sm text-gray-600">{worker.email}</p>
                         </div>
                         <Select value={userRoles[worker.email] || "user"} onValueChange={(value) => handleRoleChange(worker.email, value)}>
@@ -290,8 +287,7 @@ export default function Workers() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle dir="rtl">{editingWorker ? "ערוך עובד" : "הוסף עובד חדש"}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-              <div><Label htmlFor="full_name" dir="rtl">שם מלא *</Label><Input id="full_name" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="שם מלא" dir="rtl" /></div>
-              <div><Label htmlFor="nickname" dir="rtl">כינוי</Label><Input id="nickname" value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="כינוי" dir="rtl" /></div>
+              <div><Label htmlFor="nickname" dir="rtl">כינוי *</Label><Input id="nickname" value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="כינוי" dir="rtl" /></div>
               <div><Label htmlFor="role" dir="rtl">תפקיד *</Label>
                 <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -365,7 +361,7 @@ export default function Workers() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setShowDialog(false); setEditingWorker(null); }} dir="rtl">ביטול</Button>
-              <Button onClick={handleSubmit} disabled={!formData.full_name} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
+              <Button onClick={handleSubmit} disabled={!formData.nickname} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
