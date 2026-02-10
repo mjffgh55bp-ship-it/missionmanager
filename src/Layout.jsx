@@ -99,10 +99,19 @@ export default function Layout({ children }) {
   return (
     <>
       <style>{`
-        html, body, * {
+        html, body, *, *::before, *::after {
           font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
-        input, textarea, select, button, div, span, p, h1, h2, h3, h4, h5, h6, a, label, td, th, li {
+        input, textarea, select, button, div, span, p, h1, h2, h3, h4, h5, h6, a, label, td, th, li, ul, ol {
+          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        }
+        [class*="text"], [class*="font"], [class*="title"], [class*="label"], [class*="badge"], [class*="button"] {
+          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        }
+        .text-xs, .text-sm, .text-base, .text-lg, .text-xl, .text-2xl, .text-3xl {
+          font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        }
+        .font-normal, .font-medium, .font-semibold, .font-bold {
           font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
       `}</style>
