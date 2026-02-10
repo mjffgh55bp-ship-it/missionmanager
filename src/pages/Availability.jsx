@@ -520,7 +520,7 @@ END:VEVENT
                 <div>
                   <CardTitle className="text-xl" dir="rtl">זמינות שבועית</CardTitle>
                   <p className="text-xs text-gray-600 mt-1" dir="rtl">
-                    {format(weekStart, "d MMM")} - {format(addDays(weekStart, 6), "d MMM, yyyy")}
+                    {formatDateHebrew(weekStart)} - {formatDateHebrew(addDays(weekStart, 6))}
                     <span className="text-gray-400 ml-2">({formatHebrewDate(weekStart)})</span>
                   </p>
                 </div>
@@ -645,7 +645,7 @@ END:VEVENT
                         <div className="flex items-center justify-between mb-2">
                           <div>
                             <span className="font-semibold text-sm" dir="rtl">{day}</span>
-                            <span className="text-xs text-gray-500 ml-2" dir="rtl">{format(addDays(weekStart, dayIndex), "d MMM")}</span>
+                            <span className="text-xs text-gray-500 ml-2" dir="rtl">{formatDateHebrew(addDays(weekStart, dayIndex))}</span>
                             <span className="text-xs text-gray-400 ml-1">({formatHebrewDate(addDays(weekStart, dayIndex))})</span>
                           </div>
                           {event && (
