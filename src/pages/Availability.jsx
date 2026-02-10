@@ -799,12 +799,12 @@ END:VEVENT
                             <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`wanted-${shift.date}-${shift.start_time}`} index={index}>
                               {(provided, snapshot) => (
                                 <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
-                                 className={`flex items-center gap-3 p-3 rounded-lg border ${snapshot.isDragging ? 'bg-green-50 border-green-300 shadow-lg' : 'bg-white border-gray-200'}`}>
+                                  className={`flex items-center gap-3 p-3 rounded-lg border ${snapshot.isDragging ? 'bg-green-50 border-green-300 shadow-lg' : 'bg-white border-gray-200'}`}>
                                   <GripVertical className="w-5 h-5 text-gray-400" />
                                   <div className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full font-bold text-sm">{index + 1}</div>
-                                  <div className="flex-1" dir="rtl">
+                                  <div className="flex-1">
                                     <p className="font-semibold text-gray-900">{format(new Date(shift.date), "EEE, MMM d")}</p>
-                                    <p className="text-sm text-gray-600">{shift.end_time} - {shift.start_time}</p>
+                                    <p className="text-sm text-gray-600">{shift.start_time} - {shift.end_time}</p>
                                   </div>
                                 </div>
                               )}
@@ -826,12 +826,12 @@ END:VEVENT
                             <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`available-${shift.date}-${shift.start_time}`} index={index}>
                               {(provided, snapshot) => (
                                 <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
-                                 className={`flex items-center gap-3 p-3 rounded-lg border ${snapshot.isDragging ? 'bg-blue-50 border-blue-300 shadow-lg' : 'bg-white border-gray-200'}`}>
+                                  className={`flex items-center gap-3 p-3 rounded-lg border ${snapshot.isDragging ? 'bg-blue-50 border-blue-300 shadow-lg' : 'bg-white border-gray-200'}`}>
                                   <GripVertical className="w-5 h-5 text-gray-400" />
                                   <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-bold text-sm">{index + 1}</div>
-                                  <div className="flex-1" dir="rtl">
+                                  <div className="flex-1">
                                     <p className="font-semibold text-gray-900">{format(new Date(shift.date), "EEE, MMM d")}</p>
-                                    <p className="text-sm text-gray-600">{shift.end_time} - {shift.start_time}</p>
+                                    <p className="text-sm text-gray-600">{shift.start_time} - {shift.end_time}</p>
                                   </div>
                                 </div>
                               )}
@@ -864,8 +864,8 @@ END:VEVENT
                       <div>
                         <p className="font-semibold text-green-700 mb-2" dir="rtl">נוסף:</p>
                         {added.map((s, i) => (
-                          <div key={i} className="p-2 bg-green-50 rounded mb-1 text-sm" dir="rtl">
-                            ({s.type}) {s.end_time}-{s.start_time} {format(new Date(s.date), "EEE, MMM d")}
+                          <div key={i} className="p-2 bg-green-50 rounded mb-1 text-sm">
+                            {format(new Date(s.date), "EEE, MMM d")} {s.start_time}-{s.end_time} ({s.type})
                           </div>
                         ))}
                       </div>
@@ -874,8 +874,8 @@ END:VEVENT
                       <div>
                         <p className="font-semibold text-red-700 mb-2" dir="rtl">הוסר:</p>
                         {removed.map((s, i) => (
-                          <div key={i} className="p-2 bg-red-50 rounded mb-1 text-sm" dir="rtl">
-                            ({s.type}) {s.end_time}-{s.start_time} {format(new Date(s.date), "EEE, MMM d")}
+                          <div key={i} className="p-2 bg-red-50 rounded mb-1 text-sm">
+                            {format(new Date(s.date), "EEE, MMM d")} {s.start_time}-{s.end_time} ({s.type})
                           </div>
                         ))}
                       </div>
@@ -920,8 +920,8 @@ END:VEVENT
                     <p className="font-semibold mb-2" dir="rtl">האירועים השנתיים שלך:</p>
                     {getYearlyEventsForDate(selectedDate).map((e, i) => (
                       <div key={i} className="p-3 bg-green-50 border border-green-200 rounded-lg mb-2">
-                        <p className="font-medium text-green-800" dir="rtl">{e.title}</p>
-                        <p className="text-sm text-gray-600" dir="rtl">{e.end_time} - {e.start_time}</p>
+                        <p className="font-medium text-green-800">{e.title}</p>
+                        <p className="text-sm text-gray-600">{e.start_time} - {e.end_time}</p>
                       </div>
                     ))}
                   </div>
@@ -933,9 +933,9 @@ END:VEVENT
                   ) : (
                     getAssignmentForDate(selectedDate).map((a, i) => (
                       <div key={i} className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
-                        <p className="font-medium" dir="rtl">{a.food_cart_name}</p>
-                        <p className="text-sm text-gray-600" dir="rtl">({a.hours}h) {a.end_time} - {a.start_time}</p>
-                        {a.menu && <p className="text-sm text-amber-700" dir="rtl">Menu: {a.menu}</p>}
+                        <p className="font-medium">{a.food_cart_name}</p>
+                        <p className="text-sm text-gray-600">{a.start_time} - {a.end_time} ({a.hours}h)</p>
+                        {a.menu && <p className="text-sm text-amber-700">Menu: {a.menu}</p>}
                       </div>
                     ))
                   )}
