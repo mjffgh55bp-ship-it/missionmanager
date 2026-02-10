@@ -809,7 +809,7 @@ END:VEVENT
                                   <GripVertical className="w-5 h-5 text-gray-400" />
                                   <div className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full font-bold text-sm">{index + 1}</div>
                                   <div className="flex-1">
-                                    <p className="font-semibold text-gray-900">{format(new Date(shift.date), "EEE, MMM d")}</p>
+                                    <p className="font-semibold text-gray-900" dir="rtl">{format(new Date(shift.date), "EEE, d MMM")}</p>
                                     <p className="text-sm text-gray-600">{shift.start_time} - {shift.end_time}</p>
                                   </div>
                                 </div>
@@ -836,7 +836,7 @@ END:VEVENT
                                   <GripVertical className="w-5 h-5 text-gray-400" />
                                   <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-bold text-sm">{index + 1}</div>
                                   <div className="flex-1">
-                                    <p className="font-semibold text-gray-900">{format(new Date(shift.date), "EEE, MMM d")}</p>
+                                    <p className="font-semibold text-gray-900" dir="rtl">{format(new Date(shift.date), "EEE, d MMM")}</p>
                                     <p className="text-sm text-gray-600">{shift.start_time} - {shift.end_time}</p>
                                   </div>
                                 </div>
@@ -913,11 +913,11 @@ END:VEVENT
               <div className="space-y-4 py-4">
                 {getEventForDate(selectedDate) && (
                   <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                    <p className="font-semibold text-purple-800 flex items-center gap-2">
+                    <p className="font-semibold text-purple-800 flex items-center gap-2" dir="rtl">
                       <PartyPopper className="w-4 h-4" />{getEventForDate(selectedDate).title}
                     </p>
                     {getEventForDate(selectedDate).description && (
-                      <p className="text-sm text-gray-600 mt-1">{getEventForDate(selectedDate).description}</p>
+                      <p className="text-sm text-gray-600 mt-1" dir="rtl">{getEventForDate(selectedDate).description}</p>
                     )}
                   </div>
                 )}
@@ -926,7 +926,7 @@ END:VEVENT
                     <p className="font-semibold mb-2" dir="rtl">האירועים השנתיים שלך:</p>
                     {getYearlyEventsForDate(selectedDate).map((e, i) => (
                       <div key={i} className="p-3 bg-green-50 border border-green-200 rounded-lg mb-2">
-                        <p className="font-medium text-green-800">{e.title}</p>
+                        <p className="font-medium text-green-800" dir="rtl">{e.title}</p>
                         <p className="text-sm text-gray-600">{e.start_time} - {e.end_time}</p>
                       </div>
                     ))}
@@ -939,7 +939,7 @@ END:VEVENT
                   ) : (
                     getAssignmentForDate(selectedDate).map((a, i) => (
                       <div key={i} className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
-                        <p className="font-medium">{a.food_cart_name}</p>
+                        <p className="font-medium" dir="rtl">{a.food_cart_name}</p>
                         <p className="text-sm text-gray-600">{a.start_time} - {a.end_time} ({a.hours}h)</p>
                         {a.menu && <p className="text-sm text-amber-700" dir="rtl">תפריט: {a.menu}</p>}
                       </div>
