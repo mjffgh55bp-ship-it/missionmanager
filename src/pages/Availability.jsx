@@ -24,7 +24,7 @@ const SHIFT_BLOCKS = [
   { start: "02:00", end: "06:00" }
 ];
 
-const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS_OF_WEEK = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
 export default function Availability() {
   const queryClient = useQueryClient();
@@ -496,9 +496,9 @@ END:VEVENT
             <div className="flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <div>
-                  <CardTitle className="text-xl">Weekly Availability</CardTitle>
-                  <p className="text-xs text-gray-600 mt-1">
-                    {format(weekStart, "MMM d")} - {format(addDays(weekStart, 6), "MMM d, yyyy")}
+                  <CardTitle className="text-xl" dir="rtl">זמינות שבועית</CardTitle>
+                  <p className="text-xs text-gray-600 mt-1" dir="rtl">
+                    {format(weekStart, "d MMM")} - {format(addDays(weekStart, 6), "d MMM, yyyy")}
                     <span className="text-gray-400 ml-2">({formatHebrewDate(weekStart)})</span>
                   </p>
                 </div>
@@ -560,8 +560,8 @@ END:VEVENT
                     {unavailabilities.map((unavail) => (
                       <div key={unavail.id} className="flex items-center justify-between p-2 bg-red-50 border border-red-200 rounded-lg">
                         <div className="flex-1">
-                          <p className="font-medium text-sm text-gray-900">{format(new Date(unavail.date), "EEE, MMM d")}</p>
-                          <p className="text-xs text-gray-600">{unavail.start_time} - {unavail.end_time} • {unavail.reason}</p>
+                          <p className="font-medium text-sm text-gray-900" dir="rtl">{format(new Date(unavail.date), "EEE, d MMM")}</p>
+                          <p className="text-xs text-gray-600" dir="rtl">{unavail.start_time} - {unavail.end_time} • {unavail.reason === 'overseas' ? 'בחו"ל' : 'תפוס'}</p>
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteUnavailability(unavail.id)} className="text-red-600 hover:text-red-700 hover:bg-red-100 h-8 w-8">
                           <XCircle className="w-4 h-4" />
@@ -622,8 +622,8 @@ END:VEVENT
                       <div key={day} className="border rounded-lg p-2">
                         <div className="flex items-center justify-between mb-2">
                           <div>
-                            <span className="font-semibold text-sm">{day}</span>
-                            <span className="text-xs text-gray-500 ml-2">{format(addDays(weekStart, dayIndex), "MMM d")}</span>
+                            <span className="font-semibold text-sm" dir="rtl">{day}</span>
+                            <span className="text-xs text-gray-500 ml-2" dir="rtl">{format(addDays(weekStart, dayIndex), "d MMM")}</span>
                             <span className="text-xs text-gray-400 ml-1">({formatHebrewDate(addDays(weekStart, dayIndex))})</span>
                           </div>
                           {event && (
@@ -692,13 +692,13 @@ END:VEVENT
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-base" dir="rtl">לוח</CardTitle>
                   <div className="flex gap-1 items-center">
-                    <Button variant="outline" size="sm" onClick={generateICSFile} title="Sync to phone calendar">
+                    <Button variant="outline" size="sm" onClick={generateICSFile} title="סנכרן ללוח השנה בטלפון">
                       <Download className="w-4 h-4" />
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
                       <ChevronLeft className="w-4 h-4" />
                     </Button>
-                    <span className="px-2 py-1 text-sm font-medium">{format(calendarMonth, "MMM yyyy")}</span>
+                    <span className="px-2 py-1 text-sm font-medium" dir="rtl">{format(calendarMonth, "MMM yyyy")}</span>
                     <Button variant="outline" size="sm" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
                       <ChevronRight className="w-4 h-4" />
                     </Button>
@@ -707,7 +707,7 @@ END:VEVENT
               </CardHeader>
               <CardContent className="py-3 px-4">
                 <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                  {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                  {["א", "ב", "ג", "ד", "ה", "ו", "ש"].map((d, i) => (
                     <div key={i} className="font-semibold text-gray-500 py-1">{d}</div>
                   ))}
                   {calendarDays.map((day, idx) => {
@@ -753,20 +753,20 @@ END:VEVENT
                 <Label htmlFor="multiDay" dir="rtl">מספר ימים</Label>
               </div>
               <div className={unavailabilityForm.multiDay ? "grid grid-cols-2 gap-4" : ""}>
-                <div><Label>{unavailabilityForm.multiDay ? "Start Date" : "Date"}</Label><Input type="date" value={unavailabilityForm.start_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_date: e.target.value })} /></div>
-                {unavailabilityForm.multiDay && <div><Label>End Date</Label><Input type="date" value={unavailabilityForm.end_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_date: e.target.value })} /></div>}
+                <div><Label dir="rtl">{unavailabilityForm.multiDay ? "תאריך התחלה" : "תאריך"}</Label><Input type="date" value={unavailabilityForm.start_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_date: e.target.value })} /></div>
+                {unavailabilityForm.multiDay && <div><Label dir="rtl">תאריך סיום</Label><Input type="date" value={unavailabilityForm.end_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_date: e.target.value })} /></div>}
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><Label>Start Time</Label><Input type="time" value={unavailabilityForm.start_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_time: e.target.value })} /></div>
-                <div><Label>End Time</Label><Input type="time" value={unavailabilityForm.end_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_time: e.target.value })} /></div>
+                <div><Label dir="rtl">שעת התחלה</Label><Input type="time" value={unavailabilityForm.start_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_time: e.target.value })} /></div>
+                <div><Label dir="rtl">שעת סיום</Label><Input type="time" value={unavailabilityForm.end_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_time: e.target.value })} /></div>
               </div>
               <div>
-                <Label>Reason</Label>
+                <Label dir="rtl">סיבה</Label>
                 <Select value={unavailabilityForm.reason} onValueChange={(value) => setUnavailabilityForm({ ...unavailabilityForm, reason: value })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="occupied">Occupied</SelectItem>
-                    <SelectItem value="overseas">Overseas</SelectItem>
+                    <SelectItem value="occupied" dir="rtl">תפוס</SelectItem>
+                    <SelectItem value="overseas" dir="rtl">בחו"ל</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -782,7 +782,7 @@ END:VEVENT
           <DialogContent className="sm:max-w-lg">
             <DialogHeader><DialogTitle className="flex items-center gap-2"><Info className="w-5 h-5 text-blue-600" />נהלי הרשמה ועדכונים</DialogTitle></DialogHeader>
             <div className="py-4"><div className="bg-blue-50 border border-blue-200 rounded-lg p-4 whitespace-pre-wrap">{tipsMessage}</div></div>
-            <DialogFooter><Button onClick={() => setShowTipsPopup(false)} className="bg-blue-900 hover:bg-blue-800">Got it</Button></DialogFooter>
+            <DialogFooter><Button onClick={() => setShowTipsPopup(false)} className="bg-blue-900 hover:bg-blue-800" dir="rtl">הבנתי</Button></DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -870,8 +870,8 @@ END:VEVENT
                       <div>
                         <p className="font-semibold text-green-700 mb-2" dir="rtl">נוסף:</p>
                         {added.map((s, i) => (
-                          <div key={i} className="p-2 bg-green-50 rounded mb-1 text-sm">
-                            {format(new Date(s.date), "EEE, MMM d")} {s.start_time}-{s.end_time} ({s.type})
+                          <div key={i} className="p-2 bg-green-50 rounded mb-1 text-sm" dir="rtl">
+                            {format(new Date(s.date), "EEE, d MMM")} {s.start_time}-{s.end_time} ({s.type === 'wanted' ? 'רצוי' : s.type === 'available' ? 'זמין' : 'לא זמין'})
                           </div>
                         ))}
                       </div>
@@ -880,8 +880,8 @@ END:VEVENT
                       <div>
                         <p className="font-semibold text-red-700 mb-2" dir="rtl">הוסר:</p>
                         {removed.map((s, i) => (
-                          <div key={i} className="p-2 bg-red-50 rounded mb-1 text-sm">
-                            {format(new Date(s.date), "EEE, MMM d")} {s.start_time}-{s.end_time} ({s.type})
+                          <div key={i} className="p-2 bg-red-50 rounded mb-1 text-sm" dir="rtl">
+                            {format(new Date(s.date), "EEE, d MMM")} {s.start_time}-{s.end_time} ({s.type === 'wanted' ? 'רצוי' : s.type === 'available' ? 'זמין' : 'לא זמין'})
                           </div>
                         ))}
                       </div>
@@ -907,7 +907,7 @@ END:VEVENT
         <Dialog open={showDateDetails} onOpenChange={setShowDateDetails}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>{selectedDate && format(selectedDate, "EEEE, MMMM d, yyyy")}</DialogTitle>
+              <DialogTitle dir="rtl">{selectedDate && format(selectedDate, "EEEE, d MMMM, yyyy")}</DialogTitle>
             </DialogHeader>
             {selectedDate && (
               <div className="space-y-4 py-4">
@@ -941,7 +941,7 @@ END:VEVENT
                       <div key={i} className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
                         <p className="font-medium">{a.food_cart_name}</p>
                         <p className="text-sm text-gray-600">{a.start_time} - {a.end_time} ({a.hours}h)</p>
-                        {a.menu && <p className="text-sm text-amber-700">Menu: {a.menu}</p>}
+                        {a.menu && <p className="text-sm text-amber-700" dir="rtl">תפריט: {a.menu}</p>}
                       </div>
                     ))
                   )}
