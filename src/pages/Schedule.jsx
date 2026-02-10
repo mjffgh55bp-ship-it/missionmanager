@@ -390,7 +390,10 @@ export default function Schedule() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[80px]" dir="rtl">פעולות</TableHead>
+                            <TableHead className="w-[100px]" dir="rtl">שעה</TableHead>
+                            <TableHead className="w-[120px]" dir="rtl">טבח ראשי</TableHead>
+                            <TableHead className="w-[120px]" dir="rtl">עוזר טבח</TableHead>
+                            <TableHead className="w-[120px]" dir="rtl">נוסף</TableHead>
                             {columns.map(col => (
                               <TableHead key={col} className="w-[100px]">
                                 <div className="flex items-center gap-1">
@@ -399,10 +402,7 @@ export default function Schedule() {
                                 </div>
                               </TableHead>
                             ))}
-                            <TableHead className="w-[120px]" dir="rtl">נוסף</TableHead>
-                            <TableHead className="w-[120px]" dir="rtl">עוזר טבח</TableHead>
-                            <TableHead className="w-[120px]" dir="rtl">טבח ראשי</TableHead>
-                            <TableHead className="w-[100px]" dir="rtl">שעה</TableHead>
+                            <TableHead className="w-[80px]" dir="rtl">פעולות</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -411,11 +411,36 @@ export default function Schedule() {
                           ) : (
                             cartAssignments.map((assignment) => (
                               <TableRow key={assignment.id} className={assignment.has_trainee ? "bg-orange-50" : ""}>
+                                <TableCell className="font-medium">
+                                  <div className="text-sm">{assignment.start_time || "?"}-{assignment.end_time || "?"}</div>
+                                  <div className="text-xs text-gray-500">{assignment.hours || 0}h</div>
+                                </TableCell>
                                 <TableCell>
-                                  <div className="flex gap-1">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditAssignment(assignment)}><Pencil className="w-3 h-3" /></Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => handleDeleteAssignment(assignment.id)}><Trash2 className="w-3 h-3" /></Button>
-                                  </div>
+                                  <button onClick={() => handlePositionClick(assignment, 'chef')} className={`w-full text-right p-1 rounded border hover:bg-blue-50 ${assignment.chef_id && isWorkerUnavailable(assignment.chef_id, assignment.start_time, assignment.end_time) ? "border-red-300 bg-red-50" : "border-gray-200"}`} dir="rtl">
+                                    {assignment.chef_name ? (
+                                      <span className={`text-xs font-medium truncate ${getSeniorityColor(assignment.chef_seniority)}`}>{assignment.chef_name}</span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400">+ טבח</span>
+                                    )}
+                                  </button>
+                                </TableCell>
+                                <TableCell>
+                                  <button onClick={() => handlePositionClick(assignment, 'sous_chef')} className={`w-full text-right p-1 rounded border hover:bg-blue-50 ${assignment.sous_chef_id && isWorkerUnavailable(assignment.sous_chef_id, assignment.start_time, assignment.end_time) ? "border-red-300 bg-red-50" : "border-gray-200"}`} dir="rtl">
+                                    {assignment.sous_chef_name ? (
+                                      <span className={`text-xs font-medium truncate ${getSeniorityColor(assignment.sous_chef_seniority)}`}>{assignment.sous_chef_name}</span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400">+ עוזר</span>
+                                    )}
+                                  </button>
+                                </TableCell>
+                                <TableCell>
+                                  <button onClick={() => handlePositionClick(assignment, 'additional')} className="w-full text-right p-1 rounded border border-gray-200 hover:bg-blue-50" dir="rtl">
+                                    {assignment.additional_chef_name ? (
+                                      <span className="text-xs font-medium truncate text-gray-900">{assignment.additional_chef_name}</span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400">+ נוסף</span>
+                                    )}
+                                  </button>
                                 </TableCell>
                                 {columns.map(col => (
                                   <TableCell key={col}>
@@ -435,35 +460,10 @@ export default function Schedule() {
                                   </TableCell>
                                 ))}
                                 <TableCell>
-                                  <button onClick={() => handlePositionClick(assignment, 'additional')} className="w-full text-left p-1 rounded border border-gray-200 hover:bg-blue-50">
-                                    {assignment.additional_chef_name ? (
-                                      <span className="text-xs font-medium truncate text-gray-900">{assignment.additional_chef_name}</span>
-                                    ) : (
-                                      <span className="text-xs text-gray-400" dir="rtl">+ נוסף</span>
-                                    )}
-                                  </button>
-                                </TableCell>
-                                <TableCell>
-                                  <button onClick={() => handlePositionClick(assignment, 'sous_chef')} className={`w-full text-left p-1 rounded border hover:bg-blue-50 ${assignment.sous_chef_id && isWorkerUnavailable(assignment.sous_chef_id, assignment.start_time, assignment.end_time) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                                    {assignment.sous_chef_name ? (
-                                      <span className={`text-xs font-medium truncate ${getSeniorityColor(assignment.sous_chef_seniority)}`}>{assignment.sous_chef_name}</span>
-                                    ) : (
-                                      <span className="text-xs text-gray-400" dir="rtl">+ עוזר</span>
-                                    )}
-                                  </button>
-                                </TableCell>
-                                <TableCell>
-                                  <button onClick={() => handlePositionClick(assignment, 'chef')} className={`w-full text-left p-1 rounded border hover:bg-blue-50 ${assignment.chef_id && isWorkerUnavailable(assignment.chef_id, assignment.start_time, assignment.end_time) ? "border-red-300 bg-red-50" : "border-gray-200"}`}>
-                                    {assignment.chef_name ? (
-                                      <span className={`text-xs font-medium truncate ${getSeniorityColor(assignment.chef_seniority)}`}>{assignment.chef_name}</span>
-                                    ) : (
-                                      <span className="text-xs text-gray-400" dir="rtl">+ טבח</span>
-                                    )}
-                                  </button>
-                                </TableCell>
-                                <TableCell className="font-medium">
-                                  <div className="text-sm">{assignment.start_time || "?"}-{assignment.end_time || "?"}</div>
-                                  <div className="text-xs text-gray-500">{assignment.hours || 0}h</div>
+                                  <div className="flex gap-1">
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditAssignment(assignment)}><Pencil className="w-3 h-3" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => handleDeleteAssignment(assignment.id)}><Trash2 className="w-3 h-3" /></Button>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))
