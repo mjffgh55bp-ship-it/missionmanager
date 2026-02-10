@@ -437,8 +437,9 @@ export default function Yearly() {
                       const isShabbat = dayOfWeek === 6;
                       const isFriday = dayOfWeek === 5;
                       const hebDate = getHebrewDate(day);
+                      const isToday = format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
                       return (
-                        <div key={idx} className={`text-center text-[8px] py-1 border-l leading-tight flex flex-col justify-center ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}>
+                        <div key={idx} className={`text-center text-[8px] py-1 border-l leading-tight flex flex-col justify-center ${isToday ? 'border-l-2 border-l-blue-500' : ''} ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}>
                           <div className="font-semibold">{HEBREW_DAYS[dayOfWeek]}</div>
                           <div>{day.getDate()}</div>
                           <div className="text-gray-500">{hebDate.dayHeb}</div>
@@ -472,9 +473,10 @@ export default function Yearly() {
                                         const dayOfWeek = getDay(day);
                                         const isShabbat = dayOfWeek === 6;
                                         const isFriday = dayOfWeek === 5;
+                                        const isToday = format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
                                         return (
                                           <div key={idx}
-                                            className={`h-full border-l ${viewOnly ? '' : 'cursor-pointer hover:bg-blue-50'} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
+                                            className={`h-full border-l ${isToday ? 'border-l-2 border-l-blue-500' : ''} ${viewOnly ? '' : 'cursor-pointer hover:bg-blue-50'} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`}
                                             style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}
                                             onClick={() => handleCellClick(row.id, dateStr)} />
                                         );
@@ -500,7 +502,8 @@ export default function Yearly() {
                           const dayOfWeek = getDay(day);
                           const isShabbat = dayOfWeek === 6;
                           const isFriday = dayOfWeek === 5;
-                          return <div key={idx} className={`h-full border-l ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }} />;
+                          const isToday = format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                          return <div key={idx} className={`h-full border-l ${isToday ? 'border-l-2 border-l-blue-500' : ''} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }} />;
                         })}
                         {unavailabilities.map((unavail, idx) => {
                           const dateIdx = yearDaysMap[unavail.date];
