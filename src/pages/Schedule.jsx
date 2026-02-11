@@ -47,15 +47,22 @@ export default function Schedule() {
   const [columnTypes, setColumnTypes] = useState([]);
   const [columnSubTypes, setColumnSubTypes] = useState({});
   const [cartColumns, setCartColumns] = useState({});
+  const [templates, setTemplates] = useState([]);
+  const [templateRows, setTemplateRows] = useState([]);
   
   const [showWorkerDialog, setShowWorkerDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showAddShiftDialog, setShowAddShiftDialog] = useState(false);
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
+  const [showAddTemplateRowDialog, setShowAddTemplateRowDialog] = useState(false);
+  const [showEditTemplateRowDialog, setShowEditTemplateRowDialog] = useState(false);
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [selectedCartId, setSelectedCartId] = useState(null);
   const [newColumnType, setNewColumnType] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [currentTemplateRow, setCurrentTemplateRow] = useState(null);
+  const [templateRowValues, setTemplateRowValues] = useState({});
   
   const [editFormData, setEditFormData] = useState({
     start_time: "",
@@ -78,7 +85,7 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     
-    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData, colTypesSettings, colSubTypesSettings, cartColsSettings] = await Promise.all([
+    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData, colTypesSettings, colSubTypesSettings, cartColsSettings, templatesData, templateRowsData] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.FoodCart.filter({ active: true }),
       base44.entities.Assignment.filter({ date: dateString }),
@@ -86,13 +93,17 @@ export default function Schedule() {
       base44.entities.Unavailability.filter({ date: dateString }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
-      base44.entities.AppSettings.filter({ setting_key: "cart_columns" })
+      base44.entities.AppSettings.filter({ setting_key: "cart_columns" }),
+      base44.entities.Template.filter({ active: true }),
+      base44.entities.TemplateRow.filter({ date: dateString })
     ]);
     setWorkers(workersData);
     setCarts(cartsData);
     setAssignments(assignmentsData);
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
+    setTemplates(templatesData);
+    setTemplateRows(templateRowsData);
     if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     if (cartColsSettings.length > 0) setCartColumns(JSON.parse(cartColsSettings[0].setting_value) || {});
@@ -275,6 +286,66 @@ export default function Schedule() {
     await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
   };
 
+  const handleAddTemplateRow = () => {
+    setSelectedTemplateId("");
+    setTemplateRowValues({});
+    setCurrentTemplateRow(null);
+    setShowAddTemplateRowDialog(true);
+  };
+
+  const handleEditTemplateRow = (row) => {
+    setCurrentTemplateRow(row);
+    setSelectedTemplateId(row.template_id);
+    setTemplateRowValues(row.values || {});
+    setShowEditTemplateRowDialog(true);
+  };
+
+  const handleSaveTemplateRow = async () => {
+    const template = templates.find(t => t.id === selectedTemplateId);
+    if (!template) return;
+
+    const data = {
+      template_id: selectedTemplateId,
+      template_name: template.name,
+      date: dateString,
+      values: templateRowValues
+    };
+
+    if (currentTemplateRow) {
+      await base44.entities.TemplateRow.update(currentTemplateRow.id, data);
+    } else {
+      await base44.entities.TemplateRow.create(data);
+    }
+
+    setShowAddTemplateRowDialog(false);
+    setShowEditTemplateRowDialog(false);
+    setSelectedTemplateId("");
+    setTemplateRowValues({});
+    setCurrentTemplateRow(null);
+    loadData();
+  };
+
+  const handleDeleteTemplateRow = async (rowId) => {
+    if (confirm("האם למחוק שורה זו?")) {
+      await base44.entities.TemplateRow.delete(rowId);
+      loadData();
+    }
+  };
+
+  const handleTemplateChange = (templateId) => {
+    setSelectedTemplateId(templateId);
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      const initialValues = {};
+      template.columns.forEach(col => {
+        if (col.default_value) {
+          initialValues[col.name] = col.default_value;
+        }
+      });
+      setTemplateRowValues(initialValues);
+    }
+  };
+
   const handleUpdateColumnValue = async (assignmentId, colType, value, subType) => {
     const assignment = assignments.find(a => a.id === assignmentId);
     const updatedValues = { ...(assignment.column_values || {}), [colType]: { value, subType } };
@@ -357,6 +428,10 @@ export default function Schedule() {
                 <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center" dir="rtl">{formatDateHebrew(currentDate)}</div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
                 <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
+                <Button className="bg-green-600 hover:bg-green-700" onClick={handleAddTemplateRow} dir="rtl">
+                  <Plus className="w-4 h-4 ml-2" />
+                  הוסף שורה מתבנית
+                </Button>
                 <Button variant="outline" onClick={handleExportToExcel} className="gap-2" dir="rtl">
                   <Download className="w-4 h-4" />
                   ייצא
@@ -365,6 +440,55 @@ export default function Schedule() {
             </div>
           </CardHeader>
         </Card>
+
+        {templateRows.length > 0 && (
+          <div className="space-y-4 mb-6">
+            {templateRows.map((row) => {
+              const template = templates.find(t => t.id === row.template_id);
+              if (!template) return null;
+              
+              return (
+                <Card key={row.id} className="border-none shadow-lg overflow-hidden">
+                  <CardHeader className="text-white py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => handleEditTemplateRow(row)}>
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                        <Button size="sm" variant="secondary" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteTemplateRow(row.id)}>
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            {template.columns.map((col, idx) => (
+                              <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">{col.name}</TableHead>
+                            ))}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            {template.columns.map((col, idx) => (
+                              <TableCell key={idx} dir="rtl">
+                                <div className="text-sm">{row.values?.[col.name] || "-"}</div>
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
         {carts.length === 0 ? (
           <Card className="border-none shadow-lg"><CardContent className="py-16 text-center" dir="rtl"><h3 className="text-xl font-semibold text-gray-900 mb-2">נדרשת הגדרה</h3><p className="text-gray-600">אנא הוסף עגלות מזון תחילה.</p></CardContent></Card>
@@ -572,6 +696,93 @@ export default function Schedule() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddColumnDialog(false)} dir="rtl">ביטול</Button>
               <Button onClick={handleAddColumn} disabled={!newColumnType} className="bg-blue-900 hover:bg-blue-800" dir="rtl">הוסף</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Template Row Dialog */}
+        <Dialog open={showAddTemplateRowDialog} onOpenChange={setShowAddTemplateRowDialog}>
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle dir="rtl">הוסף שורה מתבנית</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label dir="rtl">בחר תבנית</Label>
+                <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="בחר תבנית..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {selectedTemplateId && templates.find(t => t.id === selectedTemplateId) && (
+                <div className="space-y-3 border-t pt-4">
+                  {templates.find(t => t.id === selectedTemplateId).columns.map((col, idx) => (
+                    <div key={idx}>
+                      <Label className="text-sm" dir="rtl">{col.name}</Label>
+                      {col.type === "time" ? (
+                        <Input
+                          type="time"
+                          value={templateRowValues[col.name] || ""}
+                          onChange={(e) => setTemplateRowValues({ ...templateRowValues, [col.name]: e.target.value })}
+                        />
+                      ) : (
+                        <Input
+                          value={templateRowValues[col.name] || ""}
+                          onChange={(e) => setTemplateRowValues({ ...templateRowValues, [col.name]: e.target.value })}
+                          placeholder={col.default_value || ""}
+                          dir="rtl"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddTemplateRowDialog(false)} dir="rtl">ביטול</Button>
+              <Button onClick={handleSaveTemplateRow} disabled={!selectedTemplateId} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שמור</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Template Row Dialog */}
+        <Dialog open={showEditTemplateRowDialog} onOpenChange={setShowEditTemplateRowDialog}>
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle dir="rtl">ערוך שורה</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              {selectedTemplateId && templates.find(t => t.id === selectedTemplateId) && (
+                <div className="space-y-3">
+                  <div className="font-semibold text-lg mb-3" dir="rtl">{templates.find(t => t.id === selectedTemplateId).name}</div>
+                  {templates.find(t => t.id === selectedTemplateId).columns.map((col, idx) => (
+                    <div key={idx}>
+                      <Label className="text-sm" dir="rtl">{col.name}</Label>
+                      {col.type === "time" ? (
+                        <Input
+                          type="time"
+                          value={templateRowValues[col.name] || ""}
+                          onChange={(e) => setTemplateRowValues({ ...templateRowValues, [col.name]: e.target.value })}
+                        />
+                      ) : (
+                        <Input
+                          value={templateRowValues[col.name] || ""}
+                          onChange={(e) => setTemplateRowValues({ ...templateRowValues, [col.name]: e.target.value })}
+                          placeholder={col.default_value || ""}
+                          dir="rtl"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEditTemplateRowDialog(false)} dir="rtl">ביטול</Button>
+              <Button onClick={handleSaveTemplateRow} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שמור</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
