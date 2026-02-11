@@ -16,7 +16,8 @@ export default function Templates() {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
-    columns: []
+    columns: [],
+    default_rows: []
   });
 
   useEffect(() => {
@@ -45,7 +46,8 @@ export default function Templates() {
         { name: "נוסף", type: "worker", width: 120 },
         { name: "משימה", type: "text", width: 150 },
         { name: "הערות", type: "text", width: 150 }
-      ]
+      ],
+      default_rows: []
     });
     setShowDialog(true);
   };
@@ -55,7 +57,8 @@ export default function Templates() {
     setFormData({
       name: template.name,
       color: template.color || "#3b82f6",
-      columns: template.columns || []
+      columns: template.columns || [],
+      default_rows: template.default_rows || []
     });
     setShowDialog(true);
   };
@@ -96,6 +99,30 @@ export default function Templates() {
     const updated = [...formData.columns];
     updated[index] = { ...updated[index], [field]: value };
     setFormData({ ...formData, columns: updated });
+  };
+
+  const handleAddDefaultRow = () => {
+    const newRow = {};
+    formData.columns.forEach(col => {
+      newRow[col.name] = col.default_value || "";
+    });
+    setFormData({
+      ...formData,
+      default_rows: [...formData.default_rows, newRow]
+    });
+  };
+
+  const handleRemoveDefaultRow = (index) => {
+    setFormData({
+      ...formData,
+      default_rows: formData.default_rows.filter((_, i) => i !== index)
+    });
+  };
+
+  const handleUpdateDefaultRow = (rowIndex, colName, value) => {
+    const updated = [...formData.default_rows];
+    updated[rowIndex] = { ...updated[rowIndex], [colName]: value };
+    setFormData({ ...formData, default_rows: updated });
   };
 
   const getColumnTypeLabel = (type) => {
@@ -267,6 +294,58 @@ export default function Templates() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <Label dir="rtl">שורות ברירת מחדל (אופציונלי)</Label>
+                  <Button size="sm" variant="outline" onClick={handleAddDefaultRow} disabled={formData.columns.length === 0} dir="rtl">
+                    <Plus className="w-3 h-3 ml-1" />
+                    שורה
+                  </Button>
+                </div>
+                {formData.default_rows.length > 0 && (
+                  <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          {formData.columns.map((col, idx) => (
+                            <th key={idx} className="px-2 py-2 text-right border-b" dir="rtl">{col.name}</th>
+                          ))}
+                          <th className="px-2 py-2 w-10 border-b"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formData.default_rows.map((row, rowIdx) => (
+                          <tr key={rowIdx} className="border-b">
+                            {formData.columns.map((col, colIdx) => (
+                              <td key={colIdx} className="p-0">
+                                <Input
+                                  type={col.type === "time" ? "time" : "text"}
+                                  value={row[col.name] || ""}
+                                  onChange={(e) => handleUpdateDefaultRow(rowIdx, col.name, e.target.value)}
+                                  placeholder={col.default_value || ""}
+                                  dir="rtl"
+                                  className="border-0 rounded-none text-sm h-9"
+                                />
+                              </td>
+                            ))}
+                            <td className="p-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 text-red-500 hover:text-red-700"
+                                onClick={() => handleRemoveDefaultRow(rowIdx)}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>

@@ -297,19 +297,32 @@ export default function Schedule() {
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
 
-    const initialValues = {};
-    template.columns.forEach(col => {
-      if (col.default_value) {
-        initialValues[col.name] = col.default_value;
-      }
-    });
+    // אם יש שורות ברירת מחדל בתבנית, צור אותן
+    if (template.default_rows && template.default_rows.length > 0) {
+      const rowsToCreate = template.default_rows.map(row => ({
+        template_id: templateId,
+        template_name: template.name,
+        date: dateString,
+        values: row
+      }));
+      
+      await base44.entities.TemplateRow.bulkCreate(rowsToCreate);
+    } else {
+      // אחרת צור שורה ריקה עם ערכי ברירת מחדל מהעמודות
+      const initialValues = {};
+      template.columns.forEach(col => {
+        if (col.default_value) {
+          initialValues[col.name] = col.default_value;
+        }
+      });
 
-    await base44.entities.TemplateRow.create({
-      template_id: templateId,
-      template_name: template.name,
-      date: dateString,
-      values: initialValues
-    });
+      await base44.entities.TemplateRow.create({
+        template_id: templateId,
+        template_name: template.name,
+        date: dateString,
+        values: initialValues
+      });
+    }
 
     loadData();
   };
