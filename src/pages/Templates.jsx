@@ -304,7 +304,15 @@ export default function Templates() {
                     שורה
                   </Button>
                 </div>
-                {formData.default_rows.length > 0 && (
+                {formData.columns.length === 0 ? (
+                  <div className="text-sm text-gray-500 text-center py-4 border rounded-lg" dir="rtl">
+                    יש להוסיף עמודות לפני הוספת שורות ברירת מחדל
+                  </div>
+                ) : formData.default_rows.length === 0 ? (
+                  <div className="text-sm text-gray-500 text-center py-4 border rounded-lg" dir="rtl">
+                    לחץ על "שורה" להוספת שורות ברירת מחדל
+                  </div>
+                ) : (
                   <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50 sticky top-0">
