@@ -183,12 +183,49 @@ export default function Templates() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <div className="flex flex-wrap gap-2">
-                    {template.columns?.map((col, idx) => (
-                      <Badge key={idx} variant="outline" className="text-sm" dir="rtl">
-                        {col.name}
-                      </Badge>
-                    ))}
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-2" dir="rtl">עמודות:</div>
+                      <div className="flex flex-wrap gap-2">
+                        {template.columns?.map((col, idx) => (
+                          <Badge key={idx} variant="outline" className="text-sm" dir="rtl">
+                            {col.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {template.default_rows && template.default_rows.length > 0 && (
+                      <div>
+                        <div className="text-xs text-gray-500 mb-2" dir="rtl">
+                          שורות ברירת מחדל ({template.default_rows.length}):
+                        </div>
+                        <div className="border rounded-lg overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                {template.columns?.map((col, idx) => (
+                                  <th key={idx} className="px-2 py-1 text-right border-b text-gray-600" dir="rtl">
+                                    {col.name}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {template.default_rows.map((row, rowIdx) => (
+                                <tr key={rowIdx} className="border-b last:border-b-0">
+                                  {template.columns?.map((col, colIdx) => (
+                                    <td key={colIdx} className="px-2 py-1 text-right" dir="rtl">
+                                      {row[col.name] || "-"}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
