@@ -34,6 +34,7 @@ export default function Templates() {
     setEditingTemplate(null);
     setFormData({
       name: "",
+      color: "#3b82f6",
       columns: [
         { name: "תדריך", type: "text", width: 100 },
         { name: "התחלה", type: "time", width: 80 },
@@ -53,17 +54,13 @@ export default function Templates() {
     setEditingTemplate(template);
     setFormData({
       name: template.name,
+      color: template.color || "#3b82f6",
       columns: template.columns || []
     });
     setShowDialog(true);
   };
 
   const handleSaveTemplate = async () => {
-    if (!formData.name || formData.columns.length === 0) {
-      alert("נא למלא שם ולפחות עמודה אחת");
-      return;
-    }
-
     if (editingTemplate) {
       await base44.entities.Template.update(editingTemplate.id, formData);
     } else {
@@ -145,7 +142,7 @@ export default function Templates() {
           ) : (
             templates.map((template) => (
               <Card key={template.id} className="border-none shadow-lg overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3">
+                <CardHeader className="text-white py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                   <div className="flex justify-between items-center">
                     <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
                     <div className="flex gap-2">
@@ -179,14 +176,25 @@ export default function Templates() {
               <DialogTitle dir="rtl">{editingTemplate ? "ערוך תבנית" : "תבנית חדשה"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div>
-                <Label dir="rtl">שם התבנית</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="לדוגמה: נחש בהריון"
-                  dir="rtl"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="md:col-span-3">
+                  <Label dir="rtl">שם התבנית</Label>
+                  <Input
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="לדוגמה: נחש בהריון"
+                    dir="rtl"
+                  />
+                </div>
+                <div>
+                  <Label dir="rtl">צבע</Label>
+                  <Input
+                    type="color"
+                    value={formData.color}
+                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                    className="h-10 cursor-pointer"
+                  />
+                </div>
               </div>
 
               <div>
