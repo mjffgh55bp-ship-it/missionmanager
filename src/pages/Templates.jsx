@@ -159,7 +159,7 @@ export default function Templates() {
                   <div className="flex flex-wrap gap-2">
                     {template.columns?.map((col, idx) => (
                       <Badge key={idx} variant="outline" className="text-sm" dir="rtl">
-                        {col.name} ({getColumnTypeLabel(col.type)})
+                        {col.name}
                       </Badge>
                     ))}
                   </div>
