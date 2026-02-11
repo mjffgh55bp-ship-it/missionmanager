@@ -485,10 +485,28 @@ export default function Schedule() {
                   <CardHeader className="text-white py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                     <div className="flex justify-between items-center">
                       <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
-                      <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
-                        <Plus className="w-3 h-3 ml-1" />
-                        הוסף שורה
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
+                          <Plus className="w-3 h-3 ml-1" />
+                          הוסף שורה
+                        </Button>
+                        {templateRowsForTemplate.length > 0 && (
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            onClick={async () => {
+                              if (confirm(`האם למחוק את כל ${templateRowsForTemplate.length} השורות של ${template.name}?`)) {
+                                await Promise.all(templateRowsForTemplate.map(row => base44.entities.TemplateRow.delete(row.id)));
+                                loadData();
+                              }
+                            }}
+                            dir="rtl"
+                          >
+                            <Trash2 className="w-3 h-3 ml-1" />
+                            מחק הכל
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -582,6 +600,22 @@ export default function Schedule() {
                       <div className="flex gap-2">
                         <Button size="sm" variant="secondary" onClick={() => openAddColumnDialog(cart.id)}><Plus className="w-3 h-3" /></Button>
                         <Button size="sm" variant="secondary" onClick={() => openAddShiftDialog(cart.id)} dir="rtl"><Plus className="w-4 h-4 mr-1" />משמרת</Button>
+                        {cartAssignments.length > 0 && (
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            onClick={async () => {
+                              if (confirm(`האם למחוק את כל ${cartAssignments.length} המשמרות של ${cart.name}?`)) {
+                                await Promise.all(cartAssignments.map(a => base44.entities.Assignment.delete(a.id)));
+                                loadData();
+                              }
+                            }}
+                            dir="rtl"
+                          >
+                            <Trash2 className="w-3 h-3 ml-1" />
+                            מחק הכל
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
