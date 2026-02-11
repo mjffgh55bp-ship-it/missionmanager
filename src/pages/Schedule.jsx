@@ -308,32 +308,20 @@ export default function Schedule() {
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
 
-    // אם יש שורות ברירת מחדל בתבנית, צור אותן
-    if (template.default_rows && template.default_rows.length > 0) {
-      const rowsToCreate = template.default_rows.map(row => ({
-        template_id: templateId,
-        template_name: template.name,
-        date: dateString,
-        values: row
-      }));
-      
-      await base44.entities.TemplateRow.bulkCreate(rowsToCreate);
-    } else {
-      // אחרת צור שורה ריקה עם ערכי ברירת מחדל מהעמודות
-      const initialValues = {};
-      template.columns.forEach(col => {
-        if (col.default_value) {
-          initialValues[col.name] = col.default_value;
-        }
-      });
+    // תמיד צור רק שורה אחת עם ערכי ברירת מחדל מהעמודות
+    const initialValues = {};
+    template.columns.forEach(col => {
+      if (col.default_value) {
+        initialValues[col.name] = col.default_value;
+      }
+    });
 
-      await base44.entities.TemplateRow.create({
-        template_id: templateId,
-        template_name: template.name,
-        date: dateString,
-        values: initialValues
-      });
-    }
+    await base44.entities.TemplateRow.create({
+      template_id: templateId,
+      template_name: template.name,
+      date: dateString,
+      values: initialValues
+    });
 
     loadData();
   };
@@ -486,7 +474,9 @@ export default function Schedule() {
                     variant="destructive" 
                     onClick={async () => {
                       if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
-                        await Promise.all(templateRows.map(row => base44.entities.TemplateRow.delete(row.id)));
+                        for (const row of templateRows) {
+                          await base44.entities.TemplateRow.delete(row.id);
+                        }
                         loadData();
                       }
                     }}
@@ -548,12 +538,9 @@ export default function Schedule() {
                           size="sm" 
                           variant="destructive" 
                           onClick={async () => {
-                            const confirmMessage = templateRowsForTemplate.length > 0 
-                              ? `האם למחוק את ${template.name} עם ${templateRowsForTemplate.length} השורות?` 
-                              : `האם להסתיר את ${template.name} מהיום?`;
-                            if (confirm(confirmMessage)) {
-                              if (templateRowsForTemplate.length > 0) {
-                                await Promise.all(templateRowsForTemplate.map(row => base44.entities.TemplateRow.delete(row.id)));
+                            if (confirm(`האם למחוק את כל ${templateRowsForTemplate.length} השורות של ${template.name}?`)) {
+                              for (const row of templateRowsForTemplate) {
+                                await base44.entities.TemplateRow.delete(row.id);
                               }
                               loadData();
                             }
@@ -662,7 +649,9 @@ export default function Schedule() {
                             variant="destructive" 
                             onClick={async () => {
                               if (confirm(`האם למחוק את כל ${cartAssignments.length} המשמרות של ${cart.name}?`)) {
-                                await Promise.all(cartAssignments.map(a => base44.entities.Assignment.delete(a.id)));
+                                for (const assignment of cartAssignments) {
+                                  await base44.entities.Assignment.delete(assignment.id);
+                                }
                                 loadData();
                               }
                             }}
