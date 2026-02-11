@@ -59,6 +59,14 @@ export default function Schedule() {
   const [showCreateCategoryDialog, setShowCreateCategoryDialog] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState("#3b82f6");
+  const [showAddFromTemplatesDialog, setShowAddFromTemplatesDialog] = useState(false);
+  const [showAddTemplateColumnDialog, setShowAddTemplateColumnDialog] = useState(false);
+  const [showAddCategoryToTemplateDialog, setShowAddCategoryToTemplateDialog] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [newTemplateColumnName, setNewTemplateColumnName] = useState("");
+  const [newTemplateColumnType, setNewTemplateColumnType] = useState("text");
+  const [newSubCategoryName, setNewSubCategoryName] = useState("");
+  const [newSubCategoryColor, setNewSubCategoryColor] = useState("#3b82f6");
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [selectedCartId, setSelectedCartId] = useState(null);
@@ -465,14 +473,29 @@ export default function Schedule() {
                 <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center" dir="rtl">{formatDateHebrew(currentDate)}</div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
                 <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
-                <Button className="bg-green-600 hover:bg-green-700" onClick={handleAddTemplateRow} dir="rtl">
+                <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddFromTemplatesDialog(true)} dir="rtl">
                   <Plus className="w-4 h-4 ml-2" />
-                  הוסף שורה מתבנית
+                  הוסף תבנית מהשלדיות
                 </Button>
                 <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => setShowCreateCategoryDialog(true)} dir="rtl">
                   <Plus className="w-4 h-4 ml-2" />
                   צור קטגוריה חדשה
                 </Button>
+                {templateRows.length > 0 && (
+                  <Button 
+                    variant="destructive" 
+                    onClick={async () => {
+                      if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
+                        await Promise.all(templateRows.map(row => base44.entities.TemplateRow.delete(row.id)));
+                        loadData();
+                      }
+                    }}
+                    dir="rtl"
+                  >
+                    <Trash2 className="w-4 h-4 ml-2" />
+                    מחק הכל
+                  </Button>
+                )}
                 <Button variant="outline" onClick={handleExportToExcel} className="gap-2" dir="rtl">
                   <Download className="w-4 h-4" />
                   ייצא
@@ -496,6 +519,30 @@ export default function Schedule() {
                         <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
                           <Plus className="w-3 h-3 ml-1" />
                           הוסף שורה
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          onClick={() => {
+                            setSelectedTemplate(template);
+                            setShowAddTemplateColumnDialog(true);
+                          }} 
+                          dir="rtl"
+                        >
+                          <Plus className="w-3 h-3 ml-1" />
+                          הוסף עמודה
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          onClick={() => {
+                            setSelectedTemplate(template);
+                            setShowAddCategoryToTemplateDialog(true);
+                          }} 
+                          dir="rtl"
+                        >
+                          <Plus className="w-3 h-3 ml-1" />
+                          הוסף קטגוריה
                         </Button>
                         <Button 
                           size="sm" 
@@ -924,6 +971,159 @@ export default function Schedule() {
                 dir="rtl"
               >
                 צור קטגוריה
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add From Templates Dialog */}
+        <Dialog open={showAddFromTemplatesDialog} onOpenChange={setShowAddFromTemplatesDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle dir="rtl">הוסף תבנית מהשלדיות</DialogTitle></DialogHeader>
+            <div className="space-y-3 py-4">
+              {templates.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4" dir="rtl">אין שלדיות זמינות</p>
+              ) : (
+                templates.map(template => (
+                  <button
+                    key={template.id}
+                    onClick={async () => {
+                      await handleAddTemplateRowForTemplate(template.id);
+                      setShowAddFromTemplatesDialog(false);
+                    }}
+                    className="w-full p-3 rounded-lg border hover:border-blue-400 hover:bg-blue-50 text-right"
+                    dir="rtl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="w-4 h-4 rounded" 
+                        style={{ backgroundColor: template.color }}
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{template.name}</div>
+                        <div className="text-xs text-gray-500">{template.columns.length} עמודות</div>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddFromTemplatesDialog(false)} dir="rtl">ביטול</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Template Column Dialog */}
+        <Dialog open={showAddTemplateColumnDialog} onOpenChange={setShowAddTemplateColumnDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle dir="rtl">הוסף עמודה ל{selectedTemplate?.name}</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label dir="rtl">שם העמודה</Label>
+                <Input
+                  value={newTemplateColumnName}
+                  onChange={(e) => setNewTemplateColumnName(e.target.value)}
+                  placeholder="לדוגמה: שעה, שם..."
+                  dir="rtl"
+                />
+              </div>
+              <div>
+                <Label dir="rtl">סוג</Label>
+                <Select value={newTemplateColumnType} onValueChange={setNewTemplateColumnType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">טקסט</SelectItem>
+                    <SelectItem value="time">שעה</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowAddTemplateColumnDialog(false);
+                setNewTemplateColumnName("");
+                setNewTemplateColumnType("text");
+              }} dir="rtl">ביטול</Button>
+              <Button 
+                onClick={async () => {
+                  if (!newTemplateColumnName || !selectedTemplate) return;
+                  const updatedColumns = [...selectedTemplate.columns, {
+                    name: newTemplateColumnName,
+                    type: newTemplateColumnType,
+                    width: 150
+                  }];
+                  await base44.entities.Template.update(selectedTemplate.id, { columns: updatedColumns });
+                  setShowAddTemplateColumnDialog(false);
+                  setNewTemplateColumnName("");
+                  setNewTemplateColumnType("text");
+                  setSelectedTemplate(null);
+                  loadData();
+                }}
+                disabled={!newTemplateColumnName}
+                className="bg-blue-900 hover:bg-blue-800"
+                dir="rtl"
+              >
+                הוסף עמודה
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Category to Template Dialog */}
+        <Dialog open={showAddCategoryToTemplateDialog} onOpenChange={setShowAddCategoryToTemplateDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle dir="rtl">הוסף תת-קטגוריה חדשה</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label dir="rtl">שם התת-קטגוריה</Label>
+                <Input
+                  value={newSubCategoryName}
+                  onChange={(e) => setNewSubCategoryName(e.target.value)}
+                  placeholder="לדוגמה: כלי עזר, מרכיבים..."
+                  dir="rtl"
+                />
+              </div>
+              <div>
+                <Label dir="rtl">צבע</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="color"
+                    value={newSubCategoryColor}
+                    onChange={(e) => setNewSubCategoryColor(e.target.value)}
+                    className="w-20 h-10"
+                  />
+                  <div className="text-sm text-gray-600" dir="rtl">{newSubCategoryColor}</div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowAddCategoryToTemplateDialog(false);
+                setNewSubCategoryName("");
+                setNewSubCategoryColor("#3b82f6");
+              }} dir="rtl">ביטול</Button>
+              <Button 
+                onClick={async () => {
+                  if (!newSubCategoryName) return;
+                  const newTemplate = await base44.entities.Template.create({
+                    name: `${selectedTemplate?.name} - ${newSubCategoryName}`,
+                    color: newSubCategoryColor,
+                    columns: selectedTemplate?.columns || [{ name: "עמודה 1", type: "text", width: 150 }],
+                    default_rows: [],
+                    active: true
+                  });
+                  setShowAddCategoryToTemplateDialog(false);
+                  setNewSubCategoryName("");
+                  setNewSubCategoryColor("#3b82f6");
+                  setSelectedTemplate(null);
+                  loadData();
+                }}
+                disabled={!newSubCategoryName}
+                className="bg-purple-600 hover:bg-purple-700"
+                dir="rtl"
+              >
+                צור תת-קטגוריה
               </Button>
             </DialogFooter>
           </DialogContent>
