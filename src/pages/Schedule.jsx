@@ -56,6 +56,9 @@ export default function Schedule() {
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
   const [showAddTemplateRowDialog, setShowAddTemplateRowDialog] = useState(false);
   const [showEditTemplateRowDialog, setShowEditTemplateRowDialog] = useState(false);
+  const [showCreateCategoryDialog, setShowCreateCategoryDialog] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryColor, setNewCategoryColor] = useState("#3b82f6");
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [selectedCartId, setSelectedCartId] = useState(null);
@@ -466,6 +469,10 @@ export default function Schedule() {
                   <Plus className="w-4 h-4 ml-2" />
                   הוסף שורה מתבנית
                 </Button>
+                <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => setShowCreateCategoryDialog(true)} dir="rtl">
+                  <Plus className="w-4 h-4 ml-2" />
+                  צור קטגוריה חדשה
+                </Button>
                 <Button variant="outline" onClick={handleExportToExcel} className="gap-2" dir="rtl">
                   <Download className="w-4 h-4" />
                   ייצא
@@ -858,6 +865,66 @@ export default function Schedule() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowAddTemplateRowDialog(false)} dir="rtl">ביטול</Button>
               <Button onClick={handleSaveTemplateRow} disabled={!selectedTemplateId} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שמור</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Category Dialog */}
+        <Dialog open={showCreateCategoryDialog} onOpenChange={setShowCreateCategoryDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle dir="rtl">צור קטגוריה חדשה</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label dir="rtl">שם הקטגוריה</Label>
+                <Input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="לדוגמה: מתכונים, משימות..."
+                  dir="rtl"
+                />
+              </div>
+              <div>
+                <Label dir="rtl">צבע</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="color"
+                    value={newCategoryColor}
+                    onChange={(e) => setNewCategoryColor(e.target.value)}
+                    className="w-20 h-10"
+                  />
+                  <div className="text-sm text-gray-600" dir="rtl">{newCategoryColor}</div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowCreateCategoryDialog(false);
+                setNewCategoryName("");
+                setNewCategoryColor("#3b82f6");
+              }} dir="rtl">ביטול</Button>
+              <Button 
+                onClick={async () => {
+                  if (!newCategoryName) return;
+                  const newTemplate = await base44.entities.Template.create({
+                    name: newCategoryName,
+                    color: newCategoryColor,
+                    columns: [
+                      { name: "עמודה 1", type: "text", width: 150 }
+                    ],
+                    default_rows: [],
+                    active: true
+                  });
+                  setShowCreateCategoryDialog(false);
+                  setNewCategoryName("");
+                  setNewCategoryColor("#3b82f6");
+                  loadData();
+                }}
+                disabled={!newCategoryName}
+                className="bg-purple-600 hover:bg-purple-700"
+                dir="rtl"
+              >
+                צור קטגוריה
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
