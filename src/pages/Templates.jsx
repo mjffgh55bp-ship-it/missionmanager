@@ -209,37 +209,49 @@ export default function Templates() {
                   {formData.columns.map((col, idx) => (
                     <div key={idx} className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg">
                       <GripVertical className="w-4 h-4 text-gray-400 mt-2" />
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <div className="flex-1 space-y-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <div>
+                            <Label className="text-xs" dir="rtl">שם</Label>
+                            <Input
+                              value={col.name}
+                              onChange={(e) => handleUpdateColumn(idx, "name", e.target.value)}
+                              placeholder="שם העמודה"
+                              dir="rtl"
+                              className="text-sm"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs" dir="rtl">סוג</Label>
+                            <Select value={col.type} onValueChange={(val) => handleUpdateColumn(idx, "type", val)}>
+                              <SelectTrigger className="text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="text">טקסט</SelectItem>
+                                <SelectItem value="time">שעה</SelectItem>
+                                <SelectItem value="select">בחירה</SelectItem>
+                                <SelectItem value="worker">עובד</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label className="text-xs" dir="rtl">רוחב</Label>
+                            <Input
+                              type="number"
+                              value={col.width}
+                              onChange={(e) => handleUpdateColumn(idx, "width", parseInt(e.target.value))}
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
                         <div>
-                          <Label className="text-xs" dir="rtl">שם</Label>
+                          <Label className="text-xs" dir="rtl">טקסט ברירת מחדל</Label>
                           <Input
-                            value={col.name}
-                            onChange={(e) => handleUpdateColumn(idx, "name", e.target.value)}
-                            placeholder="שם העמודה"
+                            value={col.default_value || ""}
+                            onChange={(e) => handleUpdateColumn(idx, "default_value", e.target.value)}
+                            placeholder="אופציונלי - טקסט שיופיע אוטומטית"
                             dir="rtl"
-                            className="text-sm"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs" dir="rtl">סוג</Label>
-                          <Select value={col.type} onValueChange={(val) => handleUpdateColumn(idx, "type", val)}>
-                            <SelectTrigger className="text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="text">טקסט</SelectItem>
-                              <SelectItem value="time">שעה</SelectItem>
-                              <SelectItem value="select">בחירה</SelectItem>
-                              <SelectItem value="worker">עובד</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs" dir="rtl">רוחב</Label>
-                          <Input
-                            type="number"
-                            value={col.width}
-                            onChange={(e) => handleUpdateColumn(idx, "width", parseInt(e.target.value))}
                             className="text-sm"
                           />
                         </div>
