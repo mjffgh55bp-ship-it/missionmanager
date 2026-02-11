@@ -501,18 +501,33 @@ export default function Schedule() {
                               <TableRow key={row.id}>
                                 {template.columns.map((col, idx) => (
                                   <TableCell key={idx} dir="rtl" className="p-0">
-                                    <Input
-                                      type={col.type === "time" ? "time" : "text"}
-                                      value={row.values?.[col.name] || ""}
-                                      onChange={(e) => {
-                                        const newValues = { ...row.values, [col.name]: e.target.value };
-                                        base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                        setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                      }}
-                                      placeholder={col.default_value || "-"}
-                                      dir="rtl"
-                                      className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
-                                    />
+                                    {col.type === "time" ? (
+                                      <Input
+                                        type="time"
+                                        value={row.values?.[col.name] || ""}
+                                        onChange={(e) => {
+                                          const newValues = { ...row.values, [col.name]: e.target.value };
+                                          base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                          setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                        }}
+                                        placeholder={col.default_value || ""}
+                                        dir="rtl"
+                                        className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+                                      />
+                                    ) : (
+                                      <Input
+                                        type="text"
+                                        value={row.values?.[col.name] || ""}
+                                        onChange={(e) => {
+                                          const newValues = { ...row.values, [col.name]: e.target.value };
+                                          base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                          setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                        }}
+                                        placeholder={col.default_value || "-"}
+                                        dir="rtl"
+                                        className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+                                      />
+                                    )}
                                   </TableCell>
                                 ))}
                                 <TableCell className="p-1">
