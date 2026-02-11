@@ -490,22 +490,24 @@ export default function Schedule() {
                           <Plus className="w-3 h-3 ml-1" />
                           הוסף שורה
                         </Button>
-                        {templateRowsForTemplate.length > 0 && (
-                          <Button 
-                            size="sm" 
-                            variant="destructive" 
-                            onClick={async () => {
-                              if (confirm(`האם למחוק את כל ${templateRowsForTemplate.length} השורות של ${template.name}?`)) {
+                        <Button 
+                          size="sm" 
+                          variant="destructive" 
+                          onClick={async () => {
+                            const confirmMessage = templateRowsForTemplate.length > 0 
+                              ? `האם למחוק את ${template.name} עם ${templateRowsForTemplate.length} השורות?` 
+                              : `האם להסתיר את ${template.name} מהיום?`;
+                            if (confirm(confirmMessage)) {
+                              if (templateRowsForTemplate.length > 0) {
                                 await Promise.all(templateRowsForTemplate.map(row => base44.entities.TemplateRow.delete(row.id)));
-                                loadData();
                               }
-                            }}
-                            dir="rtl"
-                          >
-                            <Trash2 className="w-3 h-3 ml-1" />
-                            מחק הכל
-                          </Button>
-                        )}
+                              loadData();
+                            }
+                          }}
+                          dir="rtl"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
                       </div>
                     </div>
                   </CardHeader>
