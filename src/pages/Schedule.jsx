@@ -286,11 +286,33 @@ export default function Schedule() {
     await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
   };
 
-  const handleAddTemplateRow = () => {
-    setSelectedTemplateId("");
-    setTemplateRowValues({});
-    setCurrentTemplateRow(null);
-    setShowAddTemplateRowDialog(true);
+  const handleAddTemplateRow = async () => {
+    if (!selectedTemplateId) {
+      setSelectedTemplateId("");
+      setTemplateRowValues({});
+      setCurrentTemplateRow(null);
+      setShowAddTemplateRowDialog(true);
+      return;
+    }
+    
+    const template = templates.find(t => t.id === selectedTemplateId);
+    if (!template) return;
+
+    const initialValues = {};
+    template.columns.forEach(col => {
+      if (col.default_value) {
+        initialValues[col.name] = col.default_value;
+      }
+    });
+
+    await base44.entities.TemplateRow.create({
+      template_id: selectedTemplateId,
+      template_name: template.name,
+      date: dateString,
+      values: initialValues
+    });
+
+    loadData();
   };
 
   const handleEditTemplateRow = (row) => {
@@ -441,25 +463,20 @@ export default function Schedule() {
           </CardHeader>
         </Card>
 
-        {templateRows.length > 0 && (
+        {templates.length > 0 && (
           <div className="space-y-4 mb-6">
-            {templateRows.map((row) => {
-              const template = templates.find(t => t.id === row.template_id);
-              if (!template) return null;
+            {templates.map((template) => {
+              const templateRowsForTemplate = templateRows.filter(r => r.template_id === template.id);
               
               return (
-                <Card key={row.id} className="border-none shadow-lg overflow-hidden">
+                <Card key={template.id} className="border-none shadow-lg overflow-hidden">
                   <CardHeader className="text-white py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                     <div className="flex justify-between items-center">
                       <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => handleEditTemplateRow(row)}>
-                          <Pencil className="w-3 h-3" />
-                        </Button>
-                        <Button size="sm" variant="secondary" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteTemplateRow(row.id)}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
+                      <Button size="sm" variant="secondary" onClick={() => { setSelectedTemplateId(template.id); handleAddTemplateRow(); }} dir="rtl">
+                        <Plus className="w-3 h-3 ml-1" />
+                        הוסף שורה
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -470,16 +487,48 @@ export default function Schedule() {
                             {template.columns.map((col, idx) => (
                               <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">{col.name}</TableHead>
                             ))}
+                            <TableHead className="w-[60px]" dir="rtl"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          <TableRow>
-                            {template.columns.map((col, idx) => (
-                              <TableCell key={idx} dir="rtl">
-                                <div className="text-sm">{row.values?.[col.name] || "-"}</div>
+                          {templateRowsForTemplate.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={template.columns.length + 1} className="text-center text-gray-500 py-8" dir="rtl">
+                                אין שורות. לחץ "הוסף שורה" להוספה.
                               </TableCell>
-                            ))}
-                          </TableRow>
+                            </TableRow>
+                          ) : (
+                            templateRowsForTemplate.map((row) => (
+                              <TableRow key={row.id}>
+                                {template.columns.map((col, idx) => (
+                                  <TableCell key={idx} dir="rtl" className="p-0">
+                                    <Input
+                                      type={col.type === "time" ? "time" : "text"}
+                                      value={row.values?.[col.name] || ""}
+                                      onChange={(e) => {
+                                        const newValues = { ...row.values, [col.name]: e.target.value };
+                                        base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                        setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                      }}
+                                      placeholder={col.default_value || "-"}
+                                      dir="rtl"
+                                      className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+                                    />
+                                  </TableCell>
+                                ))}
+                                <TableCell className="p-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-7 w-7 text-red-500 hover:text-red-700" 
+                                    onClick={() => handleDeleteTemplateRow(row.id)}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
                         </TableBody>
                       </Table>
                     </div>
