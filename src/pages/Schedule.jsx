@@ -286,16 +286,15 @@ export default function Schedule() {
     await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
   };
 
-  const handleAddTemplateRow = async () => {
-    if (!selectedTemplateId) {
-      setSelectedTemplateId("");
-      setTemplateRowValues({});
-      setCurrentTemplateRow(null);
-      setShowAddTemplateRowDialog(true);
-      return;
-    }
-    
-    const template = templates.find(t => t.id === selectedTemplateId);
+  const handleAddTemplateRow = () => {
+    setSelectedTemplateId("");
+    setTemplateRowValues({});
+    setCurrentTemplateRow(null);
+    setShowAddTemplateRowDialog(true);
+  };
+
+  const handleAddTemplateRowForTemplate = async (templateId) => {
+    const template = templates.find(t => t.id === templateId);
     if (!template) return;
 
     const initialValues = {};
@@ -306,7 +305,7 @@ export default function Schedule() {
     });
 
     await base44.entities.TemplateRow.create({
-      template_id: selectedTemplateId,
+      template_id: templateId,
       template_name: template.name,
       date: dateString,
       values: initialValues
@@ -473,7 +472,7 @@ export default function Schedule() {
                   <CardHeader className="text-white py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                     <div className="flex justify-between items-center">
                       <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
-                      <Button size="sm" variant="secondary" onClick={() => { setSelectedTemplateId(template.id); handleAddTemplateRow(); }} dir="rtl">
+                      <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
                         <Plus className="w-3 h-3 ml-1" />
                         הוסף שורה
                       </Button>
