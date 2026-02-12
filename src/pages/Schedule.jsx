@@ -730,10 +730,10 @@ export default function Schedule() {
                   <CardContent className="p-0">
                     <div className="overflow-x-auto">
                       <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[60px]" dir="rtl"></TableHead>
-                              {orderedColumns.map((col, idx) => (
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[60px]" dir="rtl"></TableHead>
+                            {orderedColumns.map((col, idx) => (
                               <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">
                                 <div className="flex items-center gap-1 justify-center">
                                   <span>{col.name}</span>
@@ -780,20 +780,20 @@ export default function Schedule() {
                                 </div>
                               </TableHead>
                             ))}
-                              <TableHead className="w-[60px]" dir="rtl"></TableHead>
+                            <TableHead className="w-[60px]" dir="rtl"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {templateRowsForTemplate.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={template.columns.length + 2} className="text-center text-gray-500 py-8" dir="rtl">
+                                אין שורות. לחץ "הוסף שורה" להוספה.
+                              </TableCell>
                             </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {templateRowsForTemplate.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={orderedColumns.length + 2} className="text-center text-gray-500 py-8" dir="rtl">
-                                  אין שורות. לחץ "הוסף שורה" להוספה.
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              templateRowsForTemplate.map((row, rowIndex) => (
-                                <TableRow key={row.id}>
-                                  <TableCell className="w-[60px]">
+                          ) : (
+                            templateRowsForTemplate.map((row, rowIndex) => (
+                              <TableRow key={row.id}>
+                                <TableCell className="w-[60px]">
                                     <div className="flex flex-col gap-1 items-center">
                                       <Button 
                                         size="icon" 
@@ -803,7 +803,7 @@ export default function Schedule() {
                                         onClick={async () => {
                                           const currentRow = templateRowsForTemplate[rowIndex];
                                           const prevRow = templateRowsForTemplate[rowIndex - 1];
-
+                                          
                                           // החלף את created_date
                                           await base44.entities.TemplateRow.update(currentRow.id, { 
                                             created_date: prevRow.created_date 
@@ -811,7 +811,7 @@ export default function Schedule() {
                                           await base44.entities.TemplateRow.update(prevRow.id, { 
                                             created_date: currentRow.created_date 
                                           });
-
+                                          
                                           loadData();
                                         }}
                                       >
@@ -825,7 +825,7 @@ export default function Schedule() {
                                         onClick={async () => {
                                           const currentRow = templateRowsForTemplate[rowIndex];
                                           const nextRow = templateRowsForTemplate[rowIndex + 1];
-
+                                          
                                           // החלף את created_date
                                           await base44.entities.TemplateRow.update(currentRow.id, { 
                                             created_date: nextRow.created_date 
@@ -833,7 +833,7 @@ export default function Schedule() {
                                           await base44.entities.TemplateRow.update(nextRow.id, { 
                                             created_date: currentRow.created_date 
                                           });
-
+                                          
                                           loadData();
                                         }}
                                       >
@@ -842,53 +842,53 @@ export default function Schedule() {
                                     </div>
                                   </TableCell>
                                   {orderedColumns.map((col, idx) => (
-                                    <TableCell key={idx} dir="rtl" className="p-0">
-                                      {col.type === "time" ? (
-                                        <Input
-                                          type="time"
-                                          value={row.values?.[col.name] || ""}
-                                          onChange={(e) => {
-                                            const newValues = { ...row.values, [col.name]: e.target.value };
-                                            base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                            setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                          }}
-                                          placeholder={col.default_value || ""}
-                                          dir="rtl"
-                                          className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
-                                        />
-                                      ) : (
-                                        <Input
-                                          type="text"
-                                          value={row.values?.[col.name] || ""}
-                                          onChange={(e) => {
-                                            const newValues = { ...row.values, [col.name]: e.target.value };
-                                            base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                            setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                          }}
-                                          placeholder={col.default_value || "-"}
-                                          dir="rtl"
-                                          className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
-                                        />
-                                      )}
-                                    </TableCell>
-                                  ))}
-                                  <TableCell className="p-1">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon" 
-                                      className="h-7 w-7 text-red-500 hover:text-red-700" 
-                                      onClick={() => handleDeleteTemplateRow(row.id)}
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </Button>
+                                  <TableCell key={idx} dir="rtl" className="p-0">
+                                    {col.type === "time" ? (
+                                      <Input
+                                        type="time"
+                                        value={row.values?.[col.name] || ""}
+                                        onChange={(e) => {
+                                          const newValues = { ...row.values, [col.name]: e.target.value };
+                                          base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                          setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                        }}
+                                        placeholder={col.default_value || ""}
+                                        dir="rtl"
+                                        className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+                                      />
+                                    ) : (
+                                      <Input
+                                        type="text"
+                                        value={row.values?.[col.name] || ""}
+                                        onChange={(e) => {
+                                          const newValues = { ...row.values, [col.name]: e.target.value };
+                                          base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                          setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                        }}
+                                        placeholder={col.default_value || "-"}
+                                        dir="rtl"
+                                        className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+                                      />
+                                    )}
                                   </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
+                                ))}
+                                <TableCell className="p-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-7 w-7 text-red-500 hover:text-red-700" 
+                                    onClick={() => handleDeleteTemplateRow(row.id)}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
                 </Card>
               );
               });
