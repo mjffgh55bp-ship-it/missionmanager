@@ -24,10 +24,11 @@ export default function Workers() {
   const [userRoles, setUserRoles] = useState({});
   const [savingRoles, setSavingRoles] = useState(false);
   const [populations, setPopulations] = useState([]);
+  const [workerRoles, setWorkerRoles] = useState([]);
   const [formData, setFormData] = useState({
     nickname: "",
     birthday: "",
-    role: "chef",
+    role: "",
     category: "category_1",
     phone: "",
     email: "",
@@ -43,12 +44,13 @@ export default function Workers() {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, catSettings, rolesSettings, populationsSettings] = await Promise.all([
+    const [workersData, assignmentsData, catSettings, rolesSettings, populationsSettings, workerRolesSettings] = await Promise.all([
       base44.entities.Worker.list("-created_date"),
       base44.entities.Assignment.list(),
       base44.entities.AppSettings.filter({ setting_key: "worker_category_names" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_populations" })
+      base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -65,6 +67,11 @@ export default function Workers() {
     } else {
       setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
     }
+    if (workerRolesSettings.length > 0) {
+      setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
+    } else {
+      setWorkerRoles(["שף", "סו-שף"]);
+    }
   };
 
   const getWorkerTotalHours = (workerId) => {
@@ -76,7 +83,7 @@ export default function Workers() {
     else await base44.entities.Worker.create(formData);
     setShowDialog(false);
     setEditingWorker(null);
-    setFormData({ nickname: "", birthday: "", role: "chef", category: "category_1", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
+    setFormData({ nickname: "", birthday: "", role: "", category: "category_1", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
     loadData();
   };
 
@@ -183,8 +190,8 @@ export default function Workers() {
                       <div>
                         <CardTitle className="text-lg text-right" dir="rtl">{worker.nickname}</CardTitle>
                         <div className="flex gap-2 mt-1 flex-wrap">
-                          <Badge className={worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'} dir="rtl">
-                           {worker.role === 'chef' ? 'טבח ראשי' : 'עוזר טבח'}
+                          <Badge className="bg-blue-100 text-blue-900" dir="rtl">
+                          {worker.role || 'לא הוגדר'}
                           </Badge>
                           <Badge className={seniorityInfo.color}>{seniorityInfo.label}</Badge>
                           <Badge className={getCategoryColor(worker.category)}>
@@ -232,7 +239,7 @@ export default function Workers() {
                       <h4 className="text-sm font-semibold text-green-900 mb-2" dir="rtl">כשירות</h4>
                       <div className="space-y-1">
                         {worker.population && <p className="text-sm text-gray-700" dir="rtl">👥 אוכלוסיה: {worker.population}</p>}
-                        <p className="text-sm text-gray-700" dir="rtl">🍳 תפקיד: {worker.role === 'chef' ? 'שף' : 'סו-שף'}</p>
+                        <p className="text-sm text-gray-700" dir="rtl">🍳 תפקיד: {worker.role || 'לא הוגדר'}</p>
                         <p className="text-sm text-gray-700" dir="rtl">⭐ כשירות: {seniorityInfo.label}</p>
                         <p className="text-sm text-gray-700" dir="rtl">🏆 מדריך: {worker.is_guide ? 'כן' : 'לא'}</p>
                       </div>
@@ -354,12 +361,14 @@ export default function Workers() {
                     </Select>
                   </div>
 
-                  <div><Label htmlFor="role" dir="rtl">תפקיד (שף/סו-שף) *</Label>
+                  <div><Label htmlFor="role" dir="rtl">תפקיד *</Label>
                     <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="בחר תפקיד..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="chef" dir="rtl">שף</SelectItem>
-                        <SelectItem value="sous_chef" dir="rtl">סו-שף</SelectItem>
+                        {workerRoles.map(role => (
+                          <SelectItem key={role} value={role}>{role}</SelectItem>
+                        ))}
+                        {workerRoles.length === 0 && <SelectItem value={null} disabled>לא הוגדרו תפקידים</SelectItem>}
                       </SelectContent>
                     </Select>
                   </div>

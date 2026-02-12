@@ -33,13 +33,15 @@ export default function Settings() {
   const [newColSubType, setNewColSubType] = useState("");
   const [populations, setPopulations] = useState([]);
   const [newPopulation, setNewPopulation] = useState("");
+  const [workerRoles, setWorkerRoles] = useState([]);
+  const [newWorkerRole, setNewWorkerRole] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings] = await Promise.all([
+    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
@@ -49,7 +51,8 @@ export default function Settings() {
       base44.entities.AppSettings.filter({ setting_key: "param_sub_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_populations" })
+      base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
     ]);
     
     if (tipsSettings.length > 0) {
@@ -67,6 +70,11 @@ export default function Settings() {
       setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     } else {
       setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
+    }
+    if (workerRolesSettings.length > 0) {
+      setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
+    } else {
+      setWorkerRoles(["שף", "סו-שף"]);
     }
     setWorkers(workersData);
     setCompanyEvents(eventsData);
@@ -211,6 +219,24 @@ export default function Settings() {
     setPopulations(updated);
   };
 
+  const handleAddWorkerRole = async () => {
+    if (!newWorkerRole.trim()) return;
+    const updated = [...workerRoles, newWorkerRole.trim()];
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
+    const data = { setting_key: "worker_roles", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setWorkerRoles(updated);
+    setNewWorkerRole("");
+  };
+
+  const handleRemoveWorkerRole = async (role) => {
+    const updated = workerRoles.filter(r => r !== role);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
+    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+    setWorkerRoles(updated);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
@@ -339,6 +365,29 @@ export default function Settings() {
                 ))}
               </div>
             </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Worker Roles */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-indigo-600" />תפקידי עובדים</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר תפקידים שניתן לבחור בהם בעת הוספת/עריכת עובדים</p>
+            <div className="flex gap-2 mb-4">
+              <Input value={newWorkerRole} onChange={(e) => setNewWorkerRole(e.target.value)} placeholder="שם תפקיד חדש..." dir="rtl" />
+              <Button onClick={handleAddWorkerRole}><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {workerRoles.map(role => (
+                <Badge key={role} className="bg-indigo-100 text-indigo-800 pr-1">
+                  {role}
+                  <button onClick={() => handleRemoveWorkerRole(role)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                </Badge>
+              ))}
+              {workerRoles.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו תפקידים</p>}
+            </div>
           </CardContent>
         </Card>
 
