@@ -543,20 +543,18 @@ export default function Schedule() {
                           size="sm" 
                           variant="destructive" 
                           onClick={async () => {
-                            if (confirm(`האם למחוק את כל התבנית "${template.name}" לצמיתות?`)) {
-                              // מחק את כל השורות של התבנית
+                            if (confirm(`האם למחוק את השלדית "${template.name}" מהלוח (רק ליום ${formatDateHebrew(currentDate)})?`)) {
+                              // מחק רק את השורות של התבנית לתאריך הנוכחי
                               for (const row of templateRowsForTemplate) {
                                 await base44.entities.TemplateRow.delete(row.id);
                               }
-                              // מחק את התבנית עצמה
-                              await base44.entities.Template.delete(template.id);
                               loadData();
                             }
                           }}
                           dir="rtl"
                         >
                           <Trash2 className="w-3 h-3 ml-1" />
-                          מחק תבנית
+                          מחק מהלוח
                         </Button>
                       </div>
                     </div>
