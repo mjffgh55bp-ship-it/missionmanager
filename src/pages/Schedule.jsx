@@ -127,12 +127,16 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     
-    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData, colTypesSettings, colSubTypesSettings, cartColsSettings, allTemplatesData, templateRowsData] = await Promise.all([
+    // Split API calls into smaller groups to avoid rate limits
+    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.FoodCart.filter({ active: true }),
       base44.entities.Assignment.filter({ date: dateString }),
       base44.entities.Availability.filter({ week_start_date: weekStartStr }),
-      base44.entities.Unavailability.filter({ date: dateString }),
+      base44.entities.Unavailability.filter({ date: dateString })
+    ]);
+    
+    const [colTypesSettings, colSubTypesSettings, cartColsSettings, allTemplatesData, templateRowsData] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_columns" }),
