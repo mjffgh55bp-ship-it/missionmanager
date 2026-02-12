@@ -873,10 +873,10 @@ export default function Schedule() {
                                 </TableRow>
                               ))}
                             </TableBody>
-                            </Table>
+                          </Table>
 
-                            {/* Left Table */}
-                            <Table>
+                          {/* Left Table */}
+                          <Table>
                             <TableHeader>
                               <TableRow>
                                 {leftColumns.map((col, idx) => (
