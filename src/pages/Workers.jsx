@@ -174,7 +174,7 @@ export default function Workers() {
                         <ChefHat className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg">{worker.nickname}</CardTitle>
+                        <CardTitle className="text-lg text-right" dir="rtl">{worker.nickname}</CardTitle>
                         <div className="flex gap-2 mt-1 flex-wrap">
                           <Badge className={worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'} dir="rtl">
                            {worker.role === 'chef' ? 'טבח ראשי' : 'עוזר טבח'}
@@ -241,19 +241,10 @@ export default function Workers() {
                         </div>
                       </div>
                     )}
-
-                    <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                      <div className="flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span className="text-sm font-medium text-gray-900" dir="rtl">שנה סטטוס מדריך</span></div>
-                      <Switch checked={worker.is_guide} onCheckedChange={() => toggleGuide(worker)} />
-                    </div>
                   </div>
                   
                   <div className="flex gap-2 mt-4">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleEdit(worker)} dir="rtl"><Pencil className="w-3 h-3 mr-2" />ערוך</Button>
-                    <Button variant={worker.active ? "destructive" : "default"} size="sm" className="flex-1" onClick={() => toggleActive(worker)} dir="rtl">
-                      {worker.active ? <><UserX className="w-3 h-3 mr-2" />השבת</> : <><UserCheck className="w-3 h-3 mr-2" />הפעל</>}
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDeleteWorker(worker.id)} dir="rtl"><Trash2 className="w-3 h-3" /></Button>
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => handleEdit(worker)} dir="rtl"><Pencil className="w-3 h-3 mr-2" />ערוך</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -410,6 +401,16 @@ export default function Workers() {
               </div>
             </div>
             <DialogFooter>
+              {editingWorker && (
+                <>
+                  <Button variant="destructive" onClick={() => handleDeleteWorker(editingWorker.id)} dir="rtl">
+                    <Trash2 className="w-3 h-3 mr-2" />מחק עובד
+                  </Button>
+                  <Button variant={editingWorker.active ? "destructive" : "default"} onClick={() => { toggleActive(editingWorker); setShowDialog(false); }} dir="rtl">
+                    {editingWorker.active ? <><UserX className="w-3 h-3 mr-2" />השבת</> : <><UserCheck className="w-3 h-3 mr-2" />הפעל</>}
+                  </Button>
+                </>
+              )}
               <Button variant="outline" onClick={() => { setShowDialog(false); setEditingWorker(null); }} dir="rtl">ביטול</Button>
               <Button onClick={handleSubmit} disabled={!formData.nickname} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
             </DialogFooter>
