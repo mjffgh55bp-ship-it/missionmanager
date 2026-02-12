@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Pencil, GripVertical } from "lucide-react";
+import { Plus, Trash2, Pencil, GripVertical, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function Templates() {
@@ -79,6 +79,18 @@ export default function Templates() {
       await base44.entities.Template.delete(id);
       loadTemplates();
     }
+  };
+
+  const handleDuplicateTemplate = async (template) => {
+    const duplicatedTemplate = {
+      name: `${template.name} - עותק`,
+      color: template.color || "#3b82f6",
+      columns: template.columns || [],
+      default_rows: template.default_rows || [],
+      active: true
+    };
+    await base44.entities.Template.create(duplicatedTemplate);
+    loadTemplates();
   };
 
   const handleAddColumn = () => {
@@ -173,6 +185,9 @@ export default function Templates() {
                   <div className="flex justify-between items-center">
                     <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
                     <div className="flex gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => handleDuplicateTemplate(template)}>
+                        <Copy className="w-3 h-3" />
+                      </Button>
                       <Button size="sm" variant="secondary" onClick={() => handleEditTemplate(template)}>
                         <Pencil className="w-3 h-3" />
                       </Button>
