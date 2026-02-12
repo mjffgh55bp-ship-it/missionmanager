@@ -311,12 +311,13 @@ export default function Schedule() {
     setShowAddTemplateRowDialog(true);
   };
 
-  const handleAddTemplateRowForTemplate = async (templateId) => {
+  const handleAddTemplateRowForTemplate = async (templateId, useDefaults = false) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
 
-    // אם יש שורות ברירת מחדל, צור אותן. אחרת צור שורה ריקה אחת
-    const rowsToCreate = template.default_rows && template.default_rows.length > 0
+    // אם useDefaults=true (הוספה מהשלדיות) ויש שורות ברירת מחדל, צור אותן
+    // אחרת, תמיד צור שורה ריקה אחת בלבד
+    const rowsToCreate = useDefaults && template.default_rows && template.default_rows.length > 0
       ? template.default_rows
       : [{}];
 
@@ -1076,7 +1077,7 @@ export default function Schedule() {
                   <button
                     key={template.id}
                     onClick={async () => {
-                      await handleAddTemplateRowForTemplate(template.id);
+                      await handleAddTemplateRowForTemplate(template.id, true);
                       setShowAddFromTemplatesDialog(false);
                       await loadData();
                     }}
