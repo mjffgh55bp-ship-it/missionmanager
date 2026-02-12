@@ -50,7 +50,7 @@ export default function Schedule() {
   const [templates, setTemplates] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
-  const [isEditMode, setIsEditMode] = useState(false);
+
   
   const [showWorkerDialog, setShowWorkerDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -477,16 +477,7 @@ export default function Schedule() {
                   <Plus className="w-4 h-4 ml-2" />
                   הוסף תבנית מהשלדיות
                 </Button>
-                {templates.length > 0 && (
-                  <Button 
-                    variant={isEditMode ? "default" : "outline"}
-                    onClick={() => setIsEditMode(!isEditMode)} 
-                    dir="rtl"
-                  >
-                    <Pencil className="w-4 h-4 ml-2" />
-                    {isEditMode ? "סיים עריכה" : "עריכת לוח"}
-                  </Button>
-                )}
+
                 {templateRows.length > 0 && (
                   <Button 
                     variant="destructive" 
@@ -544,8 +535,7 @@ export default function Schedule() {
                   <CardHeader className="text-black py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        {isEditMode && (
-                          <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1">
                             <Button 
                               size="icon" 
                               variant="ghost" 
@@ -597,7 +587,6 @@ export default function Schedule() {
                               <ChevronDown className="w-4 h-4" />
                             </Button>
                           </div>
-                        )}
                         <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
                       </div>
                       <div className="flex gap-2">
@@ -654,7 +643,7 @@ export default function Schedule() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            {isEditMode && <TableHead className="w-[60px]" dir="rtl"></TableHead>}
+                            <TableHead className="w-[60px]" dir="rtl"></TableHead>
                             {template.columns.map((col, idx) => (
                               <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">{col.name}</TableHead>
                             ))}
@@ -664,15 +653,14 @@ export default function Schedule() {
                         <TableBody>
                           {templateRowsForTemplate.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={template.columns.length + 1 + (isEditMode ? 1 : 0)} className="text-center text-gray-500 py-8" dir="rtl">
+                              <TableCell colSpan={template.columns.length + 2} className="text-center text-gray-500 py-8" dir="rtl">
                                 אין שורות. לחץ "הוסף שורה" להוספה.
                               </TableCell>
                             </TableRow>
                           ) : (
                             templateRowsForTemplate.map((row, rowIndex) => (
                               <TableRow key={row.id}>
-                                {isEditMode && (
-                                  <TableCell className="w-[60px]">
+                                <TableCell className="w-[60px]">
                                     <div className="flex flex-col gap-1 items-center">
                                       <Button 
                                         size="icon" 
@@ -720,7 +708,6 @@ export default function Schedule() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                )}
                                 {template.columns.map((col, idx) => (
                                   <TableCell key={idx} dir="rtl" className="p-0">
                                     {col.type === "time" ? (
