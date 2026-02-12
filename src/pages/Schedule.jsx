@@ -311,7 +311,7 @@ export default function Schedule() {
   };
 
   const handleAddTemplateRowForTemplate = async (templateId) => {
-    const template = templates.find(t => t.id === templateId);
+    const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
 
     // צור שורה ריקה אחת בלבד
@@ -324,7 +324,7 @@ export default function Schedule() {
       values: initialValues
     });
 
-    loadData();
+    await loadData();
   };
 
   const handleEditTemplateRow = (row) => {
