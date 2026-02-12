@@ -645,7 +645,41 @@ export default function Schedule() {
                           <TableRow>
                             <TableHead className="w-[60px]" dir="rtl"></TableHead>
                             {template.columns.map((col, idx) => (
-                              <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">{col.name}</TableHead>
+                              <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">
+                                <div className="flex items-center gap-1 justify-center">
+                                  <div className="flex flex-col">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-4 w-4 p-0"
+                                      disabled={idx === 0}
+                                      onClick={async () => {
+                                        const newColumns = [...template.columns];
+                                        [newColumns[idx - 1], newColumns[idx]] = [newColumns[idx], newColumns[idx - 1]];
+                                        await base44.entities.Template.update(template.id, { columns: newColumns });
+                                        loadData();
+                                      }}
+                                    >
+                                      <ChevronUp className="w-3 h-3" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-4 w-4 p-0"
+                                      disabled={idx === template.columns.length - 1}
+                                      onClick={async () => {
+                                        const newColumns = [...template.columns];
+                                        [newColumns[idx], newColumns[idx + 1]] = [newColumns[idx + 1], newColumns[idx]];
+                                        await base44.entities.Template.update(template.id, { columns: newColumns });
+                                        loadData();
+                                      }}
+                                    >
+                                      <ChevronDown className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                  <span>{col.name}</span>
+                                </div>
+                              </TableHead>
                             ))}
                             <TableHead className="w-[60px]" dir="rtl"></TableHead>
                           </TableRow>
