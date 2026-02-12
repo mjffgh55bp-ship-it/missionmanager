@@ -315,6 +315,9 @@ export default function Schedule() {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
 
+    // צור group_id ייחודי למופע הזה של התבנית
+    const groupId = Date.now().toString();
+
     // אם useDefaults=true (הוספה מהשלדיות) ויש שורות ברירת מחדל, צור אותן
     // אחרת, תמיד צור שורה ריקה אחת בלבד
     const rowsToCreate = useDefaults && template.default_rows && template.default_rows.length > 0
@@ -326,7 +329,8 @@ export default function Schedule() {
         template_id: templateId,
         template_name: template.name,
         date: dateString,
-        values: rowValues
+        values: rowValues,
+        group_id: groupId
       });
     }
 
@@ -348,7 +352,8 @@ export default function Schedule() {
       template_id: selectedTemplateId,
       template_name: template.name,
       date: dateString,
-      values: templateRowValues
+      values: templateRowValues,
+      group_id: currentTemplateRow?.group_id || Date.now().toString()
     };
 
     if (currentTemplateRow) {
@@ -510,11 +515,32 @@ export default function Schedule() {
 
         {templates.length > 0 && (
           <div className="space-y-4 mb-6">
-            {templates.map((template, templateIndex) => {
-              const templateRowsForTemplate = templateRows.filter(r => r.template_id === template.id).sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
+            {(() => {
+              // קבץ שורות לפי template_id ו-group_id
+              const groupedRows = {};
+              templateRows.forEach(row => {
+                const key = `${row.template_id}_${row.group_id || 'default'}`;
+                if (!groupedRows[key]) {
+                  groupedRows[key] = [];
+                }
+                groupedRows[key].push(row);
+              });
+
+              // המר לרשימת קבוצות
+              const groups = Object.entries(groupedRows).map(([key, rows]) => ({
+                key,
+                template_id: rows[0].template_id,
+                group_id: rows[0].group_id,
+                rows: rows.sort((a, b) => new Date(a.created_date) - new Date(b.created_date))
+              }));
+
+              return groups.map((group, groupIndex) => {
+                const template = allTemplates.find(t => t.id === group.template_id);
+                if (!template) return null;
+                const templateRowsForTemplate = group.rows;
               
               return (
-                <Card key={template.id} className="border-none shadow-lg overflow-hidden">
+                <Card key={group.key} className="border-none shadow-lg overflow-hidden">
                   <CardHeader className="text-black py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
@@ -524,12 +550,23 @@ export default function Schedule() {
                               size="icon" 
                               variant="ghost" 
                               className="h-6 w-6 text-black hover:bg-black/10"
-                              disabled={templateIndex === 0}
-                              onClick={() => {
-                                const newTemplates = [...templates];
-                                [newTemplates[templateIndex - 1], newTemplates[templateIndex]] = 
-                                [newTemplates[templateIndex], newTemplates[templateIndex - 1]];
-                                setTemplates(newTemplates);
+                              disabled={groupIndex === 0}
+                              onClick={async () => {
+                                const currentGroup = groups[groupIndex];
+                                const prevGroup = groups[groupIndex - 1];
+                                
+                                // החלף את created_date של השורה הראשונה בכל קבוצה
+                                const currentFirstRow = currentGroup.rows[0];
+                                const prevFirstRow = prevGroup.rows[0];
+                                
+                                await base44.entities.TemplateRow.update(currentFirstRow.id, { 
+                                  created_date: prevFirstRow.created_date 
+                                });
+                                await base44.entities.TemplateRow.update(prevFirstRow.id, { 
+                                  created_date: currentFirstRow.created_date 
+                                });
+                                
+                                loadData();
                               }}
                             >
                               <ChevronUp className="w-4 h-4" />
@@ -538,12 +575,23 @@ export default function Schedule() {
                               size="icon" 
                               variant="ghost" 
                               className="h-6 w-6 text-black hover:bg-black/10"
-                              disabled={templateIndex === templates.length - 1}
-                              onClick={() => {
-                                const newTemplates = [...templates];
-                                [newTemplates[templateIndex], newTemplates[templateIndex + 1]] = 
-                                [newTemplates[templateIndex + 1], newTemplates[templateIndex]];
-                                setTemplates(newTemplates);
+                              disabled={groupIndex === groups.length - 1}
+                              onClick={async () => {
+                                const currentGroup = groups[groupIndex];
+                                const nextGroup = groups[groupIndex + 1];
+                                
+                                // החלף את created_date של השורה הראשונה בכל קבוצה
+                                const currentFirstRow = currentGroup.rows[0];
+                                const nextFirstRow = nextGroup.rows[0];
+                                
+                                await base44.entities.TemplateRow.update(currentFirstRow.id, { 
+                                  created_date: nextFirstRow.created_date 
+                                });
+                                await base44.entities.TemplateRow.update(nextFirstRow.id, { 
+                                  created_date: currentFirstRow.created_date 
+                                });
+                                
+                                loadData();
                               }}
                             >
                               <ChevronDown className="w-4 h-4" />
