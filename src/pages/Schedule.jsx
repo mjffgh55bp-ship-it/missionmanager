@@ -984,7 +984,7 @@ export default function Schedule() {
                     onClick={async () => {
                       await handleAddTemplateRowForTemplate(template.id);
                       setShowAddFromTemplatesDialog(false);
-                      loadData();
+                      await loadData();
                     }}
                     className="w-full p-3 rounded-lg border hover:border-blue-400 hover:bg-blue-50 text-right"
                     dir="rtl"
