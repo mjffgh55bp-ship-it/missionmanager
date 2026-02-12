@@ -163,6 +163,36 @@ export default function Schedule() {
       setCustomColumnOrders({});
     }
     
+    // Auto-add default templates if no rows exist for this date
+    if (templateRowsData.length === 0) {
+      const defaultTemplates = allTemplatesData.filter(t => t.is_default && t.active);
+      for (const template of defaultTemplates) {
+        const groupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        const rowsToCreate = template.default_rows && template.default_rows.length > 0
+          ? template.default_rows
+          : [{}];
+        
+        for (const rowValues of rowsToCreate) {
+          await base44.entities.TemplateRow.create({
+            template_id: template.id,
+            template_name: template.name,
+            date: dateString,
+            values: rowValues,
+            group_id: groupId
+          });
+        }
+      }
+      
+      // Reload template rows after adding defaults
+      if (defaultTemplates.length > 0) {
+        const updatedTemplateRows = await base44.entities.TemplateRow.filter({ date: dateString });
+        setTemplateRows(updatedTemplateRows);
+        const uniqueTemplateIds = [...new Set(updatedTemplateRows.map(row => row.template_id))];
+        const templatesInUse = allTemplatesData.filter(t => uniqueTemplateIds.includes(t.id));
+        setTemplates(templatesInUse);
+      }
+    }
+    
     setLoading(false);
   };
 
@@ -866,9 +896,9 @@ export default function Schedule() {
           </div>
         )}
 
-        {carts.length === 0 ? (
+        {carts.length === 0 && templateRows.length === 0 ? (
           <Card className="border-none shadow-lg"><CardContent className="py-16 text-center" dir="rtl"><h3 className="text-xl font-semibold text-gray-900 mb-2">נדרשת הגדרה</h3><p className="text-gray-600">אנא הוסף עגלות מזון תחילה.</p></CardContent></Card>
-        ) : (
+        ) : carts.length > 0 ? (
           <div className="space-y-6">
             {carts.map((cart) => {
               const cartAssignments = getCartAssignments(cart.id);
@@ -994,7 +1024,7 @@ export default function Schedule() {
               );
             })}
           </div>
-        )}
+        ) : null}
 
         {/* Worker Dialog */}
         <Dialog open={showWorkerDialog} onOpenChange={setShowWorkerDialog}>

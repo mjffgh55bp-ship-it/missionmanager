@@ -184,16 +184,31 @@ export default function Templates() {
                 <CardHeader className="text-white py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                   <div className="flex justify-between items-center">
                     <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => handleDuplicateTemplate(template)}>
-                        <Copy className="w-3 h-3" />
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => handleEditTemplate(template)}>
-                        <Pencil className="w-3 h-3" />
-                      </Button>
-                      <Button size="sm" variant="secondary" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteTemplate(template.id)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                    <div className="flex gap-2 items-center">
+                     {template.is_default && (
+                       <Badge className="bg-purple-100 text-purple-800 text-xs" dir="rtl">קבוע</Badge>
+                     )}
+                     <Button 
+                       size="sm" 
+                       variant="secondary" 
+                       onClick={async () => {
+                         await base44.entities.Template.update(template.id, { is_default: !template.is_default });
+                         loadTemplates();
+                       }}
+                       className={template.is_default ? "bg-purple-100 hover:bg-purple-200" : ""}
+                       dir="rtl"
+                     >
+                       {template.is_default ? "בטל קבוע" : "הגדר כקבוע"}
+                     </Button>
+                     <Button size="sm" variant="secondary" onClick={() => handleDuplicateTemplate(template)}>
+                       <Copy className="w-3 h-3" />
+                     </Button>
+                     <Button size="sm" variant="secondary" onClick={() => handleEditTemplate(template)}>
+                       <Pencil className="w-3 h-3" />
+                     </Button>
+                     <Button size="sm" variant="secondary" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteTemplate(template.id)}>
+                       <Trash2 className="w-3 h-3" />
+                     </Button>
                     </div>
                   </div>
                 </CardHeader>
