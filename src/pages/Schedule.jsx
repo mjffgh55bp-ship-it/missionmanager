@@ -470,10 +470,6 @@ export default function Schedule() {
                   <Plus className="w-4 h-4 ml-2" />
                   הוסף תבנית מהשלדיות
                 </Button>
-                <Button className="bg-purple-600 hover:bg-purple-700" onClick={() => setShowCreateCategoryDialog(true)} dir="rtl">
-                  <Plus className="w-4 h-4 ml-2" />
-                  צור קטגוריה חדשה
-                </Button>
                 {templateRows.length > 0 && (
                   <Button 
                     variant="destructive" 
