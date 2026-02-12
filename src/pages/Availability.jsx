@@ -809,30 +809,30 @@ END:VEVENT
         </Dialog>
 
         <Dialog open={showSummary} onOpenChange={setShowSummary}>
-          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle dir="rtl">סקור וסדר מחדש עדיפות</DialogTitle></DialogHeader>
             <div className="py-4">
-              <Tabs defaultValue="wanted" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="wanted" dir="rtl">רצוי ({wantedShifts.length})</TabsTrigger>
-                  <TabsTrigger value="available" dir="rtl">זמין ({availableShifts.length})</TabsTrigger>
-                </TabsList>
-                <TabsContent value="wanted" className="mt-4">
-                  <p className="text-sm text-gray-600 mb-2" dir="rtl">גרור כדי לשנות סדר עדיפות המשמרות הרצויות</p>
+              <div className="grid grid-cols-2 gap-4">
+                {/* Wanted Shifts */}
+                <div className="border rounded-lg p-4">
+                  <div className="mb-3">
+                    <h3 className="font-semibold text-green-700 mb-1" dir="rtl">משמרות רצויות ({wantedShifts.length})</h3>
+                    <p className="text-xs text-gray-600" dir="rtl">גרור לשינוי עדיפות</p>
+                  </div>
                   <DragDropContext onDragEnd={(r) => handleDragEnd(r, "wanted")}>
                     <Droppable droppableId="wanted-shifts">
                       {(provided) => (
-                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2 max-h-64 overflow-y-auto">
+                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2 max-h-96 overflow-y-auto">
                           {wantedShifts.map((shift, index) => (
                             <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`wanted-${shift.date}-${shift.start_time}`} index={index}>
                               {(provided, snapshot) => (
                                 <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
-                                  className={`flex items-center gap-3 p-3 rounded-lg border ${snapshot.isDragging ? 'bg-green-50 border-green-300 shadow-lg' : 'bg-white border-gray-200'}`}>
-                                  <GripVertical className="w-5 h-5 text-gray-400" />
-                                  <div className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full font-bold text-sm">{index + 1}</div>
-                                  <div className="flex-1">
-                                    <p className="font-semibold text-gray-900" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
-                                    <p className="text-sm text-gray-600">{shift.start_time} - {shift.end_time}</p>
+                                  className={`flex items-center gap-2 p-2 rounded-lg border ${snapshot.isDragging ? 'bg-green-50 border-green-300 shadow-lg' : 'bg-white border-gray-200'}`}>
+                                  <GripVertical className="w-4 h-4 text-gray-400" />
+                                  <div className="flex items-center justify-center w-7 h-7 bg-green-500 text-white rounded-full font-bold text-xs">{index + 1}</div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-gray-900 text-sm truncate" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
+                                    <p className="text-xs text-gray-600">{shift.start_time} - {shift.end_time}</p>
                                   </div>
                                 </div>
                               )}
@@ -843,23 +843,28 @@ END:VEVENT
                       )}
                     </Droppable>
                   </DragDropContext>
-                </TabsContent>
-                <TabsContent value="available" className="mt-4">
-                  <p className="text-sm text-gray-600 mb-2" dir="rtl">גרור כדי לשנות סדר עדיפות המשמרות הזמינות</p>
+                </div>
+
+                {/* Available Shifts */}
+                <div className="border rounded-lg p-4">
+                  <div className="mb-3">
+                    <h3 className="font-semibold text-blue-700 mb-1" dir="rtl">משמרות זמינות ({availableShifts.length})</h3>
+                    <p className="text-xs text-gray-600" dir="rtl">גרור לשינוי עדיפות</p>
+                  </div>
                   <DragDropContext onDragEnd={(r) => handleDragEnd(r, "available")}>
                     <Droppable droppableId="available-shifts">
                       {(provided) => (
-                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2 max-h-64 overflow-y-auto">
+                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2 max-h-96 overflow-y-auto">
                           {availableShifts.map((shift, index) => (
                             <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`available-${shift.date}-${shift.start_time}`} index={index}>
                               {(provided, snapshot) => (
                                 <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
-                                  className={`flex items-center gap-3 p-3 rounded-lg border ${snapshot.isDragging ? 'bg-blue-50 border-blue-300 shadow-lg' : 'bg-white border-gray-200'}`}>
-                                  <GripVertical className="w-5 h-5 text-gray-400" />
-                                  <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-bold text-sm">{index + 1}</div>
-                                  <div className="flex-1">
-                                    <p className="font-semibold text-gray-900" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
-                                    <p className="text-sm text-gray-600">{shift.start_time} - {shift.end_time}</p>
+                                  className={`flex items-center gap-2 p-2 rounded-lg border ${snapshot.isDragging ? 'bg-blue-50 border-blue-300 shadow-lg' : 'bg-white border-gray-200'}`}>
+                                  <GripVertical className="w-4 h-4 text-gray-400" />
+                                  <div className="flex items-center justify-center w-7 h-7 bg-blue-500 text-white rounded-full font-bold text-xs">{index + 1}</div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-gray-900 text-sm truncate" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
+                                    <p className="text-xs text-gray-600">{shift.start_time} - {shift.end_time}</p>
                                   </div>
                                 </div>
                               )}
@@ -870,8 +875,8 @@ END:VEVENT
                       )}
                     </Droppable>
                   </DragDropContext>
-                </TabsContent>
-              </Tabs>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowSummary(false)} dir="rtl"><X className="w-4 h-4 mr-2" />חזור</Button>
