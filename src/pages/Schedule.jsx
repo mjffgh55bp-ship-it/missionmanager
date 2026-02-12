@@ -308,13 +308,8 @@ export default function Schedule() {
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
 
-    // תמיד צור רק שורה אחת עם ערכי ברירת מחדל מהעמודות
+    // צור שורה ריקה אחת בלבד
     const initialValues = {};
-    template.columns.forEach(col => {
-      if (col.default_value) {
-        initialValues[col.name] = col.default_value;
-      }
-    });
 
     await base44.entities.TemplateRow.create({
       template_id: templateId,
@@ -538,16 +533,20 @@ export default function Schedule() {
                           size="sm" 
                           variant="destructive" 
                           onClick={async () => {
-                            if (confirm(`האם למחוק את כל ${templateRowsForTemplate.length} השורות של ${template.name}?`)) {
+                            if (confirm(`האם למחוק את כל התבנית "${template.name}" לצמיתות?`)) {
+                              // מחק את כל השורות של התבנית
                               for (const row of templateRowsForTemplate) {
                                 await base44.entities.TemplateRow.delete(row.id);
                               }
+                              // מחק את התבנית עצמה
+                              await base44.entities.Template.delete(template.id);
                               loadData();
                             }
                           }}
                           dir="rtl"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3 h-3 ml-1" />
+                          מחק תבנית
                         </Button>
                       </div>
                     </div>
