@@ -534,13 +534,18 @@ export default function Schedule() {
       <div className="max-w-screen-2xl mx-auto">
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b bg-white">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <CardTitle className="text-2xl" dir="rtl">לוח</CardTitle>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <CardTitle className="text-2xl" dir="rtl">לוח</CardTitle>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
+                  <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center" dir="rtl">{formatDateHebrew(currentDate)}</div>
+                  <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
+                  <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
+                </div>
+              </div>
+              
               <div className="flex items-center gap-3 flex-wrap">
-                <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
-                <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center" dir="rtl">{formatDateHebrew(currentDate)}</div>
-                <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
-                <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
                 <Button 
                   variant="outline" 
                   onClick={() => handleSave(false)} 
