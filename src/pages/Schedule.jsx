@@ -503,7 +503,7 @@ export default function Schedule() {
         {templates.length > 0 && (
           <div className="space-y-4 mb-6">
             {templates.map((template) => {
-              const templateRowsForTemplate = templateRows.filter(r => r.template_id === template.id);
+              const templateRowsForTemplate = templateRows.filter(r => r.template_id === template.id).sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
               
               return (
                 <Card key={template.id} className="border-none shadow-lg overflow-hidden">
