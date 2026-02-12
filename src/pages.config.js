@@ -56,6 +56,7 @@ import Settings from './pages/Settings';
 import Templates from './pages/Templates';
 import Workers from './pages/Workers';
 import Yearly from './pages/Yearly';
+import ShiftMaster from './pages/ShiftMaster';
 import __Layout from './Layout.jsx';
 
 
@@ -69,6 +70,7 @@ export const PAGES = {
     "Templates": Templates,
     "Workers": Workers,
     "Yearly": Yearly,
+    "ShiftMaster": ShiftMaster,
 }
 
 export const pagesConfig = {

@@ -25,6 +25,7 @@ const managerNavigationItems = [
   { title: "עובדים", url: createPageUrl("Workers"), icon: Users },
   { title: "דוחות", url: createPageUrl("Reports"), icon: BarChart3 },
   { title: "תקופתית", url: createPageUrl("Yearly"), icon: BarChart3 },
+  { title: "מחשבון משמרות", url: createPageUrl("ShiftMaster"), icon: ChefHat },
   { title: "הגדרות", url: createPageUrl("Settings"), icon: Settings },
 ];
 
