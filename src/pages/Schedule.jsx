@@ -314,15 +314,19 @@ export default function Schedule() {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
 
-    // צור שורה ריקה אחת בלבד
-    const initialValues = {};
+    // אם יש שורות ברירת מחדל, צור אותן. אחרת צור שורה ריקה אחת
+    const rowsToCreate = template.default_rows && template.default_rows.length > 0
+      ? template.default_rows
+      : [{}];
 
-    await base44.entities.TemplateRow.create({
-      template_id: templateId,
-      template_name: template.name,
-      date: dateString,
-      values: initialValues
-    });
+    for (const rowValues of rowsToCreate) {
+      await base44.entities.TemplateRow.create({
+        template_id: templateId,
+        template_name: template.name,
+        date: dateString,
+        values: rowValues
+      });
+    }
 
     await loadData();
   };
