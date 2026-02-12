@@ -944,7 +944,7 @@ export default function Schedule() {
                     name: newCategoryName,
                     color: newCategoryColor,
                     columns: [
-                      { name: "עמודה 1", type: "text", width: 150 }
+                      { name: "עמודה 1", type: "text", width: 120 }
                     ],
                     default_rows: [],
                     active: true
@@ -1039,7 +1039,7 @@ export default function Schedule() {
                   const updatedColumns = [...selectedTemplate.columns, {
                     name: newTemplateColumnName,
                     type: newTemplateColumnType,
-                    width: 150
+                    width: 120
                   }];
                   await base44.entities.Template.update(selectedTemplate.id, { columns: updatedColumns });
                   setShowAddTemplateColumnDialog(false);
@@ -1097,7 +1097,7 @@ export default function Schedule() {
                   const newTemplate = await base44.entities.Template.create({
                     name: `${selectedTemplate?.name} - ${newSubCategoryName}`,
                     color: newSubCategoryColor,
-                    columns: selectedTemplate?.columns || [{ name: "עמודה 1", type: "text", width: 150 }],
+                    columns: selectedTemplate?.columns || [{ name: "עמודה 1", type: "text", width: 120 }],
                     default_rows: [],
                     active: true
                   });
