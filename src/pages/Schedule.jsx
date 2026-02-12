@@ -873,10 +873,10 @@ export default function Schedule() {
                                 </TableRow>
                               ))}
                             </TableBody>
-                          </Table>
-                          
-                          {/* Left Table */}
-                          <Table>
+                            </Table>
+
+                            {/* Left Table */}
+                            <Table>
                             <TableHeader>
                               <TableRow>
                                 {leftColumns.map((col, idx) => (
@@ -963,10 +963,10 @@ export default function Schedule() {
                                 </TableRow>
                               ))}
                             </TableBody>
-                          </Table>
-                        </div>
-                      ) : (
-                        <Table>
+                            </Table>
+                            </div>
+                            ) : (
+                            <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-[60px]" dir="rtl"></TableHead>
