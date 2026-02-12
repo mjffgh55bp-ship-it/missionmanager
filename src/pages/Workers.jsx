@@ -25,6 +25,7 @@ export default function Workers() {
   const [savingRoles, setSavingRoles] = useState(false);
   const [formData, setFormData] = useState({
     nickname: "",
+    birthday: "",
     role: "chef",
     category: "category_1",
     phone: "",
@@ -68,7 +69,7 @@ export default function Workers() {
     else await base44.entities.Worker.create(formData);
     setShowDialog(false);
     setEditingWorker(null);
-    setFormData({ nickname: "", role: "chef", category: "category_1", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
+    setFormData({ nickname: "", birthday: "", role: "chef", category: "category_1", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
     loadData();
   };
 
@@ -76,6 +77,7 @@ export default function Workers() {
     setEditingWorker(worker);
     setFormData({
       nickname: worker.nickname || "",
+      birthday: worker.birthday || "",
       role: worker.role,
       category: worker.category || "category_1",
       phone: worker.phone || "",
@@ -207,17 +209,43 @@ export default function Workers() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                      <div className="flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span className="text-sm font-medium text-gray-900" dir="rtl">סטטוס מדריך</span></div>
-                      <Switch checked={worker.is_guide} onCheckedChange={() => toggleGuide(worker)} />
+                    {/* פרטים אישיים */}
+                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <h4 className="text-sm font-semibold text-blue-900 mb-2" dir="rtl">פרטים אישיים</h4>
+                      <div className="space-y-1">
+                        <p className="text-sm text-gray-700" dir="rtl">👤 כינוי: {worker.nickname}</p>
+                        {worker.birthday && <p className="text-sm text-gray-700" dir="rtl">🎂 יום הולדת: {format(new Date(worker.birthday), "dd/MM/yyyy")}</p>}
+                        {worker.hire_date && <p className="text-sm text-gray-700" dir="rtl">📅 תאריך גיוס: {format(new Date(worker.hire_date), "dd/MM/yyyy")}</p>}
+                        {worker.training && <p className="text-sm text-gray-700" dir="rtl">🎓 קורס: {worker.training}</p>}
+                      </div>
                     </div>
 
-                    {worker.email && <p className="text-sm text-gray-600">📧 {worker.email}</p>}
-                    {worker.phone && <p className="text-sm text-gray-600">📞 {worker.phone}</p>}
-                    {worker.population && <p className="text-sm text-gray-600" dir="rtl">👥 {worker.population}</p>}
-                    {worker.training && <p className="text-sm text-gray-600" dir="rtl">🎓 {worker.training}</p>}
-                    {worker.additional_training && <p className="text-sm text-gray-600" dir="rtl">⭐ {worker.additional_training}</p>}
-                    {worker.hire_date && <p className="text-sm text-gray-600" dir="rtl">📅 גויס: {format(new Date(worker.hire_date), "MMM d, yyyy")}</p>}
+                    {/* כשירות */}
+                    <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                      <h4 className="text-sm font-semibold text-green-900 mb-2" dir="rtl">כשירות</h4>
+                      <div className="space-y-1">
+                        {worker.population && <p className="text-sm text-gray-700" dir="rtl">👥 אוכלוסיה: {worker.population}</p>}
+                        <p className="text-sm text-gray-700" dir="rtl">🍳 תפקיד: {worker.role === 'chef' ? 'שף' : 'סו-שף'}</p>
+                        <p className="text-sm text-gray-700" dir="rtl">⭐ כשירות: {seniorityInfo.label}</p>
+                        <p className="text-sm text-gray-700" dir="rtl">🏆 מדריך: {worker.is_guide ? 'כן' : 'לא'}</p>
+                      </div>
+                    </div>
+
+                    {/* פרטי קשר */}
+                    {(worker.email || worker.phone) && (
+                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <h4 className="text-sm font-semibold text-gray-900 mb-2" dir="rtl">פרטי קשר</h4>
+                        <div className="space-y-1">
+                          {worker.email && <p className="text-sm text-gray-700" dir="rtl">📧 {worker.email}</p>}
+                          {worker.phone && <p className="text-sm text-gray-700" dir="rtl">📞 {worker.phone}</p>}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <div className="flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span className="text-sm font-medium text-gray-900" dir="rtl">שנה סטטוס מדריך</span></div>
+                      <Switch checked={worker.is_guide} onCheckedChange={() => toggleGuide(worker)} />
+                    </div>
                   </div>
                   
                   <div className="flex gap-2 mt-4">
@@ -287,77 +315,99 @@ export default function Workers() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle dir="rtl">{editingWorker ? "ערוך עובד" : "הוסף עובד חדש"}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-              <div><Label htmlFor="nickname" dir="rtl">כינוי *</Label><Input id="nickname" value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="כינוי" dir="rtl" /></div>
-              <div><Label htmlFor="role" dir="rtl">תפקיד *</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="chef" dir="rtl">טבח ראשי</SelectItem>
-                    <SelectItem value="sous_chef" dir="rtl">עוזר טבח</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div><Label dir="rtl">קטגוריה</Label>
-                <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="category_1">{categoryNames.category_1}</SelectItem>
-                    <SelectItem value="category_2">{categoryNames.category_2}</SelectItem>
-                    <SelectItem value="category_3">{categoryNames.category_3}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                <Label htmlFor="is_guide" className="cursor-pointer flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span>Qualified Guide</span></Label>
-                <Switch id="is_guide" checked={formData.is_guide} onCheckedChange={(checked) => setFormData({ ...formData, is_guide: checked })} />
-              </div>
-              <div><Label htmlFor="email" dir="rtl">אימייל</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@mail.com" dir="rtl" /></div>
-              <div><Label htmlFor="phone" dir="rtl">טלפון</Label><Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="05x-xxxxxxx" dir="rtl" /></div>
               
-              <div>
-                <Label dir="rtl">אוכלוסייה</Label>
-                <Select value={formData.population} onValueChange={(value) => setFormData({ ...formData, population: value })}>
-                  <SelectTrigger><SelectValue placeholder="בחר אוכלוסייה..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="מנהל">מנהל</SelectItem>
-                    <SelectItem value="קבוע בכיר">קבוע בכיר</SelectItem>
-                    <SelectItem value="קבוע">קבוע</SelectItem>
-                    <SelectItem value="קבלן בכיר">קבלן בכיר</SelectItem>
-                    <SelectItem value="קבלן">קבלן</SelectItem>
-                    <SelectItem value="קבלן מיוחד">קבלן מיוחד</SelectItem>
-                    <SelectItem value="ותיק">ותיק</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* פרטים אישיים */}
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="text-sm font-semibold text-blue-900 mb-3" dir="rtl">פרטים אישיים</h4>
+                <div className="space-y-3">
+                  <div><Label htmlFor="nickname" dir="rtl">כינוי *</Label><Input id="nickname" value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="כינוי" dir="rtl" /></div>
+                  <div><Label htmlFor="birthday" dir="rtl">תאריך יום הולדת</Label><Input id="birthday" type="date" value={formData.birthday} onChange={(e) => setFormData({ ...formData, birthday: e.target.value })} /></div>
+                  <div><Label htmlFor="hire_date" dir="rtl">תאריך גיוס</Label><Input id="hire_date" type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
+                  <div>
+                    <Label dir="rtl">קורס/הכשרה</Label>
+                    <Select value={formData.training} onValueChange={(value) => setFormData({ ...formData, training: value })}>
+                      <SelectTrigger><SelectValue placeholder="בחר קורס..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="שף">שף</SelectItem>
+                        <SelectItem value="שף 2">שף 2</SelectItem>
+                        <SelectItem value="סו שף">סו שף</SelectItem>
+                        <SelectItem value="מארחת">מארחת</SelectItem>
+                        <SelectItem value="מאיישת סידור עבודה">מאיישת סידור עבודה</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <Label dir="rtl">הכשרה</Label>
-                <Select value={formData.training} onValueChange={(value) => setFormData({ ...formData, training: value })}>
-                  <SelectTrigger><SelectValue placeholder="בחר הכשרה..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="שף">שף</SelectItem>
-                    <SelectItem value="שף 2">שף 2</SelectItem>
-                    <SelectItem value="סו שף">סו שף</SelectItem>
-                    <SelectItem value="מארחת">מארחת</SelectItem>
-                    <SelectItem value="מאיישת סידור עבודה">מאיישת סידור עבודה</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* כשירות */}
+              <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                <h4 className="text-sm font-semibold text-green-900 mb-3" dir="rtl">כשירות</h4>
+                <div className="space-y-3">
+                  <div>
+                    <Label dir="rtl">אוכלוסייה</Label>
+                    <Select value={formData.population} onValueChange={(value) => setFormData({ ...formData, population: value })}>
+                      <SelectTrigger><SelectValue placeholder="בחר אוכלוסייה..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="מנהל">מנהל</SelectItem>
+                        <SelectItem value="קבוע בכיר">קבוע בכיר</SelectItem>
+                        <SelectItem value="קבוע">קבוע</SelectItem>
+                        <SelectItem value="קבלן בכיר">קבלן בכיר</SelectItem>
+                        <SelectItem value="קבלן">קבלן</SelectItem>
+                        <SelectItem value="קבלן מיוחד">קבלן מיוחד</SelectItem>
+                        <SelectItem value="ותיק">ותיק</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div><Label htmlFor="role" dir="rtl">תפקיד (שף/סו-שף) *</Label>
+                    <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="chef" dir="rtl">שף</SelectItem>
+                        <SelectItem value="sous_chef" dir="rtl">סו-שף</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div><Label dir="rtl">קטגוריה</Label>
+                    <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="category_1">{categoryNames.category_1}</SelectItem>
+                        <SelectItem value="category_2">{categoryNames.category_2}</SelectItem>
+                        <SelectItem value="category_3">{categoryNames.category_3}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <Label htmlFor="is_guide" className="cursor-pointer flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span dir="rtl">מדריך מוסמך</span></Label>
+                    <Switch id="is_guide" checked={formData.is_guide} onCheckedChange={(checked) => setFormData({ ...formData, is_guide: checked })} />
+                  </div>
+
+                  <div>
+                    <Label dir="rtl">הכשרה נוספת</Label>
+                    <Select value={formData.additional_training} onValueChange={(value) => setFormData({ ...formData, additional_training: value })}>
+                      <SelectTrigger><SelectValue placeholder="בחר הכשרה נוספת..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={null}>ללא</SelectItem>
+                        <SelectItem value="מדריך">מדריך</SelectItem>
+                        <SelectItem value="בוחן">בוחן</SelectItem>
+                        <SelectItem value="מתלמד">מתלמד</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <Label dir="rtl">הכשרה נוספת</Label>
-                <Select value={formData.additional_training} onValueChange={(value) => setFormData({ ...formData, additional_training: value })}>
-                  <SelectTrigger><SelectValue placeholder="בחר הכשרה נוספת..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={null}>ללא</SelectItem>
-                    <SelectItem value="מדריך">מדריך</SelectItem>
-                    <SelectItem value="בוחן">בוחן</SelectItem>
-                    <SelectItem value="מתלמד">מתלמד</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* פרטי קשר */}
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3" dir="rtl">פרטי קשר</h4>
+                <div className="space-y-3">
+                  <div><Label htmlFor="email" dir="rtl">אימייל</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@mail.com" dir="rtl" /></div>
+                  <div><Label htmlFor="phone" dir="rtl">טלפון</Label><Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="05x-xxxxxxx" dir="rtl" /></div>
+                </div>
               </div>
-
-              <div><Label htmlFor="hire_date" dir="rtl">תאריך גיוס</Label><Input id="hire_date" type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setShowDialog(false); setEditingWorker(null); }} dir="rtl">ביטול</Button>
