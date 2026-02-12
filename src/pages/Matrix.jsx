@@ -49,6 +49,10 @@ export default function Matrix() {
   const [selectedWorkerForManual, setSelectedWorkerForManual] = useState(null);
   const [manualShiftData, setManualShiftData] = useState({ start_time: '', end_time: '', type: 'available' });
   const [editingShift, setEditingShift] = useState(null);
+  const [populationFilter, setPopulationFilter] = useState("__all__");
+  const [roleFilter, setRoleFilter] = useState("__all__");
+  const [populations, setPopulations] = useState([]);
+  const [workerRoles, setWorkerRoles] = useState([]);
   const timelineRefs = useRef({});
 
   useEffect(() => { loadData(); }, [currentDate, viewMode]);
@@ -64,7 +68,7 @@ export default function Matrix() {
       assignmentFilter = { date: format(currentDate, "yyyy-MM-dd") };
     }
     
-    const [workersData, assignmentsData, availabilitiesData, unavailabilitiesData] = await Promise.all([
+    const [workersData, assignmentsData, availabilitiesData, unavailabilitiesData, populationsSettings, workerRolesSettings] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       viewMode === "daily" 
         ? base44.entities.Assignment.filter({ date: format(currentDate, "yyyy-MM-dd") })
@@ -72,7 +76,9 @@ export default function Matrix() {
       base44.entities.Availability.list(),
       viewMode === "daily"
         ? base44.entities.Unavailability.filter({ date: format(currentDate, "yyyy-MM-dd") })
-        : base44.entities.Unavailability.list()
+        : base44.entities.Unavailability.list(),
+      base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
     ]);
     
     // Filter weekly assignments
@@ -82,6 +88,13 @@ export default function Matrix() {
         const d = a.date;
         return d >= weekStartStr && d <= format(weekEnd, "yyyy-MM-dd");
       });
+    }
+    
+    if (populationsSettings.length > 0) {
+      setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
+    }
+    if (workerRolesSettings.length > 0) {
+      setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
     }
     
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
@@ -532,6 +545,30 @@ export default function Matrix() {
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
+                <Select value={populationFilter} onValueChange={setPopulationFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="אוכלוסייה" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">כל האוכלוסיות</SelectItem>
+                    {populations.map(pop => (
+                      <SelectItem key={pop} value={pop}>{pop}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="תפקיד" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">כל התפקידים</SelectItem>
+                    {workerRoles.map(role => (
+                      <SelectItem key={role} value={role}>{role}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
                 <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-1">
                   <Calendar className="w-4 h-4" />
                   <span className="text-sm" dir="rtl">יומי</span>
@@ -568,7 +605,13 @@ export default function Matrix() {
                 ) : workers.length === 0 ? (
                   <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
                 ) : (
-                  workers.map((worker, index) => {
+                  workers
+                    .filter(w => {
+                      if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                      if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                      return true;
+                    })
+                    .map((worker, index) => {
                     const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
                     const workerAssignments = getWorkerAssignments(worker.id);
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
