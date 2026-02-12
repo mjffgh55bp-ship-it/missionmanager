@@ -92,9 +92,13 @@ export default function Matrix() {
     
     if (populationsSettings.length > 0) {
       setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
+    } else {
+      setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
     }
     if (workerRolesSettings.length > 0) {
       setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
+    } else {
+      setWorkerRoles(["שף", "סו-שף"]);
     }
     
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
