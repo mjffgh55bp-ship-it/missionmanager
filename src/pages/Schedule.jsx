@@ -79,6 +79,7 @@ export default function Schedule() {
   const [templateRowValues, setTemplateRowValues] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
+  const [customColumnOrders, setCustomColumnOrders] = useState({});
   
   const [editFormData, setEditFormData] = useState({
     start_time: "",
@@ -153,6 +154,15 @@ export default function Schedule() {
     if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     if (cartColsSettings.length > 0) setCartColumns(JSON.parse(cartColsSettings[0].setting_value) || {});
+    
+    // Load custom column orders for this date
+    const columnOrderSettings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
+    if (columnOrderSettings.length > 0) {
+      setCustomColumnOrders(JSON.parse(columnOrderSettings[0].setting_value) || {});
+    } else {
+      setCustomColumnOrders({});
+    }
+    
     setLoading(false);
   };
 
@@ -572,6 +582,12 @@ export default function Schedule() {
                 const template = allTemplates.find(t => t.id === group.template_id);
                 if (!template) return null;
                 const templateRowsForTemplate = group.rows;
+                
+                // Get custom column order for this template and date, or use default
+                const customOrder = customColumnOrders[template.id];
+                const orderedColumns = customOrder 
+                  ? customOrder.map(name => template.columns.find(col => col.name === name)).filter(Boolean)
+                  : template.columns;
               
               return (
                 <Card key={group.key} className="border-none shadow-lg overflow-hidden">
@@ -687,40 +703,50 @@ export default function Schedule() {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[60px]" dir="rtl"></TableHead>
-                            {template.columns.map((col, idx) => (
+                            {orderedColumns.map((col, idx) => (
                               <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">
                                 <div className="flex items-center gap-1 justify-center">
-                                  <div className="flex flex-col">
+                                  <span>{col.name}</span>
+                                  <div className="flex gap-0.5">
                                     <Button
                                       size="icon"
                                       variant="ghost"
                                       className="h-4 w-4 p-0"
                                       disabled={idx === 0}
                                       onClick={async () => {
-                                        const newColumns = [...template.columns];
-                                        [newColumns[idx - 1], newColumns[idx]] = [newColumns[idx], newColumns[idx - 1]];
-                                        await base44.entities.Template.update(template.id, { columns: newColumns });
-                                        loadData();
+                                        const newOrder = [...orderedColumns];
+                                        [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+                                        const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map(c => c.name) };
+                                        setCustomColumnOrders(newCustomOrders);
+                                        
+                                        const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
+                                        const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
+                                        if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+                                        else await base44.entities.AppSettings.create(data);
                                       }}
                                     >
-                                      <ChevronUp className="w-3 h-3" />
+                                      <ChevronRight className="w-3 h-3" />
                                     </Button>
                                     <Button
                                       size="icon"
                                       variant="ghost"
                                       className="h-4 w-4 p-0"
-                                      disabled={idx === template.columns.length - 1}
+                                      disabled={idx === orderedColumns.length - 1}
                                       onClick={async () => {
-                                        const newColumns = [...template.columns];
-                                        [newColumns[idx], newColumns[idx + 1]] = [newColumns[idx + 1], newColumns[idx]];
-                                        await base44.entities.Template.update(template.id, { columns: newColumns });
-                                        loadData();
+                                        const newOrder = [...orderedColumns];
+                                        [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+                                        const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map(c => c.name) };
+                                        setCustomColumnOrders(newCustomOrders);
+                                        
+                                        const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
+                                        const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
+                                        if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+                                        else await base44.entities.AppSettings.create(data);
                                       }}
                                     >
-                                      <ChevronDown className="w-3 h-3" />
+                                      <ChevronLeft className="w-3 h-3" />
                                     </Button>
                                   </div>
-                                  <span>{col.name}</span>
                                 </div>
                               </TableHead>
                             ))}
@@ -785,7 +811,7 @@ export default function Schedule() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                {template.columns.map((col, idx) => (
+                                  {orderedColumns.map((col, idx) => (
                                   <TableCell key={idx} dir="rtl" className="p-0">
                                     {col.type === "time" ? (
                                       <Input
