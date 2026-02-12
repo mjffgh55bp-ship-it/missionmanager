@@ -37,15 +37,15 @@ export default function Templates() {
       name: "",
       color: "#3b82f6",
       columns: [
-        { name: "תדריך", type: "text", width: 100 },
-        { name: "התחלה", type: "time", width: 80 },
-        { name: "סיום", type: "time", width: 80 },
+        { name: "תדריך", type: "text", width: 120 },
+        { name: "התחלה", type: "time", width: 120 },
+        { name: "סיום", type: "time", width: 120 },
         { name: "מדריך", type: "worker", width: 120 },
         { name: "שף / שף 2", type: "worker", width: 120 },
         { name: "סו שף", type: "worker", width: 120 },
         { name: "נוסף", type: "worker", width: 120 },
-        { name: "משימה", type: "text", width: 150 },
-        { name: "הערות", type: "text", width: 150 }
+        { name: "משימה", type: "text", width: 120 },
+        { name: "הערות", type: "text", width: 120 }
       ],
       default_rows: []
     });
