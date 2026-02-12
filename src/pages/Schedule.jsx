@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react";
 import { format, addDays, subDays, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, Check, Star, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Star, Download, ChevronUp, ChevronDown } from "lucide-react";
 
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 
@@ -50,6 +50,7 @@ export default function Schedule() {
   const [templates, setTemplates] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
+  const [isEditMode, setIsEditMode] = useState(false);
   
   const [showWorkerDialog, setShowWorkerDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -470,6 +471,16 @@ export default function Schedule() {
                   <Plus className="w-4 h-4 ml-2" />
                   הוסף תבנית מהשלדיות
                 </Button>
+                {templates.length > 0 && (
+                  <Button 
+                    variant={isEditMode ? "default" : "outline"}
+                    onClick={() => setIsEditMode(!isEditMode)} 
+                    dir="rtl"
+                  >
+                    <Pencil className="w-4 h-4 ml-2" />
+                    {isEditMode ? "סיים עריכה" : "עריכת לוח"}
+                  </Button>
+                )}
                 {templateRows.length > 0 && (
                   <Button 
                     variant="destructive" 
@@ -498,14 +509,48 @@ export default function Schedule() {
 
         {templates.length > 0 && (
           <div className="space-y-4 mb-6">
-            {templates.map((template) => {
+            {templates.map((template, templateIndex) => {
               const templateRowsForTemplate = templateRows.filter(r => r.template_id === template.id).sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
               
               return (
                 <Card key={template.id} className="border-none shadow-lg overflow-hidden">
                   <CardHeader className="text-white py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                     <div className="flex justify-between items-center">
-                      <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        {isEditMode && (
+                          <div className="flex flex-col gap-1">
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-6 w-6 text-white hover:bg-white/20"
+                              disabled={templateIndex === 0}
+                              onClick={() => {
+                                const newTemplates = [...templates];
+                                [newTemplates[templateIndex - 1], newTemplates[templateIndex]] = 
+                                [newTemplates[templateIndex], newTemplates[templateIndex - 1]];
+                                setTemplates(newTemplates);
+                              }}
+                            >
+                              <ChevronUp className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-6 w-6 text-white hover:bg-white/20"
+                              disabled={templateIndex === templates.length - 1}
+                              onClick={() => {
+                                const newTemplates = [...templates];
+                                [newTemplates[templateIndex], newTemplates[templateIndex + 1]] = 
+                                [newTemplates[templateIndex + 1], newTemplates[templateIndex]];
+                                setTemplates(newTemplates);
+                              }}
+                            >
+                              <ChevronDown className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+                        <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
+                      </div>
                       <div className="flex gap-2">
                         <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
                           <Plus className="w-3 h-3 ml-1" />
