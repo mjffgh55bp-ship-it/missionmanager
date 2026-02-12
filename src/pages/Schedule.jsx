@@ -514,7 +514,7 @@ export default function Schedule() {
               
               return (
                 <Card key={template.id} className="border-none shadow-lg overflow-hidden">
-                  <CardHeader className="text-white py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
+                  <CardHeader className="text-black py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
                         {isEditMode && (
@@ -522,7 +522,7 @@ export default function Schedule() {
                             <Button 
                               size="icon" 
                               variant="ghost" 
-                              className="h-6 w-6 text-white hover:bg-white/20"
+                              className="h-6 w-6 text-black hover:bg-black/10"
                               disabled={templateIndex === 0}
                               onClick={() => {
                                 const newTemplates = [...templates];
@@ -536,7 +536,7 @@ export default function Schedule() {
                             <Button 
                               size="icon" 
                               variant="ghost" 
-                              className="h-6 w-6 text-white hover:bg-white/20"
+                              className="h-6 w-6 text-black hover:bg-black/10"
                               disabled={templateIndex === templates.length - 1}
                               onClick={() => {
                                 const newTemplates = [...templates];
@@ -605,6 +605,7 @@ export default function Schedule() {
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            {isEditMode && <TableHead className="w-[60px]" dir="rtl"></TableHead>}
                             {template.columns.map((col, idx) => (
                               <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">{col.name}</TableHead>
                             ))}
@@ -614,13 +615,63 @@ export default function Schedule() {
                         <TableBody>
                           {templateRowsForTemplate.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={template.columns.length + 1} className="text-center text-gray-500 py-8" dir="rtl">
+                              <TableCell colSpan={template.columns.length + 1 + (isEditMode ? 1 : 0)} className="text-center text-gray-500 py-8" dir="rtl">
                                 אין שורות. לחץ "הוסף שורה" להוספה.
                               </TableCell>
                             </TableRow>
                           ) : (
-                            templateRowsForTemplate.map((row) => (
+                            templateRowsForTemplate.map((row, rowIndex) => (
                               <TableRow key={row.id}>
+                                {isEditMode && (
+                                  <TableCell className="w-[60px]">
+                                    <div className="flex flex-col gap-1 items-center">
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-6 w-6"
+                                        disabled={rowIndex === 0}
+                                        onClick={async () => {
+                                          const currentRow = templateRowsForTemplate[rowIndex];
+                                          const prevRow = templateRowsForTemplate[rowIndex - 1];
+                                          
+                                          // החלף את created_date
+                                          await base44.entities.TemplateRow.update(currentRow.id, { 
+                                            created_date: prevRow.created_date 
+                                          });
+                                          await base44.entities.TemplateRow.update(prevRow.id, { 
+                                            created_date: currentRow.created_date 
+                                          });
+                                          
+                                          loadData();
+                                        }}
+                                      >
+                                        <ChevronUp className="w-3 h-3" />
+                                      </Button>
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-6 w-6"
+                                        disabled={rowIndex === templateRowsForTemplate.length - 1}
+                                        onClick={async () => {
+                                          const currentRow = templateRowsForTemplate[rowIndex];
+                                          const nextRow = templateRowsForTemplate[rowIndex + 1];
+                                          
+                                          // החלף את created_date
+                                          await base44.entities.TemplateRow.update(currentRow.id, { 
+                                            created_date: nextRow.created_date 
+                                          });
+                                          await base44.entities.TemplateRow.update(nextRow.id, { 
+                                            created_date: currentRow.created_date 
+                                          });
+                                          
+                                          loadData();
+                                        }}
+                                      >
+                                        <ChevronDown className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                )}
                                 {template.columns.map((col, idx) => (
                                   <TableCell key={idx} dir="rtl" className="p-0">
                                     {col.type === "time" ? (
