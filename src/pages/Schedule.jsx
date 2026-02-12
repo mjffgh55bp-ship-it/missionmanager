@@ -619,11 +619,10 @@ export default function Schedule() {
                   ? customOrder.map(name => template.columns.find(col => col.name === name)).filter(Boolean)
                   : template.columns;
                 
-                // If split template, divide columns into two halves
+                // If split template, show all columns in both sides
                 const isSplit = template.is_split;
-                const midPoint = isSplit ? Math.ceil(orderedColumns.length / 2) : orderedColumns.length;
-                const leftColumns = orderedColumns.slice(0, midPoint);
-                const rightColumns = isSplit ? orderedColumns.slice(midPoint) : [];
+                const leftColumns = orderedColumns;
+                const rightColumns = isSplit ? orderedColumns : [];
               
               return (
                 <Card key={group.key} className="border-none shadow-lg overflow-hidden">
@@ -760,8 +759,7 @@ export default function Schedule() {
                                           disabled={idx === 0}
                                           onClick={async () => {
                                             const newOrder = [...orderedColumns];
-                                            const actualIdx = midPoint + idx;
-                                            [newOrder[actualIdx - 1], newOrder[actualIdx]] = [newOrder[actualIdx], newOrder[actualIdx - 1]];
+                                            [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
                                             const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map(c => c.name) };
                                             setCustomColumnOrders(newCustomOrders);
                                             const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
@@ -779,8 +777,7 @@ export default function Schedule() {
                                           disabled={idx === rightColumns.length - 1}
                                           onClick={async () => {
                                             const newOrder = [...orderedColumns];
-                                            const actualIdx = midPoint + idx;
-                                            [newOrder[actualIdx], newOrder[actualIdx + 1]] = [newOrder[actualIdx + 1], newOrder[actualIdx]];
+                                            [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
                                             const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map(c => c.name) };
                                             setCustomColumnOrders(newCustomOrders);
                                             const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
