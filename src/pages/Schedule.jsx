@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, AlertTriangle, Plus, Trash2, Pencil } from "lucide-react";
 import { format, addDays, subDays, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, Check, Star, Download, ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, Star, Download, ChevronUp, ChevronDown, Save } from "lucide-react";
+import toast from 'react-hot-toast';
 
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 
@@ -76,6 +77,8 @@ export default function Schedule() {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [currentTemplateRow, setCurrentTemplateRow] = useState(null);
   const [templateRowValues, setTemplateRowValues] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
   
   const [editFormData, setEditFormData] = useState({
     start_time: "",
@@ -91,6 +94,31 @@ export default function Schedule() {
   });
 
   useEffect(() => { loadData(); }, [currentDate]);
+
+  // Auto-save every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      handleSave(true);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSave = async (isAutoSave = false) => {
+    setIsSaving(true);
+    try {
+      await loadData();
+      setLastSaved(new Date());
+      if (!isAutoSave) {
+        toast.success('הלוח נשמר בהצלחה!');
+      }
+    } catch (error) {
+      if (!isAutoSave) {
+        toast.error('שגיאה בשמירת הלוח');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -473,6 +501,21 @@ export default function Schedule() {
                 <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center" dir="rtl">{formatDateHebrew(currentDate)}</div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
                 <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleSave(false)} 
+                  disabled={isSaving}
+                  className="gap-2"
+                  dir="rtl"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSaving ? 'שומר...' : 'שמור לוח'}
+                </Button>
+                {lastSaved && (
+                  <span className="text-xs text-gray-500" dir="rtl">
+                    נשמר לאחרונה: {format(lastSaved, 'HH:mm')}
+                  </span>
+                )}
                 <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddFromTemplatesDialog(true)} dir="rtl">
                   <Plus className="w-4 h-4 ml-2" />
                   הוסף תבנית מהשלדיות
