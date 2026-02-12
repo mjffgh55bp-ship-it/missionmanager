@@ -23,6 +23,7 @@ export default function Workers() {
   const [editingWorker, setEditingWorker] = useState(null);
   const [userRoles, setUserRoles] = useState({});
   const [savingRoles, setSavingRoles] = useState(false);
+  const [populations, setPopulations] = useState([]);
   const [formData, setFormData] = useState({
     nickname: "",
     birthday: "",
@@ -42,11 +43,12 @@ export default function Workers() {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, catSettings, rolesSettings] = await Promise.all([
+    const [workersData, assignmentsData, catSettings, rolesSettings, populationsSettings] = await Promise.all([
       base44.entities.Worker.list("-created_date"),
       base44.entities.Assignment.list(),
       base44.entities.AppSettings.filter({ setting_key: "worker_category_names" }),
-      base44.entities.AppSettings.filter({ setting_key: "user_roles" })
+      base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
+      base44.entities.AppSettings.filter({ setting_key: "worker_populations" })
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -57,6 +59,11 @@ export default function Workers() {
     }
     if (rolesSettings.length > 0) {
       setUserRoles(JSON.parse(rolesSettings[0].setting_value));
+    }
+    if (populationsSettings.length > 0) {
+      setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
+    } else {
+      setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
     }
   };
 
@@ -339,13 +346,10 @@ export default function Workers() {
                     <Select value={formData.population} onValueChange={(value) => setFormData({ ...formData, population: value })}>
                       <SelectTrigger><SelectValue placeholder="בחר אוכלוסייה..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="מנהל">מנהל</SelectItem>
-                        <SelectItem value="קבוע בכיר">קבוע בכיר</SelectItem>
-                        <SelectItem value="קבוע">קבוע</SelectItem>
-                        <SelectItem value="קבלן בכיר">קבלן בכיר</SelectItem>
-                        <SelectItem value="קבלן">קבלן</SelectItem>
-                        <SelectItem value="קבלן מיוחד">קבלן מיוחד</SelectItem>
-                        <SelectItem value="ותיק">ותיק</SelectItem>
+                        {populations.map(pop => (
+                          <SelectItem key={pop} value={pop}>{pop}</SelectItem>
+                        ))}
+                        {populations.length === 0 && <SelectItem value={null} disabled>לא הוגדרו אוכלוסיות</SelectItem>}
                       </SelectContent>
                     </Select>
                   </div>

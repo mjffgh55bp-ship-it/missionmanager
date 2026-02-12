@@ -31,13 +31,15 @@ export default function Settings() {
   const [newColumnType, setNewColumnType] = useState("");
   const [selectedColTypeForSubType, setSelectedColTypeForSubType] = useState("");
   const [newColSubType, setNewColSubType] = useState("");
+  const [populations, setPopulations] = useState([]);
+  const [newPopulation, setNewPopulation] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings] = await Promise.all([
+    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
@@ -46,7 +48,8 @@ export default function Settings() {
       base44.entities.AppSettings.filter({ setting_key: "count_param_types" }),
       base44.entities.AppSettings.filter({ setting_key: "param_sub_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
-      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" })
+      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
+      base44.entities.AppSettings.filter({ setting_key: "worker_populations" })
     ]);
     
     if (tipsSettings.length > 0) {
@@ -60,6 +63,11 @@ export default function Settings() {
     if (subTypesSettings.length > 0) setParamSubTypes(JSON.parse(subTypesSettings[0].setting_value) || {});
     if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
+    if (populationsSettings.length > 0) {
+      setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
+    } else {
+      setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
+    }
     setWorkers(workersData);
     setCompanyEvents(eventsData);
     setLoading(false);
@@ -183,6 +191,24 @@ export default function Settings() {
   const handleDeleteEvent = async (eventId) => {
     await base44.entities.CompanyEvent.delete(eventId);
     loadSettings();
+  };
+
+  const handleAddPopulation = async () => {
+    if (!newPopulation.trim()) return;
+    const updated = [...populations, newPopulation.trim()];
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_populations" });
+    const data = { setting_key: "worker_populations", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setPopulations(updated);
+    setNewPopulation("");
+  };
+
+  const handleRemovePopulation = async (population) => {
+    const updated = populations.filter(p => p !== population);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_populations" });
+    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+    setPopulations(updated);
   };
 
   return (
@@ -313,6 +339,29 @@ export default function Settings() {
                 ))}
               </div>
             </Tabs>
+          </CardContent>
+        </Card>
+
+        {/* Worker Populations */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-orange-600" />אוכלוסיות עובדים</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר אוכלוסיות שניתן לבחור בהן בעת הוספת/עריכת עובדים</p>
+            <div className="flex gap-2 mb-4">
+              <Input value={newPopulation} onChange={(e) => setNewPopulation(e.target.value)} placeholder="שם אוכלוסייה חדשה..." dir="rtl" />
+              <Button onClick={handleAddPopulation}><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {populations.map(pop => (
+                <Badge key={pop} className="bg-orange-100 text-orange-800 pr-1">
+                  {pop}
+                  <button onClick={() => handleRemovePopulation(pop)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                </Badge>
+              ))}
+              {populations.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו אוכלוסיות</p>}
+            </div>
           </CardContent>
         </Card>
 
