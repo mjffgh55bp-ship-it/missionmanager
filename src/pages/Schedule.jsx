@@ -48,6 +48,7 @@ export default function Schedule() {
   const [columnSubTypes, setColumnSubTypes] = useState({});
   const [cartColumns, setCartColumns] = useState({});
   const [templates, setTemplates] = useState([]);
+  const [allTemplates, setAllTemplates] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
   
   const [showWorkerDialog, setShowWorkerDialog] = useState(false);
@@ -96,7 +97,7 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     
-    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData, colTypesSettings, colSubTypesSettings, cartColsSettings, templateRowsData] = await Promise.all([
+    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData, colTypesSettings, colSubTypesSettings, cartColsSettings, allTemplatesData, templateRowsData] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.FoodCart.filter({ active: true }),
       base44.entities.Assignment.filter({ date: dateString }),
@@ -105,6 +106,7 @@ export default function Schedule() {
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_columns" }),
+      base44.entities.Template.filter({ active: true }),
       base44.entities.TemplateRow.filter({ date: dateString })
     ]);
     setWorkers(workersData);
@@ -113,13 +115,12 @@ export default function Schedule() {
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
     setTemplateRows(templateRowsData);
+    setAllTemplates(allTemplatesData);
     
     // טען רק תבניות שיש להן שורות בתאריך הנוכחי
     const uniqueTemplateIds = [...new Set(templateRowsData.map(row => row.template_id))];
-    const templatesData = await Promise.all(
-      uniqueTemplateIds.map(id => base44.entities.Template.filter({ id }))
-    );
-    setTemplates(templatesData.flat());
+    const templatesInUse = allTemplatesData.filter(t => uniqueTemplateIds.includes(t.id));
+    setTemplates(templatesInUse);
     if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     if (cartColsSettings.length > 0) setCartColumns(JSON.parse(cartColsSettings[0].setting_value) || {});
@@ -970,22 +971,14 @@ export default function Schedule() {
         </Dialog>
 
         {/* Add From Templates Dialog */}
-        <Dialog open={showAddFromTemplatesDialog} onOpenChange={(open) => {
-          setShowAddFromTemplatesDialog(open);
-          if (open) {
-            // טען את כל השלדיות כשהדיאלוג נפתח
-            base44.entities.Template.filter({ active: true }).then(allTemplates => {
-              setTemplates(allTemplates);
-            });
-          }
-        }}>
+        <Dialog open={showAddFromTemplatesDialog} onOpenChange={setShowAddFromTemplatesDialog}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle dir="rtl">הוסף תבנית מהשלדיות</DialogTitle></DialogHeader>
             <div className="space-y-3 py-4">
-              {templates.length === 0 ? (
+              {allTemplates.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-4" dir="rtl">אין שלדיות זמינות</p>
               ) : (
-                templates.map(template => (
+                allTemplates.map(template => (
                   <button
                     key={template.id}
                     onClick={async () => {
