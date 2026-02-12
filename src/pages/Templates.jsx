@@ -188,6 +188,21 @@ export default function Templates() {
                      {template.is_default && (
                        <Badge className="bg-purple-100 text-purple-800 text-xs" dir="rtl">קבוע</Badge>
                      )}
+                     {template.is_split && (
+                       <Badge className="bg-blue-100 text-blue-800 text-xs" dir="rtl">מפוצל</Badge>
+                     )}
+                     <Button 
+                       size="sm" 
+                       variant="secondary" 
+                       onClick={async () => {
+                         await base44.entities.Template.update(template.id, { is_split: !template.is_split });
+                         loadTemplates();
+                       }}
+                       className={template.is_split ? "bg-blue-100 hover:bg-blue-200" : ""}
+                       dir="rtl"
+                     >
+                       {template.is_split ? "בטל פיצול" : "הגדר מפוצל"}
+                     </Button>
                      <Button 
                        size="sm" 
                        variant="secondary" 
