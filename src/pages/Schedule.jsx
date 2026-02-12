@@ -379,7 +379,7 @@ export default function Schedule() {
     setShowAddTemplateRowDialog(true);
   };
 
-  const handleAddTemplateRowForTemplate = async (templateId, useDefaults = false) => {
+  const handleAddTemplateRowForTemplate = async (templateId, useDefaults = false, side = null) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
 
@@ -393,13 +393,20 @@ export default function Schedule() {
       : [{}];
 
     for (const rowValues of rowsToCreate) {
-      await base44.entities.TemplateRow.create({
+      const rowData = {
         template_id: templateId,
         template_name: template.name,
         date: dateString,
         values: rowValues,
         group_id: groupId
-      });
+      };
+      
+      // אם התבנית מפוצלת והוגדר צד, הוסף אותו
+      if (side) {
+        rowData.side = side;
+      }
+      
+      await base44.entities.TemplateRow.create(rowData);
     }
 
     await loadData();
@@ -619,10 +626,10 @@ export default function Schedule() {
                   ? customOrder.map(name => template.columns.find(col => col.name === name)).filter(Boolean)
                   : template.columns;
                 
-                // If split template, show all columns in both sides
+                // If split template, separate rows by side
                 const isSplit = template.is_split;
-                const leftColumns = orderedColumns;
-                const rightColumns = isSplit ? orderedColumns : [];
+                const rightRows = isSplit ? templateRowsForTemplate.filter(r => r.side === 'right') : [];
+                const leftRows = isSplit ? templateRowsForTemplate.filter(r => r.side === 'left') : templateRowsForTemplate;
               
               return (
                 <Card key={group.key} className="border-none shadow-lg overflow-hidden">
@@ -684,10 +691,23 @@ export default function Schedule() {
                         <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
                       </div>
                       <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
-                          <Plus className="w-3 h-3 ml-1" />
-                          הוסף שורה
-                        </Button>
+{isSplit ? (
+                          <>
+                            <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id, false, 'right')} dir="rtl">
+                              <Plus className="w-3 h-3 ml-1" />
+                              הוסף שורה ימין
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id, false, 'left')} dir="rtl">
+                              <Plus className="w-3 h-3 ml-1" />
+                              הוסף שורה שמאל
+                            </Button>
+                          </>
+                        ) : (
+                          <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
+                            <Plus className="w-3 h-3 ml-1" />
+                            הוסף שורה
+                          </Button>
+                        )}
                         <Button 
                           size="sm" 
                           variant="secondary" 
@@ -746,8 +766,8 @@ export default function Schedule() {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                <TableHead className="w-[60px]" dir="rtl"></TableHead>
-                                {rightColumns.map((col, idx) => (
+                                 <TableHead className="w-[60px]" dir="rtl"></TableHead>
+                                 {orderedColumns.map((col, idx) => (
                                   <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">
                                     <div className="flex items-center gap-1 justify-center">
                                       <span>{col.name}</span>
@@ -774,7 +794,7 @@ export default function Schedule() {
                                           size="icon"
                                           variant="ghost"
                                           className="h-4 w-4 p-0"
-                                          disabled={idx === rightColumns.length - 1}
+                                          disabled={idx === orderedColumns.length - 1}
                                           onClick={async () => {
                                             const newOrder = [...orderedColumns];
                                             [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
@@ -796,7 +816,7 @@ export default function Schedule() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {templateRowsForTemplate.map((row, rowIndex) => (
+                              {rightRows.map((row, rowIndex) => (
                                 <TableRow key={row.id}>
                                   <TableCell className="w-[60px]">
                                     <div className="flex flex-col gap-1 items-center">
@@ -806,8 +826,8 @@ export default function Schedule() {
                                         className="h-6 w-6"
                                         disabled={rowIndex === 0}
                                         onClick={async () => {
-                                          const currentRow = templateRowsForTemplate[rowIndex];
-                                          const prevRow = templateRowsForTemplate[rowIndex - 1];
+                                          const currentRow = rightRows[rowIndex];
+                                          const prevRow = rightRows[rowIndex - 1];
                                           await base44.entities.TemplateRow.update(currentRow.id, { created_date: prevRow.created_date });
                                           await base44.entities.TemplateRow.update(prevRow.id, { created_date: currentRow.created_date });
                                           loadData();
@@ -819,10 +839,10 @@ export default function Schedule() {
                                         size="icon" 
                                         variant="ghost" 
                                         className="h-6 w-6"
-                                        disabled={rowIndex === templateRowsForTemplate.length - 1}
+                                        disabled={rowIndex === rightRows.length - 1}
                                         onClick={async () => {
-                                          const currentRow = templateRowsForTemplate[rowIndex];
-                                          const nextRow = templateRowsForTemplate[rowIndex + 1];
+                                          const currentRow = rightRows[rowIndex];
+                                          const nextRow = rightRows[rowIndex + 1];
                                           await base44.entities.TemplateRow.update(currentRow.id, { created_date: nextRow.created_date });
                                           await base44.entities.TemplateRow.update(nextRow.id, { created_date: currentRow.created_date });
                                           loadData();
@@ -832,7 +852,7 @@ export default function Schedule() {
                                       </Button>
                                     </div>
                                   </TableCell>
-                                  {rightColumns.map((col, idx) => (
+                                  {orderedColumns.map((col, idx) => (
                                     <TableCell key={idx} dir="rtl" className="p-0">
                                       {col.type === "time" ? (
                                         <Input
@@ -937,9 +957,9 @@ export default function Schedule() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {templateRowsForTemplate.map((row) => (
+                              {leftRows.map((row) => (
                                 <TableRow key={row.id}>
-                                  {leftColumns.map((col, idx) => (
+                                  {orderedColumns.map((col, idx) => (
                                     <TableCell key={idx} dir="rtl" className="p-0">
                                       {col.type === "time" ? (
                                         <Input
