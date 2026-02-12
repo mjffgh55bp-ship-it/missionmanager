@@ -36,6 +36,8 @@ export default function Templates() {
     setFormData({
       name: "",
       color: "#3b82f6",
+      split_title_right: "",
+      split_title_left: "",
       columns: [
         { name: "תדריך", type: "text", width: 120 },
         { name: "התחלה", type: "time", width: 120 },
@@ -57,6 +59,8 @@ export default function Templates() {
     setFormData({
       name: template.name,
       color: template.color || "#3b82f6",
+      split_title_right: template.split_title_right || "",
+      split_title_left: template.split_title_left || "",
       columns: template.columns || [],
       default_rows: template.default_rows || []
     });
@@ -302,6 +306,27 @@ export default function Templates() {
                     value={formData.color}
                     onChange={(e) => setFormData({ ...formData, color: e.target.value })}
                     className="h-10 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
+                <div>
+                  <Label dir="rtl">כותרת צד ימין (לפיצול)</Label>
+                  <Input
+                    value={formData.split_title_right || ""}
+                    onChange={(e) => setFormData({ ...formData, split_title_right: e.target.value })}
+                    placeholder="לדוגמה: מנהלי מסעדה יום"
+                    dir="rtl"
+                  />
+                </div>
+                <div>
+                  <Label dir="rtl">כותרת צד שמאל (לפיצול)</Label>
+                  <Input
+                    value={formData.split_title_left || ""}
+                    onChange={(e) => setFormData({ ...formData, split_title_left: e.target.value })}
+                    placeholder="לדוגמה: מנהלי מסעדה לילה"
+                    dir="rtl"
                   />
                 </div>
               </div>

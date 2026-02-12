@@ -738,9 +738,15 @@ export default function Schedule() {
                       {isSplit ? (
                         <div className="grid grid-cols-2 gap-0 divide-x divide-gray-200">
                           {/* Right Table */}
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
+                          <div>
+                            {template.split_title_right && (
+                              <div className="text-center font-semibold py-2 bg-gray-50 border-b" dir="rtl">
+                                {template.split_title_right}
+                              </div>
+                            )}
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
                                 <TableHead className="w-[60px]" dir="rtl"></TableHead>
                                 {rightColumns.map((col, idx) => (
                                   <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">
@@ -872,13 +878,20 @@ export default function Schedule() {
                                   </TableCell>
                                 </TableRow>
                               ))}
-                            </TableBody>
-                          </Table>
+                              </TableBody>
+                            </Table>
+                          </div>
 
                           {/* Left Table */}
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
+                          <div>
+                            {template.split_title_left && (
+                              <div className="text-center font-semibold py-2 bg-gray-50 border-b" dir="rtl">
+                                {template.split_title_left}
+                              </div>
+                            )}
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
                                 {leftColumns.map((col, idx) => (
                                   <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">
                                     <div className="flex items-center gap-1 justify-center">
@@ -962,8 +975,9 @@ export default function Schedule() {
                                   ))}
                                 </TableRow>
                               ))}
-                            </TableBody>
-                          </Table>
+                              </TableBody>
+                            </Table>
+                          </div>
                         </div>
                       ) : (
                         <Table>
