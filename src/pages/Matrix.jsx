@@ -667,23 +667,61 @@ export default function Matrix() {
 
         <Card className="border-none shadow-lg">
           <CardContent className="p-0">
-            {/* Zoom Control */}
-            <div className="p-4 border-b bg-gray-50" dir="rtl">
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-medium text-gray-700">זום:</span>
-                <div className="flex-1 relative h-8 bg-gray-200 rounded-full">
+            {/* Fixed Zoom Control at Bottom */}
+            <div className="fixed bottom-0 left-0 right-0 p-2 bg-white border-t shadow-lg z-50" dir="rtl">
+              <div className="flex items-center gap-4 max-w-screen-2xl mx-auto">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setZoomRange({ start: 0, end: 100 })}
+                  disabled={zoomRange.start === 0 && zoomRange.end === 100}
+                  className="shrink-0"
+                >
+                  איפוס
+                </Button>
+                <div className="flex-1 relative h-4 bg-gray-200 rounded-full">
                   <div 
-                    className="absolute top-0 h-full bg-blue-300 rounded-full"
+                    className="absolute top-0 h-full bg-blue-400 rounded-full cursor-move hover:bg-blue-500 transition-colors"
                     style={{ 
                       right: `${zoomRange.start}%`, 
                       width: `${zoomRange.end - zoomRange.start}%` 
                     }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const startX = e.clientX;
+                      const startRangeStart = zoomRange.start;
+                      const startRangeEnd = zoomRange.end;
+                      const width = startRangeEnd - startRangeStart;
+                      const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                      const handleMove = (moveE) => {
+                        const delta = ((moveE.clientX - startX) / rect.width) * -100;
+                        let newStart = startRangeStart + delta;
+                        let newEnd = startRangeEnd + delta;
+                        
+                        if (newStart < 0) {
+                          newStart = 0;
+                          newEnd = width;
+                        } else if (newEnd > 100) {
+                          newEnd = 100;
+                          newStart = 100 - width;
+                        }
+                        
+                        setZoomRange({ start: newStart, end: newEnd });
+                      };
+                      const handleUp = () => {
+                        document.removeEventListener('mousemove', handleMove);
+                        document.removeEventListener('mouseup', handleUp);
+                      };
+                      document.addEventListener('mousemove', handleMove);
+                      document.addEventListener('mouseup', handleUp);
+                    }}
                   />
                   <div 
-                    className="absolute top-0 w-4 h-8 bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors"
+                    className="absolute top-0 w-3 h-4 bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors"
                     style={{ right: `${zoomRange.start}%` }}
                     onMouseDown={(e) => {
                       e.preventDefault();
+                      e.stopPropagation();
                       const startX = e.clientX;
                       const startValue = zoomRange.start;
                       const rect = e.currentTarget.parentElement.getBoundingClientRect();
@@ -701,10 +739,11 @@ export default function Matrix() {
                     }}
                   />
                   <div 
-                    className="absolute top-0 w-4 h-8 bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors"
+                    className="absolute top-0 w-3 h-4 bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors"
                     style={{ right: `${zoomRange.end}%`, transform: 'translateX(100%)' }}
                     onMouseDown={(e) => {
                       e.preventDefault();
+                      e.stopPropagation();
                       const startX = e.clientX;
                       const startValue = zoomRange.end;
                       const rect = e.currentTarget.parentElement.getBoundingClientRect();
@@ -722,18 +761,10 @@ export default function Matrix() {
                     }}
                   />
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setZoomRange({ start: 0, end: 100 })}
-                  disabled={zoomRange.start === 0 && zoomRange.end === 100}
-                >
-                  איפוס
-                </Button>
               </div>
             </div>
             
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto pb-16">
               <div className="min-w-[1400px]">
                 <div className="flex sticky top-0 bg-gray-100 z-50 border-b">
                   <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50" dir="rtl">עובד</div>
