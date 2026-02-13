@@ -649,9 +649,7 @@ export default function Matrix() {
                           }}
                           className="flex-1 relative border-r cursor-crosshair h-16"
                           onMouseDown={(e) => {
-                            if (e.target === e.currentTarget || e.target.classList.contains('time-slot')) {
-                              handleMouseDown(e, worker, null, 'create');
-                            }
+                            handleMouseDown(e, worker, null, 'create');
                           }}
                         >
                           <div className="absolute inset-0 flex h-16">
