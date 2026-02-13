@@ -912,28 +912,28 @@ export default function Matrix() {
         )}
 
         {/* Legend */}
-        <Card className="border-none shadow-lg mt-4">
-          <CardHeader className="border-b bg-white py-3 px-6">
+        <Card className="border-none shadow-lg mt-4 max-w-2xl">
+          <CardHeader className="border-b bg-white py-2 px-4">
             <div className="flex justify-between items-center">
               <div>
-                <CardTitle className="text-lg" dir="rtl">מקרא סוג פעילות</CardTitle>
-                <p className="text-sm text-gray-600 mt-1" dir="rtl">לחץ על קטגוריה כדי לסמן אותה על המטריצה</p>
+                <CardTitle className="text-base" dir="rtl">מקרא סוג פעילות</CardTitle>
+                <p className="text-xs text-gray-600 mt-0.5" dir="rtl">לחץ על קטגוריה כדי לסמן אותה על המטריצה</p>
               </div>
               <Button onClick={handleAddCategory} size="sm">
-                <Plus className="w-4 h-4 ml-1" />
+                <Plus className="w-3 h-3 ml-1" />
                 הוסף קטגוריה
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 gap-2">
+          <CardContent className="p-3">
+            <div className="grid grid-cols-1 gap-1.5">
               {categories.map((category) => (
-                <div key={category.id} className="flex gap-2">
+                <div key={category.id} className="flex gap-1.5">
                   <button
                     onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
-                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${category.color} ${
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${category.color} ${
                       selectedCategory === category.id 
-                        ? `ring-4 ${category.borderColor} ring-opacity-50 scale-[1.02]` 
+                        ? `ring-2 ${category.borderColor} ring-opacity-50 scale-[1.02]` 
                         : 'hover:scale-[1.01]'
                     }`}
                     dir="rtl"
@@ -944,15 +944,17 @@ export default function Matrix() {
                     size="sm"
                     variant="outline"
                     onClick={() => handleEditCategory(category)}
+                    className="h-7 w-7 p-0"
                   >
-                    <Edit2 className="w-4 h-4" />
+                    <Edit2 className="w-3 h-3" />
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => handleDeleteCategory(category.id)}
+                    className="h-7 w-7 p-0"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
               ))}
