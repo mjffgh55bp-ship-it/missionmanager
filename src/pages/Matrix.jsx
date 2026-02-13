@@ -389,6 +389,10 @@ export default function Matrix() {
     const startX = e.clientX - rect.left;
     const startPercent = (startX / rect.width) * 100;
     
+    console.log('=== MOUSE DOWN ===');
+    console.log('Current selectedActivityType:', selectedActivityType);
+    console.log('Action:', action);
+    
     setDragging({
       workerId: worker.id,
       worker,
@@ -399,6 +403,7 @@ export default function Matrix() {
       originalEnd: shift?.end_time,
       originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0,
       originalType: shift?.type,
+      selectedActivityType: selectedActivityType || 'shift',
       rect
     });
   };
@@ -459,7 +464,7 @@ export default function Matrix() {
       return;
     }
     
-    const { workerId, worker, shift, action } = dragging;
+    const { workerId, worker, shift, action, selectedActivityType: dragActivityType } = dragging;
     const { start, end, day } = dragPreview;
     
     if (start === end) {
@@ -475,8 +480,9 @@ export default function Matrix() {
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     
     if (action === 'create') {
-      const activityType = selectedActivityType || 'shift';
-      console.log('Creating shift with activity_type:', activityType, 'from selectedActivityType:', selectedActivityType);
+      const activityType = dragActivityType || 'shift';
+      console.log('=== CREATING SHIFT ===');
+      console.log('Using activity_type from dragging state:', activityType);
       updatedShifts.push({ 
         date: targetDate, 
         start_time: start, 
