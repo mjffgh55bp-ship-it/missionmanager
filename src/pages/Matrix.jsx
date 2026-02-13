@@ -47,32 +47,39 @@ const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { st
     const totalMinutes = hoursFromDayStart * 60 + minutes;
     basePercent = (totalMinutes / (24 * 60)) * 100;
   }
-  // Map to zoomed range
+  
+  // Check if time is outside zoom range
+  if (basePercent < zoomRange.start || basePercent > zoomRange.end) {
+    return basePercent < zoomRange.start ? -1 : 101;
+  }
+  
+  // Map to zoomed range (0-100% of visible area)
   const zoomWidth = zoomRange.end - zoomRange.start;
   return ((basePercent - zoomRange.start) / zoomWidth) * 100;
 };
 
 const percentageToTime = (percentage, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
-  // Map from zoomed percentage back to full range
+  // Map from zoomed percentage (0-100% of visible area) back to full range (0-100% of timeline)
   const zoomWidth = zoomRange.end - zoomRange.start;
   const basePercent = (percentage / 100) * zoomWidth + zoomRange.start;
   
-  const totalMinutes = Math.round((basePercent / 100) * (viewMode === 'weekly' ? 7 * 24 * 60 : 24 * 60));
+  // Round to nearest minute for precision
+  const totalMinutes = (basePercent / 100) * (viewMode === 'weekly' ? 7 * 24 * 60 : 24 * 60);
   
   if (viewMode === 'weekly') {
     const day = Math.floor(totalMinutes / (24 * 60));
     const minutesInDay = totalMinutes % (24 * 60);
     const hoursFromDayStart = Math.floor(minutesInDay / 60);
-    const minutes = Math.round((minutesInDay % 60) / 15) * 15;
+    const mins = Math.round((minutesInDay % 60) / 15) * 15;
     // Convert back to actual hour (timeline starts at 06:00)
     const actualHour = (hoursFromDayStart + 6) % 24;
-    return { day, time: `${String(actualHour).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}` };
+    return { day: Math.max(0, Math.min(6, day)), time: `${String(actualHour).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}` };
   } else {
     const hoursFromDayStart = Math.floor(totalMinutes / 60);
-    const minutes = Math.round((totalMinutes % 60) / 15) * 15;
+    const mins = Math.round((totalMinutes % 60) / 15) * 15;
     // Convert back to actual hour (timeline starts at 06:00)
     const actualHour = (hoursFromDayStart + 6) % 24;
-    return { day: 0, time: `${String(actualHour).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}` };
+    return { day: 0, time: `${String(actualHour).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}` };
   }
 };
 
