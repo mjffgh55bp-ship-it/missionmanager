@@ -138,7 +138,7 @@ export default function Matrix() {
   const [editingActivityType, setEditingActivityType] = useState(null);
   const [newActivityType, setNewActivityType] = useState({ label: '', color: '#3b82f6' });
   const [tempActivityTypes, setTempActivityTypes] = useState([]);
-  const [selectedActivityType, setSelectedActivityType] = useState(null);
+  const [selectedActivityType, setSelectedActivityType] = useState('shift');
   const [isLoadingData, setIsLoadingData] = useState(false);
   const loadingTimeoutRef = useRef(null);
 
@@ -1464,13 +1464,12 @@ export default function Matrix() {
                     key={type.id} 
                     type="button"
                     onClick={() => {
-                      const newValue = isSelected ? null : type.id;
+                      // Always set to this type, never deselect
                       console.log('=== ACTIVITY TYPE CLICK ===');
                       console.log('Current selectedActivityType:', selectedActivityType);
                       console.log('Clicked type.id:', type.id);
-                      console.log('New value will be:', newValue);
-                      setSelectedActivityType(newValue);
-                      console.log('State updated to:', newValue);
+                      console.log('Setting to:', type.id);
+                      setSelectedActivityType(type.id);
                     }}
                     style={{ backgroundColor: type.color }} 
                     className={`text-sm font-medium text-gray-900 py-2 px-4 rounded-lg text-center transition-all hover:opacity-90 cursor-pointer ${
