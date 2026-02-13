@@ -854,27 +854,6 @@ export default function Matrix() {
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
-                <div className="border rounded-lg p-2 bg-white">
-                  <Label className="text-xs font-semibold mb-2 block" dir="rtl">קטגוריה לציור</Label>
-                  <div className="flex gap-1 flex-wrap max-w-[500px]">
-                    {activityTypes.slice(0, 6).map(type => (
-                      <button
-                        key={type.id}
-                        onClick={() => setSelectedActivityType(selectedActivityType === type.id ? null : type.id)}
-                        className={`px-2 py-1 text-xs rounded-md transition-all ${
-                          selectedActivityType === type.id 
-                            ? 'ring-2 ring-blue-500 ring-offset-1' 
-                            : 'hover:opacity-80'
-                        }`}
-                        style={{ backgroundColor: type.color }}
-                        title={type.label}
-                      >
-                        {type.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
                 <Select value={populationFilter} onValueChange={setPopulationFilter}>
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="אוכלוסייה" />
@@ -1450,14 +1429,19 @@ export default function Matrix() {
             </div>
             <div className="flex flex-col gap-2">
               {activityTypes.map(type => (
-                <div 
+                <button
                   key={type.id} 
+                  onClick={() => setSelectedActivityType(selectedActivityType === type.id ? null : type.id)}
                   style={{ backgroundColor: type.color }} 
-                  className="text-sm font-medium text-gray-900 py-2 px-4 rounded-lg text-center"
+                  className={`text-sm font-medium text-gray-900 py-2 px-4 rounded-lg text-center transition-all hover:opacity-90 ${
+                    selectedActivityType === type.id 
+                      ? 'ring-4 ring-blue-500 ring-offset-2' 
+                      : ''
+                  }`}
                   dir="rtl"
                 >
-                  {type.label}
-                </div>
+                  {type.label} {selectedActivityType === type.id && '✓'}
+                </button>
               ))}
             </div>
           </CardContent>
