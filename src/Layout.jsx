@@ -130,7 +130,7 @@ export default function Layout({ children }) {
             onClick={() => setSidebarOpen(false)}
           />
           <div 
-            className="fixed top-0 right-0 h-full w-56 bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-300"
+            className="fixed top-0 right-0 h-full w-56 bg-white border-l border-gray-200 shadow-2xl z-[100] transform transition-transform duration-300"
             onMouseLeave={() => setSidebarOpen(false)}
           >
             <div className="border-b border-gray-200 p-4">
