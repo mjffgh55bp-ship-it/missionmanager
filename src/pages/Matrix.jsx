@@ -453,16 +453,24 @@ export default function Matrix() {
     await saveCategories(newCategories);
   };
 
-  const handleAddActivity = (worker) => {
-    setSelectedWorker(worker);
-    setActivityForm({ 
-      category_id: categories[0]?.id || "", 
-      day: 0, 
-      start_time: "06:00", 
-      end_time: "07:00",
-      note: ""
+  const handleAddQuickBlock = (workerId) => {
+    if (!selectedCategory) {
+      alert("נא לבחור קטגוריה מהמקרא תחילה");
+      return;
+    }
+    
+    // הוסף בלוק של שעה אחת בשעה 6 ביום ראשון
+    const dayIndex = 0;
+    const startHour = 6;
+    const key = getCellKey(workerId, dayIndex, startHour);
+    
+    setCellData(prev => {
+      const existing = prev[key] || [];
+      return {
+        ...prev,
+        [key]: [...existing, selectedCategory]
+      };
     });
-    setShowActivityDialog(true);
   };
 
   const handleSaveActivity = () => {
@@ -858,7 +866,8 @@ export default function Matrix() {
                               size="sm" 
                               variant="ghost" 
                               className="h-6 w-6 p-0"
-                              onClick={() => handleAddActivity(worker)}
+                              onClick={() => handleAddQuickBlock(worker.id)}
+                              title="הוסף בלוק מהיר"
                             >
                               <Plus className="w-4 h-4" />
                             </Button>
