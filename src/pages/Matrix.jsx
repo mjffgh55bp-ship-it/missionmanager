@@ -556,7 +556,12 @@ export default function Matrix() {
     const note = getCellNote(workerId, dayIndex, hour);
 
     const targetStartHour = workerId === targetWorkerId ? targetHour : hour;
-    const finalDayIndex = workerId === targetWorkerId ? targetDayIndex : dayIndex;
+    let finalDayIndex = workerId === targetWorkerId ? targetDayIndex : dayIndex;
+    
+    // אם השעה היא בין 0-5 (אחרי חצות), עבור ליום הבא
+    if (workerId !== targetWorkerId && targetStartHour >= 0 && targetStartHour <= 5) {
+      finalDayIndex = (dayIndex + 1) % 7;
+    }
 
     setCellData(prev => {
       const newData = { ...prev };
