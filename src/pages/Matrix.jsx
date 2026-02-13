@@ -452,6 +452,7 @@ export default function Matrix() {
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     
     if (action === 'create') {
+      console.log('Creating shift with selectedActivityType:', selectedActivityType);
       updatedShifts.push({ 
         date: targetDate, 
         start_time: start, 
@@ -460,6 +461,7 @@ export default function Matrix() {
         activity_type: selectedActivityType || 'shift',
         priority: updatedShifts.length + 1 
       });
+      console.log('Created shift:', updatedShifts[updatedShifts.length - 1]);
     } else if (shift) {
       updatedShifts = updatedShifts.map(s => {
         if (s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time) {
@@ -1135,36 +1137,20 @@ export default function Matrix() {
                         </div>
                       </div>
                       {viewMode === 'weekly' && summary && (
-                        <div className="flex border-b bg-gray-100 text-xs h-8">
-                          <div className="w-[300px] min-w-[300px] px-3 py-1 border-r sticky left-0 bg-gray-100 z-40 font-semibold text-gray-700" dir="rtl">
-                            סיכום שבועי
-                          </div>
-                          <div className="flex-1 px-3 py-1 flex gap-4 items-center flex-wrap text-gray-700" dir="rtl">
-                            <span><strong>סה"כ:</strong> {summary.total}</span>
-                            <span><strong>כוננות:</strong> {summary.standby}</span>
-                            <span><strong>משמרת:</strong> {summary.regularShift}</span>
-                            <span><strong>אימון:</strong> {summary.training}</span>
-                            <span><strong>אחר:</strong> {summary.other}</span>
-                            <span><strong>ליבה:</strong> {summary.core}</span>
-                            <span><strong>קיצון:</strong> {summary.extreme}</span>
-                          </div>
-                        </div>
-                      )}
-                      {viewMode === 'weekly' && summary && (
-                        <div className="flex border-b bg-gray-100 text-xs h-8">
-                          <div className="w-[300px] min-w-[300px] px-3 py-1 border-r sticky left-0 bg-gray-100 z-40 font-semibold text-gray-700" dir="rtl">
-                            סיכום שבועי
-                          </div>
-                          <div className="flex-1 px-3 py-1 flex gap-4 items-center flex-wrap text-gray-700" dir="rtl">
-                            <span><strong>סה"כ:</strong> {summary.total}</span>
-                            <span><strong>כוננות:</strong> {summary.standby}</span>
-                            <span><strong>משמרת:</strong> {summary.regularShift}</span>
-                            <span><strong>אימון:</strong> {summary.training}</span>
-                            <span><strong>אחר:</strong> {summary.other}</span>
-                            <span><strong>ליבה:</strong> {summary.core}</span>
-                            <span><strong>קיצון:</strong> {summary.extreme}</span>
-                          </div>
-                        </div>
+                       <div className="flex border-b bg-gray-100 text-xs h-8">
+                         <div className="w-[300px] min-w-[300px] px-3 py-1 border-r sticky left-0 bg-gray-100 z-40 font-semibold text-gray-700" dir="rtl">
+                           סיכום שבועי
+                         </div>
+                         <div className="flex-1 px-3 py-1 flex gap-4 items-center flex-wrap text-gray-700" dir="rtl">
+                           <span><strong>סה"כ:</strong> {summary.total}</span>
+                           <span><strong>כוננות:</strong> {summary.standby}</span>
+                           <span><strong>משמרת:</strong> {summary.regularShift}</span>
+                           <span><strong>אימון:</strong> {summary.training}</span>
+                           <span><strong>אחר:</strong> {summary.other}</span>
+                           <span><strong>ליבה:</strong> {summary.core}</span>
+                           <span><strong>קיצון:</strong> {summary.extreme}</span>
+                         </div>
+                       </div>
                       )}
                       </React.Fragment>
                     );
