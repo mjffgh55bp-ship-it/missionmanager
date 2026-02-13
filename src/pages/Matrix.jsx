@@ -13,20 +13,34 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
-const timeSlots = Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
+const getDailyTimeSlots = () => Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
+const getWeeklyTimeSlots = () => {
+  const slots = [];
+  for (let day = 0; day < 7; day++) {
+    for (let hour = 6; hour < 30; hour++) {
+      slots.push({ day, hour: hour % 24, label: hour === 6 ? DAYS_OF_WEEK[day] : null });
+    }
+  }
+  return slots;
+};
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
-const timeToPercentage = (timeStr) => {
+const timeToPercentage = (timeStr, day = 0, viewMode = 'daily') => {
   if (!timeStr) return 0;
   const [hours, minutes] = timeStr.split(':').map(Number);
+  if (viewMode === 'weekly') {
+    const totalMinutes = day * 24 * 60 + hours * 60 + minutes;
+    return (totalMinutes / (7 * 24 * 60)) * 100;
+  }
   return ((hours * 60 + minutes) / (24 * 60)) * 100;
 };
 
-const percentageToTime = (percentage) => {
-  const totalMinutes = Math.round((percentage / 100) * 24 * 60);
+const percentageToTime = (percentage, viewMode = 'daily') => {
+  const totalMinutes = Math.round((percentage / 100) * (viewMode === 'weekly' ? 7 * 24 * 60 : 24 * 60));
   const hours = Math.floor(totalMinutes / 60) % 24;
   const minutes = Math.round((totalMinutes % 60) / 15) * 15;
-  return `${String(hours).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+  const day = viewMode === 'weekly' ? Math.floor(totalMinutes / (24 * 60)) : 0;
+  return { day, time: `${String(hours).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}` };
 };
 
 export default function Matrix() {
@@ -127,11 +141,17 @@ export default function Matrix() {
       (a.status === "approved" || a.status === "submitted")
     );
     if (!workerAvail || !workerAvail.shifts) return [];
+    if (viewMode === 'weekly') {
+      return workerAvail.shifts || [];
+    }
     return workerAvail.shifts.filter(s => s.date === targetDate);
   };
 
   const getWorkerUnavailabilityForDate = (workerId, date = null) => {
     const targetDate = date || dateString;
+    if (viewMode === 'weekly') {
+      return unavailabilities.filter(u => u.worker_id === workerId);
+    }
     return unavailabilities.filter(u => u.worker_id === workerId && u.date === targetDate);
   };
 
@@ -208,7 +228,7 @@ export default function Matrix() {
     setNotificationNotes("");
   };
 
-  const handleMouseDown = (e, worker, shift, action) => {
+  const handleMouseDown = (e, worker, shift, action, dayIndex = 0) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -230,41 +250,58 @@ export default function Matrix() {
       startPercent,
       originalStart: shift?.start_time,
       originalEnd: shift?.end_time,
+      originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0,
       originalType: shift?.type,
       rect
     });
+  };
+  
+  const getDayIndexFromDate = (dateStr) => {
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const date = new Date(dateStr);
+    const diff = Math.floor((date - weekStart) / (1000 * 60 * 60 * 24));
+    return Math.max(0, Math.min(6, diff));
   };
 
   const handleMouseMove = (e) => {
     if (!dragging) return;
     
-    const { workerId, worker, shift, action, startPercent, originalStart, originalEnd, rect } = dragging;
+    const { workerId, worker, shift, action, startPercent, originalStart, originalEnd, originalDay, rect } = dragging;
     const currentX = e.clientX - rect.left;
     const currentPercent = Math.max(0, Math.min(100, (currentX / rect.width) * 100));
     
     let newStart = originalStart;
     let newEnd = originalEnd;
+    let newDay = originalDay || 0;
     
     if (action === 'create') {
       const minP = Math.min(startPercent, currentPercent);
       const maxP = Math.max(startPercent, currentPercent);
-      newStart = percentageToTime(minP);
-      newEnd = percentageToTime(maxP);
+      const startData = percentageToTime(minP, viewMode);
+      const endData = percentageToTime(maxP, viewMode);
+      newStart = viewMode === 'weekly' ? startData.time : startData;
+      newEnd = viewMode === 'weekly' ? endData.time : endData;
+      newDay = viewMode === 'weekly' ? startData.day : 0;
     } else if (action === 'resize-start') {
-      newStart = percentageToTime(currentPercent);
+      const data = percentageToTime(currentPercent, viewMode);
+      newStart = viewMode === 'weekly' ? data.time : data;
     } else if (action === 'resize-end') {
-      newEnd = percentageToTime(currentPercent);
+      const data = percentageToTime(currentPercent, viewMode);
+      newEnd = viewMode === 'weekly' ? data.time : data;
     } else if (action === 'move') {
-      const origStartP = timeToPercentage(originalStart);
-      const origEndP = timeToPercentage(originalEnd);
+      const origStartP = timeToPercentage(originalStart, originalDay || 0, viewMode);
+      const origEndP = timeToPercentage(originalEnd, originalDay || 0, viewMode);
       const width = origEndP - origStartP;
       const diff = currentPercent - startPercent;
       const newStartP = Math.max(0, Math.min(100 - width, origStartP + diff));
-      newStart = percentageToTime(newStartP);
-      newEnd = percentageToTime(newStartP + width);
+      const startData = percentageToTime(newStartP, viewMode);
+      const endData = percentageToTime(newStartP + width, viewMode);
+      newStart = viewMode === 'weekly' ? startData.time : startData;
+      newEnd = viewMode === 'weekly' ? endData.time : endData;
+      newDay = viewMode === 'weekly' ? startData.day : 0;
     }
     
-    setDragPreview({ workerId, start: newStart, end: newEnd, type: shift?.type || 'available' });
+    setDragPreview({ workerId, start: newStart, end: newEnd, day: newDay, type: shift?.type || 'available' });
   };
 
   const handleMouseUp = async () => {
@@ -275,7 +312,7 @@ export default function Matrix() {
     }
     
     const { workerId, worker, shift, action } = dragging;
-    const { start, end } = dragPreview;
+    const { start, end, day } = dragPreview;
     
     if (start === end) {
       setDragging(null);
@@ -283,15 +320,18 @@ export default function Matrix() {
       return;
     }
     
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const targetDate = viewMode === 'weekly' ? format(addDays(weekStart, day || 0), 'yyyy-MM-dd') : dateString;
+    
     const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     
     if (action === 'create') {
-      updatedShifts.push({ date: dateString, start_time: start, end_time: end, type: 'available', priority: updatedShifts.length + 1 });
+      updatedShifts.push({ date: targetDate, start_time: start, end_time: end, type: 'available', priority: updatedShifts.length + 1 });
     } else if (shift) {
       updatedShifts = updatedShifts.map(s => {
         if (s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time) {
-          return { ...s, start_time: start, end_time: end };
+          return { ...s, date: targetDate, start_time: start, end_time: end };
         }
         return s;
       });
@@ -427,9 +467,10 @@ export default function Matrix() {
   };
 
   const AssignmentBar = ({ assignment }) => {
-    const startPercent = timeToPercentage(assignment.start_time);
-    const endPercent = timeToPercentage(assignment.end_time);
-    const width = endPercent > startPercent ? endPercent - startPercent : (100 - startPercent) + endPercent;
+    const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(assignment.date) : 0;
+    const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode);
+    const endPercent = timeToPercentage(assignment.end_time, dayIndex, viewMode);
+    const width = endPercent > startPercent ? endPercent - startPercent : (viewMode === 'daily' ? (100 - startPercent) + endPercent : 0);
 
     return (
       <TooltipProvider>
@@ -452,8 +493,9 @@ export default function Matrix() {
   };
 
   const AvailabilityBar = ({ shift, worker }) => {
-    const startPercent = timeToPercentage(shift.start_time);
-    const endPercent = timeToPercentage(shift.end_time);
+    const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
+    const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode);
+    const endPercent = timeToPercentage(shift.end_time, dayIndex, viewMode);
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
 
     const colors = { wanted: "bg-green-400 border-green-600", available: "bg-blue-300 border-blue-500", unavailable: "bg-red-300 border-red-500" };
@@ -464,10 +506,10 @@ export default function Matrix() {
       <div
         className={`absolute h-full border-l-2 rounded-sm flex items-center justify-between px-1 z-10 cursor-move ${colors[shift.type] || colors.available}`}
         style={{ left: `${startPercent}%`, width: `${width}%` }}
-        onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move'); }}
+        onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }}
         onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
       >
-        <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start'); }} />
+        <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start', dayIndex); }} />
         
         {/* Type indicator - clickable circle */}
         <button
@@ -483,14 +525,15 @@ export default function Matrix() {
           {icons[shift.type]}
           <span>{shift.start_time}-{shift.end_time}</span>
         </div>
-        <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end'); }} />
+        <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end', dayIndex); }} />
       </div>
     );
   };
 
   const UnavailabilityBar = ({ unavail }) => {
-    const startPercent = timeToPercentage(unavail.start_time);
-    const endPercent = timeToPercentage(unavail.end_time);
+    const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(unavail.date) : 0;
+    const startPercent = timeToPercentage(unavail.start_time, dayIndex, viewMode);
+    const endPercent = timeToPercentage(unavail.end_time, dayIndex, viewMode);
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
 
     return (
@@ -512,8 +555,8 @@ export default function Matrix() {
 
   const DragPreviewBar = ({ preview, workerId }) => {
     if (!preview || preview.workerId !== workerId) return null;
-    const startPercent = timeToPercentage(preview.start);
-    const endPercent = timeToPercentage(preview.end);
+    const startPercent = timeToPercentage(preview.start, preview.day || 0, viewMode);
+    const endPercent = timeToPercentage(preview.end, preview.day || 0, viewMode);
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
 
     return (
@@ -602,9 +645,18 @@ export default function Matrix() {
                 <div className="flex sticky top-0 bg-gray-100 z-50 border-b">
                   <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50" dir="rtl">עובד</div>
                   <div className="flex-1 relative flex">
-                    {timeSlots.map((hour) => (
-                      <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">{String(hour).padStart(2, '0')}:00</div>
-                    ))}
+                    {viewMode === 'daily' ? (
+                      getDailyTimeSlots().map((hour) => (
+                        <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">{String(hour).padStart(2, '0')}:00</div>
+                      ))
+                    ) : (
+                      getWeeklyTimeSlots().map((slot, idx) => (
+                        <div key={idx} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">
+                          {slot.label && <div className="font-bold">{slot.label}</div>}
+                          {slot.hour === 6 && <div className="text-[10px]">{String(slot.hour).padStart(2, '0')}:00</div>}
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -657,7 +709,11 @@ export default function Matrix() {
                           }}
                         >
                           <div className="absolute inset-0 flex h-16">
-                            {timeSlots.map(hour => (<div key={hour} className="flex-1 border-r time-slot h-16"></div>))}
+                            {viewMode === 'daily' ? (
+                              getDailyTimeSlots().map(hour => (<div key={hour} className="flex-1 border-r time-slot h-16"></div>))
+                            ) : (
+                              getWeeklyTimeSlots().map((slot, idx) => (<div key={idx} className="flex-1 border-r time-slot h-16"></div>))
+                            )}
                           </div>
                           <div className="absolute inset-0">
                             {availabilityShifts.map((shift, idx) => (<AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />))}
