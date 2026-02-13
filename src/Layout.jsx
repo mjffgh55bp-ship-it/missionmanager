@@ -126,7 +126,7 @@ export default function Layout({ children }) {
       {sidebarOpen && (
         <>
           <div 
-            className="fixed inset-0 bg-black/20 z-40"
+            className="fixed inset-0 bg-black/20 z-[90]"
             onClick={() => setSidebarOpen(false)}
           />
           <div 
