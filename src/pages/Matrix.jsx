@@ -112,6 +112,10 @@ export default function Matrix() {
     return () => clearInterval(interval);
   }, [cellData, workerActivities, blockNotes, weekStart]);
 
+  useEffect(() => {
+    saveMatrixData();
+  }, [cellData, workerActivities, blockNotes]);
+
   const loadData = async () => {
     try {
       const workersData = await base44.entities.Worker.filter({ active: true });
@@ -469,6 +473,30 @@ export default function Matrix() {
     setShowBlockNoteDialog(false);
   };
 
+  const handleDeleteBlock = () => {
+    if (!selectedBlock) return;
+    
+    const { workerId, dayIndex, hour, colspan } = selectedBlock;
+    
+    setCellData(prev => {
+      const newData = { ...prev };
+      for (let i = 0; i < colspan; i++) {
+        const hourToDelete = (hour + i) % 24;
+        const key = getCellKey(workerId, dayIndex, hourToDelete);
+        delete newData[key];
+      }
+      return newData;
+    });
+    
+    setBlockNotes(prev => {
+      const newNotes = { ...prev };
+      delete newNotes[selectedBlock.blockKey];
+      return newNotes;
+    });
+    
+    setShowBlockNoteDialog(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
@@ -788,7 +816,7 @@ export default function Matrix() {
         <Dialog open={showBlockNoteDialog} onOpenChange={setShowBlockNoteDialog}>
           <DialogContent dir="rtl">
             <DialogHeader>
-              <DialogTitle>הוספת הערה לבלוק</DialogTitle>
+              <DialogTitle>עריכת בלוק</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
@@ -806,9 +834,15 @@ export default function Matrix() {
                 />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowBlockNoteDialog(false)}>ביטול</Button>
-              <Button onClick={handleSaveBlockNote}>שמור</Button>
+            <DialogFooter className="flex justify-between">
+              <Button variant="destructive" onClick={handleDeleteBlock}>
+                <Trash2 className="w-4 h-4 ml-1" />
+                מחק בלוק
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowBlockNoteDialog(false)}>ביטול</Button>
+                <Button onClick={handleSaveBlockNote}>שמור</Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
