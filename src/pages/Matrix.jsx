@@ -97,6 +97,7 @@ export default function Matrix() {
   const [blockNoteText, setBlockNoteText] = useState("");
   const [selectedCategoryChange, setSelectedCategoryChange] = useState("");
   const [selectedWorkerTarget, setSelectedWorkerTarget] = useState("");
+  const [draggedBlock, setDraggedBlock] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -458,10 +459,90 @@ export default function Matrix() {
     }));
   };
 
-  const handleBlockClick = (block) => {
+  const handleBlockClick = (block, e) => {
+    e.stopPropagation();
     setSelectedBlock(block);
     setBlockNoteText(block.note || "");
+    setSelectedCategoryChange("");
+    setSelectedWorkerTarget("");
     setShowBlockNoteDialog(true);
+  };
+
+  const handleBlockDragStart = (block, e) => {
+    e.stopPropagation();
+    setDraggedBlock(block);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleBlockDragEnd = (e) => {
+    setDraggedBlock(null);
+  };
+
+  const handleWorkerDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleWorkerDrop = (targetWorkerId, e) => {
+    e.preventDefault();
+    if (!draggedBlock || draggedBlock.workerId === targetWorkerId) {
+      setDraggedBlock(null);
+      return;
+    }
+
+    const { workerId, dayIndex, hour, colspan } = draggedBlock;
+    const categoryId = getCellCategory(workerId, dayIndex, hour);
+
+    if (e.shiftKey) {
+      // העתקה עם Shift
+      setCellData(prev => {
+        const newData = { ...prev };
+        for (let i = 0; i < colspan; i++) {
+          const hourToCopy = (hour + i) % 24;
+          const newKey = getCellKey(targetWorkerId, dayIndex, hourToCopy);
+          newData[newKey] = categoryId;
+        }
+        return newData;
+      });
+
+      const oldBlockKey = draggedBlock.blockKey;
+      const newBlockKey = `${targetWorkerId}-${dayIndex}-${hour}-${(hour + colspan - 1) % 24}`;
+      
+      if (blockNotes[oldBlockKey]) {
+        setBlockNotes(prev => ({
+          ...prev,
+          [newBlockKey]: prev[oldBlockKey]
+        }));
+      }
+    } else {
+      // העברה רגילה
+      setCellData(prev => {
+        const newData = { ...prev };
+        for (let i = 0; i < colspan; i++) {
+          const hourToMove = (hour + i) % 24;
+          const oldKey = getCellKey(workerId, dayIndex, hourToMove);
+          delete newData[oldKey];
+          
+          const newKey = getCellKey(targetWorkerId, dayIndex, hourToMove);
+          newData[newKey] = categoryId;
+        }
+        return newData;
+      });
+
+      const oldBlockKey = draggedBlock.blockKey;
+      const newBlockKey = `${targetWorkerId}-${dayIndex}-${hour}-${(hour + colspan - 1) % 24}`;
+      
+      setBlockNotes(prev => {
+        const newNotes = { ...prev };
+        if (prev[oldBlockKey]) {
+          newNotes[newBlockKey] = prev[oldBlockKey];
+          delete newNotes[oldBlockKey];
+        }
+        return newNotes;
+      });
+    }
+
+    setDraggedBlock(null);
   };
 
   const handleChangeBlockCategory = (newCategoryId) => {
@@ -653,7 +734,11 @@ export default function Matrix() {
                   {workers.map((worker, workerIndex) => (
                     <React.Fragment key={worker.id}>
                       <tr className={workerIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        <td className="sticky right-0 z-10 border border-gray-300 p-2 font-medium text-sm bg-inherit">
+                        <td 
+                          className={`sticky right-0 z-10 border border-gray-300 p-2 font-medium text-sm bg-inherit ${draggedBlock && draggedBlock.workerId !== worker.id ? 'ring-2 ring-blue-400' : ''}`}
+                          onDragOver={handleWorkerDragOver}
+                          onDrop={(e) => handleWorkerDrop(worker.id, e)}
+                        >
                           <div className="flex items-center justify-between gap-2">
                             <span>{worker.nickname}</span>
                             <Button 
@@ -686,10 +771,13 @@ export default function Matrix() {
                                   <td
                                     key={`${dayIndex}-${block.hour}`}
                                     colSpan={block.colspan}
-                                    className={`border border-gray-200 p-0 h-auto cursor-pointer ${block.category.color} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
+                                    className={`border border-gray-200 p-0 h-auto cursor-move ${block.category.color} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${draggedBlock?.blockKey === block.blockKey ? 'opacity-50' : ''}`}
                                     style={{ minWidth: `${block.colspan * 24}px` }}
-                                    title={`${block.category.label} (${block.startTime} - ${block.endTime})${block.note ? '\n' + block.note : ''}`}
-                                    onClick={() => handleBlockClick(block)}
+                                    title={`${block.category.label} (${block.startTime} - ${block.endTime})${block.note ? '\n' + block.note : ''}\n\nגרור להעברה | Shift+גרור להעתקה | לחץ לעריכה`}
+                                    draggable
+                                    onDragStart={(e) => handleBlockDragStart(block, e)}
+                                    onDragEnd={handleBlockDragEnd}
+                                    onClick={(e) => handleBlockClick(block, e)}
                                   >
                                     <div className="h-full flex flex-col items-center justify-center px-1 py-1">
                                       <span className="text-[10px] font-semibold truncate" dir="rtl">
