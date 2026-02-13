@@ -686,8 +686,8 @@ export default function Matrix() {
                       e.preventDefault();
                       const startX = e.clientX;
                       const startValue = zoomRange.start;
+                      const rect = e.currentTarget.parentElement.getBoundingClientRect();
                       const handleMove = (moveE) => {
-                        const rect = e.currentTarget.parentElement.getBoundingClientRect();
                         const delta = ((moveE.clientX - startX) / rect.width) * -100;
                         const newStart = Math.max(0, Math.min(zoomRange.end - 5, startValue + delta));
                         setZoomRange({ start: newStart, end: zoomRange.end });
@@ -707,8 +707,8 @@ export default function Matrix() {
                       e.preventDefault();
                       const startX = e.clientX;
                       const startValue = zoomRange.end;
+                      const rect = e.currentTarget.parentElement.getBoundingClientRect();
                       const handleMove = (moveE) => {
-                        const rect = e.currentTarget.parentElement.getBoundingClientRect();
                         const delta = ((moveE.clientX - startX) / rect.width) * -100;
                         const newEnd = Math.max(zoomRange.start + 5, Math.min(100, startValue + delta));
                         setZoomRange({ start: zoomRange.start, end: newEnd });
