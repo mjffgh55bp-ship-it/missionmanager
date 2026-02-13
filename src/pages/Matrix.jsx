@@ -453,24 +453,16 @@ export default function Matrix() {
     await saveCategories(newCategories);
   };
 
-  const handleAddQuickBlock = (workerId) => {
-    if (!selectedCategory) {
-      alert("נא לבחור קטגוריה מהמקרא תחילה");
-      return;
-    }
-    
-    // הוסף בלוק של שעה אחת בשעה 6 ביום ראשון
-    const dayIndex = 0;
-    const startHour = 6;
-    const key = getCellKey(workerId, dayIndex, startHour);
-    
-    setCellData(prev => {
-      const existing = prev[key] || [];
-      return {
-        ...prev,
-        [key]: [...existing, selectedCategory]
-      };
+  const handleAddActivity = (worker) => {
+    setSelectedWorker(worker);
+    setActivityForm({ 
+      category_id: categories[0]?.id || "", 
+      day: 0, 
+      start_time: "06:00", 
+      end_time: "07:00",
+      note: ""
     });
+    setShowActivityDialog(true);
   };
 
   const handleSaveActivity = () => {
@@ -479,20 +471,33 @@ export default function Matrix() {
     const category = categories.find(c => c.id === activityForm.category_id);
     if (!category) return;
 
-    const newActivity = {
-      id: `activity_${Date.now()}`,
-      day: activityForm.day,
-      category: category.label,
-      color: category.color,
-      start: activityForm.start_time,
-      end: activityForm.end_time,
-      note: activityForm.note
-    };
+    // המר את השעות לאינדקסים
+    const startHour = parseInt(activityForm.start_time.split(':')[0]);
+    const endHour = parseInt(activityForm.end_time.split(':')[0]);
+    
+    // הוסף בלוקים למטריצה
+    setCellData(prev => {
+      const newData = { ...prev };
+      let currentHour = startHour;
+      
+      while (currentHour !== endHour) {
+        const key = getCellKey(selectedWorker.id, activityForm.day, currentHour);
+        const existing = newData[key] || [];
+        newData[key] = [...existing, category.id];
+        currentHour = (currentHour + 1) % 24;
+      }
+      
+      return newData;
+    });
 
-    setWorkerActivities(prev => ({
-      ...prev,
-      [selectedWorker.id]: [...(prev[selectedWorker.id] || []), newActivity]
-    }));
+    // אם יש הערה, שמור אותה
+    if (activityForm.note) {
+      const blockKey = `${selectedWorker.id}-${activityForm.day}-${startHour}-${(endHour - 1) % 24}`;
+      setBlockNotes(prev => ({
+        ...prev,
+        [blockKey]: activityForm.note
+      }));
+    }
 
     setShowActivityDialog(false);
   };
@@ -866,8 +871,8 @@ export default function Matrix() {
                               size="sm" 
                               variant="ghost" 
                               className="h-6 w-6 p-0"
-                              onClick={() => handleAddQuickBlock(worker.id)}
-                              title="הוסף בלוק מהיר"
+                              onClick={() => handleAddActivity(worker)}
+                              title="הוסף בלוק"
                             >
                               <Plus className="w-4 h-4" />
                             </Button>
