@@ -28,16 +28,45 @@ const DEFAULT_CATEGORIES = [
 const COLOR_OPTIONS = [
   { value: "bg-pink-200", label: "ורוד בהיר" },
   { value: "bg-pink-500", label: "ורוד" },
+  { value: "bg-pink-700", label: "ורוד כהה" },
   { value: "bg-lime-400", label: "ירוק בהיר" },
   { value: "bg-lime-500", label: "ירוק" },
+  { value: "bg-lime-700", label: "ירוק כהה" },
+  { value: "bg-amber-500", label: "חום בהיר" },
   { value: "bg-amber-700", label: "חום" },
-  { value: "bg-purple-400", label: "סגול" },
-  { value: "bg-sky-300", label: "תכלת" },
-  { value: "bg-orange-400", label: "כתום" },
   { value: "bg-purple-200", label: "סגול בהיר" },
+  { value: "bg-purple-400", label: "סגול" },
+  { value: "bg-purple-700", label: "סגול כהה" },
+  { value: "bg-sky-200", label: "תכלת בהיר" },
+  { value: "bg-sky-300", label: "תכלת" },
+  { value: "bg-sky-500", label: "תכלת כהה" },
+  { value: "bg-orange-300", label: "כתום בהיר" },
+  { value: "bg-orange-400", label: "כתום" },
+  { value: "bg-orange-600", label: "כתום כהה" },
+  { value: "bg-gray-300", label: "אפור בהיר" },
   { value: "bg-gray-400", label: "אפור" },
+  { value: "bg-gray-600", label: "אפור כהה" },
+  { value: "bg-blue-300", label: "כחול בהיר" },
   { value: "bg-blue-400", label: "כחול" },
+  { value: "bg-blue-600", label: "כחול כהה" },
+  { value: "bg-red-300", label: "אדום בהיר" },
   { value: "bg-red-400", label: "אדום" },
+  { value: "bg-red-600", label: "אדום כהה" },
+  { value: "bg-yellow-300", label: "צהוב בהיר" },
+  { value: "bg-yellow-400", label: "צהוב" },
+  { value: "bg-yellow-600", label: "צהוב כהה" },
+  { value: "bg-green-300", label: "ירוק עלים בהיר" },
+  { value: "bg-green-500", label: "ירוק עלים" },
+  { value: "bg-green-700", label: "ירוק עלים כהה" },
+  { value: "bg-teal-300", label: "טורקיז בהיר" },
+  { value: "bg-teal-500", label: "טורקיז" },
+  { value: "bg-teal-700", label: "טורקיז כהה" },
+  { value: "bg-indigo-300", label: "אינדיגו בהיר" },
+  { value: "bg-indigo-500", label: "אינדיגו" },
+  { value: "bg-indigo-700", label: "אינדיגו כהה" },
+  { value: "bg-rose-300", label: "ורד בהיר" },
+  { value: "bg-rose-500", label: "ורד" },
+  { value: "bg-rose-700", label: "ורד כהה" },
 ];
 
 export default function Matrix() {
@@ -463,15 +492,13 @@ export default function Matrix() {
                   >
                     <Edit2 className="w-4 h-4" />
                   </Button>
-                  {!category.id.startsWith('selected') && !category.id.startsWith('absent') && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDeleteCategory(category.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDeleteCategory(category.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 </div>
               ))}
             </div>
