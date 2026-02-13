@@ -13,30 +13,46 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
-const getDailyTimeSlots = () => Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
-const getWeeklyTimeSlots = () => {
-  const slots = [];
+const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
+  const allSlots = Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
+  const startIdx = Math.floor((zoomRange.start / 100) * allSlots.length);
+  const endIdx = Math.ceil((zoomRange.end / 100) * allSlots.length);
+  return allSlots.slice(startIdx, endIdx);
+};
+const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
+  const allSlots = [];
   for (let day = 0; day < 7; day++) {
     for (let hour = 6; hour < 30; hour++) {
-      slots.push({ day, hour: hour % 24, label: hour === 6 ? DAYS_OF_WEEK[day] : null });
+      allSlots.push({ day, hour: hour % 24, label: hour === 6 ? DAYS_OF_WEEK[day] : null });
     }
   }
-  return slots;
+  const startIdx = Math.floor((zoomRange.start / 100) * allSlots.length);
+  const endIdx = Math.ceil((zoomRange.end / 100) * allSlots.length);
+  return allSlots.slice(startIdx, endIdx);
 };
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
-const timeToPercentage = (timeStr, day = 0, viewMode = 'daily') => {
+const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
   if (!timeStr) return 0;
   const [hours, minutes] = timeStr.split(':').map(Number);
+  let basePercent;
   if (viewMode === 'weekly') {
     const totalMinutes = day * 24 * 60 + hours * 60 + minutes;
-    return (totalMinutes / (7 * 24 * 60)) * 100;
+    basePercent = (totalMinutes / (7 * 24 * 60)) * 100;
+  } else {
+    basePercent = ((hours * 60 + minutes) / (24 * 60)) * 100;
   }
-  return ((hours * 60 + minutes) / (24 * 60)) * 100;
+  // Map to zoomed range
+  const zoomWidth = zoomRange.end - zoomRange.start;
+  return ((basePercent - zoomRange.start) / zoomWidth) * 100;
 };
 
-const percentageToTime = (percentage, viewMode = 'daily') => {
-  const totalMinutes = Math.round((percentage / 100) * (viewMode === 'weekly' ? 7 * 24 * 60 : 24 * 60));
+const percentageToTime = (percentage, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
+  // Map from zoomed percentage back to full range
+  const zoomWidth = zoomRange.end - zoomRange.start;
+  const basePercent = (percentage / 100) * zoomWidth + zoomRange.start;
+  
+  const totalMinutes = Math.round((basePercent / 100) * (viewMode === 'weekly' ? 7 * 24 * 60 : 24 * 60));
   const hours = Math.floor(totalMinutes / 60) % 24;
   const minutes = Math.round((totalMinutes % 60) / 15) * 15;
   const day = viewMode === 'weekly' ? Math.floor(totalMinutes / (24 * 60)) : 0;
@@ -67,6 +83,7 @@ export default function Matrix() {
   const [roleFilter, setRoleFilter] = useState("__all__");
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
+  const [zoomRange, setZoomRange] = useState({ start: 0, end: 100 });
   const timelineRefs = useRef({});
 
   useEffect(() => { loadData(); }, [currentDate, viewMode]);
@@ -277,26 +294,26 @@ export default function Matrix() {
     if (action === 'create') {
       const minP = Math.min(startPercent, currentPercent);
       const maxP = Math.max(startPercent, currentPercent);
-      const startData = percentageToTime(minP, viewMode);
-      const endData = percentageToTime(maxP, viewMode);
+      const startData = percentageToTime(minP, viewMode, zoomRange);
+      const endData = percentageToTime(maxP, viewMode, zoomRange);
       newStart = startData.time;
       newEnd = endData.time;
       newDay = startData.day;
     } else if (action === 'resize-start') {
-      const data = percentageToTime(currentPercent, viewMode);
+      const data = percentageToTime(currentPercent, viewMode, zoomRange);
       newStart = data.time;
       newDay = data.day;
     } else if (action === 'resize-end') {
-      const data = percentageToTime(currentPercent, viewMode);
+      const data = percentageToTime(currentPercent, viewMode, zoomRange);
       newEnd = data.time;
     } else if (action === 'move') {
-      const origStartP = timeToPercentage(originalStart, originalDay || 0, viewMode);
-      const origEndP = timeToPercentage(originalEnd, originalDay || 0, viewMode);
+      const origStartP = timeToPercentage(originalStart, originalDay || 0, viewMode, zoomRange);
+      const origEndP = timeToPercentage(originalEnd, originalDay || 0, viewMode, zoomRange);
       const width = origEndP - origStartP;
       const diff = currentPercent - startPercent;
       const newStartP = Math.max(0, Math.min(100 - width, origStartP + diff));
-      const startData = percentageToTime(newStartP, viewMode);
-      const endData = percentageToTime(newStartP + width, viewMode);
+      const startData = percentageToTime(newStartP, viewMode, zoomRange);
+      const endData = percentageToTime(newStartP + width, viewMode, zoomRange);
       newStart = startData.time;
       newEnd = endData.time;
       newDay = startData.day;
@@ -469,9 +486,12 @@ export default function Matrix() {
 
   const AssignmentBar = ({ assignment }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(assignment.date) : 0;
-    const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode);
-    const endPercent = timeToPercentage(assignment.end_time, dayIndex, viewMode);
+    const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
+    const endPercent = timeToPercentage(assignment.end_time, dayIndex, viewMode, zoomRange);
     const width = endPercent > startPercent ? endPercent - startPercent : (viewMode === 'daily' ? (100 - startPercent) + endPercent : 0);
+    
+    // Hide if outside zoom range
+    if (startPercent < 0 || startPercent > 100) return null;
 
     return (
       <TooltipProvider>
@@ -495,9 +515,12 @@ export default function Matrix() {
 
   const AvailabilityBar = ({ shift, worker }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
-    const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode);
-    const endPercent = timeToPercentage(shift.end_time, dayIndex, viewMode);
+    const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode, zoomRange);
+    const endPercent = timeToPercentage(shift.end_time, dayIndex, viewMode, zoomRange);
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
+    
+    // Hide if outside zoom range
+    if (startPercent < 0 || startPercent > 100) return null;
 
     const colors = { wanted: "bg-green-400 border-green-600", available: "bg-blue-300 border-blue-500", unavailable: "bg-red-300 border-red-500" };
     const icons = { wanted: <Star className="w-3 h-3 fill-current" />, available: <Check className="w-3 h-3" />, unavailable: <Ban className="w-3 h-3" /> };
@@ -533,9 +556,12 @@ export default function Matrix() {
 
   const UnavailabilityBar = ({ unavail }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(unavail.date) : 0;
-    const startPercent = timeToPercentage(unavail.start_time, dayIndex, viewMode);
-    const endPercent = timeToPercentage(unavail.end_time, dayIndex, viewMode);
+    const startPercent = timeToPercentage(unavail.start_time, dayIndex, viewMode, zoomRange);
+    const endPercent = timeToPercentage(unavail.end_time, dayIndex, viewMode, zoomRange);
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
+    
+    // Hide if outside zoom range
+    if (startPercent < 0 || startPercent > 100) return null;
 
     return (
       <TooltipProvider>
@@ -556,8 +582,8 @@ export default function Matrix() {
 
   const DragPreviewBar = ({ preview, workerId }) => {
     if (!preview || preview.workerId !== workerId) return null;
-    const startPercent = timeToPercentage(preview.start, preview.day || 0, viewMode);
-    const endPercent = timeToPercentage(preview.end, preview.day || 0, viewMode);
+    const startPercent = timeToPercentage(preview.start, preview.day || 0, viewMode, zoomRange);
+    const endPercent = timeToPercentage(preview.end, preview.day || 0, viewMode, zoomRange);
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
 
     return (
@@ -641,17 +667,83 @@ export default function Matrix() {
 
         <Card className="border-none shadow-lg">
           <CardContent className="p-0">
+            {/* Zoom Control */}
+            <div className="p-4 border-b bg-gray-50" dir="rtl">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium text-gray-700">זום:</span>
+                <div className="flex-1 relative h-8 bg-gray-200 rounded-full">
+                  <div 
+                    className="absolute top-0 h-full bg-blue-300 rounded-full"
+                    style={{ 
+                      right: `${zoomRange.start}%`, 
+                      width: `${zoomRange.end - zoomRange.start}%` 
+                    }}
+                  />
+                  <div 
+                    className="absolute top-0 w-4 h-8 bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors"
+                    style={{ right: `${zoomRange.start}%` }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const startX = e.clientX;
+                      const startValue = zoomRange.start;
+                      const handleMove = (moveE) => {
+                        const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                        const delta = ((moveE.clientX - startX) / rect.width) * -100;
+                        const newStart = Math.max(0, Math.min(zoomRange.end - 5, startValue + delta));
+                        setZoomRange({ start: newStart, end: zoomRange.end });
+                      };
+                      const handleUp = () => {
+                        document.removeEventListener('mousemove', handleMove);
+                        document.removeEventListener('mouseup', handleUp);
+                      };
+                      document.addEventListener('mousemove', handleMove);
+                      document.addEventListener('mouseup', handleUp);
+                    }}
+                  />
+                  <div 
+                    className="absolute top-0 w-4 h-8 bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors"
+                    style={{ right: `${zoomRange.end}%`, transform: 'translateX(100%)' }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      const startX = e.clientX;
+                      const startValue = zoomRange.end;
+                      const handleMove = (moveE) => {
+                        const rect = e.currentTarget.parentElement.getBoundingClientRect();
+                        const delta = ((moveE.clientX - startX) / rect.width) * -100;
+                        const newEnd = Math.max(zoomRange.start + 5, Math.min(100, startValue + delta));
+                        setZoomRange({ start: zoomRange.start, end: newEnd });
+                      };
+                      const handleUp = () => {
+                        document.removeEventListener('mousemove', handleMove);
+                        document.removeEventListener('mouseup', handleUp);
+                      };
+                      document.addEventListener('mousemove', handleMove);
+                      document.addEventListener('mouseup', handleUp);
+                    }}
+                  />
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setZoomRange({ start: 0, end: 100 })}
+                  disabled={zoomRange.start === 0 && zoomRange.end === 100}
+                >
+                  איפוס
+                </Button>
+              </div>
+            </div>
+            
             <div className="overflow-x-auto">
               <div className="min-w-[1400px]">
                 <div className="flex sticky top-0 bg-gray-100 z-50 border-b">
                   <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50" dir="rtl">עובד</div>
                   <div className="flex-1 relative flex">
                     {viewMode === 'daily' ? (
-                      getDailyTimeSlots().map((hour) => (
+                      getDailyTimeSlots(zoomRange).map((hour) => (
                         <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">{String(hour).padStart(2, '0')}:00</div>
                       ))
                     ) : (
-                      getWeeklyTimeSlots().map((slot, idx) => (
+                      getWeeklyTimeSlots(zoomRange).map((slot, idx) => (
                         <div key={idx} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">
                           {slot.label && <div className="font-bold">{slot.label}</div>}
                           {slot.hour === 6 && <div className="text-[10px]">{String(slot.hour).padStart(2, '0')}:00</div>}
@@ -711,9 +803,9 @@ export default function Matrix() {
                         >
                           <div className="absolute inset-0 flex h-16">
                             {viewMode === 'daily' ? (
-                              getDailyTimeSlots().map(hour => (<div key={hour} className="flex-1 border-r time-slot h-16"></div>))
+                              getDailyTimeSlots(zoomRange).map(hour => (<div key={hour} className="flex-1 border-r time-slot h-16"></div>))
                             ) : (
-                              getWeeklyTimeSlots().map((slot, idx) => (<div key={idx} className="flex-1 border-r time-slot h-16"></div>))
+                              getWeeklyTimeSlots(zoomRange).map((slot, idx) => (<div key={idx} className="flex-1 border-r time-slot h-16"></div>))
                             )}
                           </div>
                           <div className="absolute inset-0">
