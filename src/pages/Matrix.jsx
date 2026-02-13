@@ -7,10 +7,28 @@ import { format, startOfWeek, addDays, addWeeks, subWeeks } from "date-fns";
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
+const CATEGORIES = [
+  { id: "selected", label: "איכ√ת √ נבחר", color: "bg-pink-200", borderColor: "border-blue-600" },
+  { id: "absent", label: "נבחר: ‎√×לא", color: "bg-pink-100", borderColor: "border-pink-600" },
+  { id: "green", label: "המקף כחול", color: "bg-lime-400", borderColor: "border-lime-600" },
+  { id: "greenAlt", label: "כגונת טבל 30 המקפת כחול", color: "bg-lime-500", borderColor: "border-lime-700" },
+  { id: "magenta", label: "כגונת 45", color: "bg-pink-500", borderColor: "border-pink-700" },
+  { id: "brown", label: "תשמורת", color: "bg-amber-700", borderColor: "border-amber-900" },
+  { id: "purple", label: "כוננות 60/75/90/105/120/180", color: "bg-purple-400", borderColor: "border-purple-600" },
+  { id: "lightBlue", label: "מאמן", color: "bg-sky-300", borderColor: "border-sky-500" },
+  { id: "orange", label: "ציוד", color: "bg-orange-400", borderColor: "border-orange-600" },
+  { id: "lightPink", label: "אחר", color: "bg-pink-200", borderColor: "border-pink-400" },
+  { id: "lavender", label: "חופש", color: "bg-purple-200", borderColor: "border-purple-400" },
+  { id: "gray", label: 'חו"ל', color: "bg-gray-400", borderColor: "border-gray-600" },
+];
+
 export default function Matrix() {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [workers, setWorkers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [cellData, setCellData] = useState({});
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -42,6 +60,43 @@ export default function Matrix() {
     setWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }));
   };
 
+  const getCellKey = (workerId, dayIndex, hour) => {
+    return `${workerId}-${dayIndex}-${hour}`;
+  };
+
+  const handleCellMouseDown = (workerId, dayIndex, hour) => {
+    if (!selectedCategory) return;
+    setIsDragging(true);
+    toggleCell(workerId, dayIndex, hour);
+  };
+
+  const handleCellMouseEnter = (workerId, dayIndex, hour) => {
+    if (!isDragging || !selectedCategory) return;
+    toggleCell(workerId, dayIndex, hour);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const toggleCell = (workerId, dayIndex, hour) => {
+    const key = getCellKey(workerId, dayIndex, hour);
+    setCellData(prev => {
+      const newData = { ...prev };
+      if (newData[key] === selectedCategory) {
+        delete newData[key];
+      } else {
+        newData[key] = selectedCategory;
+      }
+      return newData;
+    });
+  };
+
+  const getCellCategory = (workerId, dayIndex, hour) => {
+    const key = getCellKey(workerId, dayIndex, hour);
+    return cellData[key];
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
@@ -51,7 +106,7 @@ export default function Matrix() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gray-50 p-4" onMouseUp={handleMouseUp}>
       <div className="max-w-[1600px] mx-auto">
         {/* Header */}
         <Card className="border-none shadow-lg mb-4">
@@ -116,11 +171,19 @@ export default function Matrix() {
                       </td>
                       {weekDays.map((day, dayIndex) => (
                         <React.Fragment key={dayIndex}>
-                          {hours.map((hour) => (
-                            <td key={hour} className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] hover:bg-blue-50 cursor-pointer ${hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}>
-                              {/* תא שעה - נוסיף פונקציונליות בהמשך */}
-                            </td>
-                          ))}
+                          {hours.map((hour) => {
+                            const category = getCellCategory(worker.id, dayIndex, hour);
+                            const categoryData = CATEGORIES.find(c => c.id === category);
+                            return (
+                              <td 
+                                key={hour} 
+                                className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] cursor-pointer transition-colors ${hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${categoryData ? categoryData.color : 'hover:bg-blue-50'}`}
+                                onMouseDown={() => handleCellMouseDown(worker.id, dayIndex, hour)}
+                                onMouseEnter={() => handleCellMouseEnter(worker.id, dayIndex, hour)}
+                              >
+                              </td>
+                            );
+                          })}
                         </React.Fragment>
                       ))}
                     </tr>
@@ -136,6 +199,32 @@ export default function Matrix() {
             <p className="text-gray-500" dir="rtl">אין עובדים פעילים במערכת</p>
           </div>
         )}
+
+        {/* Legend */}
+        <Card className="border-none shadow-lg mt-4">
+          <CardHeader className="border-b bg-white py-3 px-6">
+            <CardTitle className="text-lg" dir="rtl">מקרא סוג פעילות</CardTitle>
+            <p className="text-sm text-gray-600 mt-1" dir="rtl">לחץ על קטגוריה כדי למהור אותה לעובדים על המטריצה</p>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 gap-2">
+              {CATEGORIES.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
+                  className={`w-full py-3 px-4 rounded-lg text-sm font-medium transition-all ${category.color} ${
+                    selectedCategory === category.id 
+                      ? `ring-4 ${category.borderColor} ring-opacity-50 scale-[1.02]` 
+                      : 'hover:scale-[1.01]'
+                  }`}
+                  dir="rtl"
+                >
+                  {category.label}
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
