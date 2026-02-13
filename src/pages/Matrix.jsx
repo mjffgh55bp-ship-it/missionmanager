@@ -1417,20 +1417,33 @@ export default function Matrix() {
                 ערוך קטגוריות
               </Button>
             </div>
+            <p className="text-sm text-gray-600 mb-2" dir="rtl">לחץ על קטגוריה כדי לבחור אותה לצביעה על המטריצה</p>
+            {selectedActivityType && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2 text-center" dir="rtl">
+                <span className="font-semibold">נבחר: </span>
+                <span style={{ color: activityTypes.find(t => t.id === selectedActivityType)?.color }}>
+                  {activityTypes.find(t => t.id === selectedActivityType)?.label}
+                </span>
+              </div>
+            )}
             <div className="flex flex-col gap-2">
               {activityTypes.map(type => (
                 <button
                   key={type.id} 
-                  onClick={() => setSelectedActivityType(selectedActivityType === type.id ? null : type.id)}
+                  onClick={() => {
+                    const newValue = selectedActivityType === type.id ? null : type.id;
+                    console.log('Clicked activity type:', type.id, 'New value:', newValue);
+                    setSelectedActivityType(newValue);
+                  }}
                   style={{ backgroundColor: type.color }} 
                   className={`text-sm font-medium text-gray-900 py-2 px-4 rounded-lg text-center transition-all hover:opacity-90 ${
                     selectedActivityType === type.id 
-                      ? 'ring-4 ring-blue-500 ring-offset-2' 
+                      ? 'ring-4 ring-blue-500 ring-offset-2 shadow-lg' 
                       : ''
                   }`}
                   dir="rtl"
                 >
-                  {type.label} {selectedActivityType === type.id && '✓'}
+                  {type.label} {selectedActivityType === type.id && '✓ נבחר'}
                 </button>
               ))}
             </div>
