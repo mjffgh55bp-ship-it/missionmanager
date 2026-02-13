@@ -95,6 +95,8 @@ export default function Matrix() {
   const [showBlockNoteDialog, setShowBlockNoteDialog] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState(null);
   const [blockNoteText, setBlockNoteText] = useState("");
+  const [selectedCategoryChange, setSelectedCategoryChange] = useState("");
+  const [selectedWorkerTarget, setSelectedWorkerTarget] = useState("");
 
   useEffect(() => {
     loadData();
@@ -462,6 +464,90 @@ export default function Matrix() {
     setShowBlockNoteDialog(true);
   };
 
+  const handleChangeBlockCategory = (newCategoryId) => {
+    if (!selectedBlock) return;
+    
+    const { workerId, dayIndex, hour, colspan } = selectedBlock;
+    
+    setCellData(prev => {
+      const newData = { ...prev };
+      for (let i = 0; i < colspan; i++) {
+        const hourToChange = (hour + i) % 24;
+        const key = getCellKey(workerId, dayIndex, hourToChange);
+        newData[key] = newCategoryId;
+      }
+      return newData;
+    });
+  };
+
+  const handleMoveBlock = (targetWorkerId) => {
+    if (!selectedBlock || !targetWorkerId) return;
+    
+    const { workerId, dayIndex, hour, colspan } = selectedBlock;
+    const categoryId = getCellCategory(workerId, dayIndex, hour);
+    
+    // מחק מהעובד המקורי
+    setCellData(prev => {
+      const newData = { ...prev };
+      for (let i = 0; i < colspan; i++) {
+        const hourToDelete = (hour + i) % 24;
+        const oldKey = getCellKey(workerId, dayIndex, hourToDelete);
+        delete newData[oldKey];
+        
+        // הוסף לעובד החדש
+        const newKey = getCellKey(targetWorkerId, dayIndex, hourToDelete);
+        newData[newKey] = categoryId;
+      }
+      return newData;
+    });
+    
+    // העבר הערה
+    const oldBlockKey = selectedBlock.blockKey;
+    const newBlockKey = `${targetWorkerId}-${dayIndex}-${hour}-${(hour + colspan - 1) % 24}`;
+    
+    setBlockNotes(prev => {
+      const newNotes = { ...prev };
+      if (prev[oldBlockKey]) {
+        newNotes[newBlockKey] = prev[oldBlockKey];
+        delete newNotes[oldBlockKey];
+      }
+      return newNotes;
+    });
+    
+    setShowBlockNoteDialog(false);
+  };
+
+  const handleCopyBlock = (targetWorkerId) => {
+    if (!selectedBlock || !targetWorkerId) return;
+    
+    const { workerId, dayIndex, hour, colspan } = selectedBlock;
+    const categoryId = getCellCategory(workerId, dayIndex, hour);
+    
+    // העתק לעובד החדש
+    setCellData(prev => {
+      const newData = { ...prev };
+      for (let i = 0; i < colspan; i++) {
+        const hourToCopy = (hour + i) % 24;
+        const newKey = getCellKey(targetWorkerId, dayIndex, hourToCopy);
+        newData[newKey] = categoryId;
+      }
+      return newData;
+    });
+    
+    // העתק הערה
+    const oldBlockKey = selectedBlock.blockKey;
+    const newBlockKey = `${targetWorkerId}-${dayIndex}-${hour}-${(hour + colspan - 1) % 24}`;
+    
+    if (blockNotes[oldBlockKey]) {
+      setBlockNotes(prev => ({
+        ...prev,
+        [newBlockKey]: prev[oldBlockKey]
+      }));
+    }
+    
+    setShowBlockNoteDialog(false);
+  };
+
   const handleSaveBlockNote = () => {
     if (!selectedBlock) return;
     
@@ -814,17 +900,41 @@ export default function Matrix() {
 
         {/* Block Note Dialog */}
         <Dialog open={showBlockNoteDialog} onOpenChange={setShowBlockNoteDialog}>
-          <DialogContent dir="rtl">
+          <DialogContent dir="rtl" className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>עריכת בלוק</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div>
-                <Label>קטגוריה: {selectedBlock?.category.label}</Label>
-                <p className="text-sm text-gray-600">
-                  {selectedBlock?.startTime} - {selectedBlock?.endTime}
-                </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>עובד נוכחי</Label>
+                  <p className="text-sm font-medium">{workers.find(w => w.id === selectedBlock?.workerId)?.nickname}</p>
+                </div>
+                <div>
+                  <Label>זמן</Label>
+                  <p className="text-sm text-gray-600">
+                    {selectedBlock?.startTime} - {selectedBlock?.endTime}
+                  </p>
+                </div>
               </div>
+              
+              <div>
+                <Label>שנה קטגוריה</Label>
+                <select
+                  className="w-full border rounded p-2"
+                  value={selectedCategoryChange}
+                  onChange={(e) => {
+                    setSelectedCategoryChange(e.target.value);
+                    handleChangeBlockCategory(e.target.value);
+                  }}
+                >
+                  <option value="">בחר קטגוריה חדשה...</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.label}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <Label>הערה</Label>
                 <Input
@@ -833,6 +943,36 @@ export default function Matrix() {
                   placeholder="הוסף הערה..."
                 />
               </div>
+
+              <div className="border-t pt-4">
+                <Label className="mb-2 block">העבר או העתק לעובד אחר</Label>
+                <div className="flex gap-2">
+                  <select
+                    className="flex-1 border rounded p-2"
+                    value={selectedWorkerTarget}
+                    onChange={(e) => setSelectedWorkerTarget(e.target.value)}
+                  >
+                    <option value="">בחר עובד...</option>
+                    {workers.filter(w => w.id !== selectedBlock?.workerId).map(worker => (
+                      <option key={worker.id} value={worker.id}>{worker.nickname}</option>
+                    ))}
+                  </select>
+                  <Button 
+                    onClick={() => handleMoveBlock(selectedWorkerTarget)} 
+                    disabled={!selectedWorkerTarget}
+                    variant="outline"
+                  >
+                    העבר
+                  </Button>
+                  <Button 
+                    onClick={() => handleCopyBlock(selectedWorkerTarget)} 
+                    disabled={!selectedWorkerTarget}
+                    variant="outline"
+                  >
+                    העתק
+                  </Button>
+                </div>
+              </div>
             </div>
             <DialogFooter className="flex justify-between">
               <Button variant="destructive" onClick={handleDeleteBlock}>
@@ -840,8 +980,8 @@ export default function Matrix() {
                 מחק בלוק
               </Button>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowBlockNoteDialog(false)}>ביטול</Button>
-                <Button onClick={handleSaveBlockNote}>שמור</Button>
+                <Button variant="outline" onClick={() => setShowBlockNoteDialog(false)}>סגור</Button>
+                <Button onClick={handleSaveBlockNote}>שמור הערה</Button>
               </div>
             </DialogFooter>
           </DialogContent>
