@@ -240,21 +240,18 @@ export default function Matrix() {
     
     if (!selectedCategory) return;
     
-    const key = getCellKey(workerId, dayIndex, hour);
-    const hasBlock = cellData[key];
-    
-    // אם יש בלוק - לא עושים כלום, זה יטופל ב-handleBlockClick
-    if (hasBlock && !isDrawing) return;
-    
     if (!isDrawing) {
       // התחל ציור
       setIsDrawing(true);
       setDrawStartCell({ workerId, dayIndex, hour });
       addCell(workerId, dayIndex, hour);
     } else {
-      // סיים ציור
-      setIsDrawing(false);
-      setDrawStartCell(null);
+      // בדוק אם לחצנו על אותו עובד ויום
+      if (workerId === drawStartCell?.workerId && dayIndex === drawStartCell?.dayIndex) {
+        // סיים ציור
+        setIsDrawing(false);
+        setDrawStartCell(null);
+      }
     }
   };
 
@@ -494,10 +491,16 @@ export default function Matrix() {
 
   const handleBlockClick = (block, e) => {
     e.stopPropagation();
+    e.preventDefault();
     
-    // אם אנחנו במצב ציור - לא לפתוח את החלון
-    if (isDrawing) return;
+    // אם אנחנו במצב ציור - סיים את הציור
+    if (isDrawing) {
+      setIsDrawing(false);
+      setDrawStartCell(null);
+      return;
+    }
     
+    // אחרת, פתח את חלון העריכה
     setSelectedBlock(block);
     setBlockNoteText(block.note || "");
     setSelectedCategoryChange("");
