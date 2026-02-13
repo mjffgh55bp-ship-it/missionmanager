@@ -1451,27 +1451,33 @@ export default function Matrix() {
               </div>
             )}
             <div className="flex flex-col gap-2">
-              {activityTypes.map(type => (
-                <button
-                  key={type.id} 
-                  onClick={(e) => {
-                    e.preventDefault();
-                    const newValue = selectedActivityType === type.id ? null : type.id;
-                    console.log('Clicked activity type button. Current:', selectedActivityType, 'Type clicked:', type.id, 'New value:', newValue);
-                    setSelectedActivityType(newValue);
-                    console.log('After setSelectedActivityType, should be:', newValue);
-                  }}
-                  style={{ backgroundColor: type.color }} 
-                  className={`text-sm font-medium text-gray-900 py-2 px-4 rounded-lg text-center transition-all hover:opacity-90 ${
-                    selectedActivityType === type.id 
-                      ? 'ring-4 ring-blue-500 ring-offset-2 shadow-lg' 
-                      : ''
-                  }`}
-                  dir="rtl"
-                >
-                  {type.label} {selectedActivityType === type.id && '✓ נבחר'}
-                </button>
-              ))}
+              {activityTypes.map(type => {
+                const isSelected = selectedActivityType === type.id;
+                return (
+                  <button
+                    key={type.id} 
+                    type="button"
+                    onClick={() => {
+                      const newValue = isSelected ? null : type.id;
+                      console.log('=== ACTIVITY TYPE CLICK ===');
+                      console.log('Current selectedActivityType:', selectedActivityType);
+                      console.log('Clicked type.id:', type.id);
+                      console.log('New value will be:', newValue);
+                      setSelectedActivityType(newValue);
+                      console.log('State updated to:', newValue);
+                    }}
+                    style={{ backgroundColor: type.color }} 
+                    className={`text-sm font-medium text-gray-900 py-2 px-4 rounded-lg text-center transition-all hover:opacity-90 cursor-pointer ${
+                      isSelected
+                        ? 'ring-4 ring-blue-500 ring-offset-2 shadow-lg' 
+                        : ''
+                    }`}
+                    dir="rtl"
+                  >
+                    {type.label} {isSelected && '✓ נבחר'}
+                  </button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
