@@ -100,7 +100,7 @@ export default function Matrix() {
                     {weekDays.map((day, dayIndex) => (
                       <React.Fragment key={dayIndex}>
                         {hours.map((hour) => (
-                          <th key={hour} className="border border-blue-400 p-1 text-white text-[10px] min-w-[24px] w-[24px]">
+                          <th key={hour} className={`border border-blue-400 p-1 text-white text-[10px] min-w-[24px] w-[24px] ${hour === 5 ? 'border-l-4 border-l-blue-900' : ''}`}>
                             {hour}
                           </th>
                         ))}
@@ -117,7 +117,7 @@ export default function Matrix() {
                       {weekDays.map((day, dayIndex) => (
                         <React.Fragment key={dayIndex}>
                           {hours.map((hour) => (
-                            <td key={hour} className="border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] hover:bg-blue-50 cursor-pointer">
+                            <td key={hour} className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] hover:bg-blue-50 cursor-pointer ${hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}>
                               {/* תא שעה - נוסיף פונקציונליות בהמשך */}
                             </td>
                           ))}
