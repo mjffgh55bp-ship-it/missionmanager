@@ -389,8 +389,10 @@ export default function Matrix() {
     const startX = e.clientX - rect.left;
     const startPercent = (startX / rect.width) * 100;
     
+    // Capture the current activity type at the moment of mouse down
+    const currentActivityType = selectedActivityType;
     console.log('=== MOUSE DOWN ===');
-    console.log('Current selectedActivityType:', selectedActivityType);
+    console.log('Captured selectedActivityType:', currentActivityType);
     console.log('Action:', action);
     
     setDragging({
@@ -403,7 +405,7 @@ export default function Matrix() {
       originalEnd: shift?.end_time,
       originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0,
       originalType: shift?.type,
-      selectedActivityType: selectedActivityType || 'shift',
+      activityTypeToUse: currentActivityType,
       rect
     });
   };
@@ -464,7 +466,7 @@ export default function Matrix() {
       return;
     }
     
-    const { workerId, worker, shift, action, selectedActivityType: dragActivityType } = dragging;
+    const { workerId, worker, shift, action, activityTypeToUse } = dragging;
     const { start, end, day } = dragPreview;
     
     if (start === end) {
@@ -480,9 +482,9 @@ export default function Matrix() {
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     
     if (action === 'create') {
-      const activityType = dragActivityType || 'shift';
+      const activityType = activityTypeToUse || 'shift';
       console.log('=== CREATING SHIFT ===');
-      console.log('Using activity_type from dragging state:', activityType);
+      console.log('Using activityTypeToUse:', activityType);
       updatedShifts.push({ 
         date: targetDate, 
         start_time: start, 
@@ -491,7 +493,8 @@ export default function Matrix() {
         activity_type: activityType,
         priority: updatedShifts.length + 1 
       });
-      console.log('Created shift object:', JSON.stringify(updatedShifts[updatedShifts.length - 1]));
+      console.log('Created shift with activity_type:', activityType);
+      console.log('Full shift object:', JSON.stringify(updatedShifts[updatedShifts.length - 1]));
     } else if (shift) {
       updatedShifts = updatedShifts.map(s => {
         if (s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time) {
@@ -508,6 +511,8 @@ export default function Matrix() {
       shifts: updatedShifts,
       status: workerAvail?.status || "approved"
     };
+    
+    console.log('Saving availability with shifts:', JSON.stringify(updatedShifts));
     
     if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
     else await base44.entities.Availability.create(availData);
