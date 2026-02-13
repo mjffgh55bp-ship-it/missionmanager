@@ -743,17 +743,18 @@ export default function Matrix() {
     // Hide if outside zoom range
     if (startPercent < 0 || startPercent > 100) return null;
 
-    // Get activity type color
-    const activityType = activityTypes.find(t => t.id === shift.activity_type);
+    // Get activity type color and label
+    const activityTypeId = shift.activity_type || 'shift';
+    const activityType = activityTypes.find(t => t.id === activityTypeId);
     const activityColor = activityType ? activityType.color : '#8B4513';
+    const activityLabel = activityType ? activityType.label : 'משמרת';
     
-    const colors = { wanted: "bg-green-400 border-green-600", available: "bg-blue-300 border-blue-500", unavailable: "bg-red-300 border-red-500" };
     const icons = { wanted: <Star className="w-3 h-3 fill-current" />, available: <Check className="w-3 h-3" />, unavailable: <Ban className="w-3 h-3" /> };
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
 
     return (
       <div
-        className="absolute h-full border-l-2 rounded-sm flex items-center justify-between px-1 z-10 cursor-move"
+        className="absolute h-full border-l-2 rounded-sm flex flex-col items-center justify-center px-1 z-10 cursor-move"
         style={{ 
           left: `${startPercent}%`, 
           width: `${width}%`,
@@ -776,9 +777,12 @@ export default function Matrix() {
           {typeLabels[shift.type] || "A"}
         </button>
         
-        <div className="flex items-center gap-1 text-gray-800 text-[10px] font-medium mx-2 truncate mt-2 pointer-events-none">
-          {icons[shift.type]}
-          <span>{shift.start_time}-{shift.end_time}</span>
+        <div className="flex flex-col items-center gap-0 text-gray-800 text-[10px] font-medium truncate pointer-events-none w-full px-1 mt-2">
+          <div className="font-bold text-[9px] truncate w-full text-center">{activityLabel}</div>
+          <div className="flex items-center gap-1">
+            {icons[shift.type]}
+            <span className="text-[9px]">{shift.start_time}-{shift.end_time}</span>
+          </div>
         </div>
         <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end', dayIndex); }} />
       </div>
