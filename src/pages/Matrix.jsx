@@ -859,16 +859,42 @@ export default function Matrix() {
                 </div>
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowManualDialog(false)} dir="rtl">ביטול</Button>
-              <Button 
-                onClick={submitManualShift} 
-                className="bg-blue-900 hover:bg-blue-800"
-                disabled={!manualShiftData.start_time || !manualShiftData.end_time}
-                dir="rtl"
-              >
-                {editingShift ? 'עדכן' : <><Plus className="w-4 h-4 mr-2" />הוסף</>}
-              </Button>
+            <DialogFooter className="flex justify-between" dir="rtl">
+              <div>
+                {editingShift && (
+                  <Button 
+                    variant="destructive" 
+                    onClick={async () => {
+                      if (!selectedWorkerForManual || !editingShift) return;
+                      const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForManual.id && a.week_start_date === weekStartDate);
+                      if (!workerAvail) return;
+                      const updatedShifts = workerAvail.shifts.filter(s => 
+                        !(s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type)
+                      );
+                      await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
+                      setShowManualDialog(false);
+                      setSelectedWorkerForManual(null);
+                      setManualShiftData({ start_time: '', end_time: '', type: 'available' });
+                      setEditingShift(null);
+                      loadData();
+                    }}
+                    dir="rtl"
+                  >
+                    מחק
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setShowManualDialog(false)} dir="rtl">ביטול</Button>
+                <Button 
+                  onClick={submitManualShift} 
+                  className="bg-blue-900 hover:bg-blue-800"
+                  disabled={!manualShiftData.start_time || !manualShiftData.end_time}
+                  dir="rtl"
+                >
+                  {editingShift ? 'עדכן' : <><Plus className="w-4 h-4 mr-2" />הוסף</>}
+                </Button>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
