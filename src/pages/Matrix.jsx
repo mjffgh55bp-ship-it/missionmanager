@@ -232,8 +232,8 @@ export default function Matrix() {
     return `${workerId}-${dayIndex}-${hour}`;
   };
 
-  const handleCellMouseDown = (workerId, dayIndex, hour) => {
-    if (!selectedCategory) return;
+  const handleCellMouseDown = (workerId, dayIndex, hour, e) => {
+    if (!selectedCategory || e.button !== 0) return;
     setIsDragging(true);
     toggleCell(workerId, dayIndex, hour);
   };
@@ -478,69 +478,53 @@ export default function Matrix() {
     setDraggedBlock(null);
   };
 
-  const handleWorkerDragOver = (e) => {
+
+
+  const handleCellDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleWorkerDrop = (targetWorkerId, e) => {
+  const handleCellDrop = (targetWorkerId, targetDayIndex, targetHour, e) => {
     e.preventDefault();
-    if (!draggedBlock || draggedBlock.workerId === targetWorkerId) {
-      setDraggedBlock(null);
-      return;
-    }
+    e.stopPropagation();
+    
+    if (!draggedBlock) return;
 
     const { workerId, dayIndex, hour, colspan } = draggedBlock;
     const categoryId = getCellCategory(workerId, dayIndex, hour);
 
-    if (e.shiftKey) {
-      // העתקה עם Shift
-      setCellData(prev => {
-        const newData = { ...prev };
-        for (let i = 0; i < colspan; i++) {
-          const hourToCopy = (hour + i) % 24;
-          const newKey = getCellKey(targetWorkerId, dayIndex, hourToCopy);
-          newData[newKey] = categoryId;
-        }
-        return newData;
-      });
-
-      const oldBlockKey = draggedBlock.blockKey;
-      const newBlockKey = `${targetWorkerId}-${dayIndex}-${hour}-${(hour + colspan - 1) % 24}`;
-      
-      if (blockNotes[oldBlockKey]) {
-        setBlockNotes(prev => ({
-          ...prev,
-          [newBlockKey]: prev[oldBlockKey]
-        }));
+    // מחק את הבלוק המקורי
+    setCellData(prev => {
+      const newData = { ...prev };
+      for (let i = 0; i < colspan; i++) {
+        const hourToDelete = (hour + i) % 24;
+        const oldKey = getCellKey(workerId, dayIndex, hourToDelete);
+        delete newData[oldKey];
       }
-    } else {
-      // העברה רגילה
-      setCellData(prev => {
-        const newData = { ...prev };
-        for (let i = 0; i < colspan; i++) {
-          const hourToMove = (hour + i) % 24;
-          const oldKey = getCellKey(workerId, dayIndex, hourToMove);
-          delete newData[oldKey];
-          
-          const newKey = getCellKey(targetWorkerId, dayIndex, hourToMove);
-          newData[newKey] = categoryId;
-        }
-        return newData;
-      });
-
-      const oldBlockKey = draggedBlock.blockKey;
-      const newBlockKey = `${targetWorkerId}-${dayIndex}-${hour}-${(hour + colspan - 1) % 24}`;
       
-      setBlockNotes(prev => {
-        const newNotes = { ...prev };
-        if (prev[oldBlockKey]) {
-          newNotes[newBlockKey] = prev[oldBlockKey];
-          delete newNotes[oldBlockKey];
-        }
-        return newNotes;
-      });
-    }
+      // הוסף במיקום החדש
+      for (let i = 0; i < colspan; i++) {
+        const newHour = (targetHour + i) % 24;
+        const newKey = getCellKey(targetWorkerId, targetDayIndex, newHour);
+        newData[newKey] = categoryId;
+      }
+      
+      return newData;
+    });
+
+    // העבר את ההערה
+    const oldBlockKey = draggedBlock.blockKey;
+    const newBlockKey = `${targetWorkerId}-${targetDayIndex}-${targetHour}-${(targetHour + colspan - 1) % 24}`;
+    
+    setBlockNotes(prev => {
+      const newNotes = { ...prev };
+      if (prev[oldBlockKey]) {
+        newNotes[newBlockKey] = prev[oldBlockKey];
+        delete newNotes[oldBlockKey];
+      }
+      return newNotes;
+    });
 
     setDraggedBlock(null);
   };
@@ -734,11 +718,7 @@ export default function Matrix() {
                   {workers.map((worker, workerIndex) => (
                     <React.Fragment key={worker.id}>
                       <tr className={workerIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        <td 
-                          className={`sticky right-0 z-10 border border-gray-300 p-2 font-medium text-sm bg-inherit ${draggedBlock && draggedBlock.workerId !== worker.id ? 'ring-2 ring-blue-400' : ''}`}
-                          onDragOver={handleWorkerDragOver}
-                          onDrop={(e) => handleWorkerDrop(worker.id, e)}
-                        >
+                        <td className="sticky right-0 z-10 border border-gray-300 p-2 font-medium text-sm bg-inherit">
                           <div className="flex items-center justify-between gap-2">
                             <span>{worker.nickname}</span>
                             <Button 
@@ -760,9 +740,11 @@ export default function Matrix() {
                                   return (
                                     <td
                                       key={`${dayIndex}-${block.hour}`}
-                                      className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] cursor-pointer hover:bg-blue-50 ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
-                                      onMouseDown={() => handleCellMouseDown(worker.id, dayIndex, block.hour)}
+                                      className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] ${!draggedBlock ? 'cursor-pointer hover:bg-blue-50' : 'bg-blue-100'} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
+                                      onMouseDown={(e) => handleCellMouseDown(worker.id, dayIndex, block.hour, e)}
                                       onMouseEnter={() => handleCellMouseEnter(worker.id, dayIndex, block.hour)}
+                                      onDragOver={handleCellDragOver}
+                                      onDrop={(e) => handleCellDrop(worker.id, dayIndex, block.hour, e)}
                                     />
                                   );
                                 }
@@ -773,13 +755,15 @@ export default function Matrix() {
                                     colSpan={block.colspan}
                                     className={`border border-gray-200 p-0 h-auto cursor-move ${block.category.color} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${draggedBlock?.blockKey === block.blockKey ? 'opacity-50' : ''}`}
                                     style={{ minWidth: `${block.colspan * 24}px` }}
-                                    title={`${block.category.label} (${block.startTime} - ${block.endTime})${block.note ? '\n' + block.note : ''}\n\nגרור להעברה | Shift+גרור להעתקה | לחץ לעריכה`}
+                                    title={`${block.category.label} (${block.startTime} - ${block.endTime})${block.note ? '\n' + block.note : ''}\n\nגרור להעברה | לחץ לעריכה`}
                                     draggable
                                     onDragStart={(e) => handleBlockDragStart(block, e)}
                                     onDragEnd={handleBlockDragEnd}
+                                    onDragOver={handleCellDragOver}
+                                    onDrop={(e) => handleCellDrop(worker.id, dayIndex, block.hour, e)}
                                     onClick={(e) => handleBlockClick(block, e)}
                                   >
-                                    <div className="h-full flex flex-col items-center justify-center px-1 py-1">
+                                    <div className="h-full flex flex-col items-center justify-center px-1 py-1 pointer-events-none">
                                       <span className="text-[10px] font-semibold truncate" dir="rtl">
                                         {block.category.label}
                                       </span>
