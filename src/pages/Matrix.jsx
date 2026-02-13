@@ -91,6 +91,10 @@ export default function Matrix() {
     end_time: "07:00",
     note: ""
   });
+  const [blockNotes, setBlockNotes] = useState({});
+  const [showBlockNoteDialog, setShowBlockNoteDialog] = useState(false);
+  const [selectedBlock, setSelectedBlock] = useState(null);
+  const [blockNoteText, setBlockNoteText] = useState("");
 
   useEffect(() => {
     loadData();
@@ -98,7 +102,15 @@ export default function Matrix() {
 
   useEffect(() => {
     loadCategories();
+    loadMatrixData();
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      saveMatrixData();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [cellData, workerActivities, blockNotes, weekStart]);
 
   const loadData = async () => {
     try {
@@ -137,19 +149,76 @@ export default function Matrix() {
     }
   };
 
+  const loadMatrixData = async () => {
+    try {
+      const weekKey = format(weekStart, "yyyy-MM-dd");
+      const settings = await base44.entities.AppSettings.filter({ setting_key: `matrix_data_${weekKey}` });
+      
+      if (settings.length > 0) {
+        const data = JSON.parse(settings[0].setting_value);
+        setCellData(data.cellData || {});
+        setWorkerActivities(data.workerActivities || {});
+        setBlockNotes(data.blockNotes || {});
+      }
+    } catch (error) {
+      console.error("Error loading matrix data:", error);
+    }
+  };
+
+  const saveMatrixData = async () => {
+    try {
+      const weekKey = format(weekStart, "yyyy-MM-dd");
+      const settings = await base44.entities.AppSettings.filter({ setting_key: `matrix_data_${weekKey}` });
+      const value = JSON.stringify({
+        cellData,
+        workerActivities,
+        blockNotes
+      });
+      
+      if (settings.length > 0) {
+        await base44.entities.AppSettings.update(settings[0].id, { setting_value: value });
+      } else {
+        await base44.entities.AppSettings.create({ 
+          setting_key: `matrix_data_${weekKey}`, 
+          setting_value: value 
+        });
+      }
+    } catch (error) {
+      console.error("Error saving matrix data:", error);
+    }
+  };
+
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const hours = Array.from({ length: 24 }, (_, i) => (i + 6) % 24); // 6,7,8...23,0,1...5
 
-  const goToPreviousWeek = () => {
-    setWeekStart(subWeeks(weekStart, 1));
+  const goToPreviousWeek = async () => {
+    await saveMatrixData();
+    const newWeek = subWeeks(weekStart, 1);
+    setWeekStart(newWeek);
+    setCellData({});
+    setWorkerActivities({});
+    setBlockNotes({});
+    setTimeout(() => loadMatrixData(), 100);
   };
 
-  const goToNextWeek = () => {
-    setWeekStart(addWeeks(weekStart, 1));
+  const goToNextWeek = async () => {
+    await saveMatrixData();
+    const newWeek = addWeeks(weekStart, 1);
+    setWeekStart(newWeek);
+    setCellData({});
+    setWorkerActivities({});
+    setBlockNotes({});
+    setTimeout(() => loadMatrixData(), 100);
   };
 
-  const goToCurrentWeek = () => {
-    setWeekStart(startOfWeek(new Date(), { weekStartsOn: 0 }));
+  const goToCurrentWeek = async () => {
+    await saveMatrixData();
+    const newWeek = startOfWeek(new Date(), { weekStartsOn: 0 });
+    setWeekStart(newWeek);
+    setCellData({});
+    setWorkerActivities({});
+    setBlockNotes({});
+    setTimeout(() => loadMatrixData(), 100);
   };
 
   const getCellKey = (workerId, dayIndex, hour) => {
@@ -231,6 +300,8 @@ export default function Matrix() {
 
       const startTime = `${String(hour).padStart(2, '0')}:00`;
       const endTime = `${String((endHour + 1) % 24).padStart(2, '0')}:00`;
+      const blockKey = `${workerId}-${dayIndex}-${hour}-${endHour}`;
+      const note = blockNotes[blockKey] || "";
 
       blocks.push({
         type: 'category',
@@ -238,7 +309,11 @@ export default function Matrix() {
         colspan,
         category: categoryData,
         startTime,
-        endTime
+        endTime,
+        workerId,
+        dayIndex,
+        note,
+        blockKey
       });
 
       i += colspan - 1;
@@ -377,6 +452,23 @@ export default function Matrix() {
     }));
   };
 
+  const handleBlockClick = (block) => {
+    setSelectedBlock(block);
+    setBlockNoteText(block.note || "");
+    setShowBlockNoteDialog(true);
+  };
+
+  const handleSaveBlockNote = () => {
+    if (!selectedBlock) return;
+    
+    setBlockNotes(prev => ({
+      ...prev,
+      [selectedBlock.blockKey]: blockNoteText
+    }));
+    
+    setShowBlockNoteDialog(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
@@ -482,7 +574,8 @@ export default function Matrix() {
                                     colSpan={block.colspan}
                                     className={`border border-gray-200 p-0 h-auto cursor-pointer ${block.category.color} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
                                     style={{ minWidth: `${block.colspan * 24}px` }}
-                                    title={`${block.category.label} (${block.startTime} - ${block.endTime})`}
+                                    title={`${block.category.label} (${block.startTime} - ${block.endTime})${block.note ? '\n' + block.note : ''}`}
+                                    onClick={() => handleBlockClick(block)}
                                   >
                                     <div className="h-full flex flex-col items-center justify-center px-1 py-1">
                                       <span className="text-[10px] font-semibold truncate" dir="rtl">
@@ -687,6 +780,35 @@ export default function Matrix() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowActivityDialog(false)}>ביטול</Button>
               <Button onClick={handleSaveActivity}>הוסף</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Block Note Dialog */}
+        <Dialog open={showBlockNoteDialog} onOpenChange={setShowBlockNoteDialog}>
+          <DialogContent dir="rtl">
+            <DialogHeader>
+              <DialogTitle>הוספת הערה לבלוק</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>קטגוריה: {selectedBlock?.category.label}</Label>
+                <p className="text-sm text-gray-600">
+                  {selectedBlock?.startTime} - {selectedBlock?.endTime}
+                </p>
+              </div>
+              <div>
+                <Label>הערה</Label>
+                <Input
+                  value={blockNoteText}
+                  onChange={(e) => setBlockNoteText(e.target.value)}
+                  placeholder="הוסף הערה..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowBlockNoteDialog(false)}>ביטול</Button>
+              <Button onClick={handleSaveBlockNote}>שמור</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
