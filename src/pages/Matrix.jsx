@@ -139,8 +139,16 @@ export default function Matrix() {
   const [newActivityType, setNewActivityType] = useState({ label: '', color: '#3b82f6' });
   const [tempActivityTypes, setTempActivityTypes] = useState([]);
   const [selectedActivityType, setSelectedActivityType] = useState(null);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const loadingTimeoutRef = useRef(null);
 
-  useEffect(() => { loadData(); }, [currentDate, viewMode]);
+  useEffect(() => { 
+    loadStaticData();
+  }, []);
+
+  useEffect(() => { 
+    loadDynamicData(); 
+  }, [currentDate, viewMode]);
 
   useEffect(() => { loadActivityTypes(); }, []);
 
@@ -195,38 +203,13 @@ export default function Matrix() {
     }
   };
 
-  const loadData = async () => {
-    setLoading(true);
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekStartStr = format(weekStart, "yyyy-MM-dd");
-    
-    let assignmentFilter = {};
-    if (viewMode === "daily") {
-      assignmentFilter = { date: format(currentDate, "yyyy-MM-dd") };
-    }
-    
-    const [workersData, assignmentsData, availabilitiesData, unavailabilitiesData, populationsSettings, workerRolesSettings] = await Promise.all([
+  const loadStaticData = async () => {
+    // Load workers and settings only once
+    const [workersData, populationsSettings, workerRolesSettings] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
-      viewMode === "daily" 
-        ? base44.entities.Assignment.filter({ date: format(currentDate, "yyyy-MM-dd") })
-        : base44.entities.Assignment.list(),
-      base44.entities.Availability.list(),
-      viewMode === "daily"
-        ? base44.entities.Unavailability.filter({ date: format(currentDate, "yyyy-MM-dd") })
-        : base44.entities.Unavailability.list(),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
     ]);
-    
-    // Filter weekly assignments
-    let filteredAssignments = assignmentsData;
-    if (viewMode === "weekly") {
-      filteredAssignments = assignmentsData.filter(a => {
-        const d = a.date;
-        return d >= weekStartStr && d <= format(weekEnd, "yyyy-MM-dd");
-      });
-    }
     
     if (populationsSettings.length > 0) {
       setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
@@ -240,10 +223,50 @@ export default function Matrix() {
     }
     
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
+  };
+
+  const loadDynamicData = async () => {
+    if (isLoadingData) return;
+    setIsLoadingData(true);
+    setLoading(true);
+    
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    
+    const [assignmentsData, availabilitiesData, unavailabilitiesData] = await Promise.all([
+      viewMode === "daily" 
+        ? base44.entities.Assignment.filter({ date: format(currentDate, "yyyy-MM-dd") })
+        : base44.entities.Assignment.list(),
+      base44.entities.Availability.list(),
+      viewMode === "daily"
+        ? base44.entities.Unavailability.filter({ date: format(currentDate, "yyyy-MM-dd") })
+        : base44.entities.Unavailability.list()
+    ]);
+    
+    // Filter weekly assignments
+    let filteredAssignments = assignmentsData;
+    if (viewMode === "weekly") {
+      filteredAssignments = assignmentsData.filter(a => {
+        const d = a.date;
+        return d >= weekStartStr && d <= format(weekEnd, "yyyy-MM-dd");
+      });
+    }
+    
     setAssignments(filteredAssignments);
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
     setLoading(false);
+    setIsLoadingData(false);
+  };
+
+  const debouncedLoadData = () => {
+    if (loadingTimeoutRef.current) {
+      clearTimeout(loadingTimeoutRef.current);
+    }
+    loadingTimeoutRef.current = setTimeout(() => {
+      loadDynamicData();
+    }, 300);
   };
 
   const dateString = format(currentDate, "yyyy-MM-dd");
@@ -484,7 +507,7 @@ export default function Matrix() {
     
     setDragging(null);
     setDragPreview(null);
-    loadData();
+    debouncedLoadData();
   };
 
   const handleTypeClick = async (e, worker, shift) => {
@@ -509,7 +532,7 @@ export default function Matrix() {
     });
     
     await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
-    loadData();
+    debouncedLoadData();
   };
 
   const handleChangeType = async (newType) => {
@@ -529,7 +552,7 @@ export default function Matrix() {
     setShowTypeDialog(false);
     setSelectedShiftForType(null);
     setSelectedWorkerForType(null);
-    loadData();
+    debouncedLoadData();
   };
 
   const handleManualShiftAdd = (worker) => {
@@ -604,7 +627,7 @@ export default function Matrix() {
     setSelectedWorkerForManual(null);
     setManualShiftData({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
     setEditingShift(null);
-    loadData();
+    debouncedLoadData();
   };
 
   const calculateWorkerSummary = (workerId) => {
@@ -1318,7 +1341,7 @@ export default function Matrix() {
                       setSelectedWorkerForManual(null);
                       setManualShiftData({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
                       setEditingShift(null);
-                      loadData();
+                      debouncedLoadData();
                     }}
                     dir="rtl"
                   >
