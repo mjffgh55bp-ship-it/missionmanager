@@ -380,12 +380,16 @@ export default function Matrix() {
     const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForManual.id && a.week_start_date === weekStartDate);
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
 
+    // Ensure date is in correct format without timezone issues
+    const targetDate = format(currentDate, "yyyy-MM-dd");
+
     if (editingShift) {
       // Update existing shift
       updatedShifts = updatedShifts.map(s => {
         if (s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type) {
           return {
             ...s,
+            date: targetDate,
             start_time: manualShiftData.start_time,
             end_time: manualShiftData.end_time,
             type: manualShiftData.type
@@ -396,7 +400,7 @@ export default function Matrix() {
     } else {
       // Add new shift
       updatedShifts.push({
-        date: dateString,
+        date: targetDate,
         start_time: manualShiftData.start_time,
         end_time: manualShiftData.end_time,
         type: manualShiftData.type,
