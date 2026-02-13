@@ -188,6 +188,43 @@ export default function Matrix() {
     return cellData[key];
   };
 
+  const getCellBlockInfo = (workerId, dayIndex, hour) => {
+    const category = getCellCategory(workerId, dayIndex, hour);
+    if (!category) return null;
+
+    const categoryData = categories.find(c => c.id === category);
+    if (!categoryData) return null;
+
+    // בדיקה אם זה תחילת בלוק
+    const prevHour = hour - 1;
+    const prevKey = getCellKey(workerId, dayIndex, prevHour >= 0 ? prevHour : -1);
+    const isBlockStart = prevHour < 0 || cellData[prevKey] !== category;
+
+    if (!isBlockStart) return null;
+
+    // חישוב אורך הבלוק
+    let endHour = hour + 1;
+    while (endHour < 24) {
+      const nextKey = getCellKey(workerId, dayIndex, endHour);
+      if (cellData[nextKey] === category) {
+        endHour++;
+      } else {
+        break;
+      }
+    }
+
+    const blockLength = endHour - hour;
+    const startTime = `${String(hour).padStart(2, '0')}:00`;
+    const endTime = `${String(endHour).padStart(2, '0')}:00`;
+
+    return {
+      categoryData,
+      blockLength,
+      startTime,
+      endTime
+    };
+  };
+
   const getWorkerActivities = (workerId) => {
     const activities = [];
     const processedBlocks = new Set();
@@ -401,41 +438,51 @@ export default function Matrix() {
                         </td>
                         {weekDays.map((day, dayIndex) => (
                           <React.Fragment key={dayIndex}>
-                            {hours.map((hour) => {
+                            {hours.map((hour, hourIdx) => {
                               const category = getCellCategory(worker.id, dayIndex, hour);
                               const categoryData = categories.find(c => c.id === category);
+                              const blockInfo = getCellBlockInfo(worker.id, dayIndex, hour);
+                              
                               return (
                                 <td 
                                   key={hour} 
-                                  className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] cursor-pointer transition-colors ${hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${categoryData ? categoryData.color : 'hover:bg-blue-50'}`}
+                                  className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] cursor-pointer transition-colors relative ${hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${categoryData ? categoryData.color : 'hover:bg-blue-50'}`}
                                   onMouseDown={() => handleCellMouseDown(worker.id, dayIndex, hour)}
                                   onMouseEnter={() => handleCellMouseEnter(worker.id, dayIndex, hour)}
                                 >
+                                  {blockInfo && (
+                                    <div 
+                                      className="absolute top-0 right-0 h-full flex items-center justify-center text-[9px] font-semibold whitespace-nowrap px-1 pointer-events-none"
+                                      style={{ width: `${blockInfo.blockLength * 24}px` }}
+                                      dir="rtl"
+                                    >
+                                      <span className="truncate">{blockInfo.categoryData.label}</span>
+                                      <span className="ml-1 text-[8px]">({blockInfo.startTime}-{blockInfo.endTime})</span>
+                                    </div>
+                                  )}
                                 </td>
                               );
                             })}
                           </React.Fragment>
                         ))}
                       </tr>
-                      {getWorkerActivities(worker.id).length > 0 && (
+                      {workerActivities[worker.id] && workerActivities[worker.id].length > 0 && (
                         <tr className={workerIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                           <td className="sticky right-0 z-10 border border-gray-300 p-2 bg-inherit" colSpan={1}>
                           </td>
                           <td colSpan={168} className="border border-gray-300 p-2">
                             <div className="flex flex-wrap gap-2 text-xs" dir="rtl">
-                              {getWorkerActivities(worker.id).map((activity, idx) => (
+                              {workerActivities[worker.id].map((activity, idx) => (
                                 <div key={idx} className={`${activity.color} px-2 py-1 rounded flex items-center gap-1`}>
                                   <span className="font-medium">{HEBREW_DAYS[activity.day]}:</span>
                                   <span>{activity.category}</span>
                                   <span>({activity.start} - {activity.end})</span>
-                                  {activity.id && (
-                                    <button 
-                                      onClick={() => handleDeleteActivity(worker.id, activity.id)}
-                                      className="hover:text-red-600"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  )}
+                                  <button 
+                                    onClick={() => handleDeleteActivity(worker.id, activity.id)}
+                                    className="hover:text-red-600"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
                                 </div>
                               ))}
                             </div>
