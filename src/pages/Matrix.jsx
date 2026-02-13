@@ -279,15 +279,16 @@ export default function Matrix() {
       const maxP = Math.max(startPercent, currentPercent);
       const startData = percentageToTime(minP, viewMode);
       const endData = percentageToTime(maxP, viewMode);
-      newStart = viewMode === 'weekly' ? startData.time : startData;
-      newEnd = viewMode === 'weekly' ? endData.time : endData;
-      newDay = viewMode === 'weekly' ? startData.day : 0;
+      newStart = startData.time;
+      newEnd = endData.time;
+      newDay = startData.day;
     } else if (action === 'resize-start') {
       const data = percentageToTime(currentPercent, viewMode);
-      newStart = viewMode === 'weekly' ? data.time : data;
+      newStart = data.time;
+      newDay = data.day;
     } else if (action === 'resize-end') {
       const data = percentageToTime(currentPercent, viewMode);
-      newEnd = viewMode === 'weekly' ? data.time : data;
+      newEnd = data.time;
     } else if (action === 'move') {
       const origStartP = timeToPercentage(originalStart, originalDay || 0, viewMode);
       const origEndP = timeToPercentage(originalEnd, originalDay || 0, viewMode);
@@ -296,9 +297,9 @@ export default function Matrix() {
       const newStartP = Math.max(0, Math.min(100 - width, origStartP + diff));
       const startData = percentageToTime(newStartP, viewMode);
       const endData = percentageToTime(newStartP + width, viewMode);
-      newStart = viewMode === 'weekly' ? startData.time : startData;
-      newEnd = viewMode === 'weekly' ? endData.time : endData;
-      newDay = viewMode === 'weekly' ? startData.day : 0;
+      newStart = startData.time;
+      newEnd = endData.time;
+      newDay = startData.day;
     }
     
     setDragPreview({ workerId, start: newStart, end: newEnd, day: newDay, type: shift?.type || 'available' });
