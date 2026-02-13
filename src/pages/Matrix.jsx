@@ -733,8 +733,9 @@ export default function Matrix() {
                       document.addEventListener('mouseup', handleUp);
                     }}
                   />
+                  {/* Left handle (screen left, controls start) */}
                   <div 
-                    className="absolute top-0 w-3 h-4 bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors"
+                    className="absolute top-0 w-3 h-4 bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors z-10"
                     style={{ right: `${zoomRange.start}%` }}
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -743,8 +744,9 @@ export default function Matrix() {
                       const startValue = zoomRange.start;
                       const rect = e.currentTarget.parentElement.getBoundingClientRect();
                       const handleMove = (moveE) => {
-                        const delta = ((moveE.clientX - startX) / rect.width) * -100;
-                        const newStart = Math.max(0, Math.min(zoomRange.end - 5, startValue + delta));
+                        const deltaPixels = moveE.clientX - startX;
+                        const deltaPercent = (deltaPixels / rect.width) * -100;
+                        const newStart = Math.max(0, Math.min(zoomRange.end - 5, startValue + deltaPercent));
                         setZoomRange({ start: newStart, end: zoomRange.end });
                       };
                       const handleUp = () => {
@@ -755,9 +757,10 @@ export default function Matrix() {
                       document.addEventListener('mouseup', handleUp);
                     }}
                   />
+                  {/* Right handle (screen right, controls end) */}
                   <div 
-                    className="absolute top-0 w-3 h-4 bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors"
-                    style={{ right: `${zoomRange.end}%`, transform: 'translateX(100%)' }}
+                    className="absolute top-0 w-3 h-4 bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors z-10"
+                    style={{ left: `${100 - zoomRange.end}%` }}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -765,8 +768,9 @@ export default function Matrix() {
                       const startValue = zoomRange.end;
                       const rect = e.currentTarget.parentElement.getBoundingClientRect();
                       const handleMove = (moveE) => {
-                        const delta = ((moveE.clientX - startX) / rect.width) * -100;
-                        const newEnd = Math.max(zoomRange.start + 5, Math.min(100, startValue + delta));
+                        const deltaPixels = moveE.clientX - startX;
+                        const deltaPercent = (deltaPixels / rect.width) * 100;
+                        const newEnd = Math.max(zoomRange.start + 5, Math.min(100, startValue + deltaPercent));
                         setZoomRange({ start: zoomRange.start, end: newEnd });
                       };
                       const handleUp = () => {
