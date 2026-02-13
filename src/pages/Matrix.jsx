@@ -188,41 +188,62 @@ export default function Matrix() {
     return cellData[key];
   };
 
-  const getCellBlockInfo = (workerId, dayIndex, hour) => {
-    const category = getCellCategory(workerId, dayIndex, hour);
-    if (!category) return null;
+  const getBlocksForWorkerDay = (workerId, dayIndex) => {
+    const blocks = [];
+    const processedHours = new Set();
 
-    const categoryData = categories.find(c => c.id === category);
-    if (!categoryData) return null;
+    for (let i = 0; i < hours.length; i++) {
+      const hour = hours[i];
+      
+      if (processedHours.has(hour)) continue;
 
-    // בדיקה אם זה תחילת בלוק
-    const prevHour = hour - 1;
-    const prevKey = getCellKey(workerId, dayIndex, prevHour >= 0 ? prevHour : -1);
-    const isBlockStart = prevHour < 0 || cellData[prevKey] !== category;
-
-    if (!isBlockStart) return null;
-
-    // חישוב אורך הבלוק
-    let endHour = hour + 1;
-    while (endHour < 24) {
-      const nextKey = getCellKey(workerId, dayIndex, endHour);
-      if (cellData[nextKey] === category) {
-        endHour++;
-      } else {
-        break;
+      const category = getCellCategory(workerId, dayIndex, hour);
+      
+      if (!category) {
+        blocks.push({ type: 'empty', hour, colspan: 1 });
+        continue;
       }
+
+      const categoryData = categories.find(c => c.id === category);
+      if (!categoryData) {
+        blocks.push({ type: 'empty', hour, colspan: 1 });
+        continue;
+      }
+
+      // מצא את כל השעות הרצופות עם אותה קטגוריה
+      let endHour = hour;
+      let colspan = 1;
+      processedHours.add(hour);
+
+      for (let j = i + 1; j < hours.length; j++) {
+        const nextHour = hours[j];
+        const nextCategory = getCellCategory(workerId, dayIndex, nextHour);
+        
+        if (nextCategory === category) {
+          endHour = nextHour;
+          colspan++;
+          processedHours.add(nextHour);
+        } else {
+          break;
+        }
+      }
+
+      const startTime = `${String(hour).padStart(2, '0')}:00`;
+      const endTime = `${String((endHour + 1) % 24).padStart(2, '0')}:00`;
+
+      blocks.push({
+        type: 'category',
+        hour,
+        colspan,
+        category: categoryData,
+        startTime,
+        endTime
+      });
+
+      i += colspan - 1;
     }
 
-    const blockLength = endHour - hour;
-    const startTime = `${String(hour).padStart(2, '0')}:00`;
-    const endTime = `${String(endHour).padStart(2, '0')}:00`;
-
-    return {
-      categoryData,
-      blockLength,
-      startTime,
-      endTime
-    };
+    return blocks;
   };
 
   const getWorkerActivities = (workerId) => {
@@ -436,35 +457,41 @@ export default function Matrix() {
                             </Button>
                           </div>
                         </td>
-                        {weekDays.map((day, dayIndex) => (
-                          <React.Fragment key={dayIndex}>
-                            {hours.map((hour, hourIdx) => {
-                              const category = getCellCategory(worker.id, dayIndex, hour);
-                              const categoryData = categories.find(c => c.id === category);
-                              const blockInfo = getCellBlockInfo(worker.id, dayIndex, hour);
-                              
-                              return (
-                                <td 
-                                  key={hour} 
-                                  className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] cursor-pointer transition-colors relative ${hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${categoryData ? categoryData.color : 'hover:bg-blue-50'}`}
-                                  onMouseDown={() => handleCellMouseDown(worker.id, dayIndex, hour)}
-                                  onMouseEnter={() => handleCellMouseEnter(worker.id, dayIndex, hour)}
-                                >
-                                  {blockInfo && (
-                                    <div 
-                                      className="absolute top-0 right-0 h-full flex items-center justify-center text-[9px] font-semibold whitespace-nowrap px-1 pointer-events-none"
-                                      style={{ width: `${blockInfo.blockLength * 24}px` }}
-                                      dir="rtl"
-                                    >
-                                      <span className="truncate">{blockInfo.categoryData.label}</span>
-                                      <span className="ml-1 text-[8px]">({blockInfo.startTime}-{blockInfo.endTime})</span>
+                        {weekDays.map((day, dayIndex) => {
+                          const blocks = getBlocksForWorkerDay(worker.id, dayIndex);
+                          return (
+                            <React.Fragment key={dayIndex}>
+                              {blocks.map((block, blockIdx) => {
+                                if (block.type === 'empty') {
+                                  return (
+                                    <td
+                                      key={`${dayIndex}-${block.hour}`}
+                                      className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] cursor-pointer hover:bg-blue-50 ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
+                                      onMouseDown={() => handleCellMouseDown(worker.id, dayIndex, block.hour)}
+                                      onMouseEnter={() => handleCellMouseEnter(worker.id, dayIndex, block.hour)}
+                                    />
+                                  );
+                                }
+
+                                return (
+                                  <td
+                                    key={`${dayIndex}-${block.hour}`}
+                                    colSpan={block.colspan}
+                                    className={`border border-gray-200 p-0 h-8 cursor-pointer ${block.category.color} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
+                                    style={{ minWidth: `${block.colspan * 24}px` }}
+                                    title={`${block.category.label} (${block.startTime} - ${block.endTime})`}
+                                  >
+                                    <div className="h-full flex items-center justify-center px-1">
+                                      <span className="text-[10px] font-semibold truncate" dir="rtl">
+                                        {block.category.label}
+                                      </span>
                                     </div>
-                                  )}
-                                </td>
-                              );
-                            })}
-                          </React.Fragment>
-                        ))}
+                                  </td>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
                       </tr>
                       {workerActivities[worker.id] && workerActivities[worker.id].length > 0 && (
                         <tr className={workerIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
