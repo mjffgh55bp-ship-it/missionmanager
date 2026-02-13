@@ -137,6 +137,7 @@ export default function Matrix() {
   const [showActivityTypesDialog, setShowActivityTypesDialog] = useState(false);
   const [editingActivityType, setEditingActivityType] = useState(null);
   const [newActivityType, setNewActivityType] = useState({ label: '', color: '#3b82f6' });
+  const [tempActivityTypes, setTempActivityTypes] = useState([]);
 
   useEffect(() => { loadData(); }, [currentDate, viewMode]);
 
@@ -162,23 +163,34 @@ export default function Matrix() {
     setActivityTypes(types);
   };
 
-  const handleAddActivityType = async () => {
-    if (!newActivityType.label) return;
-    const newId = newActivityType.label.toLowerCase().replace(/\s+/g, '_');
-    const updatedTypes = [...activityTypes, { id: newId, ...newActivityType }];
-    await saveActivityTypes(updatedTypes);
+  const handleOpenActivityTypesDialog = () => {
+    setTempActivityTypes([...activityTypes]);
+    setShowActivityTypesDialog(true);
+  };
+
+  const handleSaveActivityTypesDialog = async () => {
+    await saveActivityTypes(tempActivityTypes);
+    setShowActivityTypesDialog(false);
     setNewActivityType({ label: '', color: '#3b82f6' });
   };
 
-  const handleUpdateActivityType = async (id, updates) => {
-    const updatedTypes = activityTypes.map(t => t.id === id ? { ...t, ...updates } : t);
-    await saveActivityTypes(updatedTypes);
+  const handleAddActivityType = () => {
+    if (!newActivityType.label) return;
+    const newId = newActivityType.label.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
+    const updatedTypes = [...tempActivityTypes, { id: newId, ...newActivityType }];
+    setTempActivityTypes(updatedTypes);
+    setNewActivityType({ label: '', color: '#3b82f6' });
   };
 
-  const handleDeleteActivityType = async (id) => {
+  const handleUpdateActivityType = (id, updates) => {
+    const updatedTypes = tempActivityTypes.map(t => t.id === id ? { ...t, ...updates } : t);
+    setTempActivityTypes(updatedTypes);
+  };
+
+  const handleDeleteActivityType = (id) => {
     if (confirm('האם למחוק קטגוריה זו?')) {
-      const updatedTypes = activityTypes.filter(t => t.id !== id);
-      await saveActivityTypes(updatedTypes);
+      const updatedTypes = tempActivityTypes.filter(t => t.id !== id);
+      setTempActivityTypes(updatedTypes);
     }
   };
 
@@ -818,7 +830,7 @@ export default function Matrix() {
                 <div className="mt-4 border-t pt-4">
                   <div className="flex justify-between items-center mb-2">
                     <p className="text-sm font-semibold" dir="rtl">מקרא סוגי פעילות:</p>
-                    <Button variant="outline" size="sm" onClick={() => setShowActivityTypesDialog(true)} dir="rtl">
+                    <Button variant="outline" size="sm" onClick={handleOpenActivityTypesDialog} dir="rtl">
                       ערוך קטגוריות
                     </Button>
                   </div>
@@ -1325,7 +1337,7 @@ export default function Matrix() {
             <div className="space-y-4 py-4">
               <div className="border rounded-lg p-4 space-y-3">
                 <Label className="font-semibold" dir="rtl">קטגוריות קיימות</Label>
-                {activityTypes.map(type => (
+                {tempActivityTypes.map(type => (
                   <div key={type.id} className="flex items-center gap-3 p-2 border rounded-lg">
                     <Input
                       type="color"
@@ -1374,7 +1386,8 @@ export default function Matrix() {
               </div>
             </div>
             <DialogFooter>
-              <Button onClick={() => setShowActivityTypesDialog(false)} dir="rtl">סגור</Button>
+              <Button variant="outline" onClick={() => setShowActivityTypesDialog(false)} dir="rtl">ביטול</Button>
+              <Button onClick={handleSaveActivityTypesDialog} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שמור</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
