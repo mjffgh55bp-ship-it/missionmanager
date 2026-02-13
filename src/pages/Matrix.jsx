@@ -475,16 +475,17 @@ export default function Matrix() {
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     
     if (action === 'create') {
-      console.log('Creating shift with selectedActivityType:', selectedActivityType);
+      const activityType = selectedActivityType || 'shift';
+      console.log('Creating shift with activity_type:', activityType, 'from selectedActivityType:', selectedActivityType);
       updatedShifts.push({ 
         date: targetDate, 
         start_time: start, 
         end_time: end, 
         type: 'available', 
-        activity_type: selectedActivityType || 'shift',
+        activity_type: activityType,
         priority: updatedShifts.length + 1 
       });
-      console.log('Created shift:', updatedShifts[updatedShifts.length - 1]);
+      console.log('Created shift object:', JSON.stringify(updatedShifts[updatedShifts.length - 1]));
     } else if (shift) {
       updatedShifts = updatedShifts.map(s => {
         if (s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time) {
@@ -1453,10 +1454,12 @@ export default function Matrix() {
               {activityTypes.map(type => (
                 <button
                   key={type.id} 
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
                     const newValue = selectedActivityType === type.id ? null : type.id;
-                    console.log('Clicked activity type:', type.id, 'New value:', newValue);
+                    console.log('Clicked activity type button. Current:', selectedActivityType, 'Type clicked:', type.id, 'New value:', newValue);
                     setSelectedActivityType(newValue);
+                    console.log('After setSelectedActivityType, should be:', newValue);
                   }}
                   style={{ backgroundColor: type.color }} 
                   className={`text-sm font-medium text-gray-900 py-2 px-4 rounded-lg text-center transition-all hover:opacity-90 ${
