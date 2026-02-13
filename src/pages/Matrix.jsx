@@ -286,15 +286,20 @@ export default function Matrix() {
   const addCell = (workerId, dayIndex, hour) => {
     if (!selectedCategory) return;
     const key = getCellKey(workerId, dayIndex, hour);
-    setCellData(prev => ({
-      ...prev,
-      [key]: selectedCategory
-    }));
+    setCellData(prev => {
+      const existing = prev[key] || [];
+      return {
+        ...prev,
+        [key]: [...existing, selectedCategory]
+      };
+    });
   };
 
   const getCellCategory = (workerId, dayIndex, hour) => {
     const key = getCellKey(workerId, dayIndex, hour);
-    return cellData[key];
+    const stack = cellData[key];
+    if (!stack || stack.length === 0) return null;
+    return stack[stack.length - 1]; // החזר את העליון במחסנית
   };
 
   const getBlocksForWorkerDay = (workerId, dayIndex) => {
@@ -543,20 +548,29 @@ export default function Matrix() {
     const targetStartHour = workerId === targetWorkerId ? targetHour : hour;
     const finalDayIndex = workerId === targetWorkerId ? targetDayIndex : dayIndex;
 
-    // מחק את הבלוק המקורי
+    // מחק את הבלוק המקורי מהמחסנית
     setCellData(prev => {
       const newData = { ...prev };
       for (let i = 0; i < colspan; i++) {
         const hourToDelete = (hour + i) % 24;
         const oldKey = getCellKey(workerId, dayIndex, hourToDelete);
-        delete newData[oldKey];
+        const stack = newData[oldKey] || [];
+        if (stack.length > 0) {
+          const newStack = stack.slice(0, -1);
+          if (newStack.length === 0) {
+            delete newData[oldKey];
+          } else {
+            newData[oldKey] = newStack;
+          }
+        }
       }
       
       // הוסף במיקום החדש
       for (let i = 0; i < colspan; i++) {
         const newHour = (targetStartHour + i) % 24;
         const newKey = getCellKey(targetWorkerId, finalDayIndex, newHour);
-        newData[newKey] = categoryId;
+        const existing = newData[newKey] || [];
+        newData[newKey] = [...existing, categoryId];
       }
       
       return newData;
@@ -588,7 +602,13 @@ export default function Matrix() {
       for (let i = 0; i < colspan; i++) {
         const hourToChange = (hour + i) % 24;
         const key = getCellKey(workerId, dayIndex, hourToChange);
-        newData[key] = newCategoryId;
+        const stack = newData[key] || [];
+        if (stack.length > 0) {
+          // החלף את העליון במחסנית
+          const newStack = [...stack];
+          newStack[newStack.length - 1] = newCategoryId;
+          newData[key] = newStack;
+        }
       }
       return newData;
     });
@@ -600,17 +620,26 @@ export default function Matrix() {
     const { workerId, dayIndex, hour, colspan } = selectedBlock;
     const categoryId = getCellCategory(workerId, dayIndex, hour);
     
-    // מחק מהעובד המקורי
+    // מחק מהעובד המקורי והוסף לעובד החדש
     setCellData(prev => {
       const newData = { ...prev };
       for (let i = 0; i < colspan; i++) {
-        const hourToDelete = (hour + i) % 24;
-        const oldKey = getCellKey(workerId, dayIndex, hourToDelete);
-        delete newData[oldKey];
+        const hourToMove = (hour + i) % 24;
+        const oldKey = getCellKey(workerId, dayIndex, hourToMove);
+        const stack = newData[oldKey] || [];
+        if (stack.length > 0) {
+          const newStack = stack.slice(0, -1);
+          if (newStack.length === 0) {
+            delete newData[oldKey];
+          } else {
+            newData[oldKey] = newStack;
+          }
+        }
         
         // הוסף לעובד החדש
-        const newKey = getCellKey(targetWorkerId, dayIndex, hourToDelete);
-        newData[newKey] = categoryId;
+        const newKey = getCellKey(targetWorkerId, dayIndex, hourToMove);
+        const existing = newData[newKey] || [];
+        newData[newKey] = [...existing, categoryId];
       }
       return newData;
     });
@@ -643,7 +672,8 @@ export default function Matrix() {
       for (let i = 0; i < colspan; i++) {
         const hourToCopy = (hour + i) % 24;
         const newKey = getCellKey(targetWorkerId, dayIndex, hourToCopy);
-        newData[newKey] = categoryId;
+        const existing = newData[newKey] || [];
+        newData[newKey] = [...existing, categoryId];
       }
       return newData;
     });
@@ -668,20 +698,29 @@ export default function Matrix() {
     const { workerId, dayIndex, hour, colspan } = selectedBlock;
     const categoryId = getCellCategory(workerId, dayIndex, hour);
     
-    // מחק את הבלוק הישן
+    // מחק את הבלוק הישן מהמחסנית
     setCellData(prev => {
       const newData = { ...prev };
       for (let i = 0; i < colspan; i++) {
         const hourToDelete = (hour + i) % 24;
         const key = getCellKey(workerId, dayIndex, hourToDelete);
-        delete newData[key];
+        const stack = newData[key] || [];
+        if (stack.length > 0) {
+          const newStack = stack.slice(0, -1);
+          if (newStack.length === 0) {
+            delete newData[key];
+          } else {
+            newData[key] = newStack;
+          }
+        }
       }
       
       // הוסף את הבלוק החדש עם השעות החדשות
       let currentHour = blockStartHour;
       while (currentHour !== blockEndHour) {
         const key = getCellKey(workerId, dayIndex, currentHour);
-        newData[key] = categoryId;
+        const existing = newData[key] || [];
+        newData[key] = [...existing, categoryId];
         currentHour = (currentHour + 1) % 24;
       }
       
@@ -719,7 +758,16 @@ export default function Matrix() {
       for (let i = 0; i < colspan; i++) {
         const hourToDelete = (hour + i) % 24;
         const key = getCellKey(workerId, dayIndex, hourToDelete);
-        delete newData[key];
+        const stack = newData[key] || [];
+        if (stack.length > 0) {
+          // הסר את הבלוק העליון
+          const newStack = stack.slice(0, -1);
+          if (newStack.length === 0) {
+            delete newData[key];
+          } else {
+            newData[key] = newStack;
+          }
+        }
       }
       return newData;
     });
