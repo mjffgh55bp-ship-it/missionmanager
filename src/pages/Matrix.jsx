@@ -685,14 +685,24 @@ export default function Matrix() {
         <Card className="border-none shadow-lg">
           <CardContent className="p-0">
             {/* Fixed Zoom Control at Bottom */}
-            <div className="fixed bottom-0 left-0 right-0 p-2 bg-white border-t shadow-lg z-[60]" style={{ direction: 'ltr' }}>
+            <div 
+              className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg pointer-events-auto"
+              style={{ 
+                direction: 'ltr',
+                zIndex: 9999,
+                width: '100%',
+                padding: '8px'
+              }}
+            >
               <div className="flex items-center gap-4 max-w-screen-2xl mx-auto">
-                <div className="flex-1 relative h-4 bg-gray-200 rounded-full">
+                <div className="flex-1 relative bg-gray-200 rounded-full pointer-events-auto" style={{ height: '16px', minHeight: '16px' }}>
+                  {/* Main drag bar */}
                   <div 
-                    className="absolute top-0 h-full bg-blue-400 rounded-full cursor-move hover:bg-blue-500 transition-colors pointer-events-auto"
+                    className="absolute top-0 h-full bg-blue-400 rounded-full cursor-move hover:bg-blue-500 transition-colors"
                     style={{ 
                       left: `${zoomRange.start}%`, 
-                      width: `${zoomRange.end - zoomRange.start}%` 
+                      width: `${zoomRange.end - zoomRange.start}%`,
+                      pointerEvents: 'auto'
                     }}
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -704,6 +714,7 @@ export default function Matrix() {
                       const rect = e.currentTarget.parentElement.getBoundingClientRect();
                       const handleMove = (moveE) => {
                         moveE.preventDefault();
+                        moveE.stopPropagation();
                         const delta = ((moveE.clientX - startX) / rect.width) * 100;
                         let newStart = startRangeStart + delta;
                         let newEnd = startRangeEnd + delta;
@@ -718,7 +729,9 @@ export default function Matrix() {
                         
                         setZoomRange({ start: newStart, end: newEnd });
                       };
-                      const handleUp = () => {
+                      const handleUp = (upE) => {
+                        upE.preventDefault();
+                        upE.stopPropagation();
                         document.removeEventListener('mousemove', handleMove);
                         document.removeEventListener('mouseup', handleUp);
                       };
@@ -726,10 +739,17 @@ export default function Matrix() {
                       document.addEventListener('mouseup', handleUp);
                     }}
                   />
-                  {/* Left handle (controls start - beginning of timeline) */}
+                  {/* Left handle */}
                   <div 
-                    className="absolute top-0 w-4 h-6 -mt-1 bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors z-20 pointer-events-auto"
-                    style={{ left: `${zoomRange.start}%` }}
+                    className="absolute bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors"
+                    style={{ 
+                      left: `${zoomRange.start}%`,
+                      top: '-2px',
+                      width: '16px',
+                      height: '20px',
+                      zIndex: 10,
+                      pointerEvents: 'auto'
+                    }}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -738,12 +758,15 @@ export default function Matrix() {
                       const rect = e.currentTarget.parentElement.getBoundingClientRect();
                       const handleMove = (moveE) => {
                         moveE.preventDefault();
+                        moveE.stopPropagation();
                         const deltaPixels = moveE.clientX - startX;
                         const deltaPercent = (deltaPixels / rect.width) * 100;
                         const newStart = Math.max(0, Math.min(zoomRange.end - 5, startValue + deltaPercent));
                         setZoomRange({ start: newStart, end: zoomRange.end });
                       };
-                      const handleUp = () => {
+                      const handleUp = (upE) => {
+                        upE.preventDefault();
+                        upE.stopPropagation();
                         document.removeEventListener('mousemove', handleMove);
                         document.removeEventListener('mouseup', handleUp);
                       };
@@ -751,10 +774,18 @@ export default function Matrix() {
                       document.addEventListener('mouseup', handleUp);
                     }}
                   />
-                  {/* Right handle (controls end - end of timeline) */}
+                  {/* Right handle */}
                   <div 
-                    className="absolute top-0 w-4 h-6 -mt-1 bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors z-20 pointer-events-auto"
-                    style={{ left: `${zoomRange.end}%`, transform: 'translateX(-100%)' }}
+                    className="absolute bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors"
+                    style={{ 
+                      left: `${zoomRange.end}%`,
+                      top: '-2px',
+                      width: '16px',
+                      height: '20px',
+                      transform: 'translateX(-100%)',
+                      zIndex: 10,
+                      pointerEvents: 'auto'
+                    }}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -763,12 +794,15 @@ export default function Matrix() {
                       const rect = e.currentTarget.parentElement.getBoundingClientRect();
                       const handleMove = (moveE) => {
                         moveE.preventDefault();
+                        moveE.stopPropagation();
                         const deltaPixels = moveE.clientX - startX;
                         const deltaPercent = (deltaPixels / rect.width) * 100;
                         const newEnd = Math.max(zoomRange.start + 5, Math.min(100, startValue + deltaPercent));
                         setZoomRange({ start: zoomRange.start, end: newEnd });
                       };
-                      const handleUp = () => {
+                      const handleUp = (upE) => {
+                        upE.preventDefault();
+                        upE.stopPropagation();
                         document.removeEventListener('mousemove', handleMove);
                         document.removeEventListener('mouseup', handleUp);
                       };
@@ -783,6 +817,7 @@ export default function Matrix() {
                   onClick={() => setZoomRange({ start: 0, end: 100 })}
                   disabled={zoomRange.start === 0 && zoomRange.end === 100}
                   className="shrink-0"
+                  style={{ pointerEvents: 'auto' }}
                 >
                   איפוס
                 </Button>
