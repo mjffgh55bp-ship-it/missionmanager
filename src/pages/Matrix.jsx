@@ -234,13 +234,14 @@ export default function Matrix() {
 
   const handleCellMouseDown = (workerId, dayIndex, hour, e) => {
     if (!selectedCategory || e.button !== 0) return;
+    e.preventDefault();
     setIsDragging(true);
-    toggleCell(workerId, dayIndex, hour);
+    addCell(workerId, dayIndex, hour);
   };
 
   const handleCellMouseEnter = (workerId, dayIndex, hour) => {
     if (!isDragging || !selectedCategory) return;
-    toggleCell(workerId, dayIndex, hour);
+    addCell(workerId, dayIndex, hour);
   };
 
   const handleMouseUp = () => {
@@ -258,6 +259,15 @@ export default function Matrix() {
       }
       return newData;
     });
+  };
+
+  const addCell = (workerId, dayIndex, hour) => {
+    if (!selectedCategory) return;
+    const key = getCellKey(workerId, dayIndex, hour);
+    setCellData(prev => ({
+      ...prev,
+      [key]: selectedCategory
+    }));
   };
 
   const getCellCategory = (workerId, dayIndex, hour) => {
@@ -740,7 +750,7 @@ export default function Matrix() {
                                   return (
                                     <td
                                       key={`${dayIndex}-${block.hour}`}
-                                      className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] ${!draggedBlock ? 'cursor-pointer hover:bg-blue-50' : 'bg-blue-100'} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
+                                      className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] ${!draggedBlock ? 'cursor-crosshair hover:bg-blue-50' : 'bg-blue-100'} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${isDragging && selectedCategory ? 'transition-colors duration-75' : ''}`}
                                       onMouseDown={(e) => handleCellMouseDown(worker.id, dayIndex, block.hour, e)}
                                       onMouseEnter={() => handleCellMouseEnter(worker.id, dayIndex, block.hour)}
                                       onDragOver={handleCellDragOver}
