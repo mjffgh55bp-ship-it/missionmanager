@@ -100,6 +100,8 @@ export default function Matrix() {
   const [selectedCategoryChange, setSelectedCategoryChange] = useState("");
   const [selectedWorkerTarget, setSelectedWorkerTarget] = useState("");
   const [draggedBlock, setDraggedBlock] = useState(null);
+  const [blockStartHour, setBlockStartHour] = useState(0);
+  const [blockEndHour, setBlockEndHour] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -505,6 +507,8 @@ export default function Matrix() {
     setBlockNoteText(block.note || "");
     setSelectedCategoryChange("");
     setSelectedWorkerTarget("");
+    setBlockStartHour(block.hour);
+    setBlockEndHour((block.hour + block.colspan) % 24);
     setShowBlockNoteDialog(true);
   };
 
@@ -658,13 +662,49 @@ export default function Matrix() {
     setShowBlockNoteDialog(false);
   };
 
-  const handleSaveBlockNote = () => {
+  const handleSaveBlockChanges = () => {
     if (!selectedBlock) return;
     
-    setBlockNotes(prev => ({
-      ...prev,
-      [selectedBlock.blockKey]: blockNoteText
-    }));
+    const { workerId, dayIndex, hour, colspan } = selectedBlock;
+    const categoryId = getCellCategory(workerId, dayIndex, hour);
+    
+    // מחק את הבלוק הישן
+    setCellData(prev => {
+      const newData = { ...prev };
+      for (let i = 0; i < colspan; i++) {
+        const hourToDelete = (hour + i) % 24;
+        const key = getCellKey(workerId, dayIndex, hourToDelete);
+        delete newData[key];
+      }
+      
+      // הוסף את הבלוק החדש עם השעות החדשות
+      let currentHour = blockStartHour;
+      while (currentHour !== blockEndHour) {
+        const key = getCellKey(workerId, dayIndex, currentHour);
+        newData[key] = categoryId;
+        currentHour = (currentHour + 1) % 24;
+      }
+      
+      return newData;
+    });
+    
+    // עדכן הערה
+    const oldBlockKey = selectedBlock.blockKey;
+    const newColspan = blockEndHour > blockStartHour 
+      ? blockEndHour - blockStartHour 
+      : (24 - blockStartHour) + blockEndHour;
+    const newBlockKey = `${workerId}-${dayIndex}-${blockStartHour}-${(blockStartHour + newColspan - 1) % 24}`;
+    
+    setBlockNotes(prev => {
+      const newNotes = { ...prev };
+      if (oldBlockKey !== newBlockKey && prev[oldBlockKey]) {
+        newNotes[newBlockKey] = blockNoteText;
+        delete newNotes[oldBlockKey];
+      } else {
+        newNotes[newBlockKey] = blockNoteText;
+      }
+      return newNotes;
+    });
     
     setShowBlockNoteDialog(false);
   };
@@ -1022,19 +1062,38 @@ export default function Matrix() {
               <DialogTitle>עריכת בלוק</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>עובד נוכחי</Label>
-                  <p className="text-sm font-medium">{workers.find(w => w.id === selectedBlock?.workerId)?.nickname}</p>
-                </div>
-                <div>
-                  <Label>זמן</Label>
-                  <p className="text-sm text-gray-600">
-                    {selectedBlock?.startTime} - {selectedBlock?.endTime}
-                  </p>
-                </div>
+              <div>
+                <Label>עובד</Label>
+                <p className="text-sm font-medium">{workers.find(w => w.id === selectedBlock?.workerId)?.nickname}</p>
               </div>
               
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>שעת התחלה</Label>
+                  <select
+                    className="w-full border rounded p-2"
+                    value={blockStartHour}
+                    onChange={(e) => setBlockStartHour(parseInt(e.target.value))}
+                  >
+                    {hours.map(h => (
+                      <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>שעת סיום</Label>
+                  <select
+                    className="w-full border rounded p-2"
+                    value={blockEndHour}
+                    onChange={(e) => setBlockEndHour(parseInt(e.target.value))}
+                  >
+                    {hours.map(h => (
+                      <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <Label>שנה קטגוריה</Label>
                 <select
@@ -1060,36 +1119,6 @@ export default function Matrix() {
                   placeholder="הוסף הערה..."
                 />
               </div>
-
-              <div className="border-t pt-4">
-                <Label className="mb-2 block">העבר או העתק לעובד אחר</Label>
-                <div className="flex gap-2">
-                  <select
-                    className="flex-1 border rounded p-2"
-                    value={selectedWorkerTarget}
-                    onChange={(e) => setSelectedWorkerTarget(e.target.value)}
-                  >
-                    <option value="">בחר עובד...</option>
-                    {workers.filter(w => w.id !== selectedBlock?.workerId).map(worker => (
-                      <option key={worker.id} value={worker.id}>{worker.nickname}</option>
-                    ))}
-                  </select>
-                  <Button 
-                    onClick={() => handleMoveBlock(selectedWorkerTarget)} 
-                    disabled={!selectedWorkerTarget}
-                    variant="outline"
-                  >
-                    העבר
-                  </Button>
-                  <Button 
-                    onClick={() => handleCopyBlock(selectedWorkerTarget)} 
-                    disabled={!selectedWorkerTarget}
-                    variant="outline"
-                  >
-                    העתק
-                  </Button>
-                </div>
-              </div>
             </div>
             <DialogFooter className="flex justify-between">
               <Button variant="destructive" onClick={handleDeleteBlock}>
@@ -1098,7 +1127,7 @@ export default function Matrix() {
               </Button>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => setShowBlockNoteDialog(false)}>סגור</Button>
-                <Button onClick={handleSaveBlockNote}>שמור הערה</Button>
+                <Button onClick={handleSaveBlockChanges}>שמור שינויים</Button>
               </div>
             </DialogFooter>
           </DialogContent>
