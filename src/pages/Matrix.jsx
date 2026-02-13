@@ -483,15 +483,20 @@ export default function Matrix() {
     const startHour = parseInt(activityForm.start_time.split(':')[0]);
     const endHour = parseInt(activityForm.end_time.split(':')[0]);
     
+    const hoursToAdd = endHour >= startHour 
+      ? endHour - startHour 
+      : (24 - startHour) + endHour;
+    
     setCellData(prev => {
       const newData = { ...prev };
-      let currentHour = startHour;
       
-      while (currentHour !== endHour) {
-        const key = getCellKey(selectedWorker.id, activityForm.day, currentHour);
+      for (let i = 0; i < hoursToAdd; i++) {
+        const currentHour = (startHour + i) % 24;
+        const dayOffset = Math.floor((startHour + i) / 24);
+        const actualDayIndex = (activityForm.day + dayOffset) % 7;
+        const key = getCellKey(selectedWorker.id, actualDayIndex, currentHour);
         const existing = newData[key] || [];
         newData[key] = [...existing, { categoryId: category.id, note: activityForm.note || "" }];
-        currentHour = (currentHour + 1) % 24;
       }
       
       return newData;
@@ -569,7 +574,9 @@ export default function Matrix() {
       // מחק מהמקור
       for (let i = 0; i < colspan; i++) {
         const hourToDelete = (hour + i) % 24;
-        const oldKey = getCellKey(workerId, dayIndex, hourToDelete);
+        const dayOffset = Math.floor((hour + i) / 24);
+        const actualDayIndex = (dayIndex + dayOffset) % 7;
+        const oldKey = getCellKey(workerId, actualDayIndex, hourToDelete);
         const stack = newData[oldKey] || [];
         if (stack.length > 0) {
           const newStack = stack.slice(0, -1);
@@ -584,7 +591,10 @@ export default function Matrix() {
       // הוסף ביעד
       for (let i = 0; i < colspan; i++) {
         const newHour = (targetStartHour + i) % 24;
-        const newKey = getCellKey(targetWorkerId, finalDayIndex, newHour);
+        // אם עברנו את חצות (מ-23 ל-0), עבור ליום הבא
+        const dayOffset = Math.floor((targetStartHour + i) / 24);
+        const actualDayIndex = (finalDayIndex + dayOffset) % 7;
+        const newKey = getCellKey(targetWorkerId, actualDayIndex, newHour);
         const existing = newData[newKey] || [];
         newData[newKey] = [...existing, { categoryId, note }];
       }
@@ -629,7 +639,9 @@ export default function Matrix() {
       const newData = { ...prev };
       for (let i = 0; i < colspan; i++) {
         const hourToMove = (hour + i) % 24;
-        const oldKey = getCellKey(workerId, dayIndex, hourToMove);
+        const dayOffset = Math.floor((hour + i) / 24);
+        const actualDayIndex = (dayIndex + dayOffset) % 7;
+        const oldKey = getCellKey(workerId, actualDayIndex, hourToMove);
         const stack = newData[oldKey] || [];
         if (stack.length > 0) {
           const newStack = stack.slice(0, -1);
@@ -640,7 +652,7 @@ export default function Matrix() {
           }
         }
         
-        const newKey = getCellKey(targetWorkerId, dayIndex, hourToMove);
+        const newKey = getCellKey(targetWorkerId, actualDayIndex, hourToMove);
         const existing = newData[newKey] || [];
         newData[newKey] = [...existing, { categoryId, note }];
       }
@@ -661,7 +673,9 @@ export default function Matrix() {
       const newData = { ...prev };
       for (let i = 0; i < colspan; i++) {
         const hourToCopy = (hour + i) % 24;
-        const newKey = getCellKey(targetWorkerId, dayIndex, hourToCopy);
+        const dayOffset = Math.floor((hour + i) / 24);
+        const actualDayIndex = (dayIndex + dayOffset) % 7;
+        const newKey = getCellKey(targetWorkerId, actualDayIndex, hourToCopy);
         const existing = newData[newKey] || [];
         newData[newKey] = [...existing, { categoryId, note }];
       }
@@ -683,7 +697,9 @@ export default function Matrix() {
       // מחק את הבלוק הישן
       for (let i = 0; i < colspan; i++) {
         const hourToDelete = (hour + i) % 24;
-        const key = getCellKey(workerId, dayIndex, hourToDelete);
+        const dayOffset = Math.floor((hour + i) / 24);
+        const actualDayIndex = (dayIndex + dayOffset) % 7;
+        const key = getCellKey(workerId, actualDayIndex, hourToDelete);
         const stack = newData[key] || [];
         if (stack.length > 0) {
           const newStack = stack.slice(0, -1);
@@ -696,12 +712,17 @@ export default function Matrix() {
       }
       
       // הוסף את הבלוק החדש
-      let currentHour = blockStartHour;
-      while (currentHour !== blockEndHour) {
-        const key = getCellKey(workerId, dayIndex, currentHour);
+      let hoursToAdd = blockEndHour >= blockStartHour 
+        ? blockEndHour - blockStartHour 
+        : (24 - blockStartHour) + blockEndHour;
+      
+      for (let i = 0; i < hoursToAdd; i++) {
+        const currentHour = (blockStartHour + i) % 24;
+        const dayOffset = Math.floor((blockStartHour + i) / 24);
+        const actualDayIndex = (dayIndex + dayOffset) % 7;
+        const key = getCellKey(workerId, actualDayIndex, currentHour);
         const existing = newData[key] || [];
         newData[key] = [...existing, { categoryId, note: blockNoteText }];
-        currentHour = (currentHour + 1) % 24;
       }
       
       return newData;
@@ -719,10 +740,11 @@ export default function Matrix() {
       const newData = { ...prev };
       for (let i = 0; i < colspan; i++) {
         const hourToDelete = (hour + i) % 24;
-        const key = getCellKey(workerId, dayIndex, hourToDelete);
+        const dayOffset = Math.floor((hour + i) / 24);
+        const actualDayIndex = (dayIndex + dayOffset) % 7;
+        const key = getCellKey(workerId, actualDayIndex, hourToDelete);
         const stack = newData[key] || [];
         if (stack.length > 0) {
-          // הסר את הבלוק העליון
           const newStack = stack.slice(0, -1);
           if (newStack.length === 0) {
             delete newData[key];
@@ -732,12 +754,6 @@ export default function Matrix() {
         }
       }
       return newData;
-    });
-    
-    setBlockNotes(prev => {
-      const newNotes = { ...prev };
-      delete newNotes[selectedBlock.blockKey];
-      return newNotes;
     });
     
     setShowBlockNoteDialog(false);
