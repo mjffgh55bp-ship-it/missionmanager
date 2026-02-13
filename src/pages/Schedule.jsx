@@ -1042,28 +1042,63 @@ export default function Schedule() {
             <div className="py-4">
               <div className="mb-4 relative"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" /><Input placeholder="חיפוש..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" dir="rtl" /></div>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {selectedPosition && filteredWorkers.filter(w => selectedPosition.position === 'additional' || (selectedPosition.position === 'chef' ? w.role === 'chef' : w.role === 'sous_chef')).map((worker) => {
-                  const availInfo = currentAssignment ? getWorkerAvailabilityPriority(worker.id, currentAssignment.start_time, currentAssignment.end_time) : null;
-                  const isUnavailable = currentAssignment ? isWorkerUnavailable(worker.id, currentAssignment.start_time, currentAssignment.end_time) : false;
-                  return (
-                    <button key={worker.id} onClick={() => handleWorkerSelect(worker.id)} className={`w-full p-3 rounded-lg border hover:border-blue-400 hover:bg-blue-50 text-left ${isUnavailable ? "border-red-300 bg-red-50" : ""}`}>
-                      <div className="flex items-center gap-3">
-                        {isUnavailable && <AlertTriangle className="w-4 h-4 text-red-500" />}
-                        {availInfo?.type === "wanted" && <Star className="w-4 h-4 text-green-600 fill-green-600" />}
-                        {availInfo?.type === "available" && <Check className="w-4 h-4 text-blue-600" />}
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{worker.nickname}</div>
-                          <div className="flex gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs" dir="rtl">{worker.seniority || 'לא ידוע'}</Badge>
-                            {worker.is_guide && <Badge className="text-xs bg-yellow-100 text-yellow-800" dir="rtl">מדריך</Badge>}
-                            {availInfo && <Badge variant="outline" className="text-xs capitalize" dir="rtl">{availInfo.type === 'wanted' ? 'רצוי' : availInfo.type === 'available' ? 'זמין' : 'לא זמין'} #{availInfo.priority}</Badge>}
-                            {isUnavailable && <Badge className="text-xs bg-red-100 text-red-800" dir="rtl">לא זמין</Badge>}
+                {selectedPosition && (() => {
+                  // Filter by role
+                  const roleFiltered = filteredWorkers.filter(w => 
+                    selectedPosition.position === 'additional' || 
+                    (selectedPosition.position === 'chef' ? w.role === 'chef' : w.role === 'sous_chef')
+                  );
+                  
+                  // Sort by availability priority
+                  const sorted = roleFiltered.sort((a, b) => {
+                    const aAvail = currentAssignment ? getWorkerAvailabilityPriority(a.id, currentAssignment.start_time, currentAssignment.end_time) : null;
+                    const bAvail = currentAssignment ? getWorkerAvailabilityPriority(b.id, currentAssignment.start_time, currentAssignment.end_time) : null;
+                    
+                    // Unavailable workers go to the bottom
+                    const aUnavailable = currentAssignment ? isWorkerUnavailable(a.id, currentAssignment.start_time, currentAssignment.end_time) : false;
+                    const bUnavailable = currentAssignment ? isWorkerUnavailable(b.id, currentAssignment.start_time, currentAssignment.end_time) : false;
+                    if (aUnavailable && !bUnavailable) return 1;
+                    if (!aUnavailable && bUnavailable) return -1;
+                    
+                    // Sort by availability type: wanted > available > no availability
+                    const aType = aAvail?.type;
+                    const bType = bAvail?.type;
+                    if (aType === 'wanted' && bType !== 'wanted') return -1;
+                    if (aType !== 'wanted' && bType === 'wanted') return 1;
+                    if (aType === 'available' && !bType) return -1;
+                    if (!aType && bType === 'available') return 1;
+                    
+                    // Sort by priority within the same type
+                    if (aAvail?.priority && bAvail?.priority) {
+                      return aAvail.priority - bAvail.priority;
+                    }
+                    
+                    return 0;
+                  });
+                  
+                  return sorted.map((worker) => {
+                    const availInfo = currentAssignment ? getWorkerAvailabilityPriority(worker.id, currentAssignment.start_time, currentAssignment.end_time) : null;
+                    const isUnavailable = currentAssignment ? isWorkerUnavailable(worker.id, currentAssignment.start_time, currentAssignment.end_time) : false;
+                    return (
+                      <button key={worker.id} onClick={() => handleWorkerSelect(worker.id)} className={`w-full p-3 rounded-lg border hover:border-blue-400 hover:bg-blue-50 text-left ${isUnavailable ? "border-red-300 bg-red-50" : availInfo?.type === 'wanted' ? "border-green-300 bg-green-50" : ""}`}>
+                        <div className="flex items-center gap-3">
+                          {isUnavailable && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                          {availInfo?.type === "wanted" && <Star className="w-4 h-4 text-green-600 fill-green-600" />}
+                          {availInfo?.type === "available" && <Check className="w-4 h-4 text-blue-600" />}
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{worker.nickname}</div>
+                            <div className="flex gap-2 mt-1">
+                              <Badge variant="outline" className="text-xs" dir="rtl">{worker.seniority || 'לא ידוע'}</Badge>
+                              {worker.is_guide && <Badge className="text-xs bg-yellow-100 text-yellow-800" dir="rtl">מדריך</Badge>}
+                              {availInfo && <Badge variant="outline" className="text-xs capitalize" dir="rtl">{availInfo.type === 'wanted' ? 'רצוי' : availInfo.type === 'available' ? 'זמין' : 'לא זמין'} #{availInfo.priority}</Badge>}
+                              {isUnavailable && <Badge className="text-xs bg-red-100 text-red-800" dir="rtl">לא זמין</Badge>}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  });
+                })()}
               </div>
             </div>
             <DialogFooter>
