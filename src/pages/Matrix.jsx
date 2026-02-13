@@ -76,6 +76,8 @@ export default function Matrix() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [cellData, setCellData] = useState({});
   const [isDragging, setIsDragging] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStartCell, setDrawStartCell] = useState(null);
   const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [workerActivities, setWorkerActivities] = useState({});
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
@@ -232,15 +234,36 @@ export default function Matrix() {
     return `${workerId}-${dayIndex}-${hour}`;
   };
 
-  const handleCellMouseDown = (workerId, dayIndex, hour, e) => {
-    if (!selectedCategory || e.button !== 0) return;
+  const handleCellClick = (workerId, dayIndex, hour, e) => {
     e.preventDefault();
-    setIsDragging(true);
-    addCell(workerId, dayIndex, hour);
+    e.stopPropagation();
+    
+    if (!selectedCategory) return;
+    
+    const key = getCellKey(workerId, dayIndex, hour);
+    const hasBlock = cellData[key];
+    
+    // אם יש בלוק - לא עושים כלום, זה יטופל ב-handleBlockClick
+    if (hasBlock && !isDrawing) return;
+    
+    if (!isDrawing) {
+      // התחל ציור
+      setIsDrawing(true);
+      setDrawStartCell({ workerId, dayIndex, hour });
+      addCell(workerId, dayIndex, hour);
+    } else {
+      // סיים ציור
+      setIsDrawing(false);
+      setDrawStartCell(null);
+    }
   };
 
   const handleCellMouseEnter = (workerId, dayIndex, hour) => {
-    if (!isDragging || !selectedCategory) return;
+    if (!isDrawing || !selectedCategory || !drawStartCell) return;
+    
+    // ודא שאנחנו באותו עובד ובאותו יום
+    if (workerId !== drawStartCell.workerId || dayIndex !== drawStartCell.dayIndex) return;
+    
     addCell(workerId, dayIndex, hour);
   };
 
@@ -471,6 +494,10 @@ export default function Matrix() {
 
   const handleBlockClick = (block, e) => {
     e.stopPropagation();
+    
+    // אם אנחנו במצב ציור - לא לפתוח את החלון
+    if (isDrawing) return;
+    
     setSelectedBlock(block);
     setBlockNoteText(block.note || "");
     setSelectedCategoryChange("");
@@ -755,8 +782,8 @@ export default function Matrix() {
                                   return (
                                     <td
                                       key={`${dayIndex}-${block.hour}`}
-                                      className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] select-none ${!draggedBlock ? 'cursor-crosshair hover:bg-blue-50' : 'bg-blue-100'} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
-                                      onMouseDown={(e) => handleCellMouseDown(worker.id, dayIndex, block.hour, e)}
+                                      className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] max-w-[24px] select-none ${!draggedBlock ? (isDrawing ? 'cursor-crosshair' : 'cursor-pointer hover:bg-blue-50') : 'bg-blue-100'} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
+                                      onClick={(e) => handleCellClick(worker.id, dayIndex, block.hour, e)}
                                       onMouseEnter={() => handleCellMouseEnter(worker.id, dayIndex, block.hour)}
                                       onDragOver={handleCellDragOver}
                                       onDrop={(e) => handleCellDrop(worker.id, dayIndex, block.hour, e)}
@@ -769,7 +796,7 @@ export default function Matrix() {
                                     key={`${dayIndex}-${block.hour}`}
                                     colSpan={block.colspan}
                                     className={`border border-gray-200 p-0 h-auto cursor-move ${block.category.color} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${draggedBlock?.blockKey === block.blockKey ? 'opacity-50' : ''}`}
-                                    style={{ minWidth: `${block.colspan * 24}px` }}
+                                    style={{ minWidth: `${block.colspan * 24}px`, maxWidth: `${block.colspan * 24}px` }}
                                     title={`${block.category.label} (${block.startTime} - ${block.endTime})${block.note ? '\n' + block.note : ''}\n\nגרור להעברה | לחץ לעריכה`}
                                     draggable
                                     onDragStart={(e) => handleBlockDragStart(block, e)}
