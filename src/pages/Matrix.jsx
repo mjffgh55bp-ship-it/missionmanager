@@ -828,7 +828,7 @@ export default function Matrix() {
               <div className="min-w-[1400px]">
                 <div className="flex sticky top-0 bg-gray-100 z-50 border-b">
                   <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50" dir="rtl">עובד</div>
-                  <div className="flex-1 relative flex">
+                  <div className="flex-1 relative flex" dir="ltr">
                     {viewMode === 'daily' ? (
                       getDailyTimeSlots(zoomRange).map((hour) => (
                         <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">{String(hour).padStart(2, '0')}:00</div>
@@ -888,6 +888,7 @@ export default function Matrix() {
                             }
                           }}
                           className="flex-1 relative border-r cursor-crosshair h-16"
+                          dir="ltr"
                           onMouseDown={(e) => {
                             handleMouseDown(e, worker, null, 'create');
                           }}
