@@ -290,7 +290,7 @@ export default function Matrix() {
       const existing = prev[key] || [];
       return {
         ...prev,
-        [key]: [...existing, selectedCategory]
+        [key]: [...existing, { categoryId: selectedCategory, note: "" }]
       };
     });
   };
@@ -299,7 +299,16 @@ export default function Matrix() {
     const key = getCellKey(workerId, dayIndex, hour);
     const stack = cellData[key];
     if (!stack || stack.length === 0) return null;
-    return stack[stack.length - 1]; // החזר את העליון במחסנית
+    const top = stack[stack.length - 1];
+    return typeof top === 'string' ? top : top.categoryId;
+  };
+
+  const getCellNote = (workerId, dayIndex, hour) => {
+    const key = getCellKey(workerId, dayIndex, hour);
+    const stack = cellData[key];
+    if (!stack || stack.length === 0) return "";
+    const top = stack[stack.length - 1];
+    return typeof top === 'object' && top.note ? top.note : "";
   };
 
   const getBlocksForWorkerDay = (workerId, dayIndex) => {
@@ -345,7 +354,7 @@ export default function Matrix() {
       const startTime = `${String(hour).padStart(2, '0')}:00`;
       const endTime = `${String((endHour + 1) % 24).padStart(2, '0')}:00`;
       const blockKey = `${workerId}-${dayIndex}-${hour}-${endHour}`;
-      const note = blockNotes[blockKey] || "";
+      const note = getCellNote(workerId, dayIndex, hour);
 
       blocks.push({
         type: 'category',
@@ -471,11 +480,9 @@ export default function Matrix() {
     const category = categories.find(c => c.id === activityForm.category_id);
     if (!category) return;
 
-    // המר את השעות לאינדקסים
     const startHour = parseInt(activityForm.start_time.split(':')[0]);
     const endHour = parseInt(activityForm.end_time.split(':')[0]);
     
-    // הוסף בלוקים למטריצה
     setCellData(prev => {
       const newData = { ...prev };
       let currentHour = startHour;
@@ -483,21 +490,12 @@ export default function Matrix() {
       while (currentHour !== endHour) {
         const key = getCellKey(selectedWorker.id, activityForm.day, currentHour);
         const existing = newData[key] || [];
-        newData[key] = [...existing, category.id];
+        newData[key] = [...existing, { categoryId: category.id, note: activityForm.note || "" }];
         currentHour = (currentHour + 1) % 24;
       }
       
       return newData;
     });
-
-    // אם יש הערה, שמור אותה
-    if (activityForm.note) {
-      const blockKey = `${selectedWorker.id}-${activityForm.day}-${startHour}-${(endHour - 1) % 24}`;
-      setBlockNotes(prev => ({
-        ...prev,
-        [blockKey]: activityForm.note
-      }));
-    }
 
     setShowActivityDialog(false);
   };
@@ -555,15 +553,15 @@ export default function Matrix() {
 
     const { workerId, dayIndex, hour, colspan } = draggedBlock;
     const categoryId = getCellCategory(workerId, dayIndex, hour);
+    const note = getCellNote(workerId, dayIndex, hour);
 
-    // אם זה אותו עובד - השתמש בשעה שנגרר אליה
-    // אם זה עובד אחר - שמור על אותן שעות
     const targetStartHour = workerId === targetWorkerId ? targetHour : hour;
     const finalDayIndex = workerId === targetWorkerId ? targetDayIndex : dayIndex;
 
-    // מחק את הבלוק המקורי מהמחסנית
     setCellData(prev => {
       const newData = { ...prev };
+      
+      // מחק מהמקור
       for (let i = 0; i < colspan; i++) {
         const hourToDelete = (hour + i) % 24;
         const oldKey = getCellKey(workerId, dayIndex, hourToDelete);
@@ -578,28 +576,15 @@ export default function Matrix() {
         }
       }
       
-      // הוסף במיקום החדש
+      // הוסף ביעד
       for (let i = 0; i < colspan; i++) {
         const newHour = (targetStartHour + i) % 24;
         const newKey = getCellKey(targetWorkerId, finalDayIndex, newHour);
         const existing = newData[newKey] || [];
-        newData[newKey] = [...existing, categoryId];
+        newData[newKey] = [...existing, { categoryId, note }];
       }
       
       return newData;
-    });
-
-    // העבר את ההערה
-    const oldBlockKey = draggedBlock.blockKey;
-    const newBlockKey = `${targetWorkerId}-${finalDayIndex}-${targetStartHour}-${(targetStartHour + colspan - 1) % 24}`;
-    
-    setBlockNotes(prev => {
-      const newNotes = { ...prev };
-      if (prev[oldBlockKey]) {
-        newNotes[newBlockKey] = prev[oldBlockKey];
-        delete newNotes[oldBlockKey];
-      }
-      return newNotes;
     });
 
     setDraggedBlock(null);
@@ -617,9 +602,10 @@ export default function Matrix() {
         const key = getCellKey(workerId, dayIndex, hourToChange);
         const stack = newData[key] || [];
         if (stack.length > 0) {
-          // החלף את העליון במחסנית
           const newStack = [...stack];
-          newStack[newStack.length - 1] = newCategoryId;
+          const topItem = newStack[newStack.length - 1];
+          const existingNote = typeof topItem === 'object' ? topItem.note : "";
+          newStack[newStack.length - 1] = { categoryId: newCategoryId, note: existingNote };
           newData[key] = newStack;
         }
       }
@@ -632,8 +618,8 @@ export default function Matrix() {
     
     const { workerId, dayIndex, hour, colspan } = selectedBlock;
     const categoryId = getCellCategory(workerId, dayIndex, hour);
+    const note = getCellNote(workerId, dayIndex, hour);
     
-    // מחק מהעובד המקורי והוסף לעובד החדש
     setCellData(prev => {
       const newData = { ...prev };
       for (let i = 0; i < colspan; i++) {
@@ -649,25 +635,11 @@ export default function Matrix() {
           }
         }
         
-        // הוסף לעובד החדש
         const newKey = getCellKey(targetWorkerId, dayIndex, hourToMove);
         const existing = newData[newKey] || [];
-        newData[newKey] = [...existing, categoryId];
+        newData[newKey] = [...existing, { categoryId, note }];
       }
       return newData;
-    });
-    
-    // העבר הערה
-    const oldBlockKey = selectedBlock.blockKey;
-    const newBlockKey = `${targetWorkerId}-${dayIndex}-${hour}-${(hour + colspan - 1) % 24}`;
-    
-    setBlockNotes(prev => {
-      const newNotes = { ...prev };
-      if (prev[oldBlockKey]) {
-        newNotes[newBlockKey] = prev[oldBlockKey];
-        delete newNotes[oldBlockKey];
-      }
-      return newNotes;
     });
     
     setShowBlockNoteDialog(false);
@@ -678,29 +650,18 @@ export default function Matrix() {
     
     const { workerId, dayIndex, hour, colspan } = selectedBlock;
     const categoryId = getCellCategory(workerId, dayIndex, hour);
+    const note = getCellNote(workerId, dayIndex, hour);
     
-    // העתק לעובד החדש
     setCellData(prev => {
       const newData = { ...prev };
       for (let i = 0; i < colspan; i++) {
         const hourToCopy = (hour + i) % 24;
         const newKey = getCellKey(targetWorkerId, dayIndex, hourToCopy);
         const existing = newData[newKey] || [];
-        newData[newKey] = [...existing, categoryId];
+        newData[newKey] = [...existing, { categoryId, note }];
       }
       return newData;
     });
-    
-    // העתק הערה
-    const oldBlockKey = selectedBlock.blockKey;
-    const newBlockKey = `${targetWorkerId}-${dayIndex}-${hour}-${(hour + colspan - 1) % 24}`;
-    
-    if (blockNotes[oldBlockKey]) {
-      setBlockNotes(prev => ({
-        ...prev,
-        [newBlockKey]: prev[oldBlockKey]
-      }));
-    }
     
     setShowBlockNoteDialog(false);
   };
@@ -711,9 +672,10 @@ export default function Matrix() {
     const { workerId, dayIndex, hour, colspan } = selectedBlock;
     const categoryId = getCellCategory(workerId, dayIndex, hour);
     
-    // מחק את הבלוק הישן מהמחסנית
     setCellData(prev => {
       const newData = { ...prev };
+      
+      // מחק את הבלוק הישן
       for (let i = 0; i < colspan; i++) {
         const hourToDelete = (hour + i) % 24;
         const key = getCellKey(workerId, dayIndex, hourToDelete);
@@ -728,34 +690,16 @@ export default function Matrix() {
         }
       }
       
-      // הוסף את הבלוק החדש עם השעות החדשות
+      // הוסף את הבלוק החדש
       let currentHour = blockStartHour;
       while (currentHour !== blockEndHour) {
         const key = getCellKey(workerId, dayIndex, currentHour);
         const existing = newData[key] || [];
-        newData[key] = [...existing, categoryId];
+        newData[key] = [...existing, { categoryId, note: blockNoteText }];
         currentHour = (currentHour + 1) % 24;
       }
       
       return newData;
-    });
-    
-    // עדכן הערה
-    const oldBlockKey = selectedBlock.blockKey;
-    const newColspan = blockEndHour > blockStartHour 
-      ? blockEndHour - blockStartHour 
-      : (24 - blockStartHour) + blockEndHour;
-    const newBlockKey = `${workerId}-${dayIndex}-${blockStartHour}-${(blockStartHour + newColspan - 1) % 24}`;
-    
-    setBlockNotes(prev => {
-      const newNotes = { ...prev };
-      if (oldBlockKey !== newBlockKey && prev[oldBlockKey]) {
-        newNotes[newBlockKey] = blockNoteText;
-        delete newNotes[oldBlockKey];
-      } else {
-        newNotes[newBlockKey] = blockNoteText;
-      }
-      return newNotes;
     });
     
     setShowBlockNoteDialog(false);
