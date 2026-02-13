@@ -759,6 +759,71 @@ export default function Matrix() {
     setShowBlockNoteDialog(false);
   };
 
+  const handleResizeBlock = (block, side, direction) => {
+    const { workerId, dayIndex, hour, colspan } = block;
+    const categoryId = getCellCategory(workerId, dayIndex, hour);
+    const note = getCellNote(workerId, dayIndex, hour);
+
+    if (colspan === 1 && direction === -1) return; // לא להקטין בלוק בן שעה אחת
+
+    setCellData(prev => {
+      const newData = { ...prev };
+
+      if (side === 'start') {
+        if (direction === 1) {
+          // הוסף שעה בהתחלה
+          const newHour = (hour - 1 + 24) % 24;
+          const dayOffset = hour === 0 ? -1 : 0;
+          const actualDayIndex = (dayIndex + dayOffset + 7) % 7;
+          const key = getCellKey(workerId, actualDayIndex, newHour);
+          const existing = newData[key] || [];
+          newData[key] = [...existing, { categoryId, note }];
+        } else {
+          // הסר שעה מההתחלה
+          const key = getCellKey(workerId, dayIndex, hour);
+          const stack = newData[key] || [];
+          if (stack.length > 0) {
+            const newStack = stack.slice(0, -1);
+            if (newStack.length === 0) {
+              delete newData[key];
+            } else {
+              newData[key] = newStack;
+            }
+          }
+        }
+      } else {
+        // side === 'end'
+        const lastHour = (hour + colspan - 1) % 24;
+        const dayOffset = Math.floor((hour + colspan - 1) / 24);
+        const actualDayIndex = (dayIndex + dayOffset) % 7;
+
+        if (direction === 1) {
+          // הוסף שעה בסוף
+          const newHour = (lastHour + 1) % 24;
+          const newDayOffset = Math.floor((hour + colspan) / 24);
+          const newActualDayIndex = (dayIndex + newDayOffset) % 7;
+          const key = getCellKey(workerId, newActualDayIndex, newHour);
+          const existing = newData[key] || [];
+          newData[key] = [...existing, { categoryId, note }];
+        } else {
+          // הסר שעה מהסוף
+          const key = getCellKey(workerId, actualDayIndex, lastHour);
+          const stack = newData[key] || [];
+          if (stack.length > 0) {
+            const newStack = stack.slice(0, -1);
+            if (newStack.length === 0) {
+              delete newData[key];
+            } else {
+              newData[key] = newStack;
+            }
+          }
+        }
+      }
+
+      return newData;
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
@@ -865,7 +930,7 @@ export default function Matrix() {
                                   <td
                                     key={`${dayIndex}-${block.hour}`}
                                     colSpan={block.colspan}
-                                    className={`border border-gray-200 p-0 h-auto cursor-move ${block.category.color} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${draggedBlock?.blockKey === block.blockKey ? 'opacity-50' : ''}`}
+                                    className={`border border-gray-200 p-0 h-auto cursor-move ${block.category.color} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${draggedBlock?.blockKey === block.blockKey ? 'opacity-50' : ''} relative group`}
                                     style={{ minWidth: `${block.colspan * 24}px`, maxWidth: `${block.colspan * 24}px` }}
                                     title={`${block.category.label} (${block.startTime} - ${block.endTime})${block.note ? '\n' + block.note : ''}\n\nגרור להעברה | לחץ לעריכה`}
                                     draggable
@@ -875,6 +940,27 @@ export default function Matrix() {
                                     onDrop={(e) => handleCellDrop(worker.id, dayIndex, block.hour, e)}
                                     onClick={(e) => handleBlockClick(block, e)}
                                   >
+                                    <button
+                                      className="absolute right-0 top-0 bottom-0 w-3 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity z-10 pointer-events-auto"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleResizeBlock(block, 'start', -1);
+                                      }}
+                                      title="הקטן מהתחלה"
+                                    >
+                                      <ChevronRight className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      className="absolute right-0 top-0 bottom-0 w-3 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity z-10 pointer-events-auto"
+                                      style={{ right: '12px' }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleResizeBlock(block, 'start', 1);
+                                      }}
+                                      title="הגדל מהתחלה"
+                                    >
+                                      <ChevronLeft className="w-3 h-3" />
+                                    </button>
                                     <div className="h-full flex flex-col items-center justify-center px-1 py-1 pointer-events-none">
                                       <span className="text-[10px] font-semibold truncate" dir="rtl">
                                         {block.category.label}
@@ -885,6 +971,27 @@ export default function Matrix() {
                                         </span>
                                       )}
                                     </div>
+                                    <button
+                                      className="absolute left-0 top-0 bottom-0 w-3 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity z-10 pointer-events-auto"
+                                      style={{ left: '12px' }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleResizeBlock(block, 'end', -1);
+                                      }}
+                                      title="הקטן מהסוף"
+                                    >
+                                      <ChevronRight className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      className="absolute left-0 top-0 bottom-0 w-3 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity z-10 pointer-events-auto"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleResizeBlock(block, 'end', 1);
+                                      }}
+                                      title="הגדל מהסוף"
+                                    >
+                                      <ChevronLeft className="w-3 h-3" />
+                                    </button>
                                   </td>
                                 );
                               })}
