@@ -49,7 +49,6 @@
  */
 import Availability from './pages/Availability';
 import Home from './pages/Home';
-import Matrix from './pages/Matrix';
 import Reports from './pages/Reports';
 import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
@@ -63,7 +62,6 @@ import __Layout from './Layout.jsx';
 export const PAGES = {
     "Availability": Availability,
     "Home": Home,
-    "Matrix": Matrix,
     "Reports": Reports,
     "Schedule": Schedule,
     "Settings": Settings,
