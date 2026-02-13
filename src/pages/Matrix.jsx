@@ -827,21 +827,6 @@ export default function Matrix() {
                   <Badge className="bg-red-100 text-red-800" dir="rtl"><Ban className="w-3 h-3 mr-1" />לא זמין</Badge>
                   <Badge className="bg-blue-400 text-white" dir="rtl">שיבוץ</Badge>
                 </div>
-                <div className="mt-4 border-t pt-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-sm font-semibold" dir="rtl">מקרא סוגי פעילות:</p>
-                    <Button variant="outline" size="sm" onClick={handleOpenActivityTypesDialog} dir="rtl">
-                      ערוך קטגוריות
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {activityTypes.map(type => (
-                      <Badge key={type.id} style={{ backgroundColor: type.color }} className="text-xs text-gray-900" dir="rtl">
-                        {type.label}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 <Select value={populationFilter} onValueChange={setPopulationFilter}>
@@ -1391,6 +1376,30 @@ export default function Matrix() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Activity Types Legend - Below Matrix */}
+        <Card className="border-none shadow-lg mt-6">
+          <CardContent className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <CardTitle className="text-xl" dir="rtl">מקרא סוגי פעילות</CardTitle>
+              <Button variant="outline" size="sm" onClick={handleOpenActivityTypesDialog} dir="rtl">
+                ערוך קטגוריות
+              </Button>
+            </div>
+            <div className="flex flex-col gap-2">
+              {activityTypes.map(type => (
+                <div 
+                  key={type.id} 
+                  style={{ backgroundColor: type.color }} 
+                  className="text-sm font-medium text-gray-900 py-2 px-4 rounded-lg text-center"
+                  dir="rtl"
+                >
+                  {type.label}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
