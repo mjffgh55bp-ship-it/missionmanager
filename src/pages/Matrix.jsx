@@ -19,11 +19,21 @@ const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
   const endIdx = Math.ceil((zoomRange.end / 100) * allSlots.length);
   return allSlots.slice(startIdx, endIdx);
 };
-const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
+const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }, weekStartDate = null) => {
   const allSlots = [];
   for (let day = 0; day < 7; day++) {
+    let dateLabel = null;
+    if (weekStartDate && day < 7) {
+      const date = addDays(weekStartDate, day);
+      dateLabel = format(date, 'd.M');
+    }
     for (let hour = 6; hour < 30; hour++) {
-      allSlots.push({ day, hour: hour % 24, label: hour === 6 ? DAYS_OF_WEEK[day] : null });
+      allSlots.push({ 
+        day, 
+        hour: hour % 24, 
+        label: hour === 6 ? DAYS_OF_WEEK[day] : null,
+        dateLabel: hour === 6 ? dateLabel : null
+      });
     }
   }
   const startIdx = Math.floor((zoomRange.start / 100) * allSlots.length);
@@ -31,6 +41,20 @@ const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
   return allSlots.slice(startIdx, endIdx);
 };
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
+
+const ACTIVITY_TYPES = [
+  { id: 'constraint', label: 'אילוץ', color: '#E0BBE4' },
+  { id: 'management', label: 'תפקיד ניהול', color: '#C5F05A' },
+  { id: 'standby_30_mgmt', label: 'כוננות 30\' לתפקיד ניהול', color: '#9AE03A' },
+  { id: 'standby_15', label: 'כוננות 15\'', color: '#FF1493' },
+  { id: 'shift', label: 'משמרת', color: '#8B4513' },
+  { id: 'standby_long', label: 'כוננות 60/75/90/105/120/180', color: '#9B59B6' },
+  { id: 'trainer', label: 'מאמן', color: '#A9A9A9' },
+  { id: 'bird', label: 'ציפור', color: '#FFA500' },
+  { id: 'other', label: 'אחר', color: '#FFB6C1' },
+  { id: 'vacation', label: 'חופש', color: '#E6C3E6' },
+  { id: 'abroad', label: 'חו"ל', color: '#C8C8C8' }
+];
 
 const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
   if (!timeStr) return 0;
@@ -101,7 +125,7 @@ export default function Matrix() {
   const [selectedWorkerForType, setSelectedWorkerForType] = useState(null);
   const [showManualDialog, setShowManualDialog] = useState(false);
   const [selectedWorkerForManual, setSelectedWorkerForManual] = useState(null);
-  const [manualShiftData, setManualShiftData] = useState({ start_time: '', end_time: '', type: 'available' });
+  const [manualShiftData, setManualShiftData] = useState({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
   const [editingShift, setEditingShift] = useState(null);
   const [populationFilter, setPopulationFilter] = useState("__all__");
   const [roleFilter, setRoleFilter] = useState("__all__");
@@ -442,7 +466,7 @@ export default function Matrix() {
 
   const handleManualShiftAdd = (worker) => {
     setSelectedWorkerForManual(worker);
-    setManualShiftData({ start_time: '', end_time: '', type: 'available' });
+    setManualShiftData({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
     setEditingShift(null);
     setShowManualDialog(true);
   };
@@ -451,7 +475,12 @@ export default function Matrix() {
     e.stopPropagation();
     e.preventDefault();
     setSelectedWorkerForManual(worker);
-    setManualShiftData({ start_time: shift.start_time, end_time: shift.end_time, type: shift.type });
+    setManualShiftData({ 
+      start_time: shift.start_time, 
+      end_time: shift.end_time, 
+      type: shift.type,
+      activity_type: shift.activity_type || 'shift'
+    });
     setEditingShift(shift);
     setShowManualDialog(true);
   };
@@ -474,7 +503,8 @@ export default function Matrix() {
             date: targetDate,
             start_time: manualShiftData.start_time,
             end_time: manualShiftData.end_time,
-            type: manualShiftData.type
+            type: manualShiftData.type,
+            activity_type: manualShiftData.activity_type || 'shift'
           };
         }
         return s;
@@ -486,6 +516,7 @@ export default function Matrix() {
         start_time: manualShiftData.start_time,
         end_time: manualShiftData.end_time,
         type: manualShiftData.type,
+        activity_type: manualShiftData.activity_type || 'shift',
         priority: updatedShifts.length + 1
       });
     }
@@ -503,9 +534,92 @@ export default function Matrix() {
 
     setShowManualDialog(false);
     setSelectedWorkerForManual(null);
-    setManualShiftData({ start_time: '', end_time: '', type: 'available' });
+    setManualShiftData({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
     setEditingShift(null);
     loadData();
+  };
+
+  const calculateWorkerSummary = (workerId) => {
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+    
+    const workerShifts = availabilities
+      .filter(a => a.worker_id === workerId)
+      .flatMap(a => a.shifts || [])
+      .filter(s => {
+        const shiftDate = new Date(s.date);
+        return shiftDate >= weekStart && shiftDate <= weekEnd;
+      });
+
+    const calculateHours = (startTime, endTime) => {
+      const [startHour, startMin] = startTime.split(':').map(Number);
+      const [endHour, endMin] = endTime.split(':').map(Number);
+      let hours = endHour - startHour;
+      if (endHour < startHour) hours += 24;
+      hours += (endMin - startMin) / 60;
+      return Math.max(0, hours);
+    };
+
+    let totalShifts = 0;
+    let standbyCount = 0;
+    let regularShiftCount = 0;
+    let trainingCount = 0;
+    let otherCount = 0;
+    let coreCount = 0;
+    let extremeCount = 0;
+
+    workerShifts.forEach(shift => {
+      const hours = calculateHours(shift.start_time, shift.end_time);
+      const activityType = shift.activity_type || 'shift';
+      
+      // Count only shift, trainer, and other for total
+      if (['shift', 'trainer', 'other'].includes(activityType)) {
+        totalShifts++;
+      }
+
+      // Standby - every 4 hours = 1 standby
+      if (activityType.includes('standby') || activityType === 'standby_15' || activityType === 'standby_30_mgmt' || activityType === 'standby_long') {
+        standbyCount += hours / 4;
+      }
+
+      // Regular shifts
+      if (activityType === 'shift') {
+        regularShiftCount++;
+        
+        // Core hours (6:00-18:00) - every 4 hours = 1 shift
+        const startHour = parseInt(shift.start_time.split(':')[0]);
+        const endHour = parseInt(shift.end_time.split(':')[0]);
+        
+        if (startHour >= 6 && endHour <= 18) {
+          coreCount += hours / 4;
+        }
+        
+        // Extreme hours (2:00-6:00) - every 4 hours = 1 shift
+        if ((startHour >= 2 && startHour < 6) || (endHour > 2 && endHour <= 6)) {
+          extremeCount += hours / 4;
+        }
+      }
+
+      // Training - each hour = 1
+      if (activityType === 'trainer') {
+        trainingCount += hours;
+      }
+
+      // Other
+      if (activityType === 'other') {
+        otherCount++;
+      }
+    });
+
+    return {
+      total: totalShifts,
+      standby: Math.round(standbyCount * 10) / 10,
+      regularShift: regularShiftCount,
+      training: Math.round(trainingCount * 10) / 10,
+      other: otherCount,
+      core: Math.round(coreCount * 10) / 10,
+      extreme: Math.round(extremeCount * 10) / 10
+    };
   };
 
   const AssignmentBar = ({ assignment }) => {
@@ -546,14 +660,24 @@ export default function Matrix() {
     // Hide if outside zoom range
     if (startPercent < 0 || startPercent > 100) return null;
 
+    // Get activity type color
+    const activityType = ACTIVITY_TYPES.find(t => t.id === shift.activity_type);
+    const activityColor = activityType ? activityType.color : '#8B4513';
+    
     const colors = { wanted: "bg-green-400 border-green-600", available: "bg-blue-300 border-blue-500", unavailable: "bg-red-300 border-red-500" };
     const icons = { wanted: <Star className="w-3 h-3 fill-current" />, available: <Check className="w-3 h-3" />, unavailable: <Ban className="w-3 h-3" /> };
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
 
     return (
       <div
-        className={`absolute h-full border-l-2 rounded-sm flex items-center justify-between px-1 z-10 cursor-move ${colors[shift.type] || colors.available}`}
-        style={{ left: `${startPercent}%`, width: `${width}%` }}
+        className="absolute h-full border-l-2 rounded-sm flex items-center justify-between px-1 z-10 cursor-move"
+        style={{ 
+          left: `${startPercent}%`, 
+          width: `${width}%`,
+          backgroundColor: activityColor,
+          borderColor: activityColor,
+          opacity: 0.9
+        }}
         onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }}
         onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
       >
@@ -644,6 +768,16 @@ export default function Matrix() {
                   <Badge className="bg-blue-100 text-blue-800" dir="rtl"><Check className="w-3 h-3 mr-1" />זמין</Badge>
                   <Badge className="bg-red-100 text-red-800" dir="rtl"><Ban className="w-3 h-3 mr-1" />לא זמין</Badge>
                   <Badge className="bg-blue-400 text-white" dir="rtl">שיבוץ</Badge>
+                </div>
+                <div className="mt-4 border-t pt-4">
+                  <p className="text-sm font-semibold mb-2" dir="rtl">מקרא סוגי פעילות:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {ACTIVITY_TYPES.map(type => (
+                      <Badge key={type.id} style={{ backgroundColor: type.color }} className="text-xs text-gray-900" dir="rtl">
+                        {type.label}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
@@ -841,9 +975,10 @@ export default function Matrix() {
                         <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">{String(hour).padStart(2, '0')}:00</div>
                       ))
                     ) : (
-                      getWeeklyTimeSlots(zoomRange).map((slot, idx) => (
+                      getWeeklyTimeSlots(zoomRange, startOfWeek(currentDate, { weekStartsOn: 0 })).map((slot, idx) => (
                         <div key={idx} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">
                           {slot.label && <div className="font-bold">{slot.label}</div>}
+                          {slot.dateLabel && <div className="text-[9px] text-gray-500">{slot.dateLabel}</div>}
                           {slot.hour === 6 && <div className="text-[10px]">{String(slot.hour).padStart(2, '0')}:00</div>}
                         </div>
                       ))
@@ -866,11 +1001,13 @@ export default function Matrix() {
                     const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
                     const workerAssignments = getWorkerAssignments(worker.id);
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
+                    const summary = viewMode === 'weekly' ? calculateWorkerSummary(worker.id) : null;
                     
                     console.log(`Row ${index}: ${worker.nickname} (${worker.id}) - Assignments:`, workerAssignments.length, 'Availability:', availabilityShifts.length);
                     
                     return (
-                      <div key={worker.id} className={`flex border-b h-16 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                      <React.Fragment key={worker.id}>
+                      <div className={`flex border-b h-16 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                         <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-40 h-16">
                           <div className="flex items-center">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'}`}>
@@ -920,6 +1057,23 @@ export default function Matrix() {
                           </div>
                         </div>
                       </div>
+                      {viewMode === 'weekly' && summary && (
+                        <div className="flex border-b bg-gray-100 text-xs h-8">
+                          <div className="w-[300px] min-w-[300px] px-3 py-1 border-r sticky left-0 bg-gray-100 z-40 font-semibold text-gray-700" dir="rtl">
+                            סיכום שבועי
+                          </div>
+                          <div className="flex-1 px-3 py-1 flex gap-4 items-center flex-wrap text-gray-700" dir="rtl">
+                            <span><strong>סה"כ:</strong> {summary.total}</span>
+                            <span><strong>כוננות:</strong> {summary.standby}</span>
+                            <span><strong>משמרת:</strong> {summary.regularShift}</span>
+                            <span><strong>אימון:</strong> {summary.training}</span>
+                            <span><strong>אחר:</strong> {summary.other}</span>
+                            <span><strong>ליבה:</strong> {summary.core}</span>
+                            <span><strong>קיצון:</strong> {summary.extreme}</span>
+                          </div>
+                        </div>
+                      )}
+                      </React.Fragment>
                     );
                   })
                 )}
@@ -1049,6 +1203,24 @@ export default function Matrix() {
                   </Button>
                 </div>
               </div>
+              <div>
+                <Label className="text-center block mb-2" dir="rtl">סוג פעילות</Label>
+                <Select value={manualShiftData.activity_type} onValueChange={(value) => setManualShiftData({ ...manualShiftData, activity_type: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="בחר סוג פעילות..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACTIVITY_TYPES.map(type => (
+                      <SelectItem key={type.id} value={type.id}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded" style={{ backgroundColor: type.color }} />
+                          <span>{type.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter className="flex justify-between" dir="rtl">
               <div>
@@ -1065,7 +1237,7 @@ export default function Matrix() {
                       await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
                       setShowManualDialog(false);
                       setSelectedWorkerForManual(null);
-                      setManualShiftData({ start_time: '', end_time: '', type: 'available' });
+                      setManualShiftData({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
                       setEditingShift(null);
                       loadData();
                     }}
@@ -1076,7 +1248,12 @@ export default function Matrix() {
                 )}
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowManualDialog(false)} dir="rtl">ביטול</Button>
+                <Button variant="outline" onClick={() => {
+                  setShowManualDialog(false);
+                  setSelectedWorkerForManual(null);
+                  setManualShiftData({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
+                  setEditingShift(null);
+                }} dir="rtl">ביטול</Button>
                 <Button 
                   onClick={submitManualShift} 
                   className="bg-blue-900 hover:bg-blue-800"
