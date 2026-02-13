@@ -504,6 +504,11 @@ export default function Matrix() {
     const { workerId, dayIndex, hour, colspan } = draggedBlock;
     const categoryId = getCellCategory(workerId, dayIndex, hour);
 
+    // אם זה אותו עובד - השתמש בשעה שנגרר אליה
+    // אם זה עובד אחר - שמור על אותן שעות
+    const targetStartHour = workerId === targetWorkerId ? targetHour : hour;
+    const finalDayIndex = workerId === targetWorkerId ? targetDayIndex : dayIndex;
+
     // מחק את הבלוק המקורי
     setCellData(prev => {
       const newData = { ...prev };
@@ -515,8 +520,8 @@ export default function Matrix() {
       
       // הוסף במיקום החדש
       for (let i = 0; i < colspan; i++) {
-        const newHour = (targetHour + i) % 24;
-        const newKey = getCellKey(targetWorkerId, targetDayIndex, newHour);
+        const newHour = (targetStartHour + i) % 24;
+        const newKey = getCellKey(targetWorkerId, finalDayIndex, newHour);
         newData[newKey] = categoryId;
       }
       
@@ -525,7 +530,7 @@ export default function Matrix() {
 
     // העבר את ההערה
     const oldBlockKey = draggedBlock.blockKey;
-    const newBlockKey = `${targetWorkerId}-${targetDayIndex}-${targetHour}-${(targetHour + colspan - 1) % 24}`;
+    const newBlockKey = `${targetWorkerId}-${finalDayIndex}-${targetStartHour}-${(targetStartHour + colspan - 1) % 24}`;
     
     setBlockNotes(prev => {
       const newNotes = { ...prev };
@@ -750,7 +755,7 @@ export default function Matrix() {
                                   return (
                                     <td
                                       key={`${dayIndex}-${block.hour}`}
-                                      className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] ${!draggedBlock ? 'cursor-crosshair hover:bg-blue-50' : 'bg-blue-100'} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''} ${isDragging && selectedCategory ? 'transition-colors duration-75' : ''}`}
+                                      className={`border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] select-none ${!draggedBlock ? 'cursor-crosshair hover:bg-blue-50' : 'bg-blue-100'} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
                                       onMouseDown={(e) => handleCellMouseDown(worker.id, dayIndex, block.hour, e)}
                                       onMouseEnter={() => handleCellMouseEnter(worker.id, dayIndex, block.hour)}
                                       onDragOver={handleCellDragOver}
