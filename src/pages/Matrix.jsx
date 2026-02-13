@@ -88,7 +88,8 @@ export default function Matrix() {
     category_id: "", 
     day: 0, 
     start_time: "06:00", 
-    end_time: "07:00" 
+    end_time: "07:00",
+    note: ""
   });
 
   useEffect(() => {
@@ -339,7 +340,8 @@ export default function Matrix() {
       category_id: categories[0]?.id || "", 
       day: 0, 
       start_time: "06:00", 
-      end_time: "07:00" 
+      end_time: "07:00",
+      note: ""
     });
     setShowActivityDialog(true);
   };
@@ -356,7 +358,8 @@ export default function Matrix() {
       category: category.label,
       color: category.color,
       start: activityForm.start_time,
-      end: activityForm.end_time
+      end: activityForm.end_time,
+      note: activityForm.note
     };
 
     setWorkerActivities(prev => ({
@@ -477,14 +480,19 @@ export default function Matrix() {
                                   <td
                                     key={`${dayIndex}-${block.hour}`}
                                     colSpan={block.colspan}
-                                    className={`border border-gray-200 p-0 h-8 cursor-pointer ${block.category.color} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
+                                    className={`border border-gray-200 p-0 h-auto cursor-pointer ${block.category.color} ${block.hour === 5 ? 'border-l-4 border-l-gray-800' : ''}`}
                                     style={{ minWidth: `${block.colspan * 24}px` }}
                                     title={`${block.category.label} (${block.startTime} - ${block.endTime})`}
                                   >
-                                    <div className="h-full flex items-center justify-center px-1">
+                                    <div className="h-full flex flex-col items-center justify-center px-1 py-1">
                                       <span className="text-[10px] font-semibold truncate" dir="rtl">
                                         {block.category.label}
                                       </span>
+                                      {block.note && (
+                                        <span className="text-[8px] text-gray-700 truncate max-w-full" dir="rtl">
+                                          {block.note}
+                                        </span>
+                                      )}
                                     </div>
                                   </td>
                                 );
@@ -504,6 +512,9 @@ export default function Matrix() {
                                   <span className="font-medium">{HEBREW_DAYS[activity.day]}:</span>
                                   <span>{activity.category}</span>
                                   <span>({activity.start} - {activity.end})</span>
+                                  {activity.note && (
+                                    <span className="text-gray-700">- {activity.note}</span>
+                                  )}
                                   <button 
                                     onClick={() => handleDeleteActivity(worker.id, activity.id)}
                                     className="hover:text-red-600"
@@ -662,6 +673,14 @@ export default function Matrix() {
                   type="time"
                   value={activityForm.end_time}
                   onChange={(e) => setActivityForm({ ...activityForm, end_time: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>הערה (אופציונלי)</Label>
+                <Input
+                  value={activityForm.note}
+                  onChange={(e) => setActivityForm({ ...activityForm, note: e.target.value })}
+                  placeholder="הערה נוספת..."
                 />
               </div>
             </div>
