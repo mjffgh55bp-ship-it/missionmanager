@@ -389,10 +389,14 @@ export default function Matrix() {
     const startX = e.clientX - rect.left;
     const startPercent = (startX / rect.width) * 100;
     
-    // Capture the current activity type at the moment of mouse down
-    const currentActivityType = selectedActivityType;
-    console.log('=== MOUSE DOWN ===');
-    console.log('Captured selectedActivityType:', currentActivityType);
+    // CRITICAL: Capture the activity type NOW before any state changes
+    const capturedActivityType = selectedActivityType;
+    const activityTypeInfo = activityTypes.find(t => t.id === capturedActivityType);
+    
+    console.log('🎯 MOUSE DOWN - ACTIVITY TYPE CAPTURE 🎯');
+    console.log('Selected Activity Type ID:', capturedActivityType);
+    console.log('Activity Type Label:', activityTypeInfo?.label);
+    console.log('Activity Type Color:', activityTypeInfo?.color);
     console.log('Action:', action);
     
     setDragging({
@@ -405,7 +409,7 @@ export default function Matrix() {
       originalEnd: shift?.end_time,
       originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0,
       originalType: shift?.type,
-      activityTypeToUse: currentActivityType,
+      activityTypeToUse: capturedActivityType,
       rect
     });
   };
@@ -483,18 +487,24 @@ export default function Matrix() {
     
     if (action === 'create') {
       const activityType = activityTypeToUse || 'shift';
-      console.log('=== CREATING SHIFT ===');
-      console.log('Using activityTypeToUse:', activityType);
-      updatedShifts.push({ 
+      const activityTypeInfo = activityTypes.find(t => t.id === activityType);
+      
+      console.log('💾 CREATING NEW SHIFT 💾');
+      console.log('Activity Type to Save:', activityType);
+      console.log('Activity Label:', activityTypeInfo?.label);
+      console.log('Activity Color:', activityTypeInfo?.color);
+      
+      const newShift = { 
         date: targetDate, 
         start_time: start, 
         end_time: end, 
         type: 'available', 
         activity_type: activityType,
         priority: updatedShifts.length + 1 
-      });
-      console.log('Created shift with activity_type:', activityType);
-      console.log('Full shift object:', JSON.stringify(updatedShifts[updatedShifts.length - 1]));
+      };
+      
+      updatedShifts.push(newShift);
+      console.log('✅ Shift Created:', JSON.stringify(newShift));
     } else if (shift) {
       updatedShifts = updatedShifts.map(s => {
         if (s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time) {
@@ -1469,11 +1479,10 @@ export default function Matrix() {
                     key={type.id} 
                     type="button"
                     onClick={() => {
-                      // Always set to this type, never deselect
-                      console.log('=== ACTIVITY TYPE CLICK ===');
-                      console.log('Current selectedActivityType:', selectedActivityType);
-                      console.log('Clicked type.id:', type.id);
-                      console.log('Setting to:', type.id);
+                      console.log('🔵 CATEGORY SELECTED 🔵');
+                      console.log('Type ID:', type.id);
+                      console.log('Type Label:', type.label);
+                      console.log('Type Color:', type.color);
                       setSelectedActivityType(type.id);
                     }}
                     style={{ backgroundColor: type.color }} 
