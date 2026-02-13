@@ -749,36 +749,57 @@ export default function Matrix() {
         {/* Manual Shift Add/Edit Dialog */}
         <Dialog open={showManualDialog} onOpenChange={setShowManualDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">{editingShift ? 'עריכת' : 'הוספת'} חלון זמינות - {selectedWorkerForManual?.nickname}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-right" dir="rtl">{editingShift ? 'עריכת' : 'הוספת'} חלון זמינות - {selectedWorkerForManual?.nickname}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
-              <div>
-                <Label dir="rtl">שעת התחלה (HH:MM)</Label>
-                <Input 
-                  type="time" 
-                  value={manualShiftData.start_time} 
-                  onChange={(e) => setManualShiftData({ ...manualShiftData, start_time: e.target.value })}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-center block mb-2" dir="rtl">שעת התחלה (HH:MM)</Label>
+                  <Input 
+                    type="time" 
+                    value={manualShiftData.start_time} 
+                    onChange={(e) => setManualShiftData({ ...manualShiftData, start_time: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-center block mb-2" dir="rtl">שעת סיום (HH:MM)</Label>
+                  <Input 
+                    type="time" 
+                    value={manualShiftData.end_time} 
+                    onChange={(e) => setManualShiftData({ ...manualShiftData, end_time: e.target.value })}
+                  />
+                </div>
               </div>
               <div>
-                <Label dir="rtl">שעת סיום (HH:MM)</Label>
-                <Input 
-                  type="time" 
-                  value={manualShiftData.end_time} 
-                  onChange={(e) => setManualShiftData({ ...manualShiftData, end_time: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label dir="rtl">סוג זמינות</Label>
-                <Select value={manualShiftData.type} onValueChange={(value) => setManualShiftData({ ...manualShiftData, type: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="wanted">רצוי (Wanted)</SelectItem>
-                    <SelectItem value="available">זמין (Available)</SelectItem>
-                    <SelectItem value="unavailable">לא זמין (Unavailable)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-center block mb-2" dir="rtl">סוג זמינות</Label>
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    variant={manualShiftData.type === "wanted" ? "default" : "outline"}
+                    className={manualShiftData.type === "wanted" ? "bg-green-500 hover:bg-green-600" : ""}
+                    onClick={() => setManualShiftData({ ...manualShiftData, type: "wanted" })}
+                    dir="rtl"
+                  >
+                    <Star className="w-4 h-4 ml-1" />
+                    רצוי
+                  </Button>
+                  <Button
+                    variant={manualShiftData.type === "available" ? "default" : "outline"}
+                    className={manualShiftData.type === "available" ? "bg-blue-500 hover:bg-blue-600" : ""}
+                    onClick={() => setManualShiftData({ ...manualShiftData, type: "available" })}
+                    dir="rtl"
+                  >
+                    <Check className="w-4 h-4 ml-1" />
+                    זמין
+                  </Button>
+                  <Button
+                    variant={manualShiftData.type === "unavailable" ? "default" : "outline"}
+                    className={manualShiftData.type === "unavailable" ? "bg-red-500 hover:bg-red-600" : ""}
+                    onClick={() => setManualShiftData({ ...manualShiftData, type: "unavailable" })}
+                    dir="rtl"
+                  >
+                    <Ban className="w-4 h-4 ml-1" />
+                    לא זמין
+                  </Button>
+                </div>
               </div>
             </div>
             <DialogFooter>
