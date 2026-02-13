@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, ChefHat, Send, Star, Check, Ban, Calendar, CalendarDays, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChefHat, Send, Star, Check, Ban, Calendar, CalendarDays, Plus, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,7 +42,7 @@ const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }, weekStartDate = 
 };
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
-const ACTIVITY_TYPES = [
+const DEFAULT_ACTIVITY_TYPES = [
   { id: 'constraint', label: 'אילוץ', color: '#E0BBE4' },
   { id: 'management', label: 'תפקיד ניהול', color: '#C5F05A' },
   { id: 'standby_30_mgmt', label: 'כוננות 30\' לתפקיד ניהול', color: '#9AE03A' },
@@ -133,8 +133,54 @@ export default function Matrix() {
   const [workerRoles, setWorkerRoles] = useState([]);
   const [zoomRange, setZoomRange] = useState({ start: 0, end: 100 });
   const timelineRefs = useRef({});
+  const [activityTypes, setActivityTypes] = useState(DEFAULT_ACTIVITY_TYPES);
+  const [showActivityTypesDialog, setShowActivityTypesDialog] = useState(false);
+  const [editingActivityType, setEditingActivityType] = useState(null);
+  const [newActivityType, setNewActivityType] = useState({ label: '', color: '#3b82f6' });
 
   useEffect(() => { loadData(); }, [currentDate, viewMode]);
+
+  useEffect(() => { loadActivityTypes(); }, []);
+
+  const loadActivityTypes = async () => {
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "activity_types" });
+    if (settings.length > 0) {
+      setActivityTypes(JSON.parse(settings[0].setting_value) || DEFAULT_ACTIVITY_TYPES);
+    } else {
+      setActivityTypes(DEFAULT_ACTIVITY_TYPES);
+    }
+  };
+
+  const saveActivityTypes = async (types) => {
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "activity_types" });
+    const data = { setting_key: "activity_types", setting_value: JSON.stringify(types) };
+    if (settings.length > 0) {
+      await base44.entities.AppSettings.update(settings[0].id, data);
+    } else {
+      await base44.entities.AppSettings.create(data);
+    }
+    setActivityTypes(types);
+  };
+
+  const handleAddActivityType = async () => {
+    if (!newActivityType.label) return;
+    const newId = newActivityType.label.toLowerCase().replace(/\s+/g, '_');
+    const updatedTypes = [...activityTypes, { id: newId, ...newActivityType }];
+    await saveActivityTypes(updatedTypes);
+    setNewActivityType({ label: '', color: '#3b82f6' });
+  };
+
+  const handleUpdateActivityType = async (id, updates) => {
+    const updatedTypes = activityTypes.map(t => t.id === id ? { ...t, ...updates } : t);
+    await saveActivityTypes(updatedTypes);
+  };
+
+  const handleDeleteActivityType = async (id) => {
+    if (confirm('האם למחוק קטגוריה זו?')) {
+      const updatedTypes = activityTypes.filter(t => t.id !== id);
+      await saveActivityTypes(updatedTypes);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -661,7 +707,7 @@ export default function Matrix() {
     if (startPercent < 0 || startPercent > 100) return null;
 
     // Get activity type color
-    const activityType = ACTIVITY_TYPES.find(t => t.id === shift.activity_type);
+    const activityType = activityTypes.find(t => t.id === shift.activity_type);
     const activityColor = activityType ? activityType.color : '#8B4513';
     
     const colors = { wanted: "bg-green-400 border-green-600", available: "bg-blue-300 border-blue-500", unavailable: "bg-red-300 border-red-500" };
@@ -770,9 +816,14 @@ export default function Matrix() {
                   <Badge className="bg-blue-400 text-white" dir="rtl">שיבוץ</Badge>
                 </div>
                 <div className="mt-4 border-t pt-4">
-                  <p className="text-sm font-semibold mb-2" dir="rtl">מקרא סוגי פעילות:</p>
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-sm font-semibold" dir="rtl">מקרא סוגי פעילות:</p>
+                    <Button variant="outline" size="sm" onClick={() => setShowActivityTypesDialog(true)} dir="rtl">
+                      ערוך קטגוריות
+                    </Button>
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
-                    {ACTIVITY_TYPES.map(type => (
+                    {activityTypes.map(type => (
                       <Badge key={type.id} style={{ backgroundColor: type.color }} className="text-xs text-gray-900" dir="rtl">
                         {type.label}
                       </Badge>
@@ -1210,7 +1261,7 @@ export default function Matrix() {
                     <SelectValue placeholder="בחר סוג פעילות..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {ACTIVITY_TYPES.map(type => (
+                    {activityTypes.map(type => (
                       <SelectItem key={type.id} value={type.id}>
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 rounded" style={{ backgroundColor: type.color }} />
@@ -1263,6 +1314,67 @@ export default function Matrix() {
                   {editingShift ? 'עדכן' : <><Plus className="w-4 h-4 mr-2" />הוסף</>}
                 </Button>
               </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Activity Types Management Dialog */}
+        <Dialog open={showActivityTypesDialog} onOpenChange={setShowActivityTypesDialog}>
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle dir="rtl">ניהול קטגוריות פעילות</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="border rounded-lg p-4 space-y-3">
+                <Label className="font-semibold" dir="rtl">קטגוריות קיימות</Label>
+                {activityTypes.map(type => (
+                  <div key={type.id} className="flex items-center gap-3 p-2 border rounded-lg">
+                    <Input
+                      type="color"
+                      value={type.color}
+                      onChange={(e) => handleUpdateActivityType(type.id, { color: e.target.value })}
+                      className="w-16 h-10"
+                    />
+                    <Input
+                      value={type.label}
+                      onChange={(e) => handleUpdateActivityType(type.id, { label: e.target.value })}
+                      className="flex-1"
+                      dir="rtl"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => handleDeleteActivityType(type.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border rounded-lg p-4 space-y-3">
+                <Label className="font-semibold" dir="rtl">הוסף קטגוריה חדשה</Label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="color"
+                    value={newActivityType.color}
+                    onChange={(e) => setNewActivityType({ ...newActivityType, color: e.target.value })}
+                    className="w-16 h-10"
+                  />
+                  <Input
+                    value={newActivityType.label}
+                    onChange={(e) => setNewActivityType({ ...newActivityType, label: e.target.value })}
+                    placeholder="שם הקטגוריה..."
+                    className="flex-1"
+                    dir="rtl"
+                  />
+                  <Button onClick={handleAddActivityType} disabled={!newActivityType.label} dir="rtl">
+                    <Plus className="w-4 h-4 ml-1" />
+                    הוסף
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setShowActivityTypesDialog(false)} dir="rtl">סגור</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
