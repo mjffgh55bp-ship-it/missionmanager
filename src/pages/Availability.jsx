@@ -767,28 +767,28 @@ END:VEVENT
 
         {/* Dialogs */}
         <Dialog open={showUnavailabilityDialog} onOpenChange={setShowUnavailabilityDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">הוסף זמן לא זמין</DialogTitle></DialogHeader>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader><DialogTitle className="text-right" dir="rtl">הוסף זמן לא זמין</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" dir="rtl">
+                <Label htmlFor="multiDay">מספר ימים</Label>
                 <input type="checkbox" id="multiDay" checked={unavailabilityForm.multiDay} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, multiDay: e.target.checked })} />
-                <Label htmlFor="multiDay" dir="rtl">מספר ימים</Label>
               </div>
-              <div className={unavailabilityForm.multiDay ? "grid grid-cols-2 gap-4" : ""}>
-                <div><Label dir="rtl">{unavailabilityForm.multiDay ? "תאריך התחלה" : "תאריך"}</Label><Input type="date" value={unavailabilityForm.start_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_date: e.target.value })} /></div>
-                {unavailabilityForm.multiDay && <div><Label dir="rtl">תאריך סיום</Label><Input type="date" value={unavailabilityForm.end_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_date: e.target.value })} /></div>}
+              <div className={unavailabilityForm.multiDay ? "grid grid-cols-2 gap-2" : ""}>
+                <div><Label className="text-center block mb-2" dir="rtl">{unavailabilityForm.multiDay ? "תאריך התחלה" : "תאריך"}</Label><Input type="date" value={unavailabilityForm.start_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_date: e.target.value })} /></div>
+                {unavailabilityForm.multiDay && <div><Label className="text-center block mb-2" dir="rtl">תאריך סיום</Label><Input type="date" value={unavailabilityForm.end_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_date: e.target.value })} /></div>}
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label dir="rtl">שעת התחלה</Label><Input type="time" value={unavailabilityForm.start_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_time: e.target.value })} /></div>
-                <div><Label dir="rtl">שעת סיום</Label><Input type="time" value={unavailabilityForm.end_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_time: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-2" dir="rtl">
+                <div><Label className="text-center block mb-2">שעת התחלה</Label><Input type="time" value={unavailabilityForm.start_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_time: e.target.value })} className="text-sm" /></div>
+                <div><Label className="text-center block mb-2">שעת סיום</Label><Input type="time" value={unavailabilityForm.end_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_time: e.target.value })} className="text-sm" /></div>
               </div>
               <div>
-                <Label dir="rtl">סיבה</Label>
+                <Label className="text-center block mb-2" dir="rtl">סיבה</Label>
                 <Select value={unavailabilityForm.reason} onValueChange={(value) => setUnavailabilityForm({ ...unavailabilityForm, reason: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="occupied" dir="rtl">תפוס</SelectItem>
-                    <SelectItem value="overseas" dir="rtl">בחו"ל</SelectItem>
+                  <SelectTrigger dir="rtl"><SelectValue /></SelectTrigger>
+                  <SelectContent dir="rtl">
+                    <SelectItem value="occupied">תפוס</SelectItem>
+                    <SelectItem value="overseas">בחו"ל</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
