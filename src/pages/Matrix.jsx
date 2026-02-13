@@ -621,12 +621,12 @@ export default function Matrix() {
                   </SelectContent>
                 </Select>
                 
-                <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-1">
-                  <Calendar className="w-4 h-4" />
-                  <span className="text-sm" dir="rtl">יומי</span>
-                  <Switch checked={viewMode === "weekly"} onCheckedChange={(checked) => setViewMode(checked ? "weekly" : "daily")} />
+                <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-2" dir="rtl">
+                  <span className="text-sm">שבועי</span>
                   <CalendarDays className="w-4 h-4" />
-                  <span className="text-sm" dir="rtl">שבועי</span>
+                  <Switch checked={viewMode === "weekly"} onCheckedChange={(checked) => setViewMode(checked ? "weekly" : "daily")} />
+                  <Calendar className="w-4 h-4" />
+                  <span className="text-sm">יומי</span>
                 </div>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronRight className="w-4 h-4" /></Button>
                 <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center">
