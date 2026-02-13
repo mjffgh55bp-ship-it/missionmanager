@@ -138,6 +138,7 @@ export default function Matrix() {
   const [editingActivityType, setEditingActivityType] = useState(null);
   const [newActivityType, setNewActivityType] = useState({ label: '', color: '#3b82f6' });
   const [tempActivityTypes, setTempActivityTypes] = useState([]);
+  const [selectedActivityType, setSelectedActivityType] = useState(null);
 
   useEffect(() => { loadData(); }, [currentDate, viewMode]);
 
@@ -451,7 +452,14 @@ export default function Matrix() {
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     
     if (action === 'create') {
-      updatedShifts.push({ date: targetDate, start_time: start, end_time: end, type: 'available', priority: updatedShifts.length + 1 });
+      updatedShifts.push({ 
+        date: targetDate, 
+        start_time: start, 
+        end_time: end, 
+        type: 'available', 
+        activity_type: selectedActivityType || 'shift',
+        priority: updatedShifts.length + 1 
+      });
     } else if (shift) {
       updatedShifts = updatedShifts.map(s => {
         if (s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time) {
@@ -619,12 +627,12 @@ export default function Matrix() {
     };
 
     let totalShifts = 0;
-    let standbyCount = 0;
+    let standbyHours = 0;
     let regularShiftCount = 0;
-    let trainingCount = 0;
+    let trainingHours = 0;
     let otherCount = 0;
-    let coreCount = 0;
-    let extremeCount = 0;
+    let coreHours = 0;
+    let extremeHours = 0;
 
     workerShifts.forEach(shift => {
       const hours = calculateHours(shift.start_time, shift.end_time);
@@ -637,7 +645,7 @@ export default function Matrix() {
 
       // Standby - every 4 hours = 1 standby
       if (activityType.includes('standby') || activityType === 'standby_15' || activityType === 'standby_30_mgmt' || activityType === 'standby_long') {
-        standbyCount += hours / 4;
+        standbyHours += hours;
       }
 
       // Regular shifts
@@ -645,22 +653,39 @@ export default function Matrix() {
         regularShiftCount++;
         
         // Core hours (6:00-18:00) - every 4 hours = 1 shift
-        const startHour = parseInt(shift.start_time.split(':')[0]);
-        const endHour = parseInt(shift.end_time.split(':')[0]);
+        const [startHour, startMin] = shift.start_time.split(':').map(Number);
+        const [endHour, endMin] = shift.end_time.split(':').map(Number);
         
-        if (startHour >= 6 && endHour <= 18) {
-          coreCount += hours / 4;
+        // Check if shift is within core hours
+        const startInCore = startHour >= 6 && startHour < 18;
+        const endInCore = endHour > 6 && endHour <= 18;
+        
+        if (startInCore || endInCore) {
+          // Calculate overlap with core hours
+          const coreStart = Math.max(startHour + startMin / 60, 6);
+          const coreEnd = Math.min(endHour + endMin / 60, 18);
+          if (coreEnd > coreStart) {
+            coreHours += Math.max(0, coreEnd - coreStart);
+          }
         }
         
         // Extreme hours (2:00-6:00) - every 4 hours = 1 shift
-        if ((startHour >= 2 && startHour < 6) || (endHour > 2 && endHour <= 6)) {
-          extremeCount += hours / 4;
+        const startInExtreme = startHour >= 2 && startHour < 6;
+        const endInExtreme = endHour > 2 && endHour <= 6;
+        
+        if (startInExtreme || endInExtreme) {
+          // Calculate overlap with extreme hours
+          const extremeStart = Math.max(startHour + startMin / 60, 2);
+          const extremeEnd = Math.min(endHour + endMin / 60, 6);
+          if (extremeEnd > extremeStart) {
+            extremeHours += Math.max(0, extremeEnd - extremeStart);
+          }
         }
       }
 
       // Training - each hour = 1
       if (activityType === 'trainer') {
-        trainingCount += hours;
+        trainingHours += hours;
       }
 
       // Other
@@ -671,12 +696,12 @@ export default function Matrix() {
 
     return {
       total: totalShifts,
-      standby: Math.round(standbyCount * 10) / 10,
+      standby: Math.round((standbyHours / 4) * 10) / 10,
       regularShift: regularShiftCount,
-      training: Math.round(trainingCount * 10) / 10,
+      training: Math.round(trainingHours * 10) / 10,
       other: otherCount,
-      core: Math.round(coreCount * 10) / 10,
-      extreme: Math.round(extremeCount * 10) / 10
+      core: Math.round((coreHours / 4) * 10) / 10,
+      extreme: Math.round((extremeHours / 4) * 10) / 10
     };
   };
 
@@ -829,6 +854,27 @@ export default function Matrix() {
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
+                <div className="border rounded-lg p-2 bg-white">
+                  <Label className="text-xs font-semibold mb-2 block" dir="rtl">קטגוריה לציור</Label>
+                  <div className="flex gap-1 flex-wrap max-w-[500px]">
+                    {activityTypes.slice(0, 6).map(type => (
+                      <button
+                        key={type.id}
+                        onClick={() => setSelectedActivityType(selectedActivityType === type.id ? null : type.id)}
+                        className={`px-2 py-1 text-xs rounded-md transition-all ${
+                          selectedActivityType === type.id 
+                            ? 'ring-2 ring-blue-500 ring-offset-1' 
+                            : 'hover:opacity-80'
+                        }`}
+                        style={{ backgroundColor: type.color }}
+                        title={type.label}
+                      >
+                        {type.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
                 <Select value={populationFilter} onValueChange={setPopulationFilter}>
                   <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="אוכלוסייה" />
@@ -1105,6 +1151,22 @@ export default function Matrix() {
                           </div>
                         </div>
                       </div>
+                      {viewMode === 'weekly' && summary && (
+                        <div className="flex border-b bg-gray-100 text-xs h-8">
+                          <div className="w-[300px] min-w-[300px] px-3 py-1 border-r sticky left-0 bg-gray-100 z-40 font-semibold text-gray-700" dir="rtl">
+                            סיכום שבועי
+                          </div>
+                          <div className="flex-1 px-3 py-1 flex gap-4 items-center flex-wrap text-gray-700" dir="rtl">
+                            <span><strong>סה"כ:</strong> {summary.total}</span>
+                            <span><strong>כוננות:</strong> {summary.standby}</span>
+                            <span><strong>משמרת:</strong> {summary.regularShift}</span>
+                            <span><strong>אימון:</strong> {summary.training}</span>
+                            <span><strong>אחר:</strong> {summary.other}</span>
+                            <span><strong>ליבה:</strong> {summary.core}</span>
+                            <span><strong>קיצון:</strong> {summary.extreme}</span>
+                          </div>
+                        </div>
+                      )}
                       {viewMode === 'weekly' && summary && (
                         <div className="flex border-b bg-gray-100 text-xs h-8">
                           <div className="w-[300px] min-w-[300px] px-3 py-1 border-r sticky left-0 bg-gray-100 z-40 font-semibold text-gray-700" dir="rtl">
