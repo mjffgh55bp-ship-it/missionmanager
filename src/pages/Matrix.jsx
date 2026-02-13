@@ -28,6 +28,7 @@ export default function Matrix() {
   };
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const hours = Array.from({ length: 24 }, (_, i) => (i + 6) % 24); // 6,7,8...23,0,1...5
 
   const goToPreviousWeek = () => {
     setWeekStart(subWeeks(weekStart, 1));
@@ -81,28 +82,46 @@ export default function Matrix() {
             <div className="overflow-x-auto">
               <table className="w-full border-collapse" dir="rtl">
                 <thead>
+                  {/* Day headers */}
                   <tr className="bg-gradient-to-l from-blue-600 to-blue-700">
-                    <th className="sticky right-0 z-20 bg-blue-700 border border-blue-600 p-3 text-white font-semibold text-sm min-w-[150px]">
+                    <th className="sticky right-0 z-20 bg-blue-700 border border-blue-600 p-2 text-white font-semibold text-sm min-w-[150px]">
                       עובד
                     </th>
                     {weekDays.map((day, index) => (
-                      <th key={index} className="border border-blue-600 p-2 text-white text-center min-w-[120px]">
+                      <th key={index} colSpan={24} className="border border-blue-600 p-2 text-white text-center">
                         <div className="font-semibold">{HEBREW_DAYS[index]}</div>
                         <div className="text-xs font-normal mt-1">{format(day, "dd/MM")}</div>
                       </th>
+                    ))}
+                  </tr>
+                  {/* Hour headers */}
+                  <tr className="bg-blue-500">
+                    <th className="sticky right-0 z-20 bg-blue-500 border border-blue-400 p-1"></th>
+                    {weekDays.map((day, dayIndex) => (
+                      <React.Fragment key={dayIndex}>
+                        {hours.map((hour) => (
+                          <th key={hour} className="border border-blue-400 p-1 text-white text-[10px] min-w-[24px] w-[24px]">
+                            {hour}
+                          </th>
+                        ))}
+                      </React.Fragment>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {workers.map((worker, workerIndex) => (
                     <tr key={worker.id} className={workerIndex % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className="sticky right-0 z-10 border border-gray-300 p-3 font-medium text-sm bg-inherit">
+                      <td className="sticky right-0 z-10 border border-gray-300 p-2 font-medium text-sm bg-inherit">
                         {worker.nickname}
                       </td>
                       {weekDays.map((day, dayIndex) => (
-                        <td key={dayIndex} className="border border-gray-300 p-2 h-16">
-                          {/* תא ריק - נוסיף פונקציונליות בהמשך */}
-                        </td>
+                        <React.Fragment key={dayIndex}>
+                          {hours.map((hour) => (
+                            <td key={hour} className="border border-gray-200 p-0 h-8 w-[24px] min-w-[24px] hover:bg-blue-50 cursor-pointer">
+                              {/* תא שעה - נוסיף פונקציונליות בהמשך */}
+                            </td>
+                          ))}
+                        </React.Fragment>
                       ))}
                     </tr>
                   ))}
