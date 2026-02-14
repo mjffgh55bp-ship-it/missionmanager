@@ -64,12 +64,9 @@ export default function Schedule() {
   const [newCategoryColor, setNewCategoryColor] = useState("#3b82f6");
   const [showAddFromTemplatesDialog, setShowAddFromTemplatesDialog] = useState(false);
   const [showAddTemplateColumnDialog, setShowAddTemplateColumnDialog] = useState(false);
-  const [showAddCategoryToTemplateDialog, setShowAddCategoryToTemplateDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [newTemplateColumnName, setNewTemplateColumnName] = useState("");
   const [newTemplateColumnType, setNewTemplateColumnType] = useState("text");
-  const [newSubCategoryName, setNewSubCategoryName] = useState("");
-  const [newSubCategoryColor, setNewSubCategoryColor] = useState("#3b82f6");
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [selectedCartId, setSelectedCartId] = useState(null);
@@ -709,18 +706,6 @@ export default function Schedule() {
                         >
                           <Plus className="w-3 h-3 ml-1" />
                           הוסף עמודה
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="secondary" 
-                          onClick={() => {
-                            setSelectedTemplate(template);
-                            setShowAddCategoryToTemplateDialog(true);
-                          }} 
-                          dir="rtl"
-                        >
-                          <Plus className="w-3 h-3 ml-1" />
-                          הוסף קטגוריה
                         </Button>
                         <Button 
                           size="sm" 
@@ -1422,65 +1407,6 @@ export default function Schedule() {
                 dir="rtl"
               >
                 הוסף עמודה
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Category to Template Dialog */}
-        <Dialog open={showAddCategoryToTemplateDialog} onOpenChange={setShowAddCategoryToTemplateDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">הוסף תת-קטגוריה חדשה</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label dir="rtl">שם התת-קטגוריה</Label>
-                <Input
-                  value={newSubCategoryName}
-                  onChange={(e) => setNewSubCategoryName(e.target.value)}
-                  placeholder="לדוגמה: כלי עזר, מרכיבים..."
-                  dir="rtl"
-                />
-              </div>
-              <div>
-                <Label dir="rtl">צבע</Label>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    type="color"
-                    value={newSubCategoryColor}
-                    onChange={(e) => setNewSubCategoryColor(e.target.value)}
-                    className="w-20 h-10"
-                  />
-                  <div className="text-sm text-gray-600" dir="rtl">{newSubCategoryColor}</div>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => {
-                setShowAddCategoryToTemplateDialog(false);
-                setNewSubCategoryName("");
-                setNewSubCategoryColor("#3b82f6");
-              }} dir="rtl">ביטול</Button>
-              <Button 
-                onClick={async () => {
-                  if (!newSubCategoryName) return;
-                  const newTemplate = await base44.entities.Template.create({
-                    name: `${selectedTemplate?.name} - ${newSubCategoryName}`,
-                    color: newSubCategoryColor,
-                    columns: selectedTemplate?.columns || [{ name: "עמודה 1", type: "text", width: 120 }],
-                    default_rows: [],
-                    active: true
-                  });
-                  setShowAddCategoryToTemplateDialog(false);
-                  setNewSubCategoryName("");
-                  setNewSubCategoryColor("#3b82f6");
-                  setSelectedTemplate(null);
-                  loadData();
-                }}
-                disabled={!newSubCategoryName}
-                className="bg-purple-600 hover:bg-purple-700"
-                dir="rtl"
-              >
-                צור תת-קטגוריה
               </Button>
             </DialogFooter>
           </DialogContent>
