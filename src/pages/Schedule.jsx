@@ -26,6 +26,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ColumnCell from "../components/schedule/ColumnCell";
+import WorkerCell from "../components/schedule/WorkerCell";
 
 
 const SHIFT_WINDOWS = [
@@ -879,33 +880,49 @@ export default function Schedule() {
                                 )}
                                   {orderedColumns.map((col, idx) => (
                                   <TableCell key={idx} dir="rtl" className="p-0">
-                                   {col.type === "time" ? (
-                                     <Input
-                                       type="time"
-                                       value={row.values?.[col.name] || ""}
-                                       onChange={(e) => {
-                                         const newValues = { ...row.values, [col.name]: e.target.value };
-                                         base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                         setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                       }}
-                                       placeholder={col.default_value || ""}
-                                       dir="rtl"
-                                       className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
-                                     />
-                                   ) : (
-                                     <Input
-                                       type="text"
-                                       value={row.values?.[col.name] || ""}
-                                       onChange={(e) => {
-                                         const newValues = { ...row.values, [col.name]: e.target.value };
-                                         base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                         setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                       }}
-                                       placeholder={col.default_value || "-"}
-                                       dir="rtl"
-                                       className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
-                                     />
-                                   )}
+                                  {col.type === "worker" ? (
+                                    <WorkerCell
+                                      rowId={row.id}
+                                      columnName={col.name}
+                                      currentValue={row.values?.[col.name]}
+                                      workers={workers}
+                                      availabilities={availabilities}
+                                      unavailabilities={unavailabilities}
+                                      dateString={dateString}
+                                      rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
+                                      rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
+                                      onSaved={(workerId) => {
+                                        const newValues = { ...row.values, [col.name]: workerId };
+                                        setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                      }}
+                                    />
+                                  ) : col.type === "time" ? (
+                                    <Input
+                                      type="time"
+                                      value={row.values?.[col.name] || ""}
+                                      onChange={(e) => {
+                                        const newValues = { ...row.values, [col.name]: e.target.value };
+                                        base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                        setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                      }}
+                                      placeholder={col.default_value || ""}
+                                      dir="rtl"
+                                      className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+                                    />
+                                  ) : (
+                                    <Input
+                                      type="text"
+                                      value={row.values?.[col.name] || ""}
+                                      onChange={(e) => {
+                                        const newValues = { ...row.values, [col.name]: e.target.value };
+                                        base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                        setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                      }}
+                                      placeholder={col.default_value || "-"}
+                                      dir="rtl"
+                                      className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+                                    />
+                                  )}
                                   </TableCell>
                                   ))}
                                   <TableCell className="p-0">
@@ -1413,6 +1430,7 @@ export default function Schedule() {
                   <SelectContent>
                     <SelectItem value="text">טקסט</SelectItem>
                     <SelectItem value="time">שעה</SelectItem>
+                    <SelectItem value="worker">איוש</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
