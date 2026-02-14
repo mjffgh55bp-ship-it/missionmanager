@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Pencil, GripVertical } from "lucide-react";
+import { Plus, Trash2, Pencil, GripVertical, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function Templates() {
@@ -16,7 +16,8 @@ export default function Templates() {
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
-    columns: []
+    columns: [],
+    default_rows: []
   });
 
   useEffect(() => {
@@ -36,16 +37,17 @@ export default function Templates() {
       name: "",
       color: "#3b82f6",
       columns: [
-        { name: "תדריך", type: "text", width: 100 },
-        { name: "התחלה", type: "time", width: 80 },
-        { name: "סיום", type: "time", width: 80 },
+        { name: "תדריך", type: "text", width: 120 },
+        { name: "התחלה", type: "time", width: 120 },
+        { name: "סיום", type: "time", width: 120 },
         { name: "מדריך", type: "worker", width: 120 },
         { name: "שף / שף 2", type: "worker", width: 120 },
         { name: "סו שף", type: "worker", width: 120 },
         { name: "נוסף", type: "worker", width: 120 },
-        { name: "משימה", type: "text", width: 150 },
-        { name: "הערות", type: "text", width: 150 }
-      ]
+        { name: "משימה", type: "text", width: 120 },
+        { name: "הערות", type: "text", width: 120 }
+      ],
+      default_rows: []
     });
     setShowDialog(true);
   };
@@ -55,7 +57,8 @@ export default function Templates() {
     setFormData({
       name: template.name,
       color: template.color || "#3b82f6",
-      columns: template.columns || []
+      columns: template.columns || [],
+      default_rows: template.default_rows || []
     });
     setShowDialog(true);
   };
@@ -78,6 +81,18 @@ export default function Templates() {
     }
   };
 
+  const handleDuplicateTemplate = async (template) => {
+    const duplicatedTemplate = {
+      name: `${template.name} - עותק`,
+      color: template.color || "#3b82f6",
+      columns: template.columns || [],
+      default_rows: template.default_rows || [],
+      active: true
+    };
+    await base44.entities.Template.create(duplicatedTemplate);
+    loadTemplates();
+  };
+
   const handleAddColumn = () => {
     setFormData({
       ...formData,
@@ -96,6 +111,30 @@ export default function Templates() {
     const updated = [...formData.columns];
     updated[index] = { ...updated[index], [field]: value };
     setFormData({ ...formData, columns: updated });
+  };
+
+  const handleAddDefaultRow = () => {
+    const newRow = {};
+    formData.columns.forEach(col => {
+      newRow[col.name] = col.default_value || "";
+    });
+    setFormData({
+      ...formData,
+      default_rows: [...formData.default_rows, newRow]
+    });
+  };
+
+  const handleRemoveDefaultRow = (index) => {
+    setFormData({
+      ...formData,
+      default_rows: formData.default_rows.filter((_, i) => i !== index)
+    });
+  };
+
+  const handleUpdateDefaultRow = (rowIndex, colName, value) => {
+    const updated = [...formData.default_rows];
+    updated[rowIndex] = { ...updated[rowIndex], [colName]: value };
+    setFormData({ ...formData, default_rows: updated });
   };
 
   const getColumnTypeLabel = (type) => {
@@ -145,23 +184,78 @@ export default function Templates() {
                 <CardHeader className="text-white py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                   <div className="flex justify-between items-center">
                     <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="secondary" onClick={() => handleEditTemplate(template)}>
-                        <Pencil className="w-3 h-3" />
-                      </Button>
-                      <Button size="sm" variant="secondary" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteTemplate(template.id)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                    <div className="flex gap-2 items-center">
+                     {template.is_default && (
+                       <Badge className="bg-purple-100 text-purple-800 text-xs" dir="rtl">קבוע</Badge>
+                     )}
+                     <Button 
+                       size="sm" 
+                       variant="secondary" 
+                       onClick={async () => {
+                         await base44.entities.Template.update(template.id, { is_default: !template.is_default });
+                         loadTemplates();
+                       }}
+                       className={template.is_default ? "bg-purple-100 hover:bg-purple-200" : ""}
+                       dir="rtl"
+                     >
+                       {template.is_default ? "בטל קבוע" : "הגדר כקבוע"}
+                     </Button>
+                     <Button size="sm" variant="secondary" onClick={() => handleDuplicateTemplate(template)}>
+                       <Copy className="w-3 h-3" />
+                     </Button>
+                     <Button size="sm" variant="secondary" onClick={() => handleEditTemplate(template)}>
+                       <Pencil className="w-3 h-3" />
+                     </Button>
+                     <Button size="sm" variant="secondary" className="text-red-600 hover:text-red-700" onClick={() => handleDeleteTemplate(template.id)}>
+                       <Trash2 className="w-3 h-3" />
+                     </Button>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <div className="flex flex-wrap gap-2">
-                    {template.columns?.map((col, idx) => (
-                      <Badge key={idx} variant="outline" className="text-sm" dir="rtl">
-                        {col.name}
-                      </Badge>
-                    ))}
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-2" dir="rtl">עמודות:</div>
+                      <div className="flex flex-wrap gap-2">
+                        {template.columns?.map((col, idx) => (
+                          <Badge key={idx} variant="outline" className="text-sm" dir="rtl">
+                            {col.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {template.default_rows && template.default_rows.length > 0 && (
+                      <div>
+                        <div className="text-xs text-gray-500 mb-2" dir="rtl">
+                          שורות ברירת מחדל ({template.default_rows.length}):
+                        </div>
+                        <div className="border rounded-lg overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                {template.columns?.map((col, idx) => (
+                                  <th key={idx} className="px-2 py-1 text-right border-b text-gray-600" dir="rtl">
+                                    {col.name}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {template.default_rows.map((row, rowIdx) => (
+                                <tr key={rowIdx} className="border-b last:border-b-0">
+                                  {template.columns?.map((col, colIdx) => (
+                                    <td key={colIdx} className="px-2 py-1 text-right" dir="rtl">
+                                      {row[col.name] || "-"}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -267,6 +361,66 @@ export default function Templates() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <Label dir="rtl">שורות ברירת מחדל (אופציונלי)</Label>
+                  <Button size="sm" variant="outline" onClick={handleAddDefaultRow} disabled={formData.columns.length === 0} dir="rtl">
+                    <Plus className="w-3 h-3 ml-1" />
+                    שורה
+                  </Button>
+                </div>
+                {formData.columns.length === 0 ? (
+                  <div className="text-sm text-gray-500 text-center py-4 border rounded-lg" dir="rtl">
+                    יש להוסיף עמודות לפני הוספת שורות ברירת מחדל
+                  </div>
+                ) : formData.default_rows.length === 0 ? (
+                  <div className="text-sm text-gray-500 text-center py-4 border rounded-lg" dir="rtl">
+                    לחץ על "שורה" להוספת שורות ברירת מחדל
+                  </div>
+                ) : (
+                  <div className="border rounded-lg overflow-hidden max-h-64 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          {formData.columns.map((col, idx) => (
+                            <th key={idx} className="px-2 py-2 text-right border-b" dir="rtl">{col.name}</th>
+                          ))}
+                          <th className="px-2 py-2 w-10 border-b"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formData.default_rows.map((row, rowIdx) => (
+                          <tr key={rowIdx} className="border-b">
+                            {formData.columns.map((col, colIdx) => (
+                              <td key={colIdx} className="p-0">
+                                <Input
+                                  type={col.type === "time" ? "time" : "text"}
+                                  value={row[col.name] || ""}
+                                  onChange={(e) => handleUpdateDefaultRow(rowIdx, col.name, e.target.value)}
+                                  placeholder={col.default_value || ""}
+                                  dir="rtl"
+                                  className="border-0 rounded-none text-sm h-9"
+                                />
+                              </td>
+                            ))}
+                            <td className="p-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 text-red-500 hover:text-red-700"
+                                onClick={() => handleRemoveDefaultRow(rowIdx)}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>

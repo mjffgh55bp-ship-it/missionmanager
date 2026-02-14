@@ -90,13 +90,7 @@ export default function Availability() {
     setCurrentUser(user);
     
     const workersData = await base44.entities.Worker.filter({ active: true });
-    // Sort workers by nickname, handling undefined values
-    workersData.sort((a, b) => {
-      const nameA = a.nickname || "";
-      const nameB = b.nickname || "";
-      return nameA.localeCompare(nameB);
-    });
-    setWorkers(workersData);
+    setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
     
     const worker = workersData.find(w => w.email === user.email);
     setCurrentWorker(worker);
@@ -767,28 +761,28 @@ END:VEVENT
 
         {/* Dialogs */}
         <Dialog open={showUnavailabilityDialog} onOpenChange={setShowUnavailabilityDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">הוסף זמן לא זמין</DialogTitle></DialogHeader>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader><DialogTitle className="text-right" dir="rtl">הוסף זמן לא זמין</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" dir="rtl">
+                <Label htmlFor="multiDay">מספר ימים</Label>
                 <input type="checkbox" id="multiDay" checked={unavailabilityForm.multiDay} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, multiDay: e.target.checked })} />
-                <Label htmlFor="multiDay" dir="rtl">מספר ימים</Label>
               </div>
-              <div className={unavailabilityForm.multiDay ? "grid grid-cols-2 gap-4" : ""}>
-                <div><Label dir="rtl">{unavailabilityForm.multiDay ? "תאריך התחלה" : "תאריך"}</Label><Input type="date" value={unavailabilityForm.start_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_date: e.target.value })} /></div>
-                {unavailabilityForm.multiDay && <div><Label dir="rtl">תאריך סיום</Label><Input type="date" value={unavailabilityForm.end_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_date: e.target.value })} /></div>}
+              <div className={unavailabilityForm.multiDay ? "grid grid-cols-2 gap-2" : ""}>
+                <div><Label className="text-center block mb-2" dir="rtl">{unavailabilityForm.multiDay ? "תאריך התחלה" : "תאריך"}</Label><Input type="date" value={unavailabilityForm.start_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_date: e.target.value })} /></div>
+                {unavailabilityForm.multiDay && <div><Label className="text-center block mb-2" dir="rtl">תאריך סיום</Label><Input type="date" value={unavailabilityForm.end_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_date: e.target.value })} /></div>}
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label dir="rtl">שעת התחלה</Label><Input type="time" value={unavailabilityForm.start_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_time: e.target.value })} /></div>
-                <div><Label dir="rtl">שעת סיום</Label><Input type="time" value={unavailabilityForm.end_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_time: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-2" dir="rtl">
+                <div><Label className="text-center block mb-2">שעת התחלה</Label><Input type="time" value={unavailabilityForm.start_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_time: e.target.value })} className="text-sm" /></div>
+                <div><Label className="text-center block mb-2">שעת סיום</Label><Input type="time" value={unavailabilityForm.end_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_time: e.target.value })} className="text-sm" /></div>
               </div>
               <div>
-                <Label dir="rtl">סיבה</Label>
+                <Label className="text-center block mb-2" dir="rtl">סיבה</Label>
                 <Select value={unavailabilityForm.reason} onValueChange={(value) => setUnavailabilityForm({ ...unavailabilityForm, reason: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="occupied" dir="rtl">תפוס</SelectItem>
-                    <SelectItem value="overseas" dir="rtl">בחו"ל</SelectItem>
+                  <SelectTrigger dir="rtl"><SelectValue /></SelectTrigger>
+                  <SelectContent dir="rtl">
+                    <SelectItem value="occupied">תפוס</SelectItem>
+                    <SelectItem value="overseas">בחו"ל</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -810,29 +804,29 @@ END:VEVENT
 
         <Dialog open={showSummary} onOpenChange={setShowSummary}>
           <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle dir="rtl">סקור וסדר מחדש עדיפות</DialogTitle></DialogHeader>
-            <div className="py-4">
-              <Tabs defaultValue="wanted" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="wanted" dir="rtl">רצוי ({wantedShifts.length})</TabsTrigger>
-                  <TabsTrigger value="available" dir="rtl">זמין ({availableShifts.length})</TabsTrigger>
-                </TabsList>
-                <TabsContent value="wanted" className="mt-4">
-                  <p className="text-sm text-gray-600 mb-2" dir="rtl">גרור כדי לשנות סדר עדיפות המשמרות הרצויות</p>
+            <DialogHeader><DialogTitle className="text-sm" dir="rtl">סקור וסדר מחדש עדיפות</DialogTitle></DialogHeader>
+            <div className="py-2">
+              <div className="grid grid-cols-2 gap-2">
+                {/* Wanted Shifts */}
+                <div className="border rounded p-2">
+                  <div className="mb-2">
+                    <h3 className="font-semibold text-green-700 text-xs mb-0.5" dir="rtl">רצוי ({wantedShifts.length})</h3>
+                    <p className="text-[10px] text-gray-600" dir="rtl">גרור לשינוי</p>
+                  </div>
                   <DragDropContext onDragEnd={(r) => handleDragEnd(r, "wanted")}>
                     <Droppable droppableId="wanted-shifts">
                       {(provided) => (
-                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2 max-h-64 overflow-y-auto">
+                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1 max-h-64 overflow-y-auto">
                           {wantedShifts.map((shift, index) => (
                             <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`wanted-${shift.date}-${shift.start_time}`} index={index}>
                               {(provided, snapshot) => (
                                 <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
-                                  className={`flex items-center gap-3 p-3 rounded-lg border ${snapshot.isDragging ? 'bg-green-50 border-green-300 shadow-lg' : 'bg-white border-gray-200'}`}>
-                                  <GripVertical className="w-5 h-5 text-gray-400" />
-                                  <div className="flex items-center justify-center w-8 h-8 bg-green-500 text-white rounded-full font-bold text-sm">{index + 1}</div>
-                                  <div className="flex-1">
-                                    <p className="font-semibold text-gray-900" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
-                                    <p className="text-sm text-gray-600">{shift.start_time} - {shift.end_time}</p>
+                                  className={`flex items-center gap-1 p-1.5 rounded border ${snapshot.isDragging ? 'bg-green-50 border-green-300 shadow-lg' : 'bg-white border-gray-200'}`}>
+                                  <GripVertical className="w-3 h-3 text-gray-400" />
+                                  <div className="flex items-center justify-center w-5 h-5 bg-green-500 text-white rounded-full font-bold text-[10px]">{index + 1}</div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-gray-900 text-[11px] truncate" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
+                                    <p className="text-[9px] text-gray-600">{shift.start_time}-{shift.end_time}</p>
                                   </div>
                                 </div>
                               )}
@@ -843,23 +837,28 @@ END:VEVENT
                       )}
                     </Droppable>
                   </DragDropContext>
-                </TabsContent>
-                <TabsContent value="available" className="mt-4">
-                  <p className="text-sm text-gray-600 mb-2" dir="rtl">גרור כדי לשנות סדר עדיפות המשמרות הזמינות</p>
+                </div>
+
+                {/* Available Shifts */}
+                <div className="border rounded p-2">
+                  <div className="mb-2">
+                    <h3 className="font-semibold text-blue-700 text-xs mb-0.5" dir="rtl">זמין ({availableShifts.length})</h3>
+                    <p className="text-[10px] text-gray-600" dir="rtl">גרור לשינוי</p>
+                  </div>
                   <DragDropContext onDragEnd={(r) => handleDragEnd(r, "available")}>
                     <Droppable droppableId="available-shifts">
                       {(provided) => (
-                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2 max-h-64 overflow-y-auto">
+                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1 max-h-64 overflow-y-auto">
                           {availableShifts.map((shift, index) => (
                             <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`available-${shift.date}-${shift.start_time}`} index={index}>
                               {(provided, snapshot) => (
                                 <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
-                                  className={`flex items-center gap-3 p-3 rounded-lg border ${snapshot.isDragging ? 'bg-blue-50 border-blue-300 shadow-lg' : 'bg-white border-gray-200'}`}>
-                                  <GripVertical className="w-5 h-5 text-gray-400" />
-                                  <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-bold text-sm">{index + 1}</div>
-                                  <div className="flex-1">
-                                    <p className="font-semibold text-gray-900" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
-                                    <p className="text-sm text-gray-600">{shift.start_time} - {shift.end_time}</p>
+                                  className={`flex items-center gap-1 p-1.5 rounded border ${snapshot.isDragging ? 'bg-blue-50 border-blue-300 shadow-lg' : 'bg-white border-gray-200'}`}>
+                                  <GripVertical className="w-3 h-3 text-gray-400" />
+                                  <div className="flex items-center justify-center w-5 h-5 bg-blue-500 text-white rounded-full font-bold text-[10px]">{index + 1}</div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-gray-900 text-[11px] truncate" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
+                                    <p className="text-[9px] text-gray-600">{shift.start_time}-{shift.end_time}</p>
                                   </div>
                                 </div>
                               )}
@@ -870,8 +869,8 @@ END:VEVENT
                       )}
                     </Droppable>
                   </DragDropContext>
-                </TabsContent>
-              </Tabs>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowSummary(false)} dir="rtl"><X className="w-4 h-4 mr-2" />חזור</Button>
