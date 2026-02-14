@@ -1497,53 +1497,7 @@ export default function Matrix() {
           </DialogContent>
         </Dialog>
 
-        {/* Activity Types Legend - Below Matrix */}
-        <Card className="border-none shadow-lg mt-6">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <CardTitle className="text-xl" dir="rtl">מקרא סוגי פעילות</CardTitle>
-              <Button variant="outline" size="sm" onClick={handleOpenActivityTypesDialog} dir="rtl">
-                ערוך קטגוריות
-              </Button>
-            </div>
-            <p className="text-sm text-gray-600 mb-2" dir="rtl">לחץ על קטגוריה כדי לבחור אותה לצביעה על המטריצה</p>
-            {selectedActivityType && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-2 text-center" dir="rtl">
-                <span className="font-semibold">נבחר: </span>
-                <span style={{ color: activityTypes.find(t => t.id === selectedActivityType)?.color }}>
-                  {activityTypes.find(t => t.id === selectedActivityType)?.label}
-                </span>
-              </div>
-            )}
-            <div className="flex flex-col gap-2">
-              {activityTypes.map(type => {
-                const isSelected = selectedActivityType === type.id;
-                return (
-                  <button
-                    key={type.id} 
-                    type="button"
-                    onClick={() => {
-                      console.log('🔵 CATEGORY SELECTED 🔵');
-                      console.log('Type ID:', type.id);
-                      console.log('Type Label:', type.label);
-                      console.log('Type Color:', type.color);
-                      setSelectedActivityType(type.id);
-                    }}
-                    style={{ backgroundColor: type.color }} 
-                    className={`text-sm font-medium text-gray-900 py-2 px-4 rounded-lg text-center transition-all hover:opacity-90 cursor-pointer ${
-                      isSelected
-                        ? 'ring-4 ring-blue-500 ring-offset-2 shadow-lg' 
-                        : ''
-                    }`}
-                    dir="rtl"
-                  >
-                    {type.label} {isSelected && '✓ נבחר'}
-                  </button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+
       </div>
     </div>
   );
