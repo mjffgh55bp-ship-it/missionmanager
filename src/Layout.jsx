@@ -25,7 +25,6 @@ const managerNavigationItems = [
   { title: "עובדים", url: createPageUrl("Workers"), icon: Users },
   { title: "דוחות", url: createPageUrl("Reports"), icon: BarChart3 },
   { title: "תקופתית", url: createPageUrl("Yearly"), icon: BarChart3 },
-  { title: "מחשבון משמרות", url: createPageUrl("ShiftMaster"), icon: ChefHat },
   { title: "הגדרות", url: createPageUrl("Settings"), icon: Settings },
 ];
 
@@ -126,11 +125,11 @@ export default function Layout({ children }) {
       {sidebarOpen && (
         <>
           <div 
-            className="fixed inset-0 bg-black/20 z-[90]"
+            className="fixed inset-0 bg-black/20 z-40"
             onClick={() => setSidebarOpen(false)}
           />
           <div 
-            className="fixed top-0 right-0 h-full w-56 bg-white border-l border-gray-200 shadow-2xl z-[100] transform transition-transform duration-300"
+            className="fixed top-0 right-0 h-full w-56 bg-white border-l border-gray-200 shadow-2xl z-50 transform transition-transform duration-300"
             onMouseLeave={() => setSidebarOpen(false)}
           >
             <div className="border-b border-gray-200 p-4">
@@ -175,7 +174,8 @@ export default function Layout({ children }) {
       {/* Main Content */}
       <main className="min-h-screen flex flex-col w-full">
         <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center gap-4 justify-between">
+          <div className="flex items-center gap-4 justify-end">
+            <h1 className="text-xl font-bold text-gray-900 flex-1 text-right" dir="rtl">מנהל משימות</h1>
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="hover:bg-gray-100 p-2 rounded-lg transition-colors duration-200"

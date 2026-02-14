@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Info, Users, X, Plus, Trash2, Clock, Hash, Columns, Settings as SettingsIcon } from "lucide-react";
+import { Save, Info, Users, X, Plus, PartyPopper, Trash2, Clock, Hash, Columns } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
@@ -17,6 +17,7 @@ export default function Settings() {
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
   const [userRoles, setUserRoles] = useState({});
   const [workers, setWorkers] = useState([]);
+  const [companyEvents, setCompanyEvents] = useState([]);
   const [timeParamTypes, setTimeParamTypes] = useState([]);
   const [countParamTypes, setCountParamTypes] = useState([]);
   const [newTimeType, setNewTimeType] = useState("");
@@ -28,35 +29,24 @@ export default function Settings() {
   const [columnTypes, setColumnTypes] = useState([]);
   const [columnSubTypes, setColumnSubTypes] = useState({});
   const [newColumnType, setNewColumnType] = useState("");
-  const [assignmentColumns, setAssignmentColumns] = useState([]);
-  const [newAssignmentColumn, setNewAssignmentColumn] = useState("");
   const [selectedColTypeForSubType, setSelectedColTypeForSubType] = useState("");
   const [newColSubType, setNewColSubType] = useState("");
-  const [populations, setPopulations] = useState([]);
-  const [newPopulation, setNewPopulation] = useState("");
-  const [workerRoles, setWorkerRoles] = useState([]);
-  const [newWorkerRole, setNewWorkerRole] = useState("");
-  const [shiftStatuses, setShiftStatuses] = useState([]);
-  const [newShiftStatus, setNewShiftStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings, assignmentColumnsSettings] = await Promise.all([
+    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
+      base44.entities.CompanyEvent.list("-date"),
       base44.entities.AppSettings.filter({ setting_key: "time_param_types" }),
       base44.entities.AppSettings.filter({ setting_key: "count_param_types" }),
       base44.entities.AppSettings.filter({ setting_key: "param_sub_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
-      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
-      base44.entities.AppSettings.filter({ setting_key: "assignment_columns" })
+      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" })
     ]);
     
     if (tipsSettings.length > 0) {
@@ -70,27 +60,8 @@ export default function Settings() {
     if (subTypesSettings.length > 0) setParamSubTypes(JSON.parse(subTypesSettings[0].setting_value) || {});
     if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
-    if (populationsSettings.length > 0) {
-      setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
-    } else {
-      setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
-    }
-    if (workerRolesSettings.length > 0) {
-      setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
-    } else {
-      setWorkerRoles(["שף", "סו-שף"]);
-    }
-    if (shiftStatusesSettings.length > 0) {
-      setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
-    } else {
-      setShiftStatuses(["מתוכנן", "מאושר", "בוצע", "בוטל"]);
-    }
-    if (assignmentColumnsSettings.length > 0) {
-      setAssignmentColumns(JSON.parse(assignmentColumnsSettings[0].setting_value) || []);
-    } else {
-      setAssignmentColumns(["שף", "סו שף", "מדריך", "תצפית", "משגיח"]);
-    }
     setWorkers(workersData);
+    setCompanyEvents(eventsData);
     setLoading(false);
   };
 
@@ -209,76 +180,9 @@ export default function Settings() {
     setColumnSubTypes(updated);
   };
 
-  const handleAddPopulation = async () => {
-    if (!newPopulation.trim()) return;
-    const updated = [...populations, newPopulation.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_populations" });
-    const data = { setting_key: "worker_populations", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setPopulations(updated);
-    setNewPopulation("");
-  };
-
-  const handleRemovePopulation = async (population) => {
-    const updated = populations.filter(p => p !== population);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_populations" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    setPopulations(updated);
-  };
-
-  const handleAddWorkerRole = async () => {
-    if (!newWorkerRole.trim()) return;
-    const updated = [...workerRoles, newWorkerRole.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
-    const data = { setting_key: "worker_roles", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setWorkerRoles(updated);
-    setNewWorkerRole("");
-  };
-
-  const handleRemoveWorkerRole = async (role) => {
-    const updated = workerRoles.filter(r => r !== role);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    setWorkerRoles(updated);
-  };
-
-  const handleAddShiftStatus = async () => {
-    if (!newShiftStatus.trim()) return;
-    const updated = [...shiftStatuses, newShiftStatus.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
-    const data = { setting_key: "shift_statuses", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setShiftStatuses(updated);
-    setNewShiftStatus("");
-  };
-
-  const handleRemoveShiftStatus = async (status) => {
-    const updated = shiftStatuses.filter(s => s !== status);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    setShiftStatuses(updated);
-  };
-
-  const handleAddAssignmentColumn = async () => {
-    if (!newAssignmentColumn.trim()) return;
-    const updated = [...assignmentColumns, newAssignmentColumn.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "assignment_columns" });
-    const data = { setting_key: "assignment_columns", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setAssignmentColumns(updated);
-    setNewAssignmentColumn("");
-  };
-
-  const handleRemoveAssignmentColumn = async (column) => {
-    const updated = assignmentColumns.filter(c => c !== column);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "assignment_columns" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    setAssignmentColumns(updated);
+  const handleDeleteEvent = async (eventId) => {
+    await base44.entities.CompanyEvent.delete(eventId);
+    loadSettings();
   };
 
   return (
@@ -288,29 +192,6 @@ export default function Settings() {
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">הגדרות</h1>
           <p className="text-gray-600" dir="rtl">הגדר הגדרות כלל מערכת</p>
         </div>
-
-        {/* Assignment Columns */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Columns className="w-5 h-5 text-amber-600" />עמודות איוש</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר עמודות איוש שניתן להוסיף ללוח התורים (שף, סו שף, מדריך וכו')</p>
-            <div className="flex gap-2 mb-4">
-              <Input value={newAssignmentColumn} onChange={(e) => setNewAssignmentColumn(e.target.value)} placeholder="שם עמודת איוש חדשה..." dir="rtl" />
-              <Button onClick={handleAddAssignmentColumn}><Plus className="w-4 h-4" /></Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {assignmentColumns.map(col => (
-                <Badge key={col} className="bg-amber-100 text-amber-800 pr-1">
-                  {col}
-                  <button onClick={() => handleRemoveAssignmentColumn(col)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
-                </Badge>
-              ))}
-              {assignmentColumns.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו עמודות איוש</p>}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Schedule Column Types */}
         <Card className="border-none shadow-lg mb-6">
@@ -435,75 +316,6 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Worker Roles */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-indigo-600" />תפקידי עובדים</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר תפקידים שניתן לבחור בהם בעת הוספת/עריכת עובדים</p>
-            <div className="flex gap-2 mb-4">
-              <Input value={newWorkerRole} onChange={(e) => setNewWorkerRole(e.target.value)} placeholder="שם תפקיד חדש..." dir="rtl" />
-              <Button onClick={handleAddWorkerRole}><Plus className="w-4 h-4" /></Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {workerRoles.map(role => (
-                <Badge key={role} className="bg-indigo-100 text-indigo-800 pr-1">
-                  {role}
-                  <button onClick={() => handleRemoveWorkerRole(role)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
-                </Badge>
-              ))}
-              {workerRoles.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו תפקידים</p>}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Shift Statuses */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><SettingsIcon className="w-5 h-5 text-teal-600" />סטטוסי משמרות</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סטטוסים שניתן להקצות למשמרות בלוח</p>
-            <div className="flex gap-2 mb-4">
-              <Input value={newShiftStatus} onChange={(e) => setNewShiftStatus(e.target.value)} placeholder="שם סטטוס חדש..." dir="rtl" />
-              <Button onClick={handleAddShiftStatus}><Plus className="w-4 h-4" /></Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {shiftStatuses.map(status => (
-                <Badge key={status} className="bg-teal-100 text-teal-800 pr-1">
-                  {status}
-                  <button onClick={() => handleRemoveShiftStatus(status)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
-                </Badge>
-              ))}
-              {shiftStatuses.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סטטוסים</p>}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Worker Populations */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-orange-600" />אוכלוסיות עובדים</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר אוכלוסיות שניתן לבחור בהן בעת הוספת/עריכת עובדים</p>
-            <div className="flex gap-2 mb-4">
-              <Input value={newPopulation} onChange={(e) => setNewPopulation(e.target.value)} placeholder="שם אוכלוסייה חדשה..." dir="rtl" />
-              <Button onClick={handleAddPopulation}><Plus className="w-4 h-4" /></Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {populations.map(pop => (
-                <Badge key={pop} className="bg-orange-100 text-orange-800 pr-1">
-                  {pop}
-                  <button onClick={() => handleRemovePopulation(pop)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
-                </Badge>
-              ))}
-              {populations.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו אוכלוסיות</p>}
-            </div>
-          </CardContent>
-        </Card>
-
         {/* User Roles */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
@@ -535,6 +347,33 @@ export default function Settings() {
                 <Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור תפקידי משתמש"}
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Company Events (View Only) */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <div className="flex justify-between items-center">
+              <CardTitle className="flex items-center gap-2" dir="rtl"><PartyPopper className="w-5 h-5 text-purple-600" />אירועי חברה</CardTitle>
+              <p className="text-sm text-gray-500" dir="rtl">הוסף אירועים מהעמוד השנתי</p>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {companyEvents.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-4" dir="rtl">אין אירועים מתוכננים</p>
+            ) : (
+              <div className="space-y-3">
+                {companyEvents.map((event) => (
+                  <div key={event.id} className="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div>
+                      <p className="font-medium text-gray-900">{event.title}</p>
+                      <p className="text-sm text-gray-600">{format(new Date(event.date), "EEEE, MMM d, yyyy")}{!event.all_day && ` • ${event.start_time} - ${event.end_time}`}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteEvent(event.id)} className="text-red-500"><Trash2 className="w-4 h-4" /></Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
