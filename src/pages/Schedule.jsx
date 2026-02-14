@@ -81,6 +81,7 @@ export default function Schedule() {
   const [lastSaved, setLastSaved] = useState(null);
   const [customColumnOrders, setCustomColumnOrders] = useState({});
   const [shiftStatuses, setShiftStatuses] = useState([]);
+  const [isEditMode, setIsEditMode] = useState(false);
   
   const [editFormData, setEditFormData] = useState({
     start_time: "",
@@ -557,6 +558,15 @@ export default function Schedule() {
               
               <div className="flex items-center gap-3 flex-wrap">
                 <Button 
+                  variant={isEditMode ? "default" : "outline"}
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  className="gap-2"
+                  dir="rtl"
+                >
+                  <Pencil className="w-4 h-4" />
+                  {isEditMode ? 'מצב עריכה מופעל' : 'מצב עריכה'}
+                </Button>
+                <Button 
                   variant="outline" 
                   onClick={() => handleSave(false)} 
                   disabled={isSaving}
@@ -571,27 +581,31 @@ export default function Schedule() {
                     נשמר לאחרונה: {format(lastSaved, 'HH:mm')}
                   </span>
                 )}
-                <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddFromTemplatesDialog(true)} dir="rtl">
-                  <Plus className="w-4 h-4 ml-2" />
-                  הוסף תבנית מהשלדיות
-                </Button>
+                {isEditMode && (
+                  <>
+                    <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddFromTemplatesDialog(true)} dir="rtl">
+                      <Plus className="w-4 h-4 ml-2" />
+                      הוסף תבנית מהשלדיות
+                    </Button>
 
-                {templateRows.length > 0 && (
-                  <Button 
-                    variant="destructive" 
-                    onClick={async () => {
-                      if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
-                        for (const row of templateRows) {
-                          await base44.entities.TemplateRow.delete(row.id);
-                        }
-                        loadData();
-                      }
-                    }}
-                    dir="rtl"
-                  >
-                    <Trash2 className="w-4 h-4 ml-2" />
-                    מחק הכל
-                  </Button>
+                    {templateRows.length > 0 && (
+                      <Button 
+                        variant="destructive" 
+                        onClick={async () => {
+                          if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
+                            for (const row of templateRows) {
+                              await base44.entities.TemplateRow.delete(row.id);
+                            }
+                            loadData();
+                          }
+                        }}
+                        dir="rtl"
+                      >
+                        <Trash2 className="w-4 h-4 ml-2" />
+                        מחק הכל
+                      </Button>
+                    )}
+                  </>
                 )}
                 <Button variant="outline" onClick={handleExportToExcel} className="gap-2" dir="rtl">
                   <Download className="w-4 h-4" />
@@ -639,7 +653,8 @@ export default function Schedule() {
                   <CardHeader className="text-black py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <div className="flex flex-col gap-1">
+                        {isEditMode && (
+                          <div className="flex flex-col gap-1">
                             <Button 
                               size="icon" 
                               variant="ghost" 
@@ -691,9 +706,11 @@ export default function Schedule() {
                               <ChevronDown className="w-4 h-4" />
                             </Button>
                           </div>
+                        )}
                         <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
                       </div>
-                      <div className="flex gap-2">
+                      {isEditMode && (
+                        <div className="flex gap-2">
                         <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
                           <Plus className="w-3 h-3 ml-1" />
                           הוסף שורה
@@ -740,6 +757,7 @@ export default function Schedule() {
                           מחק מהלוח
                         </Button>
                       </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -752,7 +770,8 @@ export default function Schedule() {
                               <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">
                                 <div className="flex items-center gap-1 justify-center">
                                   <span>{col.name}</span>
-                                  <div className="flex gap-0.5">
+                                  {isEditMode && (
+                                    <div className="flex gap-0.5">
                                     <Button
                                       size="icon"
                                       variant="ghost"
@@ -792,11 +811,12 @@ export default function Schedule() {
                                       <ChevronLeft className="w-3 h-3" />
                                     </Button>
                                   </div>
+                                  )}
                                 </div>
                               </TableHead>
                             ))}
                             <TableHead className="w-[100px]" dir="rtl">סטטוס</TableHead>
-                            <TableHead className="w-[60px]" dir="rtl"></TableHead>
+                            {isEditMode && <TableHead className="w-[60px]" dir="rtl"></TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -811,6 +831,7 @@ export default function Schedule() {
                               return (
                               <TableRow key={row.id}>
                                 <TableCell className="w-[60px]">
+                                  {isEditMode && (
                                     <div className="flex flex-col gap-1 items-center">
                                       <Button 
                                         size="icon" 
@@ -857,6 +878,7 @@ export default function Schedule() {
                                         <ChevronDown className="w-3 h-3" />
                                       </Button>
                                     </div>
+                                  )}
                                   </TableCell>
                                   {orderedColumns.map((col, idx) => (
                                   <TableCell key={idx} dir="rtl" className="p-0">
@@ -907,16 +929,18 @@ export default function Schedule() {
                                    </SelectContent>
                                    </Select>
                                    </TableCell>
-                                   <TableCell className="p-1">
-                                   <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-7 w-7 text-red-500 hover:text-red-700" 
-                                    onClick={() => handleDeleteTemplateRow(row.id)}
-                                   >
-                                    <Trash2 className="w-3 h-3" />
-                                   </Button>
-                                   </TableCell>
+                                   {isEditMode && (
+                                     <TableCell className="p-1">
+                                       <Button 
+                                         variant="ghost" 
+                                         size="icon" 
+                                         className="h-7 w-7 text-red-500 hover:text-red-700" 
+                                         onClick={() => handleDeleteTemplateRow(row.id)}
+                                       >
+                                         <Trash2 className="w-3 h-3" />
+                                       </Button>
+                                     </TableCell>
+                                   )}
                                    </TableRow>
                                    );
                                    })
@@ -945,28 +969,30 @@ export default function Schedule() {
                   <CardHeader className="bg-gradient-to-r from-amber-500 to-amber-600 text-white py-3">
                     <div className="flex justify-between items-center">
                       <CardTitle className="flex items-center gap-2 text-lg">🚚 {cart.name}<span className="text-sm font-normal opacity-90">• {cart.location}</span></CardTitle>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => openAddColumnDialog(cart.id)}><Plus className="w-3 h-3" /></Button>
-                        <Button size="sm" variant="secondary" onClick={() => openAddShiftDialog(cart.id)} dir="rtl"><Plus className="w-4 h-4 mr-1" />משמרת</Button>
-                        {cartAssignments.length > 0 && (
-                          <Button 
-                            size="sm" 
-                            variant="destructive" 
-                            onClick={async () => {
-                              if (confirm(`האם למחוק את כל ${cartAssignments.length} המשמרות של ${cart.name}?`)) {
-                                for (const assignment of cartAssignments) {
-                                  await base44.entities.Assignment.delete(assignment.id);
+                      {isEditMode && (
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="secondary" onClick={() => openAddColumnDialog(cart.id)}><Plus className="w-3 h-3" /></Button>
+                          <Button size="sm" variant="secondary" onClick={() => openAddShiftDialog(cart.id)} dir="rtl"><Plus className="w-4 h-4 mr-1" />משמרת</Button>
+                          {cartAssignments.length > 0 && (
+                            <Button 
+                              size="sm" 
+                              variant="destructive" 
+                              onClick={async () => {
+                                if (confirm(`האם למחוק את כל ${cartAssignments.length} המשמרות של ${cart.name}?`)) {
+                                  for (const assignment of cartAssignments) {
+                                    await base44.entities.Assignment.delete(assignment.id);
+                                  }
+                                  loadData();
                                 }
-                                loadData();
-                              }
-                            }}
-                            dir="rtl"
-                          >
-                            <Trash2 className="w-3 h-3 ml-1" />
-                            מחק הכל
-                          </Button>
-                        )}
-                      </div>
+                              }}
+                              dir="rtl"
+                            >
+                              <Trash2 className="w-3 h-3 ml-1" />
+                              מחק הכל
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -983,7 +1009,9 @@ export default function Schedule() {
                               <TableHead key={col} className="w-[100px]">
                                 <div className="flex items-center gap-1">
                                   <span className="truncate">{col}</span>
-                                  <button onClick={() => handleRemoveColumn(cart.id, col)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                                  {isEditMode && (
+                                    <button onClick={() => handleRemoveColumn(cart.id, col)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                                  )}
                                 </div>
                               </TableHead>
                             ))}
