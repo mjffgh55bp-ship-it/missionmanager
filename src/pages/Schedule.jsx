@@ -1007,7 +1007,21 @@ export default function Schedule() {
                                   </button>
                                 </TableCell>
                                 <TableCell>
-                                  <span className="text-xs text-gray-700">{assignment.status || "-"}</span>
+                                  <Select 
+                                    value={assignment.status || ""} 
+                                    onValueChange={async (value) => {
+                                      await base44.entities.Assignment.update(assignment.id, { status: value });
+                                      loadData();
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs">
+                                      <SelectValue placeholder="בחר..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value={null}>ללא</SelectItem>
+                                      {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                    </SelectContent>
+                                  </Select>
                                 </TableCell>
                                 {columns.map(col => (
                                   <TableCell key={col}>

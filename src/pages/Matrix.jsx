@@ -141,6 +141,8 @@ export default function Matrix() {
   const [selectedActivityType, setSelectedActivityType] = useState('shift');
   const [isLoadingData, setIsLoadingData] = useState(false);
   const loadingTimeoutRef = useRef(null);
+  const [statusFilter, setStatusFilter] = useState("__all__");
+  const [shiftStatuses, setShiftStatuses] = useState([]);
 
   useEffect(() => { 
     loadStaticData();
@@ -205,10 +207,11 @@ export default function Matrix() {
 
   const loadStaticData = async () => {
     // Load workers and settings only once
-    const [workersData, populationsSettings, workerRolesSettings] = await Promise.all([
+    const [workersData, populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
     ]);
     
     if (populationsSettings.length > 0) {
@@ -220,6 +223,9 @@ export default function Matrix() {
       setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
     } else {
       setWorkerRoles(["שף", "סו-שף"]);
+    }
+    if (shiftStatusesSettings.length > 0) {
+      setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     }
     
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
@@ -274,10 +280,17 @@ export default function Matrix() {
 
   const getWorkerAssignments = (workerId, date = null) => {
     const targetDate = date || dateString;
-    return assignments.filter(a => 
+    let filtered = assignments.filter(a => 
       (a.chef_id === workerId || a.sous_chef_id === workerId || a.additional_chef_id === workerId) &&
       (!date || a.date === targetDate)
     );
+    
+    // Apply status filter
+    if (statusFilter !== "__all__") {
+      filtered = filtered.filter(a => a.status === statusFilter);
+    }
+    
+    return filtered;
   };
 
   const getWorkerAvailabilityForDate = (workerId, date = null) => {
@@ -927,6 +940,18 @@ export default function Matrix() {
                     <SelectItem value="__all__">כל התפקידים</SelectItem>
                     {workerRoles.map(role => (
                       <SelectItem key={role} value={role}>{role}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue placeholder="סטטוס" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">כל הסטטוסים</SelectItem>
+                    {shiftStatuses.map(status => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
