@@ -1159,31 +1159,31 @@ export default function Matrix() {
                       <React.Fragment key={worker.id}>
                       <div className={`flex border-b h-16 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                         <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-40 h-16">
-                          <div className="flex items-center">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'}`}>
-                              <ChefHat className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="truncate block">{worker.nickname}</span>
-                                <button
-                                  onClick={async () => {
-                                    await base44.entities.Worker.update(worker.id, {
-                                      availability_locked: !worker.availability_locked
-                                    });
-                                    loadStaticData();
-                                  }}
-                                  className="hover:bg-gray-100 rounded p-0.5"
-                                  title={worker.availability_locked ? "נעול - לחץ לפתיחה" : "פתוח - לחץ לנעילה"}
-                                >
-                                  {worker.availability_locked ? (
-                                    <Lock className="w-4 h-4 text-gray-900" />
-                                  ) : (
-                                    <LockOpen className="w-4 h-4 text-blue-500" />
-                                  )}
-                                </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                await base44.entities.Worker.update(worker.id, {
+                                  availability_locked: !worker.availability_locked
+                                });
+                                loadStaticData();
+                              }}
+                              className="hover:bg-gray-100 rounded p-1 transition-colors"
+                              title={worker.availability_locked ? "נעול - לחץ לפתיחה" : "פתוח - לחץ לנעילה"}
+                            >
+                              {worker.availability_locked ? (
+                                <Lock className="w-5 h-5 text-gray-900" />
+                              ) : (
+                                <LockOpen className="w-5 h-5 text-blue-500" />
+                              )}
+                            </button>
+                            <div className="flex items-center">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'}`}>
+                                <ChefHat className="w-4 h-4" />
                               </div>
-                              <WeeklySummary worker={worker} />
+                              <div>
+                                <span className="truncate block">{worker.nickname}</span>
+                                <WeeklySummary worker={worker} />
+                              </div>
                             </div>
                           </div>
                           <div className="flex gap-1">
