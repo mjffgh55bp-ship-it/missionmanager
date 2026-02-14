@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, ChefHat, Send, Star, Check, Ban, Calendar, CalendarDays, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChefHat, Send, Star, Check, Ban, Calendar, CalendarDays, Plus, Trash2, Lock, LockOpen } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -840,7 +840,6 @@ export default function Matrix() {
         </button>
         
         <div className="flex flex-col items-center gap-0 text-gray-800 text-[10px] font-medium truncate pointer-events-none w-full px-1 mt-2">
-          <div className="font-bold text-[9px] truncate w-full text-center">{activityLabel}</div>
           <div className="flex items-center gap-1">
             {icons[shift.type]}
             <span className="text-[9px]">{shift.start_time}-{shift.end_time}</span>
@@ -914,7 +913,7 @@ export default function Matrix() {
                 <p className="text-sm text-gray-600 mt-1">גרור קצוות לשינוי גודל, גרור אמצע להזזה, לחץ על עיגול הסוג לשינוי</p>
                 <div className="flex gap-2 mt-2 flex-wrap">
                   <Badge className="bg-green-100 text-green-800" dir="rtl"><Star className="w-3 h-3 mr-1 fill-current" />רצוי</Badge>
-                  <Badge className="bg-blue-100 text-blue-800" dir="rtl"><Check className="w-3 h-3 mr-1" />זמין</Badge>
+                  <Badge className="bg-cyan-100 text-cyan-800" dir="rtl"><Check className="w-3 h-3 mr-1" />זמין</Badge>
                   <Badge className="bg-red-100 text-red-800" dir="rtl"><Ban className="w-3 h-3 mr-1" />לא זמין</Badge>
                   <Badge className="bg-blue-400 text-white" dir="rtl">שיבוץ</Badge>
                 </div>
@@ -1165,7 +1164,25 @@ export default function Matrix() {
                               <ChefHat className="w-4 h-4" />
                             </div>
                             <div>
-                              <span className="truncate block">{worker.nickname}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="truncate block">{worker.nickname}</span>
+                                <button
+                                  onClick={async () => {
+                                    await base44.entities.Worker.update(worker.id, {
+                                      availability_locked: !worker.availability_locked
+                                    });
+                                    loadStaticData();
+                                  }}
+                                  className="hover:bg-gray-100 rounded p-0.5"
+                                  title={worker.availability_locked ? "נעול - לחץ לפתיחה" : "פתוח - לחץ לנעילה"}
+                                >
+                                  {worker.availability_locked ? (
+                                    <Lock className="w-4 h-4 text-gray-900" />
+                                  ) : (
+                                    <LockOpen className="w-4 h-4 text-blue-500" />
+                                  )}
+                                </button>
+                              </div>
                               <WeeklySummary worker={worker} />
                             </div>
                           </div>

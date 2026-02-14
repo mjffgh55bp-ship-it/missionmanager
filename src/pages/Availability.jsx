@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Calendar as CalendarIcon, Check, X, AlertCircle, Info, GripVertical, Plus, XCircle, Star, Ban, ChevronLeft, ChevronRight, PartyPopper, Pencil, Download } from "lucide-react";
+import { Calendar as CalendarIcon, Check, X, AlertCircle, Info, GripVertical, Plus, XCircle, Star, Ban, ChevronLeft, ChevronRight, PartyPopper, Pencil, Download, Lock } from "lucide-react";
 import { format, startOfWeek, addDays, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -162,6 +162,7 @@ export default function Availability() {
 
   const cycleShiftState = (date, shiftBlock) => {
     if (existingAvailability?.status === "approved" && !showEditMode) return;
+    if (currentWorker?.availability_locked) return;
 
     const currentState = getShiftState(date, shiftBlock);
 
@@ -408,7 +409,7 @@ END:VEVENT
 
   const getShiftStyle = (type) => {
     if (type === "wanted") return "bg-green-500 border-green-600 text-white";
-    if (type === "available") return "bg-blue-500 border-blue-600 text-white";
+    if (type === "available") return "bg-cyan-500 border-cyan-600 text-white";
     if (type === "unavailable") return "bg-red-500 border-red-600 text-white";
     return "bg-white border-gray-200 hover:border-blue-300 hover:bg-blue-50";
   };
@@ -530,7 +531,7 @@ END:VEVENT
               <div className="flex items-center gap-4">
                 <div className="flex flex-wrap gap-2 text-xs">
                   <Badge className="bg-green-100 text-green-800" dir="rtl"><Star className="w-3 h-3 mr-1" />רצוי</Badge>
-                  <Badge className="bg-blue-100 text-blue-800" dir="rtl"><Check className="w-3 h-3 mr-1" />זמין</Badge>
+                  <Badge className="bg-cyan-100 text-cyan-800" dir="rtl"><Check className="w-3 h-3 mr-1" />זמין</Badge>
                   <Badge className="bg-red-100 text-red-800" dir="rtl"><Ban className="w-3 h-3 mr-1" />לא זמין</Badge>
                 </div>
                 <div className="flex items-center gap-2 ml-auto">
@@ -626,7 +627,15 @@ END:VEVENT
             {/* Shift Selection Grid */}
             <Card className="border-none shadow-lg mb-4">
               <CardHeader className="border-b bg-white py-3 px-4">
-                <CardTitle className="text-base" dir="rtl">בחר משמרות (לחץ כדי להחליף: רצוי → זמין → לא זמין)</CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-base" dir="rtl">בחר משמרות (לחץ כדי להחליף: רצוי → זמין → לא זמין)</CardTitle>
+                  {currentWorker?.availability_locked && (
+                    <Badge className="bg-red-100 text-red-800" dir="rtl">
+                      <Lock className="w-3 h-3 mr-1" />
+                      זמינות נעולה
+                    </Badge>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="py-3 px-2">
                 <div className="space-y-3">
@@ -671,8 +680,8 @@ END:VEVENT
                                 )}
                                 <button
                                   onClick={() => cycleShiftState(date, shift)}
-                                  disabled={!canEdit}
-                                  className={`p-1.5 rounded border-2 transition-all flex flex-col items-center justify-center ${getShiftStyle(state)} ${!canEdit ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                  disabled={!canEdit || currentWorker?.availability_locked}
+                                  className={`p-1.5 rounded border-2 transition-all flex flex-col items-center justify-center ${getShiftStyle(state)} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                                 >
                                   {getShiftIcon(state)}
                                   <span className="text-[10px] mt-0.5">{shift.start}</span>
@@ -688,10 +697,10 @@ END:VEVENT
 
                 {!isApproved && !isPendingChange && (
                   <div className="flex justify-end gap-2 mt-4">
-                    <Button variant="outline" size="sm" onClick={() => setSelectedShifts([])} dir="rtl">נקה</Button>
+                    <Button variant="outline" size="sm" onClick={() => setSelectedShifts([])} disabled={currentWorker?.availability_locked} dir="rtl">נקה</Button>
                     <Button
                       onClick={() => setShowSummary(true)}
-                      disabled={selectedShifts.filter(s => s.type !== "unavailable").length === 0}
+                      disabled={selectedShifts.filter(s => s.type !== "unavailable").length === 0 || currentWorker?.availability_locked}
                       size="sm"
                       className="bg-blue-900 hover:bg-blue-800"
                     >
