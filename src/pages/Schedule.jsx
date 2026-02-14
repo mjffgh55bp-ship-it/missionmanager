@@ -78,6 +78,7 @@ export default function Schedule() {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [customColumnOrders, setCustomColumnOrders] = useState({});
+  const [dailyCustomColumns, setDailyCustomColumns] = useState({});
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [editMode, setEditMode] = useState(false);
   
@@ -168,6 +169,14 @@ export default function Schedule() {
       setCustomColumnOrders(JSON.parse(columnOrderSettings[0].setting_value) || {});
     } else {
       setCustomColumnOrders({});
+    }
+    
+    // Load daily custom columns for this date
+    const dailyColumnsSettings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
+    if (dailyColumnsSettings.length > 0) {
+      setDailyCustomColumns(JSON.parse(dailyColumnsSettings[0].setting_value) || {});
+    } else {
+      setDailyCustomColumns({});
     }
     
     // Auto-add default templates if no rows exist for this date
@@ -638,11 +647,15 @@ export default function Schedule() {
                 if (!template) return null;
                 const templateRowsForTemplate = group.rows;
                 
+                // Merge template columns with daily custom columns for this date
+                const dailyColumns = dailyCustomColumns[template.id] || [];
+                const allColumns = [...template.columns, ...dailyColumns];
+                
                 // Get custom column order for this template and date, or use default
                 const customOrder = customColumnOrders[template.id];
                 const orderedColumns = customOrder 
-                  ? customOrder.map(name => template.columns.find(col => col.name === name)).filter(Boolean)
-                  : template.columns;
+                  ? customOrder.map(name => allColumns.find(col => col.name === name)).filter(Boolean)
+                  : allColumns;
               
               return (
                 <Card key={group.key} className="border-none shadow-lg overflow-hidden">
@@ -795,18 +808,38 @@ export default function Schedule() {
                                         <ChevronLeft className="w-3 h-3" />
                                       </Button>
                                       <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
-                                        onClick={async () => {
-                                          if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
-                                            const updatedColumns = template.columns.filter(c => c.name !== col.name);
-                                            await base44.entities.Template.update(template.id, { columns: updatedColumns });
-                                            loadData();
-                                          }
-                                        }}
+                                       size="icon"
+                                       variant="ghost"
+                                       className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
+                                       onClick={async () => {
+                                         if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
+                                           // Check if this is a daily custom column or template column
+                                           const isDailyColumn = (dailyCustomColumns[template.id] || []).some(c => c.name === col.name);
+
+                                           if (isDailyColumn) {
+                                             // Remove from daily custom columns
+                                             const updatedDailyColumns = {
+                                               ...dailyCustomColumns,
+                                               [template.id]: (dailyCustomColumns[template.id] || []).filter(c => c.name !== col.name)
+                                             };
+                                             setDailyCustomColumns(updatedDailyColumns);
+
+                                             const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
+                                             const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
+                                             if (settings.length > 0) {
+                                               await base44.entities.AppSettings.update(settings[0].id, data);
+                                             }
+                                           } else {
+                                             // Remove from template (affects all dates)
+                                             const updatedColumns = template.columns.filter(c => c.name !== col.name);
+                                             await base44.entities.Template.update(template.id, { columns: updatedColumns });
+                                           }
+
+                                           loadData();
+                                         }
+                                       }}
                                       >
-                                        <Trash2 className="w-3 h-3" />
+                                       <Trash2 className="w-3 h-3" />
                                       </Button>
                                     </div>
                                   )}
@@ -1462,8 +1495,21 @@ export default function Schedule() {
                     columnToAdd = { name: newTemplateColumnName, type: "text", width: 120 };
                   }
                   
-                  const updatedColumns = [...selectedTemplate.columns, columnToAdd];
-                  await base44.entities.Template.update(selectedTemplate.id, { columns: updatedColumns });
+                  // Save to daily custom columns (not to template itself)
+                  const updatedDailyColumns = {
+                    ...dailyCustomColumns,
+                    [selectedTemplate.id]: [...(dailyCustomColumns[selectedTemplate.id] || []), columnToAdd]
+                  };
+                  setDailyCustomColumns(updatedDailyColumns);
+                  
+                  const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
+                  const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
+                  if (settings.length > 0) {
+                    await base44.entities.AppSettings.update(settings[0].id, data);
+                  } else {
+                    await base44.entities.AppSettings.create(data);
+                  }
+                  
                   setShowAddTemplateColumnDialog(false);
                   setNewTemplateColumnName("");
                   setNewTemplateColumnType("text");
