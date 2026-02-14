@@ -1412,7 +1412,57 @@ export default function Schedule() {
 
         {/* Add Template Column Dialog */}
         <Dialog open={showAddTemplateColumnDialog} onOpenChange={setShowAddTemplateColumnDialog}>
-...
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle dir="rtl">הוסף עמודה לשלדית</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label dir="rtl">שם העמודה</Label>
+                <Input
+                  value={newTemplateColumnName}
+                  onChange={(e) => setNewTemplateColumnName(e.target.value)}
+                  placeholder="שם העמודה..."
+                  dir="rtl"
+                />
+              </div>
+              <div>
+                <Label dir="rtl">סוג העמודה</Label>
+                <Select value={newTemplateColumnType} onValueChange={setNewTemplateColumnType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">טקסט</SelectItem>
+                    <SelectItem value="time">שעה</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowAddTemplateColumnDialog(false);
+                setNewTemplateColumnName("");
+                setNewTemplateColumnType("text");
+              }} dir="rtl">ביטול</Button>
+              <Button 
+                onClick={async () => {
+                  if (!newTemplateColumnName || !selectedTemplate) return;
+                  const updatedColumns = [
+                    ...selectedTemplate.columns,
+                    { name: newTemplateColumnName, type: newTemplateColumnType, width: 120 }
+                  ];
+                  await base44.entities.Template.update(selectedTemplate.id, { columns: updatedColumns });
+                  setShowAddTemplateColumnDialog(false);
+                  setNewTemplateColumnName("");
+                  setNewTemplateColumnType("text");
+                  setSelectedTemplate(null);
+                  loadData();
+                }}
+                disabled={!newTemplateColumnName}
+                className="bg-blue-900 hover:bg-blue-800"
+                dir="rtl"
+              >
+                הוסף עמודה
+              </Button>
+            </DialogFooter>
+          </DialogContent>
         </Dialog>
 
         {/* Edit Template Row Dialog */}
