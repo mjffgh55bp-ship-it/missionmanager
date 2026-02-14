@@ -35,13 +35,15 @@ export default function Settings() {
   const [newPopulation, setNewPopulation] = useState("");
   const [workerRoles, setWorkerRoles] = useState([]);
   const [newWorkerRole, setNewWorkerRole] = useState("");
+  const [shiftStatuses, setShiftStatuses] = useState([]);
+  const [newShiftStatus, setNewShiftStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings] = await Promise.all([
+    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
@@ -52,7 +54,8 @@ export default function Settings() {
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
     ]);
     
     if (tipsSettings.length > 0) {
@@ -75,6 +78,11 @@ export default function Settings() {
       setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
     } else {
       setWorkerRoles(["שף", "סו-שף"]);
+    }
+    if (shiftStatusesSettings.length > 0) {
+      setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
+    } else {
+      setShiftStatuses(["מתוכנן", "מאושר", "בוצע", "בוטל"]);
     }
     setWorkers(workersData);
     setCompanyEvents(eventsData);
@@ -237,6 +245,24 @@ export default function Settings() {
     setWorkerRoles(updated);
   };
 
+  const handleAddShiftStatus = async () => {
+    if (!newShiftStatus.trim()) return;
+    const updated = [...shiftStatuses, newShiftStatus.trim()];
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
+    const data = { setting_key: "shift_statuses", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setShiftStatuses(updated);
+    setNewShiftStatus("");
+  };
+
+  const handleRemoveShiftStatus = async (status) => {
+    const updated = shiftStatuses.filter(s => s !== status);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
+    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+    setShiftStatuses(updated);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
@@ -387,6 +413,29 @@ export default function Settings() {
                 </Badge>
               ))}
               {workerRoles.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו תפקידים</p>}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Shift Statuses */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Settings className="w-5 h-5 text-teal-600" />סטטוסי משמרות</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סטטוסים שניתן להקצות למשמרות בלוח</p>
+            <div className="flex gap-2 mb-4">
+              <Input value={newShiftStatus} onChange={(e) => setNewShiftStatus(e.target.value)} placeholder="שם סטטוס חדש..." dir="rtl" />
+              <Button onClick={handleAddShiftStatus}><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {shiftStatuses.map(status => (
+                <Badge key={status} className="bg-teal-100 text-teal-800 pr-1">
+                  {status}
+                  <button onClick={() => handleRemoveShiftStatus(status)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                </Badge>
+              ))}
+              {shiftStatuses.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סטטוסים</p>}
             </div>
           </CardContent>
         </Card>

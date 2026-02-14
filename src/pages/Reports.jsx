@@ -32,22 +32,25 @@ export default function Reports() {
   const [workerFilters, setWorkerFilters] = useState({
     category: '__all__',
     guide: '__all__',
-    role: '__all__'
+    role: '__all__',
+    status: '__all__'
   });
+  const [shiftStatuses, setShiftStatuses] = useState([]);
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings, catSettings] = await Promise.all([
+    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings, catSettings, shiftStatusesSettings] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
       base44.entities.FoodCart.list(),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_category_names" })
+      base44.entities.AppSettings.filter({ setting_key: "worker_category_names" }),
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -56,6 +59,7 @@ export default function Reports() {
     if (cartParamsSettings.length > 0) setCartParams(JSON.parse(cartParamsSettings[0].setting_value) || {});
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     if (catSettings.length > 0) setCategoryNames(JSON.parse(catSettings[0].setting_value));
+    if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     setLoading(false);
   };
 
@@ -193,6 +197,7 @@ export default function Reports() {
     const workerAssignments = assignments.filter(a => {
       if (!(a.chef_id === workerId || a.sous_chef_id === workerId || a.additional_chef_id === workerId)) return false;
       if (dateRange && (a.date < dateRange.start || a.date > dateRange.end)) return false;
+      if (workerFilters.status !== '__all__' && a.status !== workerFilters.status) return false;
       return true;
     });
     let totalHours = 0;
@@ -363,6 +368,14 @@ export default function Reports() {
                     <SelectItem value="__all__" dir="rtl">כל התפקידים</SelectItem>
                     <SelectItem value="chef" dir="rtl">טבח ראשי</SelectItem>
                     <SelectItem value="sous_chef" dir="rtl">עוזר טבח</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={workerFilters.status} onValueChange={(v) => setWorkerFilters({...workerFilters, status: v})}>
+                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__" dir="rtl">כל הסטטוסים</SelectItem>
+                    {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

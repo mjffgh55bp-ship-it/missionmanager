@@ -766,15 +766,17 @@ export default function Matrix() {
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className={`absolute h-full border-l-2 rounded-sm flex items-center px-2 overflow-hidden z-20 ${assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`}
+              className={`absolute h-full border-l-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`}
               style={{ left: `${startPercent}%`, width: `${width}%` }}
             >
               <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>
+              {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
             </div>
           </TooltipTrigger>
           <TooltipContent className="bg-gray-800 text-white border-none">
             <p className="font-bold">{assignment.food_cart_name}</p>
             <p>זמן: {assignment.start_time} - {assignment.end_time}</p>
+            {assignment.status && <p>סטטוס: {assignment.status}</p>}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

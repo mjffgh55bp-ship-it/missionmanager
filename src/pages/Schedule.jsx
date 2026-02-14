@@ -80,12 +80,14 @@ export default function Schedule() {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [customColumnOrders, setCustomColumnOrders] = useState({});
+  const [shiftStatuses, setShiftStatuses] = useState([]);
   
   const [editFormData, setEditFormData] = useState({
     start_time: "",
     end_time: "",
     hours: 4,
     notes: "",
+    status: "",
     column_values: {}
   });
 
@@ -136,12 +138,13 @@ export default function Schedule() {
       base44.entities.Unavailability.filter({ date: dateString })
     ]);
     
-    const [colTypesSettings, colSubTypesSettings, cartColsSettings, allTemplatesData, templateRowsData] = await Promise.all([
+    const [colTypesSettings, colSubTypesSettings, cartColsSettings, allTemplatesData, templateRowsData, shiftStatusesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_columns" }),
       base44.entities.Template.filter({ active: true }),
-      base44.entities.TemplateRow.filter({ date: dateString })
+      base44.entities.TemplateRow.filter({ date: dateString }),
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
     ]);
     setWorkers(workersData);
     setCarts(cartsData);
@@ -158,6 +161,7 @@ export default function Schedule() {
     if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     if (cartColsSettings.length > 0) setCartColumns(JSON.parse(cartColsSettings[0].setting_value) || {});
+    if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     
     // Load custom column orders for this date
     const columnOrderSettings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
@@ -289,6 +293,7 @@ export default function Schedule() {
       end_time: assignment.end_time || "",
       hours: assignment.hours || 4,
       notes: assignment.notes || "",
+      status: assignment.status || "",
       column_values: assignment.column_values || {}
     });
     setShowEditDialog(true);
@@ -312,6 +317,7 @@ export default function Schedule() {
       end_time: editFormData.end_time,
       hours,
       notes: editFormData.notes,
+      status: editFormData.status,
       column_values: editFormData.column_values
     });
     setShowEditDialog(false);
@@ -951,6 +957,7 @@ export default function Schedule() {
                             <TableHead className="w-[120px]" dir="rtl">טבח ראשי</TableHead>
                             <TableHead className="w-[120px]" dir="rtl">עוזר טבח</TableHead>
                             <TableHead className="w-[120px]" dir="rtl">נוסף</TableHead>
+                            <TableHead className="w-[100px]" dir="rtl">סטטוס</TableHead>
                             {columns.map(col => (
                               <TableHead key={col} className="w-[100px]">
                                 <div className="flex items-center gap-1">
@@ -964,7 +971,7 @@ export default function Schedule() {
                         </TableHeader>
                         <TableBody>
                           {cartAssignments.length === 0 ? (
-                            <TableRow><TableCell colSpan={5 + columns.length} className="text-center text-gray-500 py-8" dir="rtl">אין משמרות. לחץ "משמרת" להוספה.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6 + columns.length} className="text-center text-gray-500 py-8" dir="rtl">אין משמרות. לחץ "משמרת" להוספה.</TableCell></TableRow>
                           ) : (
                             cartAssignments.map((assignment) => (
                               <TableRow key={assignment.id} className={assignment.has_trainee ? "bg-orange-50" : ""}>
@@ -998,6 +1005,9 @@ export default function Schedule() {
                                       <span className="text-xs text-gray-400">+ נוסף</span>
                                     )}
                                   </button>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-xs text-gray-700">{assignment.status || "-"}</span>
                                 </TableCell>
                                 {columns.map(col => (
                                   <TableCell key={col}>
@@ -1118,6 +1128,15 @@ export default function Schedule() {
               <div className="grid grid-cols-2 gap-4">
                 <div><Label dir="rtl">שעת התחלה</Label><Input type="time" value={editFormData.start_time} onChange={(e) => setEditFormData({ ...editFormData, start_time: e.target.value })} /></div>
                 <div><Label dir="rtl">שעת סיום</Label><Input type="time" value={editFormData.end_time} onChange={(e) => setEditFormData({ ...editFormData, end_time: e.target.value })} /></div>
+              </div>
+              <div>
+                <Label dir="rtl">סטטוס</Label>
+                <Select value={editFormData.status} onValueChange={(value) => setEditFormData({ ...editFormData, status: value })}>
+                  <SelectTrigger><SelectValue placeholder="בחר סטטוס..." /></SelectTrigger>
+                  <SelectContent>
+                    {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div><Label dir="rtl">הערות</Label><Textarea value={editFormData.notes} onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })} rows={2} dir="rtl" /></div>
             </div>
