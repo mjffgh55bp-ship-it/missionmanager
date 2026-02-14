@@ -78,6 +78,7 @@ export default function Schedule() {
   const [lastSaved, setLastSaved] = useState(null);
   const [customColumnOrders, setCustomColumnOrders] = useState({});
   const [shiftStatuses, setShiftStatuses] = useState([]);
+  const [editMode, setEditMode] = useState(false);
   
   const [editFormData, setEditFormData] = useState({
     start_time: "",
@@ -554,6 +555,15 @@ export default function Schedule() {
               
               <div className="flex items-center gap-3 flex-wrap">
                 <Button 
+                  variant={editMode ? "default" : "outline"}
+                  onClick={() => setEditMode(!editMode)} 
+                  className={editMode ? "bg-purple-600 hover:bg-purple-700" : ""}
+                  dir="rtl"
+                >
+                  <Pencil className="w-4 h-4 ml-2" />
+                  {editMode ? 'יציאה ממצב עריכה' : 'מצב עריכה'}
+                </Button>
+                <Button 
                   variant="outline" 
                   onClick={() => handleSave(false)} 
                   disabled={isSaving}
@@ -568,12 +578,14 @@ export default function Schedule() {
                     נשמר לאחרונה: {format(lastSaved, 'HH:mm')}
                   </span>
                 )}
-                <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddFromTemplatesDialog(true)} dir="rtl">
-                  <Plus className="w-4 h-4 ml-2" />
-                  הוסף תבנית מהשלדיות
-                </Button>
+                {editMode && (
+                  <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddFromTemplatesDialog(true)} dir="rtl">
+                    <Plus className="w-4 h-4 ml-2" />
+                    הוסף תבנית מהשלדיות
+                  </Button>
+                )}
 
-                {templateRows.length > 0 && (
+                {editMode && templateRows.length > 0 && (
                   <Button 
                     variant="destructive" 
                     onClick={async () => {
@@ -636,7 +648,8 @@ export default function Schedule() {
                   <CardHeader className="text-black py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
-                        <div className="flex flex-col gap-1">
+                        {editMode && (
+                          <div className="flex flex-col gap-1">
                             <Button 
                               size="icon" 
                               variant="ghost" 
@@ -688,43 +701,46 @@ export default function Schedule() {
                               <ChevronDown className="w-4 h-4" />
                             </Button>
                           </div>
+                        )}
                         <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
                       </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
-                          <Plus className="w-3 h-3 ml-1" />
-                          הוסף שורה
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="secondary" 
-                          onClick={() => {
-                            setSelectedTemplate(template);
-                            setShowAddTemplateColumnDialog(true);
-                          }} 
-                          dir="rtl"
-                        >
-                          <Plus className="w-3 h-3 ml-1" />
-                          הוסף עמודה
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="destructive" 
-                          onClick={async () => {
-                            if (confirm(`האם למחוק את השלדית "${template.name}" מהלוח (רק ליום ${formatDateHebrew(currentDate)})?`)) {
-                              // מחק רק את השורות של התבנית לתאריך הנוכחי
-                              for (const row of templateRowsForTemplate) {
-                                await base44.entities.TemplateRow.delete(row.id);
+                      {editMode && (
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
+                            <Plus className="w-3 h-3 ml-1" />
+                            הוסף שורה
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="secondary" 
+                            onClick={() => {
+                              setSelectedTemplate(template);
+                              setShowAddTemplateColumnDialog(true);
+                            }} 
+                            dir="rtl"
+                          >
+                            <Plus className="w-3 h-3 ml-1" />
+                            הוסף עמודה
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            onClick={async () => {
+                              if (confirm(`האם למחוק את השלדית "${template.name}" מהלוח (רק ליום ${formatDateHebrew(currentDate)})?`)) {
+                                // מחק רק את השורות של התבנית לתאריך הנוכחי
+                                for (const row of templateRowsForTemplate) {
+                                  await base44.entities.TemplateRow.delete(row.id);
+                                }
+                                loadData();
                               }
-                              loadData();
-                            }
-                          }}
-                          dir="rtl"
-                        >
-                          <Trash2 className="w-3 h-3 ml-1" />
-                          מחק מהלוח
-                        </Button>
-                      </div>
+                            }}
+                            dir="rtl"
+                          >
+                            <Trash2 className="w-3 h-3 ml-1" />
+                            מחק מהלוח
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -732,56 +748,72 @@ export default function Schedule() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[60px]" dir="rtl"></TableHead>
+                            {editMode && <TableHead className="w-[60px]" dir="rtl"></TableHead>}
                             {orderedColumns.map((col, idx) => (
                               <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">
                                 <div className="flex items-center gap-1 justify-center">
                                   <span>{col.name}</span>
-                                  <div className="flex gap-0.5">
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-4 w-4 p-0"
-                                      disabled={idx === 0}
-                                      onClick={async () => {
-                                        const newOrder = [...orderedColumns];
-                                        [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
-                                        const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map(c => c.name) };
-                                        setCustomColumnOrders(newCustomOrders);
-                                        
-                                        const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
-                                        const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
-                                        if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                                        else await base44.entities.AppSettings.create(data);
-                                      }}
-                                    >
-                                      <ChevronRight className="w-3 h-3" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-4 w-4 p-0"
-                                      disabled={idx === orderedColumns.length - 1}
-                                      onClick={async () => {
-                                        const newOrder = [...orderedColumns];
-                                        [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
-                                        const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map(c => c.name) };
-                                        setCustomColumnOrders(newCustomOrders);
-                                        
-                                        const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
-                                        const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
-                                        if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                                        else await base44.entities.AppSettings.create(data);
-                                      }}
-                                    >
-                                      <ChevronLeft className="w-3 h-3" />
-                                    </Button>
-                                  </div>
+                                  {editMode && (
+                                    <div className="flex gap-0.5">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-4 w-4 p-0"
+                                        disabled={idx === 0}
+                                        onClick={async () => {
+                                          const newOrder = [...orderedColumns];
+                                          [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+                                          const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map(c => c.name) };
+                                          setCustomColumnOrders(newCustomOrders);
+                                          
+                                          const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
+                                          const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
+                                          if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+                                          else await base44.entities.AppSettings.create(data);
+                                        }}
+                                      >
+                                        <ChevronRight className="w-3 h-3" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-4 w-4 p-0"
+                                        disabled={idx === orderedColumns.length - 1}
+                                        onClick={async () => {
+                                          const newOrder = [...orderedColumns];
+                                          [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+                                          const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map(c => c.name) };
+                                          setCustomColumnOrders(newCustomOrders);
+                                          
+                                          const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
+                                          const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
+                                          if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+                                          else await base44.entities.AppSettings.create(data);
+                                        }}
+                                      >
+                                        <ChevronLeft className="w-3 h-3" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
+                                        onClick={async () => {
+                                          if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
+                                            const updatedColumns = template.columns.filter(c => c.name !== col.name);
+                                            await base44.entities.Template.update(template.id, { columns: updatedColumns });
+                                            loadData();
+                                          }
+                                        }}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
                               </TableHead>
                             ))}
                             <TableHead className="w-[100px]" dir="rtl">סטטוס</TableHead>
-                            <TableHead className="w-[60px]" dir="rtl"></TableHead>
+                            {editMode && <TableHead className="w-[60px]" dir="rtl"></TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -795,7 +827,8 @@ export default function Schedule() {
                             templateRowsForTemplate.map((row, rowIndex) => {
                               return (
                               <TableRow key={row.id}>
-                                <TableCell className="w-[60px]">
+                                {editMode && (
+                                  <TableCell className="w-[60px]">
                                     <div className="flex flex-col gap-1 items-center">
                                       <Button 
                                         size="icon" 
@@ -843,6 +876,7 @@ export default function Schedule() {
                                       </Button>
                                     </div>
                                   </TableCell>
+                                )}
                                   {orderedColumns.map((col, idx) => (
                                   <TableCell key={idx} dir="rtl" className="p-0">
                                    {col.type === "time" ? (
@@ -892,16 +926,18 @@ export default function Schedule() {
                                    </SelectContent>
                                    </Select>
                                    </TableCell>
-                                   <TableCell className="p-1">
-                                   <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-7 w-7 text-red-500 hover:text-red-700" 
-                                    onClick={() => handleDeleteTemplateRow(row.id)}
-                                   >
-                                    <Trash2 className="w-3 h-3" />
-                                   </Button>
-                                   </TableCell>
+                                   {editMode && (
+                                     <TableCell className="p-1">
+                                       <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-7 w-7 text-red-500 hover:text-red-700" 
+                                        onClick={() => handleDeleteTemplateRow(row.id)}
+                                       >
+                                        <Trash2 className="w-3 h-3" />
+                                       </Button>
+                                     </TableCell>
+                                   )}
                                    </TableRow>
                                    );
                                    })
