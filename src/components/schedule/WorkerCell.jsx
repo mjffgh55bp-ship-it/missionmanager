@@ -72,14 +72,61 @@ export default function WorkerCell({
       values: { [columnName]: workerId }
     });
 
+    // Create assignment in matrix if we have time info
+    if (rowStartTime && rowEndTime) {
+      const hours = calculateHours(rowStartTime, rowEndTime);
+      await base44.entities.Assignment.create({
+        date: dateString,
+        food_cart_id: null, // Template assignments don't have cart
+        food_cart_name: columnName,
+        start_time: rowStartTime,
+        end_time: rowEndTime,
+        hours,
+        chef_id: workerId,
+        chef_name: worker.nickname,
+        chef_seniority: worker.seniority,
+        notes: `${columnName} - מאוייש מהלוח`,
+        has_trainee: false,
+        column_values: {}
+      });
+    }
+
     setShowDialog(false);
     if (onSaved) onSaved(workerId);
   };
 
+  const calculateHours = (start, end) => {
+    if (!start || !end) return 4;
+    const [startHour, startMin] = start.split(':').map(Number);
+    const [endHour, endMin] = end.split(':').map(Number);
+    let hours = endHour - startHour;
+    if (endHour < startHour) hours += 24;
+    hours += (endMin - startMin) / 60;
+    return Math.max(0, hours);
+  };
+
   const handleRemoveWorker = async () => {
+    // Remove from template row
     await base44.entities.TemplateRow.update(rowId, {
       values: { [columnName]: null }
     });
+
+    // Remove assignment from matrix if exists
+    if (currentValue && rowStartTime && rowEndTime) {
+      const assignments = await base44.entities.Assignment.filter({ 
+        date: dateString,
+        chef_id: currentValue,
+        start_time: rowStartTime,
+        end_time: rowEndTime
+      });
+      
+      for (const assignment of assignments) {
+        if (assignment.notes?.includes('מאוייש מהלוח')) {
+          await base44.entities.Assignment.delete(assignment.id);
+        }
+      }
+    }
+
     setShowDialog(false);
     if (onSaved) onSaved(null);
   };

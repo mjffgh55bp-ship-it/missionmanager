@@ -1429,7 +1429,6 @@ export default function Schedule() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="text">טקסט</SelectItem>
-                    <SelectItem value="time">שעה</SelectItem>
                     <SelectItem value="worker">איוש</SelectItem>
                   </SelectContent>
                 </Select>
