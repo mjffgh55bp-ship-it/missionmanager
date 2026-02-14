@@ -102,6 +102,8 @@ export default function Matrix() {
   const [draggedBlock, setDraggedBlock] = useState(null);
   const [blockStartHour, setBlockStartHour] = useState(0);
   const [blockEndHour, setBlockEndHour] = useState(0);
+  const [resizingBlock, setResizingBlock] = useState(null);
+  const [resizeStartX, setResizeStartX] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -759,62 +761,91 @@ export default function Matrix() {
     setShowBlockNoteDialog(false);
   };
 
-  const handleResizeBlock = (block, side, direction) => {
-    const { workerId, dayIndex, hour, colspan } = block;
+  const handleResizeStart = (e, block, side) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setResizingBlock({ ...block, side });
+    setResizeStartX(e.clientX);
+  };
+
+  const handleResizeMove = (e) => {
+    if (!resizingBlock) return;
+    
+    const deltaX = e.clientX - resizeStartX;
+    const cellWidth = 24;
+    const hoursDelta = Math.round(deltaX / cellWidth);
+    
+    if (hoursDelta === 0) return;
+    
+    const { workerId, dayIndex, hour, colspan, side } = resizingBlock;
     const categoryId = getCellCategory(workerId, dayIndex, hour);
     const note = getCellNote(workerId, dayIndex, hour);
-
-    if (colspan === 1 && direction === -1) return; // לא להקטין בלוק בן שעה אחת
 
     setCellData(prev => {
       const newData = { ...prev };
 
       if (side === 'start') {
-        if (direction === 1) {
-          // הוסף שעה בהתחלה
-          const newHour = (hour - 1 + 24) % 24;
-          const dayOffset = hour === 0 ? -1 : 0;
-          const actualDayIndex = (dayIndex + dayOffset + 7) % 7;
-          const key = getCellKey(workerId, actualDayIndex, newHour);
-          const existing = newData[key] || [];
-          newData[key] = [...existing, { categoryId, note }];
-        } else {
-          // הסר שעה מההתחלה
-          const key = getCellKey(workerId, dayIndex, hour);
-          const stack = newData[key] || [];
-          if (stack.length > 0) {
-            const newStack = stack.slice(0, -1);
-            if (newStack.length === 0) {
-              delete newData[key];
-            } else {
-              newData[key] = newStack;
+        // גרירה ימינה = הקטנה, שמאלה = הגדלה
+        const hoursToChange = -hoursDelta;
+        
+        if (hoursToChange > 0) {
+          // הגדל בהתחלה
+          for (let i = 0; i < hoursToChange; i++) {
+            if (colspan + i >= 24) break;
+            const newHour = (hour - i - 1 + 24) % 24;
+            const dayOffset = (hour - i - 1) < 0 ? -1 : 0;
+            const actualDayIndex = (dayIndex + dayOffset + 7) % 7;
+            const key = getCellKey(workerId, actualDayIndex, newHour);
+            const existing = newData[key] || [];
+            newData[key] = [...existing, { categoryId, note }];
+          }
+        } else if (hoursToChange < 0 && colspan > 1) {
+          // הקטן מההתחלה
+          for (let i = 0; i < Math.min(-hoursToChange, colspan - 1); i++) {
+            const hourToRemove = (hour + i) % 24;
+            const dayOffset = Math.floor((hour + i) / 24);
+            const actualDayIndex = (dayIndex + dayOffset) % 7;
+            const key = getCellKey(workerId, actualDayIndex, hourToRemove);
+            const stack = newData[key] || [];
+            if (stack.length > 0) {
+              const newStack = stack.slice(0, -1);
+              if (newStack.length === 0) {
+                delete newData[key];
+              } else {
+                newData[key] = newStack;
+              }
             }
           }
         }
       } else {
         // side === 'end'
-        const lastHour = (hour + colspan - 1) % 24;
-        const dayOffset = Math.floor((hour + colspan - 1) / 24);
-        const actualDayIndex = (dayIndex + dayOffset) % 7;
-
-        if (direction === 1) {
-          // הוסף שעה בסוף
-          const newHour = (lastHour + 1) % 24;
-          const newDayOffset = Math.floor((hour + colspan) / 24);
-          const newActualDayIndex = (dayIndex + newDayOffset) % 7;
-          const key = getCellKey(workerId, newActualDayIndex, newHour);
-          const existing = newData[key] || [];
-          newData[key] = [...existing, { categoryId, note }];
-        } else {
-          // הסר שעה מהסוף
-          const key = getCellKey(workerId, actualDayIndex, lastHour);
-          const stack = newData[key] || [];
-          if (stack.length > 0) {
-            const newStack = stack.slice(0, -1);
-            if (newStack.length === 0) {
-              delete newData[key];
-            } else {
-              newData[key] = newStack;
+        // גרירה שמאלה = הקטנה, ימינה = הגדלה
+        if (hoursDelta > 0) {
+          // הגדל בסוף
+          for (let i = 0; i < hoursDelta; i++) {
+            if (colspan + i >= 24) break;
+            const newHour = (hour + colspan + i) % 24;
+            const dayOffset = Math.floor((hour + colspan + i) / 24);
+            const actualDayIndex = (dayIndex + dayOffset) % 7;
+            const key = getCellKey(workerId, actualDayIndex, newHour);
+            const existing = newData[key] || [];
+            newData[key] = [...existing, { categoryId, note }];
+          }
+        } else if (hoursDelta < 0 && colspan > 1) {
+          // הקטן מהסוף
+          for (let i = 0; i < Math.min(-hoursDelta, colspan - 1); i++) {
+            const hourToRemove = (hour + colspan - 1 - i) % 24;
+            const dayOffset = Math.floor((hour + colspan - 1 - i) / 24);
+            const actualDayIndex = (dayIndex + dayOffset) % 7;
+            const key = getCellKey(workerId, actualDayIndex, hourToRemove);
+            const stack = newData[key] || [];
+            if (stack.length > 0) {
+              const newStack = stack.slice(0, -1);
+              if (newStack.length === 0) {
+                delete newData[key];
+              } else {
+                newData[key] = newStack;
+              }
             }
           }
         }
@@ -822,6 +853,12 @@ export default function Matrix() {
 
       return newData;
     });
+    
+    setResizeStartX(e.clientX);
+  };
+
+  const handleResizeEnd = () => {
+    setResizingBlock(null);
   };
 
   if (loading) {
@@ -833,7 +870,7 @@ export default function Matrix() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4" onMouseUp={handleMouseUp}>
+    <div className="min-h-screen bg-gray-50 p-4" onMouseUp={handleMouseUp} onMouseMove={handleResizeMove} onMouseUp={(e) => { handleMouseUp(e); handleResizeEnd(); }}>
       <div className="max-w-[1600px] mx-auto">
         {/* Header */}
         <Card className="border-none shadow-lg mb-4">
@@ -941,25 +978,11 @@ export default function Matrix() {
                                     onClick={(e) => handleBlockClick(block, e)}
                                   >
                                     <button
-                                      className="absolute right-0 top-0 bottom-0 w-3 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity z-10 pointer-events-auto"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleResizeBlock(block, 'start', -1);
-                                      }}
-                                      title="הקטן מהתחלה"
+                                      className="absolute right-0 top-0 bottom-0 w-4 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity z-10 pointer-events-auto cursor-ew-resize"
+                                      onMouseDown={(e) => handleResizeStart(e, block, 'start')}
+                                      title="גרור לשינוי גודל מההתחלה"
                                     >
                                       <ChevronRight className="w-3 h-3" />
-                                    </button>
-                                    <button
-                                      className="absolute right-0 top-0 bottom-0 w-3 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity z-10 pointer-events-auto"
-                                      style={{ right: '12px' }}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleResizeBlock(block, 'start', 1);
-                                      }}
-                                      title="הגדל מהתחלה"
-                                    >
-                                      <ChevronLeft className="w-3 h-3" />
                                     </button>
                                     <div className="h-full flex flex-col items-center justify-center px-1 py-1 pointer-events-none">
                                       <span className="text-[10px] font-semibold truncate" dir="rtl">
@@ -972,23 +995,9 @@ export default function Matrix() {
                                       )}
                                     </div>
                                     <button
-                                      className="absolute left-0 top-0 bottom-0 w-3 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity z-10 pointer-events-auto"
-                                      style={{ left: '12px' }}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleResizeBlock(block, 'end', -1);
-                                      }}
-                                      title="הקטן מהסוף"
-                                    >
-                                      <ChevronRight className="w-3 h-3" />
-                                    </button>
-                                    <button
-                                      className="absolute left-0 top-0 bottom-0 w-3 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity z-10 pointer-events-auto"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleResizeBlock(block, 'end', 1);
-                                      }}
-                                      title="הגדל מהסוף"
+                                      className="absolute left-0 top-0 bottom-0 w-4 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/10 transition-opacity z-10 pointer-events-auto cursor-ew-resize"
+                                      onMouseDown={(e) => handleResizeStart(e, block, 'end')}
+                                      title="גרור לשינוי גודל מהסוף"
                                     >
                                       <ChevronLeft className="w-3 h-3" />
                                     </button>
