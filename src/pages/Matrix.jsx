@@ -1371,24 +1371,7 @@ export default function Matrix() {
                   </Button>
                 </div>
               </div>
-              <div>
-                <Label className="text-center block mb-2" dir="rtl">סוג פעילות</Label>
-                <Select value={manualShiftData.activity_type} onValueChange={(value) => setManualShiftData({ ...manualShiftData, activity_type: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="בחר סוג פעילות..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activityTypes.map(type => (
-                      <SelectItem key={type.id} value={type.id}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 rounded" style={{ backgroundColor: type.color }} />
-                          <span>{type.label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+
             </div>
             <DialogFooter className="flex justify-between" dir="rtl">
               <div>
