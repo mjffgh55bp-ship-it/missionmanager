@@ -35,15 +35,13 @@ export default function Settings() {
   const [newPopulation, setNewPopulation] = useState("");
   const [workerRoles, setWorkerRoles] = useState([]);
   const [newWorkerRole, setNewWorkerRole] = useState("");
-  const [workerStatuses, setWorkerStatuses] = useState([]);
-  const [newWorkerStatus, setNewWorkerStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings, workerStatusesSettings] = await Promise.all([
+    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
@@ -54,8 +52,7 @@ export default function Settings() {
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_statuses" })
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
     ]);
     
     if (tipsSettings.length > 0) {
@@ -78,11 +75,6 @@ export default function Settings() {
       setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
     } else {
       setWorkerRoles(["שף", "סו-שף"]);
-    }
-    if (workerStatusesSettings.length > 0) {
-      setWorkerStatuses(JSON.parse(workerStatusesSettings[0].setting_value) || []);
-    } else {
-      setWorkerStatuses(["שירות קבע", "שירות סדיר", "חייל משוחרר"]);
     }
     setWorkers(workersData);
     setCompanyEvents(eventsData);
@@ -243,24 +235,6 @@ export default function Settings() {
     const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
     await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
     setWorkerRoles(updated);
-  };
-
-  const handleAddWorkerStatus = async () => {
-    if (!newWorkerStatus.trim()) return;
-    const updated = [...workerStatuses, newWorkerStatus.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_statuses" });
-    const data = { setting_key: "worker_statuses", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setWorkerStatuses(updated);
-    setNewWorkerStatus("");
-  };
-
-  const handleRemoveWorkerStatus = async (status) => {
-    const updated = workerStatuses.filter(s => s !== status);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_statuses" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    setWorkerStatuses(updated);
   };
 
   return (
@@ -436,29 +410,6 @@ export default function Settings() {
                 </Badge>
               ))}
               {populations.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו אוכלוסיות</p>}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Worker Statuses */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-teal-600" />סטטוסים של עובדים</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סטטוסים שניתן לבחור בהם בעת הוספת/עריכת עובדים</p>
-            <div className="flex gap-2 mb-4">
-              <Input value={newWorkerStatus} onChange={(e) => setNewWorkerStatus(e.target.value)} placeholder="שם סטטוס חדש..." dir="rtl" />
-              <Button onClick={handleAddWorkerStatus}><Plus className="w-4 h-4" /></Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {workerStatuses.map(status => (
-                <Badge key={status} className="bg-teal-100 text-teal-800 pr-1">
-                  {status}
-                  <button onClick={() => handleRemoveWorkerStatus(status)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
-                </Badge>
-              ))}
-              {workerStatuses.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סטטוסים</p>}
             </div>
           </CardContent>
         </Card>
