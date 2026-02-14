@@ -44,7 +44,7 @@ export default function Settings() {
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
+    const [tipsSettings, rolesSettings, workersData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings, assignmentColumnsSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
@@ -55,7 +55,8 @@ export default function Settings() {
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
+      base44.entities.AppSettings.filter({ setting_key: "assignment_columns" })
     ]);
     
     if (tipsSettings.length > 0) {
@@ -83,6 +84,11 @@ export default function Settings() {
       setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     } else {
       setShiftStatuses(["מתוכנן", "מאושר", "בוצע", "בוטל"]);
+    }
+    if (assignmentColumnsSettings.length > 0) {
+      setAssignmentColumns(JSON.parse(assignmentColumnsSettings[0].setting_value) || []);
+    } else {
+      setAssignmentColumns(["שף", "סו שף", "מדריך", "תצפית", "משגיח"]);
     }
     setWorkers(workersData);
     setLoading(false);
@@ -257,6 +263,24 @@ export default function Settings() {
     setShiftStatuses(updated);
   };
 
+  const handleAddAssignmentColumn = async () => {
+    if (!newAssignmentColumn.trim()) return;
+    const updated = [...assignmentColumns, newAssignmentColumn.trim()];
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "assignment_columns" });
+    const data = { setting_key: "assignment_columns", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setAssignmentColumns(updated);
+    setNewAssignmentColumn("");
+  };
+
+  const handleRemoveAssignmentColumn = async (column) => {
+    const updated = assignmentColumns.filter(c => c !== column);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "assignment_columns" });
+    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+    setAssignmentColumns(updated);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
@@ -264,6 +288,29 @@ export default function Settings() {
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">הגדרות</h1>
           <p className="text-gray-600" dir="rtl">הגדר הגדרות כלל מערכת</p>
         </div>
+
+        {/* Assignment Columns */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Columns className="w-5 h-5 text-amber-600" />עמודות איוש</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר עמודות איוש שניתן להוסיף ללוח התורים (שף, סו שף, מדריך וכו')</p>
+            <div className="flex gap-2 mb-4">
+              <Input value={newAssignmentColumn} onChange={(e) => setNewAssignmentColumn(e.target.value)} placeholder="שם עמודת איוש חדשה..." dir="rtl" />
+              <Button onClick={handleAddAssignmentColumn}><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {assignmentColumns.map(col => (
+                <Badge key={col} className="bg-amber-100 text-amber-800 pr-1">
+                  {col}
+                  <button onClick={() => handleRemoveAssignmentColumn(col)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                </Badge>
+              ))}
+              {assignmentColumns.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו עמודות איוש</p>}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Schedule Column Types */}
         <Card className="border-none shadow-lg mb-6">
