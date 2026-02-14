@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Info, Users, X, Plus, PartyPopper, Trash2, Clock, Hash, Columns, Settings } from "lucide-react";
+import { Save, Info, Users, X, Plus, PartyPopper, Trash2, Clock, Hash, Columns, Settings as SettingsIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
@@ -420,7 +420,7 @@ export default function Settings() {
         {/* Shift Statuses */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Settings className="w-5 h-5 text-teal-600" />סטטוסי משמרות</CardTitle>
+            <CardTitle className="flex items-center gap-2" dir="rtl"><SettingsIcon className="w-5 h-5 text-teal-600" />סטטוסי משמרות</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סטטוסים שניתן להקצות למשמרות בלוח</p>
