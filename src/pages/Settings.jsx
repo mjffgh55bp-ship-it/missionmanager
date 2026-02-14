@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Info, Users, X, Plus, PartyPopper, Trash2, Clock, Hash, Columns, Settings as SettingsIcon } from "lucide-react";
+import { Save, Info, Users, X, Plus, Trash2, Clock, Hash, Columns, Settings as SettingsIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
@@ -17,7 +17,6 @@ export default function Settings() {
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
   const [userRoles, setUserRoles] = useState({});
   const [workers, setWorkers] = useState([]);
-  const [companyEvents, setCompanyEvents] = useState([]);
   const [timeParamTypes, setTimeParamTypes] = useState([]);
   const [countParamTypes, setCountParamTypes] = useState([]);
   const [newTimeType, setNewTimeType] = useState("");
@@ -43,11 +42,10 @@ export default function Settings() {
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, eventsData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
+    const [tipsSettings, rolesSettings, workersData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
-      base44.entities.CompanyEvent.list("-date"),
       base44.entities.AppSettings.filter({ setting_key: "time_param_types" }),
       base44.entities.AppSettings.filter({ setting_key: "count_param_types" }),
       base44.entities.AppSettings.filter({ setting_key: "param_sub_types" }),
@@ -85,7 +83,6 @@ export default function Settings() {
       setShiftStatuses(["מתוכנן", "מאושר", "בוצע", "בוטל"]);
     }
     setWorkers(workersData);
-    setCompanyEvents(eventsData);
     setLoading(false);
   };
 
@@ -202,11 +199,6 @@ export default function Settings() {
     const settings = await base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" });
     await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
     setColumnSubTypes(updated);
-  };
-
-  const handleDeleteEvent = async (eventId) => {
-    await base44.entities.CompanyEvent.delete(eventId);
-    loadSettings();
   };
 
   const handleAddPopulation = async () => {
@@ -494,33 +486,6 @@ export default function Settings() {
                 <Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור תפקידי משתמש"}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Company Events (View Only) */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <div className="flex justify-between items-center">
-              <CardTitle className="flex items-center gap-2" dir="rtl"><PartyPopper className="w-5 h-5 text-purple-600" />אירועי חברה</CardTitle>
-              <p className="text-sm text-gray-500" dir="rtl">הוסף אירועים מהעמוד השנתי</p>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6">
-            {companyEvents.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4" dir="rtl">אין אירועים מתוכננים</p>
-            ) : (
-              <div className="space-y-3">
-                {companyEvents.map((event) => (
-                  <div key={event.id} className="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900">{event.title}</p>
-                      <p className="text-sm text-gray-600">{format(new Date(event.date), "EEEE, MMM d, yyyy")}{!event.all_day && ` • ${event.start_time} - ${event.end_time}`}</p>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteEvent(event.id)} className="text-red-500"><Trash2 className="w-4 h-4" /></Button>
-                  </div>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
 
