@@ -399,12 +399,13 @@ export default function Schedule() {
     setShowAddTemplateRowDialog(true);
   };
 
-  const handleAddTemplateRowForTemplate = async (templateId, useDefaults = false) => {
+  const handleAddTemplateRowForTemplate = async (templateId, useDefaults = false, existingGroupId = null) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
 
-    // צור group_id ייחודי למופע הזה של התבנית
-    const groupId = Date.now().toString();
+    // אם יש group_id קיים, השתמש בו (הוספת שורה לקבוצה קיימת)
+    // אחרת, צור group_id ייחודי (הוספת קבוצה חדשה)
+    const groupId = existingGroupId || Date.now().toString();
 
     // אם useDefaults=true (הוספה מהשלדיות) ויש שורות ברירת מחדל, צור אותן
     // אחרת, תמיד צור שורה ריקה אחת בלבד
@@ -720,7 +721,7 @@ export default function Schedule() {
                       </div>
                       {isEditMode && (
                         <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
+                        <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id, false, group.group_id)} dir="rtl">
                           <Plus className="w-3 h-3 ml-1" />
                           הוסף שורה
                         </Button>
