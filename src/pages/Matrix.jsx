@@ -770,6 +770,7 @@ export default function Matrix() {
 
   const handleResizeMove = (e) => {
     if (!resizingBlock) return;
+    e.preventDefault();
     
     const deltaX = e.clientX - resizeStartX;
     const cellWidth = 24;
@@ -777,83 +778,65 @@ export default function Matrix() {
     
     if (hoursDelta === 0) return;
     
-    const { workerId, dayIndex, hour, colspan, side } = resizingBlock;
-    const categoryId = getCellCategory(workerId, dayIndex, hour);
-    const note = getCellNote(workerId, dayIndex, hour);
+    const { workerId, dayIndex, hour, colspan, side, originalHour, originalColspan } = resizingBlock;
+    const categoryId = getCellCategory(workerId, dayIndex, originalHour || hour);
+    const note = getCellNote(workerId, dayIndex, originalHour || hour);
 
     setCellData(prev => {
       const newData = { ...prev };
 
-      if (side === 'start') {
-        // גרירה ימינה = הקטנה, שמאלה = הגדלה
-        const hoursToChange = -hoursDelta;
-        
-        if (hoursToChange > 0) {
-          // הגדל בהתחלה
-          for (let i = 0; i < hoursToChange; i++) {
-            if (colspan + i >= 24) break;
-            const newHour = (hour - i - 1 + 24) % 24;
-            const dayOffset = (hour - i - 1) < 0 ? -1 : 0;
-            const actualDayIndex = (dayIndex + dayOffset + 7) % 7;
-            const key = getCellKey(workerId, actualDayIndex, newHour);
-            const existing = newData[key] || [];
-            newData[key] = [...existing, { categoryId, note }];
-          }
-        } else if (hoursToChange < 0 && colspan > 1) {
-          // הקטן מההתחלה
-          for (let i = 0; i < Math.min(-hoursToChange, colspan - 1); i++) {
-            const hourToRemove = (hour + i) % 24;
-            const dayOffset = Math.floor((hour + i) / 24);
-            const actualDayIndex = (dayIndex + dayOffset) % 7;
-            const key = getCellKey(workerId, actualDayIndex, hourToRemove);
-            const stack = newData[key] || [];
-            if (stack.length > 0) {
-              const newStack = stack.slice(0, -1);
-              if (newStack.length === 0) {
-                delete newData[key];
-              } else {
-                newData[key] = newStack;
-              }
-            }
+      // מחק את כל הבלוק הקודם
+      const currentHour = originalHour || hour;
+      const currentColspan = originalColspan || colspan;
+      for (let i = 0; i < currentColspan; i++) {
+        const hourToDelete = (currentHour + i) % 24;
+        const dayOffset = Math.floor((currentHour + i) / 24);
+        const actualDayIndex = (dayIndex + dayOffset) % 7;
+        const key = getCellKey(workerId, actualDayIndex, hourToDelete);
+        const stack = newData[key] || [];
+        if (stack.length > 0) {
+          const newStack = stack.slice(0, -1);
+          if (newStack.length === 0) {
+            delete newData[key];
+          } else {
+            newData[key] = newStack;
           }
         }
+      }
+
+      // חשב את הבלוק החדש
+      let newStartHour, newColspan;
+      
+      if (side === 'start') {
+        // גרירה שמאלה = הקטנה (hoursDelta חיובי), ימינה = הגדלה (hoursDelta שלילי)
+        newStartHour = (currentHour - hoursDelta + 24) % 24;
+        newColspan = Math.max(1, currentColspan + hoursDelta);
       } else {
         // side === 'end'
-        // גרירה שמאלה = הקטנה, ימינה = הגדלה
-        if (hoursDelta > 0) {
-          // הגדל בסוף
-          for (let i = 0; i < hoursDelta; i++) {
-            if (colspan + i >= 24) break;
-            const newHour = (hour + colspan + i) % 24;
-            const dayOffset = Math.floor((hour + colspan + i) / 24);
-            const actualDayIndex = (dayIndex + dayOffset) % 7;
-            const key = getCellKey(workerId, actualDayIndex, newHour);
-            const existing = newData[key] || [];
-            newData[key] = [...existing, { categoryId, note }];
-          }
-        } else if (hoursDelta < 0 && colspan > 1) {
-          // הקטן מהסוף
-          for (let i = 0; i < Math.min(-hoursDelta, colspan - 1); i++) {
-            const hourToRemove = (hour + colspan - 1 - i) % 24;
-            const dayOffset = Math.floor((hour + colspan - 1 - i) / 24);
-            const actualDayIndex = (dayIndex + dayOffset) % 7;
-            const key = getCellKey(workerId, actualDayIndex, hourToRemove);
-            const stack = newData[key] || [];
-            if (stack.length > 0) {
-              const newStack = stack.slice(0, -1);
-              if (newStack.length === 0) {
-                delete newData[key];
-              } else {
-                newData[key] = newStack;
-              }
-            }
-          }
-        }
+        // גרירה ימינה = הגדלה (hoursDelta חיובי), שמאלה = הקטנה (hoursDelta שלילי)
+        newStartHour = currentHour;
+        newColspan = Math.max(1, currentColspan + hoursDelta);
+      }
+
+      // צור את הבלוק החדש
+      for (let i = 0; i < newColspan; i++) {
+        const newHour = (newStartHour + i) % 24;
+        const dayOffset = Math.floor((newStartHour + i) / 24);
+        const actualDayIndex = (dayIndex + dayOffset) % 7;
+        const key = getCellKey(workerId, actualDayIndex, newHour);
+        const existing = newData[key] || [];
+        newData[key] = [...existing, { categoryId, note }];
       }
 
       return newData;
     });
     
+    // עדכן את המצב של הבלוק שמשתנה
+    setResizingBlock({
+      ...resizingBlock,
+      originalHour: originalHour || hour,
+      originalColspan: originalColspan || colspan
+    });
     setResizeStartX(e.clientX);
   };
 
