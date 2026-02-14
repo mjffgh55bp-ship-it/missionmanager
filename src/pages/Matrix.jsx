@@ -285,7 +285,7 @@ export default function Matrix() {
       (!date || a.date === targetDate)
     );
     
-    // Apply status filter
+    // Apply status filter - also show assignments without status when filter is "all"
     if (statusFilter !== "__all__") {
       filtered = filtered.filter(a => a.status === statusFilter);
     }
