@@ -17,9 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function Workers() {
   const [workers, setWorkers] = useState([]);
   const [assignments, setAssignments] = useState([]);
-  const [categoryNames, setCategoryNames] = useState({ category_1: "קטגוריה 1", category_2: "קטגוריה 2", category_3: "קטגוריה 3" });
   const [showDialog, setShowDialog] = useState(false);
-  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [editingWorker, setEditingWorker] = useState(null);
   const [userRoles, setUserRoles] = useState({});
   const [savingRoles, setSavingRoles] = useState(false);
@@ -29,7 +27,6 @@ export default function Workers() {
     nickname: "",
     birthday: "",
     role: "",
-    category: "category_1",
     phone: "",
     email: "",
     hire_date: format(new Date(), "yyyy-MM-dd"),
@@ -39,26 +36,19 @@ export default function Workers() {
     training: "",
     additional_training: ""
   });
-  const [tempCategoryNames, setTempCategoryNames] = useState({ category_1: "", category_2: "", category_3: "" });
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, catSettings, rolesSettings, populationsSettings, workerRolesSettings] = await Promise.all([
+    const [workersData, assignmentsData, rolesSettings, populationsSettings, workerRolesSettings] = await Promise.all([
       base44.entities.Worker.list("-created_date"),
       base44.entities.Assignment.list(),
-      base44.entities.AppSettings.filter({ setting_key: "worker_category_names" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
-    if (catSettings.length > 0) {
-      const names = JSON.parse(catSettings[0].setting_value);
-      setCategoryNames(names);
-      setTempCategoryNames(names);
-    }
     if (rolesSettings.length > 0) {
       setUserRoles(JSON.parse(rolesSettings[0].setting_value));
     }
@@ -83,7 +73,7 @@ export default function Workers() {
     else await base44.entities.Worker.create(formData);
     setShowDialog(false);
     setEditingWorker(null);
-    setFormData({ nickname: "", birthday: "", role: "", category: "category_1", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
+    setFormData({ nickname: "", birthday: "", role: "", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
     loadData();
   };
 
@@ -93,7 +83,6 @@ export default function Workers() {
       nickname: worker.nickname || "",
       birthday: worker.birthday || "",
       role: worker.role,
-      category: worker.category || "category_1",
       phone: worker.phone || "",
       email: worker.email || "",
       hire_date: worker.hire_date || format(new Date(), "yyyy-MM-dd"),
@@ -122,21 +111,7 @@ export default function Workers() {
     loadData();
   };
 
-  const handleSaveCategoryNames = async () => {
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_category_names" });
-    const data = { setting_key: "worker_category_names", setting_value: JSON.stringify(tempCategoryNames) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setCategoryNames(tempCategoryNames);
-    setShowCategoryDialog(false);
-  };
 
-  const getCategoryColor = (cat) => {
-    if (cat === "category_1") return "bg-blue-100 text-blue-800";
-    if (cat === "category_2") return "bg-green-100 text-green-800";
-    if (cat === "category_3") return "bg-purple-100 text-purple-800";
-    return "bg-gray-100 text-gray-800";
-  };
 
   const handleRoleChange = (email, role) => {
     if (!email) return;
@@ -157,9 +132,6 @@ export default function Workers() {
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => { setTempCategoryNames(categoryNames); setShowCategoryDialog(true); }} dir="rtl">
-              ערוך קטגוריות
-            </Button>
             <Button onClick={() => setShowDialog(true)} className="bg-blue-900 hover:bg-blue-800 text-white px-6" dir="rtl">
               <Plus className="w-4 h-4 mr-2" />הוסף עובד
             </Button>
@@ -194,9 +166,6 @@ export default function Workers() {
                           {worker.role || 'לא הוגדר'}
                           </Badge>
                           <Badge className={seniorityInfo.color}>{seniorityInfo.label}</Badge>
-                          <Badge className={getCategoryColor(worker.category)}>
-                            {categoryNames[worker.category] || worker.category}
-                          </Badge>
                           {worker.is_guide && <Badge className="bg-yellow-100 text-yellow-800" dir="rtl"><Award className="w-3 h-3 mr-1" />מדריך</Badge>}
                         </div>
                       </div>
@@ -373,17 +342,6 @@ export default function Workers() {
                     </Select>
                   </div>
 
-                  <div><Label dir="rtl">קטגוריה</Label>
-                    <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="category_1">{categoryNames.category_1}</SelectItem>
-                        <SelectItem value="category_2">{categoryNames.category_2}</SelectItem>
-                        <SelectItem value="category_3">{categoryNames.category_3}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                     <Label htmlFor="is_guide" className="cursor-pointer flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span dir="rtl">מדריך מוסמך</span></Label>
                     <Switch id="is_guide" checked={formData.is_guide} onCheckedChange={(checked) => setFormData({ ...formData, is_guide: checked })} />
@@ -426,22 +384,6 @@ export default function Workers() {
               )}
               <Button variant="outline" onClick={() => { setShowDialog(false); setEditingWorker(null); }} dir="rtl">ביטול</Button>
               <Button onClick={handleSubmit} disabled={!formData.nickname} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Category Names Dialog */}
-        <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">ערוך שמות קטגוריות</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div><Label dir="rtl">שם קטגוריה 1</Label><Input value={tempCategoryNames.category_1} onChange={(e) => setTempCategoryNames({ ...tempCategoryNames, category_1: e.target.value })} dir="rtl" /></div>
-              <div><Label dir="rtl">שם קטגוריה 2</Label><Input value={tempCategoryNames.category_2} onChange={(e) => setTempCategoryNames({ ...tempCategoryNames, category_2: e.target.value })} dir="rtl" /></div>
-              <div><Label dir="rtl">שם קטגוריה 3</Label><Input value={tempCategoryNames.category_3} onChange={(e) => setTempCategoryNames({ ...tempCategoryNames, category_3: e.target.value })} dir="rtl" /></div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCategoryDialog(false)} dir="rtl">ביטול</Button>
-              <Button onClick={handleSaveCategoryNames} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שמור</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

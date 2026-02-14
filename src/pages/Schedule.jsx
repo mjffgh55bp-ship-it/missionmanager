@@ -80,12 +80,14 @@ export default function Schedule() {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [customColumnOrders, setCustomColumnOrders] = useState({});
+  const [shiftStatuses, setShiftStatuses] = useState([]);
   
   const [editFormData, setEditFormData] = useState({
     start_time: "",
     end_time: "",
     hours: 4,
     notes: "",
+    status: "",
     column_values: {}
   });
 
@@ -136,12 +138,13 @@ export default function Schedule() {
       base44.entities.Unavailability.filter({ date: dateString })
     ]);
     
-    const [colTypesSettings, colSubTypesSettings, cartColsSettings, allTemplatesData, templateRowsData] = await Promise.all([
+    const [colTypesSettings, colSubTypesSettings, cartColsSettings, allTemplatesData, templateRowsData, shiftStatusesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_columns" }),
       base44.entities.Template.filter({ active: true }),
-      base44.entities.TemplateRow.filter({ date: dateString })
+      base44.entities.TemplateRow.filter({ date: dateString }),
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
     ]);
     setWorkers(workersData);
     setCarts(cartsData);
@@ -158,6 +161,7 @@ export default function Schedule() {
     if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     if (cartColsSettings.length > 0) setCartColumns(JSON.parse(cartColsSettings[0].setting_value) || {});
+    if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     
     // Load custom column orders for this date
     const columnOrderSettings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
@@ -289,6 +293,7 @@ export default function Schedule() {
       end_time: assignment.end_time || "",
       hours: assignment.hours || 4,
       notes: assignment.notes || "",
+      status: assignment.status || "",
       column_values: assignment.column_values || {}
     });
     setShowEditDialog(true);
@@ -312,6 +317,7 @@ export default function Schedule() {
       end_time: editFormData.end_time,
       hours,
       notes: editFormData.notes,
+      status: editFormData.status,
       column_values: editFormData.column_values
     });
     setShowEditDialog(false);
@@ -789,18 +795,20 @@ export default function Schedule() {
                                 </div>
                               </TableHead>
                             ))}
+                            <TableHead className="w-[100px]" dir="rtl">סטטוס</TableHead>
                             <TableHead className="w-[60px]" dir="rtl"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {templateRowsForTemplate.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={template.columns.length + 2} className="text-center text-gray-500 py-8" dir="rtl">
+                              <TableCell colSpan={template.columns.length + 3} className="text-center text-gray-500 py-8" dir="rtl">
                                 אין שורות. לחץ "הוסף שורה" להוספה.
                               </TableCell>
                             </TableRow>
                           ) : (
-                            templateRowsForTemplate.map((row, rowIndex) => (
+                            templateRowsForTemplate.map((row, rowIndex) => {
+                              return (
                               <TableRow key={row.id}>
                                 <TableCell className="w-[60px]">
                                     <div className="flex flex-col gap-1 items-center">
@@ -852,47 +860,66 @@ export default function Schedule() {
                                   </TableCell>
                                   {orderedColumns.map((col, idx) => (
                                   <TableCell key={idx} dir="rtl" className="p-0">
-                                    {col.type === "time" ? (
-                                      <Input
-                                        type="time"
-                                        value={row.values?.[col.name] || ""}
-                                        onChange={(e) => {
-                                          const newValues = { ...row.values, [col.name]: e.target.value };
-                                          base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                          setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                        }}
-                                        placeholder={col.default_value || ""}
-                                        dir="rtl"
-                                        className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
-                                      />
-                                    ) : (
-                                      <Input
-                                        type="text"
-                                        value={row.values?.[col.name] || ""}
-                                        onChange={(e) => {
-                                          const newValues = { ...row.values, [col.name]: e.target.value };
-                                          base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                          setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                        }}
-                                        placeholder={col.default_value || "-"}
-                                        dir="rtl"
-                                        className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
-                                      />
-                                    )}
+                                   {col.type === "time" ? (
+                                     <Input
+                                       type="time"
+                                       value={row.values?.[col.name] || ""}
+                                       onChange={(e) => {
+                                         const newValues = { ...row.values, [col.name]: e.target.value };
+                                         base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                         setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                       }}
+                                       placeholder={col.default_value || ""}
+                                       dir="rtl"
+                                       className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+                                     />
+                                   ) : (
+                                     <Input
+                                       type="text"
+                                       value={row.values?.[col.name] || ""}
+                                       onChange={(e) => {
+                                         const newValues = { ...row.values, [col.name]: e.target.value };
+                                         base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                         setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                       }}
+                                       placeholder={col.default_value || "-"}
+                                       dir="rtl"
+                                       className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+                                     />
+                                   )}
                                   </TableCell>
-                                ))}
-                                <TableCell className="p-1">
-                                  <Button 
+                                  ))}
+                                  <TableCell className="p-0">
+                                  <Select 
+                                   value={row.values?.status || ""} 
+                                   onValueChange={async (value) => {
+                                     const newValues = { ...row.values, status: value };
+                                     await base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                     setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                   }}
+                                  >
+                                   <SelectTrigger className="h-full border-0 rounded-none text-xs">
+                                     <SelectValue placeholder="-" />
+                                   </SelectTrigger>
+                                   <SelectContent>
+                                     <SelectItem value={null}>ללא</SelectItem>
+                                     {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                   </SelectContent>
+                                   </Select>
+                                   </TableCell>
+                                   <TableCell className="p-1">
+                                   <Button 
                                     variant="ghost" 
                                     size="icon" 
                                     className="h-7 w-7 text-red-500 hover:text-red-700" 
                                     onClick={() => handleDeleteTemplateRow(row.id)}
-                                  >
+                                   >
                                     <Trash2 className="w-3 h-3" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                                   </Button>
+                                   </TableCell>
+                                   </TableRow>
+                                   );
+                                   })
                           )}
                         </TableBody>
                       </Table>
@@ -951,6 +978,7 @@ export default function Schedule() {
                             <TableHead className="w-[120px]" dir="rtl">טבח ראשי</TableHead>
                             <TableHead className="w-[120px]" dir="rtl">עוזר טבח</TableHead>
                             <TableHead className="w-[120px]" dir="rtl">נוסף</TableHead>
+                            <TableHead className="w-[100px]" dir="rtl">סטטוס</TableHead>
                             {columns.map(col => (
                               <TableHead key={col} className="w-[100px]">
                                 <div className="flex items-center gap-1">
@@ -964,7 +992,7 @@ export default function Schedule() {
                         </TableHeader>
                         <TableBody>
                           {cartAssignments.length === 0 ? (
-                            <TableRow><TableCell colSpan={5 + columns.length} className="text-center text-gray-500 py-8" dir="rtl">אין משמרות. לחץ "משמרת" להוספה.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6 + columns.length} className="text-center text-gray-500 py-8" dir="rtl">אין משמרות. לחץ "משמרת" להוספה.</TableCell></TableRow>
                           ) : (
                             cartAssignments.map((assignment) => (
                               <TableRow key={assignment.id} className={assignment.has_trainee ? "bg-orange-50" : ""}>
@@ -999,6 +1027,23 @@ export default function Schedule() {
                                     )}
                                   </button>
                                 </TableCell>
+                                <TableCell>
+                                  <Select 
+                                    value={assignment.status || ""} 
+                                    onValueChange={async (value) => {
+                                      await base44.entities.Assignment.update(assignment.id, { status: value });
+                                      loadData();
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs">
+                                      <SelectValue placeholder="בחר..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value={null}>ללא</SelectItem>
+                                      {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                    </SelectContent>
+                                    </Select>
+                                    </TableCell>
                                 {columns.map(col => (
                                   <TableCell key={col}>
                                     <ColumnCell 
@@ -1118,6 +1163,15 @@ export default function Schedule() {
               <div className="grid grid-cols-2 gap-4">
                 <div><Label dir="rtl">שעת התחלה</Label><Input type="time" value={editFormData.start_time} onChange={(e) => setEditFormData({ ...editFormData, start_time: e.target.value })} /></div>
                 <div><Label dir="rtl">שעת סיום</Label><Input type="time" value={editFormData.end_time} onChange={(e) => setEditFormData({ ...editFormData, end_time: e.target.value })} /></div>
+              </div>
+              <div>
+                <Label dir="rtl">סטטוס</Label>
+                <Select value={editFormData.status} onValueChange={(value) => setEditFormData({ ...editFormData, status: value })}>
+                  <SelectTrigger><SelectValue placeholder="בחר סטטוס..." /></SelectTrigger>
+                  <SelectContent>
+                    {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div><Label dir="rtl">הערות</Label><Textarea value={editFormData.notes} onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })} rows={2} dir="rtl" /></div>
             </div>
