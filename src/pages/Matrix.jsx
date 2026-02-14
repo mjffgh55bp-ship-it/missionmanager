@@ -42,19 +42,7 @@ const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }, weekStartDate = 
 };
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
-const DEFAULT_ACTIVITY_TYPES = [
-  { id: 'constraint', label: 'אילוץ', color: '#E0BBE4' },
-  { id: 'management', label: 'תפקיד ניהול', color: '#C5F05A' },
-  { id: 'standby_30_mgmt', label: 'כוננות 30\' לתפקיד ניהול', color: '#9AE03A' },
-  { id: 'standby_15', label: 'כוננות 15\'', color: '#FF1493' },
-  { id: 'shift', label: 'משמרת', color: '#8B4513' },
-  { id: 'standby_long', label: 'כוננות 60/75/90/105/120/180', color: '#9B59B6' },
-  { id: 'trainer', label: 'מאמן', color: '#A9A9A9' },
-  { id: 'bird', label: 'ציפור', color: '#FFA500' },
-  { id: 'other', label: 'אחר', color: '#FFB6C1' },
-  { id: 'vacation', label: 'חופש', color: '#E6C3E6' },
-  { id: 'abroad', label: 'חו"ל', color: '#C8C8C8' }
-];
+
 
 const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
   if (!timeStr) return 0;
@@ -125,7 +113,7 @@ export default function Matrix() {
   const [selectedWorkerForType, setSelectedWorkerForType] = useState(null);
   const [showManualDialog, setShowManualDialog] = useState(false);
   const [selectedWorkerForManual, setSelectedWorkerForManual] = useState(null);
-  const [manualShiftData, setManualShiftData] = useState({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
+  const [manualShiftData, setManualShiftData] = useState({ start_time: '', end_time: '', type: 'available' });
   const [editingShift, setEditingShift] = useState(null);
   const [populationFilter, setPopulationFilter] = useState("__all__");
   const [roleFilter, setRoleFilter] = useState("__all__");
@@ -133,12 +121,6 @@ export default function Matrix() {
   const [workerRoles, setWorkerRoles] = useState([]);
   const [zoomRange, setZoomRange] = useState({ start: 0, end: 100 });
   const timelineRefs = useRef({});
-  const [activityTypes, setActivityTypes] = useState(DEFAULT_ACTIVITY_TYPES);
-  const [showActivityTypesDialog, setShowActivityTypesDialog] = useState(false);
-  const [editingActivityType, setEditingActivityType] = useState(null);
-  const [newActivityType, setNewActivityType] = useState({ label: '', color: '#3b82f6' });
-  const [tempActivityTypes, setTempActivityTypes] = useState([]);
-  const [selectedActivityType, setSelectedActivityType] = useState('shift');
   const [isLoadingData, setIsLoadingData] = useState(false);
   const loadingTimeoutRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState("__all__");
@@ -151,59 +133,6 @@ export default function Matrix() {
   useEffect(() => { 
     loadDynamicData(); 
   }, [currentDate, viewMode]);
-
-  useEffect(() => { loadActivityTypes(); }, []);
-
-  const loadActivityTypes = async () => {
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "activity_types" });
-    if (settings.length > 0) {
-      setActivityTypes(JSON.parse(settings[0].setting_value) || DEFAULT_ACTIVITY_TYPES);
-    } else {
-      setActivityTypes(DEFAULT_ACTIVITY_TYPES);
-    }
-  };
-
-  const saveActivityTypes = async (types) => {
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "activity_types" });
-    const data = { setting_key: "activity_types", setting_value: JSON.stringify(types) };
-    if (settings.length > 0) {
-      await base44.entities.AppSettings.update(settings[0].id, data);
-    } else {
-      await base44.entities.AppSettings.create(data);
-    }
-    setActivityTypes(types);
-  };
-
-  const handleOpenActivityTypesDialog = () => {
-    setTempActivityTypes([...activityTypes]);
-    setShowActivityTypesDialog(true);
-  };
-
-  const handleSaveActivityTypesDialog = async () => {
-    await saveActivityTypes(tempActivityTypes);
-    setShowActivityTypesDialog(false);
-    setNewActivityType({ label: '', color: '#3b82f6' });
-  };
-
-  const handleAddActivityType = () => {
-    if (!newActivityType.label) return;
-    const newId = newActivityType.label.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now();
-    const updatedTypes = [...tempActivityTypes, { id: newId, ...newActivityType }];
-    setTempActivityTypes(updatedTypes);
-    setNewActivityType({ label: '', color: '#3b82f6' });
-  };
-
-  const handleUpdateActivityType = (id, updates) => {
-    const updatedTypes = tempActivityTypes.map(t => t.id === id ? { ...t, ...updates } : t);
-    setTempActivityTypes(updatedTypes);
-  };
-
-  const handleDeleteActivityType = (id) => {
-    if (confirm('האם למחוק קטגוריה זו?')) {
-      const updatedTypes = tempActivityTypes.filter(t => t.id !== id);
-      setTempActivityTypes(updatedTypes);
-    }
-  };
 
   const loadStaticData = async () => {
     // Load workers and settings only once
@@ -402,16 +331,6 @@ export default function Matrix() {
     const startX = e.clientX - rect.left;
     const startPercent = (startX / rect.width) * 100;
     
-    // CRITICAL: Capture the activity type NOW before any state changes
-    const capturedActivityType = selectedActivityType;
-    const activityTypeInfo = activityTypes.find(t => t.id === capturedActivityType);
-    
-    console.log('🎯 MOUSE DOWN - ACTIVITY TYPE CAPTURE 🎯');
-    console.log('Selected Activity Type ID:', capturedActivityType);
-    console.log('Activity Type Label:', activityTypeInfo?.label);
-    console.log('Activity Type Color:', activityTypeInfo?.color);
-    console.log('Action:', action);
-    
     setDragging({
       workerId: worker.id,
       worker,
@@ -422,7 +341,6 @@ export default function Matrix() {
       originalEnd: shift?.end_time,
       originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0,
       originalType: shift?.type,
-      activityTypeToUse: capturedActivityType,
       rect
     });
   };
@@ -483,7 +401,7 @@ export default function Matrix() {
       return;
     }
     
-    const { workerId, worker, shift, action, activityTypeToUse } = dragging;
+    const { workerId, worker, shift, action } = dragging;
     const { start, end, day } = dragPreview;
     
     if (start === end) {
@@ -499,25 +417,15 @@ export default function Matrix() {
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     
     if (action === 'create') {
-      const activityType = activityTypeToUse || 'shift';
-      const activityTypeInfo = activityTypes.find(t => t.id === activityType);
-      
-      console.log('💾 CREATING NEW SHIFT 💾');
-      console.log('Activity Type to Save:', activityType);
-      console.log('Activity Label:', activityTypeInfo?.label);
-      console.log('Activity Color:', activityTypeInfo?.color);
-      
       const newShift = { 
         date: targetDate, 
         start_time: start, 
         end_time: end, 
         type: 'available', 
-        activity_type: activityType,
         priority: updatedShifts.length + 1 
       };
       
       updatedShifts.push(newShift);
-      console.log('✅ Shift Created:', JSON.stringify(newShift));
     } else if (shift) {
       updatedShifts = updatedShifts.map(s => {
         if (s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time) {
@@ -592,7 +500,7 @@ export default function Matrix() {
 
   const handleManualShiftAdd = (worker) => {
     setSelectedWorkerForManual(worker);
-    setManualShiftData({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
+    setManualShiftData({ start_time: '', end_time: '', type: 'available' });
     setEditingShift(null);
     setShowManualDialog(true);
   };
@@ -604,8 +512,7 @@ export default function Matrix() {
     setManualShiftData({ 
       start_time: shift.start_time, 
       end_time: shift.end_time, 
-      type: shift.type,
-      activity_type: shift.activity_type || 'shift'
+      type: shift.type
     });
     setEditingShift(shift);
     setShowManualDialog(true);
@@ -629,8 +536,7 @@ export default function Matrix() {
             date: targetDate,
             start_time: manualShiftData.start_time,
             end_time: manualShiftData.end_time,
-            type: manualShiftData.type,
-            activity_type: manualShiftData.activity_type || 'shift'
+            type: manualShiftData.type
           };
         }
         return s;
@@ -642,7 +548,6 @@ export default function Matrix() {
         start_time: manualShiftData.start_time,
         end_time: manualShiftData.end_time,
         type: manualShiftData.type,
-        activity_type: manualShiftData.activity_type || 'shift',
         priority: updatedShifts.length + 1
       });
     }
@@ -660,7 +565,7 @@ export default function Matrix() {
 
     setShowManualDialog(false);
     setSelectedWorkerForManual(null);
-    setManualShiftData({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
+    setManualShiftData({ start_time: '', end_time: '', type: 'available' });
     setEditingShift(null);
     debouncedLoadData();
   };
@@ -696,70 +601,45 @@ export default function Matrix() {
 
     workerShifts.forEach(shift => {
       const hours = calculateHours(shift.start_time, shift.end_time);
-      const activityType = shift.activity_type || 'shift';
       
-      // Count only shift, trainer, and other for total
-      if (['shift', 'trainer', 'other'].includes(activityType)) {
-        totalShifts++;
-      }
-
-      // Standby - every 4 hours = 1 standby
-      if (activityType.includes('standby') || activityType === 'standby_15' || activityType === 'standby_30_mgmt' || activityType === 'standby_long') {
-        standbyHours += hours;
-      }
-
-      // Regular shifts
-      if (activityType === 'shift') {
-        regularShiftCount++;
+      // Count all shifts for total
+      totalShifts++;
+      regularShiftCount++;
         
-        // Core hours (6:00-18:00) - every 4 hours = 1 shift
-        const [startHour, startMin] = shift.start_time.split(':').map(Number);
-        const [endHour, endMin] = shift.end_time.split(':').map(Number);
-        
-        // Check if shift is within core hours
-        const startInCore = startHour >= 6 && startHour < 18;
-        const endInCore = endHour > 6 && endHour <= 18;
-        
-        if (startInCore || endInCore) {
-          // Calculate overlap with core hours
-          const coreStart = Math.max(startHour + startMin / 60, 6);
-          const coreEnd = Math.min(endHour + endMin / 60, 18);
-          if (coreEnd > coreStart) {
-            coreHours += Math.max(0, coreEnd - coreStart);
-          }
-        }
-        
-        // Extreme hours (2:00-6:00) - every 4 hours = 1 shift
-        const startInExtreme = startHour >= 2 && startHour < 6;
-        const endInExtreme = endHour > 2 && endHour <= 6;
-        
-        if (startInExtreme || endInExtreme) {
-          // Calculate overlap with extreme hours
-          const extremeStart = Math.max(startHour + startMin / 60, 2);
-          const extremeEnd = Math.min(endHour + endMin / 60, 6);
-          if (extremeEnd > extremeStart) {
-            extremeHours += Math.max(0, extremeEnd - extremeStart);
-          }
+      // Core hours (6:00-18:00) - every 4 hours = 1 shift
+      const [startHour, startMin] = shift.start_time.split(':').map(Number);
+      const [endHour, endMin] = shift.end_time.split(':').map(Number);
+      
+      // Check if shift is within core hours
+      const startInCore = startHour >= 6 && startHour < 18;
+      const endInCore = endHour > 6 && endHour <= 18;
+      
+      if (startInCore || endInCore) {
+        // Calculate overlap with core hours
+        const coreStart = Math.max(startHour + startMin / 60, 6);
+        const coreEnd = Math.min(endHour + endMin / 60, 18);
+        if (coreEnd > coreStart) {
+          coreHours += Math.max(0, coreEnd - coreStart);
         }
       }
-
-      // Training - each hour = 1
-      if (activityType === 'trainer') {
-        trainingHours += hours;
-      }
-
-      // Other
-      if (activityType === 'other') {
-        otherCount++;
+      
+      // Extreme hours (2:00-6:00) - every 4 hours = 1 shift
+      const startInExtreme = startHour >= 2 && startHour < 6;
+      const endInExtreme = endHour > 2 && endHour <= 6;
+      
+      if (startInExtreme || endInExtreme) {
+        // Calculate overlap with extreme hours
+        const extremeStart = Math.max(startHour + startMin / 60, 2);
+        const extremeEnd = Math.min(endHour + endMin / 60, 6);
+        if (extremeEnd > extremeStart) {
+          extremeHours += Math.max(0, extremeEnd - extremeStart);
+        }
       }
     });
 
     return {
       total: totalShifts,
-      standby: Math.round((standbyHours / 4) * 10) / 10,
       regularShift: regularShiftCount,
-      training: Math.round(trainingHours * 10) / 10,
-      other: otherCount,
       core: Math.round((coreHours / 4) * 10) / 10,
       extreme: Math.round((extremeHours / 4) * 10) / 10
     };
@@ -805,23 +685,15 @@ export default function Matrix() {
     // Hide if outside zoom range
     if (startPercent < 0 || startPercent > 100) return null;
 
-    // Get activity type color and label
-    const activityTypeId = shift.activity_type || 'shift';
-    const activityType = activityTypes.find(t => t.id === activityTypeId);
-    const activityColor = activityType ? activityType.color : '#8B4513';
-    const activityLabel = activityType ? activityType.label : 'משמרת';
-    
     const icons = { wanted: <Star className="w-3 h-3 fill-current" />, available: <Check className="w-3 h-3" />, unavailable: <Ban className="w-3 h-3" /> };
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
 
     return (
       <div
-        className="absolute h-full border-l-2 rounded-sm flex flex-col items-center justify-center px-1 z-10 cursor-move"
+        className="absolute h-full border-l-2 rounded-sm flex flex-col items-center justify-center px-1 z-10 cursor-move bg-cyan-300 border-cyan-500"
         style={{ 
           left: `${startPercent}%`, 
           width: `${width}%`,
-          backgroundColor: activityColor,
-          borderColor: activityColor,
           opacity: 0.9
         }}
         onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }}
@@ -1232,10 +1104,7 @@ export default function Matrix() {
                          </div>
                          <div className="flex-1 px-3 py-1 flex gap-4 items-center flex-wrap text-gray-700" dir="rtl">
                            <span><strong>סה"כ:</strong> {summary.total}</span>
-                           <span><strong>כוננות:</strong> {summary.standby}</span>
                            <span><strong>משמרת:</strong> {summary.regularShift}</span>
-                           <span><strong>אימון:</strong> {summary.training}</span>
-                           <span><strong>אחר:</strong> {summary.other}</span>
                            <span><strong>ליבה:</strong> {summary.core}</span>
                            <span><strong>קיצון:</strong> {summary.extreme}</span>
                          </div>
@@ -1388,7 +1257,7 @@ export default function Matrix() {
                       await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
                       setShowManualDialog(false);
                       setSelectedWorkerForManual(null);
-                      setManualShiftData({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
+                      setManualShiftData({ start_time: '', end_time: '', type: 'available' });
                       setEditingShift(null);
                       debouncedLoadData();
                     }}
@@ -1402,7 +1271,7 @@ export default function Matrix() {
                 <Button variant="outline" onClick={() => {
                   setShowManualDialog(false);
                   setSelectedWorkerForManual(null);
-                  setManualShiftData({ start_time: '', end_time: '', type: 'available', activity_type: 'shift' });
+                  setManualShiftData({ start_time: '', end_time: '', type: 'available' });
                   setEditingShift(null);
                 }} dir="rtl">ביטול</Button>
                 <Button 
@@ -1417,69 +1286,6 @@ export default function Matrix() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* Activity Types Management Dialog */}
-        <Dialog open={showActivityTypesDialog} onOpenChange={setShowActivityTypesDialog}>
-          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle dir="rtl">ניהול קטגוריות פעילות</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="border rounded-lg p-4 space-y-3">
-                <Label className="font-semibold" dir="rtl">קטגוריות קיימות</Label>
-                {tempActivityTypes.map(type => (
-                  <div key={type.id} className="flex items-center gap-3 p-2 border rounded-lg">
-                    <Input
-                      type="color"
-                      value={type.color}
-                      onChange={(e) => handleUpdateActivityType(type.id, { color: e.target.value })}
-                      className="w-16 h-10"
-                    />
-                    <Input
-                      value={type.label}
-                      onChange={(e) => handleUpdateActivityType(type.id, { label: e.target.value })}
-                      className="flex-1"
-                      dir="rtl"
-                    />
-                    <Button
-                      variant="destructive"
-                      size="icon"
-                      onClick={() => handleDeleteActivityType(type.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border rounded-lg p-4 space-y-3">
-                <Label className="font-semibold" dir="rtl">הוסף קטגוריה חדשה</Label>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="color"
-                    value={newActivityType.color}
-                    onChange={(e) => setNewActivityType({ ...newActivityType, color: e.target.value })}
-                    className="w-16 h-10"
-                  />
-                  <Input
-                    value={newActivityType.label}
-                    onChange={(e) => setNewActivityType({ ...newActivityType, label: e.target.value })}
-                    placeholder="שם הקטגוריה..."
-                    className="flex-1"
-                    dir="rtl"
-                  />
-                  <Button onClick={handleAddActivityType} disabled={!newActivityType.label} dir="rtl">
-                    <Plus className="w-4 h-4 ml-1" />
-                    הוסף
-                  </Button>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowActivityTypesDialog(false)} dir="rtl">ביטול</Button>
-              <Button onClick={handleSaveActivityTypesDialog} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שמור</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
 
       </div>
     </div>
