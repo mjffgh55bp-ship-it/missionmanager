@@ -127,22 +127,31 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     
-    // Split API calls into smaller groups to avoid rate limits
-    const [workersData, cartsData, assignmentsData, availabilitiesData, unavailabilitiesData] = await Promise.all([
+    // Load entity data first
+    const [workersData, cartsData, assignmentsData] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.FoodCart.filter({ active: true }),
-      base44.entities.Assignment.filter({ date: dateString }),
+      base44.entities.Assignment.filter({ date: dateString })
+    ]);
+    
+    // Load availability data
+    const [availabilitiesData, unavailabilitiesData] = await Promise.all([
       base44.entities.Availability.filter({ week_start_date: weekStartStr }),
       base44.entities.Unavailability.filter({ date: dateString })
     ]);
     
-    const [colTypesSettings, colSubTypesSettings, cartColsSettings, allTemplatesData, templateRowsData, shiftStatusesSettings] = await Promise.all([
+    // Load settings
+    const [colTypesSettings, colSubTypesSettings, cartColsSettings, shiftStatusesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_columns" }),
-      base44.entities.Template.filter({ active: true }),
-      base44.entities.TemplateRow.filter({ date: dateString }),
       base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
+    ]);
+    
+    // Load templates
+    const [allTemplatesData, templateRowsData] = await Promise.all([
+      base44.entities.Template.filter({ active: true }),
+      base44.entities.TemplateRow.filter({ date: dateString })
     ]);
     setWorkers(workersData);
     setCarts(cartsData);
