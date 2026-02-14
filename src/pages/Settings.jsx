@@ -489,6 +489,8 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {/* Activity Types Management - Removed as requested */}
+
         {/* Tips & Policy */}
         <Card className="border-none shadow-lg">
           <CardHeader className="border-b">
