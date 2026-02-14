@@ -28,6 +28,8 @@ export default function Settings() {
   const [columnTypes, setColumnTypes] = useState([]);
   const [columnSubTypes, setColumnSubTypes] = useState({});
   const [newColumnType, setNewColumnType] = useState("");
+  const [assignmentColumns, setAssignmentColumns] = useState([]);
+  const [newAssignmentColumn, setNewAssignmentColumn] = useState("");
   const [selectedColTypeForSubType, setSelectedColTypeForSubType] = useState("");
   const [newColSubType, setNewColSubType] = useState("");
   const [populations, setPopulations] = useState([]);
