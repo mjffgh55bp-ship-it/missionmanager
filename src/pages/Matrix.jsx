@@ -772,22 +772,35 @@ export default function Matrix() {
     if (!resizingBlock) return;
     e.preventDefault();
     
-    const deltaX = e.clientX - resizeStartX;
+    const deltaX = resizeStartX - e.clientX; // הפוך את הכיוון
     const cellWidth = 24;
-    const hoursDelta = Math.round(deltaX / cellWidth);
+    const hoursDelta = Math.floor(deltaX / cellWidth);
     
-    if (hoursDelta === 0) return;
+    const { workerId, dayIndex, hour, colspan, side, originalHour, originalColspan, originalCategoryId, originalNote } = resizingBlock;
+    const categoryId = originalCategoryId || getCellCategory(workerId, dayIndex, originalHour || hour);
+    const note = originalNote || getCellNote(workerId, dayIndex, originalHour || hour);
+
+    const currentHour = originalHour || hour;
+    const currentColspan = originalColspan || colspan;
+
+    // חשב את הבלוק החדש
+    let newStartHour, newColspan;
     
-    const { workerId, dayIndex, hour, colspan, side, originalHour, originalColspan } = resizingBlock;
-    const categoryId = getCellCategory(workerId, dayIndex, originalHour || hour);
-    const note = getCellNote(workerId, dayIndex, originalHour || hour);
+    if (side === 'start') {
+      // גרירה ימינה = הקטנה, שמאלה = הגדלה
+      newStartHour = (currentHour + hoursDelta + 1000 * 24) % 24;
+      newColspan = Math.max(1, currentColspan - hoursDelta);
+    } else {
+      // side === 'end'
+      // גרירה שמאלה = הקטנה, ימינה = הגדלה
+      newStartHour = currentHour;
+      newColspan = Math.max(1, currentColspan + hoursDelta);
+    }
 
     setCellData(prev => {
       const newData = { ...prev };
 
       // מחק את כל הבלוק הקודם
-      const currentHour = originalHour || hour;
-      const currentColspan = originalColspan || colspan;
       for (let i = 0; i < currentColspan; i++) {
         const hourToDelete = (currentHour + i) % 24;
         const dayOffset = Math.floor((currentHour + i) / 24);
@@ -804,20 +817,6 @@ export default function Matrix() {
         }
       }
 
-      // חשב את הבלוק החדש
-      let newStartHour, newColspan;
-      
-      if (side === 'start') {
-        // גרירה שמאלה = הקטנה (hoursDelta חיובי), ימינה = הגדלה (hoursDelta שלילי)
-        newStartHour = (currentHour - hoursDelta + 24) % 24;
-        newColspan = Math.max(1, currentColspan + hoursDelta);
-      } else {
-        // side === 'end'
-        // גרירה ימינה = הגדלה (hoursDelta חיובי), שמאלה = הקטנה (hoursDelta שלילי)
-        newStartHour = currentHour;
-        newColspan = Math.max(1, currentColspan + hoursDelta);
-      }
-
       // צור את הבלוק החדש
       for (let i = 0; i < newColspan; i++) {
         const newHour = (newStartHour + i) % 24;
@@ -832,12 +831,15 @@ export default function Matrix() {
     });
     
     // עדכן את המצב של הבלוק שמשתנה
-    setResizingBlock({
-      ...resizingBlock,
-      originalHour: originalHour || hour,
-      originalColspan: originalColspan || colspan
-    });
-    setResizeStartX(e.clientX);
+    if (!originalHour) {
+      setResizingBlock({
+        ...resizingBlock,
+        originalHour: hour,
+        originalColspan: colspan,
+        originalCategoryId: categoryId,
+        originalNote: note
+      });
+    }
   };
 
   const handleResizeEnd = () => {
