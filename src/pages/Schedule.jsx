@@ -905,20 +905,21 @@ export default function Schedule() {
                                      <SelectItem value={null}>ללא</SelectItem>
                                      {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                    </SelectContent>
-                                  </Select>
-                                  </TableCell>
-                                  <TableCell className="p-1">
-                                  <Button 
+                                   </Select>
+                                   </TableCell>
+                                   <TableCell className="p-1">
+                                   <Button 
                                     variant="ghost" 
                                     size="icon" 
                                     className="h-7 w-7 text-red-500 hover:text-red-700" 
                                     onClick={() => handleDeleteTemplateRow(row.id)}
-                                  >
+                                   >
                                     <Trash2 className="w-3 h-3" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                                   </Button>
+                                   </TableCell>
+                                   </TableRow>
+                                   );
+                                   })
                           )}
                         </TableBody>
                       </Table>
@@ -1041,8 +1042,8 @@ export default function Schedule() {
                                       <SelectItem value={null}>ללא</SelectItem>
                                       {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                     </SelectContent>
-                                  </Select>
-                                </TableCell>
+                                    </Select>
+                                    </TableCell>
                                 {columns.map(col => (
                                   <TableCell key={col}>
                                     <ColumnCell 
