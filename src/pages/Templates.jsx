@@ -294,10 +294,6 @@ export default function Templates() {
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <Label dir="rtl">עמודות</Label>
-                  <Button size="sm" variant="outline" onClick={handleAddColumn} dir="rtl">
-                    <Plus className="w-3 h-3 ml-1" />
-                    עמודה
-                  </Button>
                 </div>
                 <div className="space-y-3 max-h-96 overflow-y-auto">
                   {formData.columns.map((col, idx) => (
@@ -366,10 +362,6 @@ export default function Templates() {
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <Label dir="rtl">שורות ברירת מחדל (אופציונלי)</Label>
-                  <Button size="sm" variant="outline" onClick={handleAddDefaultRow} disabled={formData.columns.length === 0} dir="rtl">
-                    <Plus className="w-3 h-3 ml-1" />
-                    שורה
-                  </Button>
                 </div>
                 {formData.columns.length === 0 ? (
                   <div className="text-sm text-gray-500 text-center py-4 border rounded-lg" dir="rtl">
