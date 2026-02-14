@@ -14,6 +14,7 @@ export default function Templates() {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
+  const [columnTypes, setColumnTypes] = useState([]);
   const [formData, setFormData] = useState({
     name: "",
     columns: [],
@@ -22,6 +23,7 @@ export default function Templates() {
 
   useEffect(() => {
     loadTemplates();
+    loadColumnTypes();
   }, []);
 
   const loadTemplates = async () => {
@@ -31,22 +33,19 @@ export default function Templates() {
     setLoading(false);
   };
 
+  const loadColumnTypes = async () => {
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" });
+    if (settings.length > 0) {
+      setColumnTypes(JSON.parse(settings[0].setting_value) || []);
+    }
+  };
+
   const handleAddTemplate = () => {
     setEditingTemplate(null);
     setFormData({
       name: "",
       color: "#3b82f6",
-      columns: [
-        { name: "תדריך", type: "text", width: 120 },
-        { name: "התחלה", type: "time", width: 120 },
-        { name: "סיום", type: "time", width: 120 },
-        { name: "מדריך", type: "worker", width: 120 },
-        { name: "שף / שף 2", type: "worker", width: 120 },
-        { name: "סו שף", type: "worker", width: 120 },
-        { name: "נוסף", type: "worker", width: 120 },
-        { name: "משימה", type: "text", width: 120 },
-        { name: "הערות", type: "text", width: 120 }
-      ],
+      columns: [],
       default_rows: []
     });
     setShowDialog(true);
@@ -93,10 +92,10 @@ export default function Templates() {
     loadTemplates();
   };
 
-  const handleAddColumn = () => {
+  const handleAddColumn = (columnTypeName) => {
     setFormData({
       ...formData,
-      columns: [...formData.columns, { name: "", type: "text", width: 120 }]
+      columns: [...formData.columns, { name: columnTypeName, type: "text", width: 120 }]
     });
   };
 
@@ -294,69 +293,85 @@ export default function Templates() {
               <div>
                 <div className="flex justify-between items-center mb-3">
                   <Label dir="rtl">עמודות</Label>
+                  <Select value="" onValueChange={handleAddColumn}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="הוסף עמודה..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {columnTypes.map(type => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {formData.columns.map((col, idx) => (
-                    <div key={idx} className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg">
-                      <GripVertical className="w-4 h-4 text-gray-400 mt-2" />
-                      <div className="flex-1 space-y-2">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                {formData.columns.length === 0 ? (
+                  <div className="text-sm text-gray-500 text-center py-8 border rounded-lg" dir="rtl">
+                    בחר סוג עמודה מהרשימה למעלה להוספת עמודות
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {formData.columns.map((col, idx) => (
+                      <div key={idx} className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg">
+                        <GripVertical className="w-4 h-4 text-gray-400 mt-2" />
+                        <div className="flex-1 space-y-2">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <div>
+                              <Label className="text-xs" dir="rtl">שם</Label>
+                              <Input
+                                value={col.name}
+                                onChange={(e) => handleUpdateColumn(idx, "name", e.target.value)}
+                                placeholder="שם העמודה"
+                                dir="rtl"
+                                className="text-sm"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs" dir="rtl">סוג</Label>
+                              <Select value={col.type} onValueChange={(val) => handleUpdateColumn(idx, "type", val)}>
+                                <SelectTrigger className="text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="text">טקסט</SelectItem>
+                                  <SelectItem value="time">שעה</SelectItem>
+                                  <SelectItem value="select">בחירה</SelectItem>
+                                  <SelectItem value="worker">עובד</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs" dir="rtl">רוחב</Label>
+                              <Input
+                                type="number"
+                                value={col.width}
+                                onChange={(e) => handleUpdateColumn(idx, "width", parseInt(e.target.value))}
+                                className="text-sm"
+                              />
+                            </div>
+                          </div>
                           <div>
-                            <Label className="text-xs" dir="rtl">שם</Label>
+                            <Label className="text-xs" dir="rtl">טקסט ברירת מחדל</Label>
                             <Input
-                              value={col.name}
-                              onChange={(e) => handleUpdateColumn(idx, "name", e.target.value)}
-                              placeholder="שם העמודה"
+                              value={col.default_value || ""}
+                              onChange={(e) => handleUpdateColumn(idx, "default_value", e.target.value)}
+                              placeholder="אופציונלי - טקסט שיופיע אוטומטית"
                               dir="rtl"
                               className="text-sm"
                             />
                           </div>
-                          <div>
-                            <Label className="text-xs" dir="rtl">סוג</Label>
-                            <Select value={col.type} onValueChange={(val) => handleUpdateColumn(idx, "type", val)}>
-                              <SelectTrigger className="text-sm">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="text">טקסט</SelectItem>
-                                <SelectItem value="time">שעה</SelectItem>
-                                <SelectItem value="select">בחירה</SelectItem>
-                                <SelectItem value="worker">עובד</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label className="text-xs" dir="rtl">רוחב</Label>
-                            <Input
-                              type="number"
-                              value={col.width}
-                              onChange={(e) => handleUpdateColumn(idx, "width", parseInt(e.target.value))}
-                              className="text-sm"
-                            />
-                          </div>
                         </div>
-                        <div>
-                          <Label className="text-xs" dir="rtl">טקסט ברירת מחדל</Label>
-                          <Input
-                            value={col.default_value || ""}
-                            onChange={(e) => handleUpdateColumn(idx, "default_value", e.target.value)}
-                            placeholder="אופציונלי - טקסט שיופיע אוטומטית"
-                            dir="rtl"
-                            className="text-sm"
-                          />
-                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-500 hover:text-red-700 mt-6"
+                          onClick={() => handleRemoveColumn(idx)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-red-500 hover:text-red-700 mt-6"
-                        onClick={() => handleRemoveColumn(idx)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
