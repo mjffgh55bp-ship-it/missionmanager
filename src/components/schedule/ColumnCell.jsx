@@ -8,9 +8,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 export default function ColumnCell({ assignmentId, colType, columnValues, availableSubTypes, onSaved, isTemplateRow = false }) {
   const [open, setOpen] = useState(false);
-  const colData = columnValues?.[colType];
-  const savedValue = colData?.value || "";
-  const savedSubTypes = colData?.subTypes || (colData?.subType ? [colData.subType] : []);
+  
+  // Handle both template rows and assignments
+  const colData = isTemplateRow ? columnValues : columnValues?.[colType];
+  const savedValue = isTemplateRow ? (columnValues?.[colType] || "") : (colData?.value || "");
+  const savedSubTypes = isTemplateRow 
+    ? (columnValues?.[`${colType}_subTypes`] || [])
+    : (colData?.subTypes || (colData?.subType ? [colData.subType] : []));
   
   const [localValue, setLocalValue] = useState("");
   const [localSubTypes, setLocalSubTypes] = useState([]);
@@ -18,21 +22,39 @@ export default function ColumnCell({ assignmentId, colType, columnValues, availa
   // Sync local state when popover opens
   useEffect(() => {
     if (open) {
-      const currentData = columnValues?.[colType];
-      setLocalValue(currentData?.value || "");
-      setLocalSubTypes(currentData?.subTypes || (currentData?.subType ? [currentData.subType] : []));
+      if (isTemplateRow) {
+        setLocalValue(columnValues?.[colType] || "");
+        setLocalSubTypes(columnValues?.[`${colType}_subTypes`] || []);
+      } else {
+        const currentData = columnValues?.[colType];
+        setLocalValue(currentData?.value || "");
+        setLocalSubTypes(currentData?.subTypes || (currentData?.subType ? [currentData.subType] : []));
+      }
     }
-  }, [open, columnValues, colType]);
+  }, [open, columnValues, colType, isTemplateRow]);
 
   const handleSave = async () => {
     const cleanedSubTypes = localSubTypes.filter(st => st && st !== "__none__");
-    const updatedValues = { 
-      ...(columnValues || {}), 
-      [colType]: { value: localValue, subTypes: cleanedSubTypes } 
-    };
-    await base44.entities.Assignment.update(assignmentId, { column_values: updatedValues });
-    setOpen(false);
-    if (onSaved) onSaved(updatedValues);
+    
+    if (isTemplateRow) {
+      // For template rows, save directly to values object
+      const updatedValues = { 
+        ...(columnValues || {}), 
+        [colType]: localValue,
+        [`${colType}_subTypes`]: cleanedSubTypes
+      };
+      setOpen(false);
+      if (onSaved) onSaved(updatedValues);
+    } else {
+      // For assignments, save to column_values
+      const updatedValues = { 
+        ...(columnValues || {}), 
+        [colType]: { value: localValue, subTypes: cleanedSubTypes } 
+      };
+      await base44.entities.Assignment.update(assignmentId, { column_values: updatedValues });
+      setOpen(false);
+      if (onSaved) onSaved(updatedValues);
+    }
   };
 
   const toggleSubType = (st) => {
