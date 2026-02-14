@@ -1468,7 +1468,8 @@ export default function Schedule() {
                   setNewTemplateColumnName("");
                   setNewTemplateColumnType("text");
                   setSelectedTemplate(null);
-                  loadData();
+                  await loadData();
+                  toast.success('עמודה נוספה בהצלחה');
                 }}
                 disabled={!newTemplateColumnName || (newTemplateColumnName === "worker_custom" && !newTemplateColumnType)}
                 className="bg-blue-900 hover:bg-blue-800"
