@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-export default function ColumnCell({ assignmentId, colType, columnValues, availableSubTypes, onSaved }) {
+export default function ColumnCell({ assignmentId, colType, columnValues, availableSubTypes, onSaved, isTemplateRow = false }) {
   const [open, setOpen] = useState(false);
   const colData = columnValues?.[colType];
   const savedValue = colData?.value || "";

@@ -910,17 +910,17 @@ export default function Schedule() {
                                       className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
                                     />
                                   ) : (
-                                    <Input
-                                      type="text"
-                                      value={row.values?.[col.name] || ""}
-                                      onChange={(e) => {
-                                        const newValues = { ...row.values, [col.name]: e.target.value };
+                                    <ColumnCell 
+                                      assignmentId={row.id}
+                                      colType={col.name}
+                                      columnValues={row.values || {}}
+                                      availableSubTypes={columnSubTypes[col.name] || []}
+                                      isTemplateRow={true}
+                                      onSaved={(updatedColumnValues) => {
+                                        const newValues = { ...row.values, ...updatedColumnValues };
                                         base44.entities.TemplateRow.update(row.id, { values: newValues });
                                         setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
                                       }}
-                                      placeholder={col.default_value || "-"}
-                                      dir="rtl"
-                                      className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
                                     />
                                   )}
                                   </TableCell>
@@ -1415,24 +1415,30 @@ export default function Schedule() {
             <DialogHeader><DialogTitle dir="rtl">הוסף עמודה ל{selectedTemplate?.name}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label dir="rtl">שם העמודה</Label>
-                <Input
-                  value={newTemplateColumnName}
-                  onChange={(e) => setNewTemplateColumnName(e.target.value)}
-                  placeholder="לדוגמה: שעה, שם..."
-                  dir="rtl"
-                />
-              </div>
-              <div>
-                <Label dir="rtl">סוג</Label>
-                <Select value={newTemplateColumnType} onValueChange={setNewTemplateColumnType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label dir="rtl">בחר סוג עמודה</Label>
+                <Select value={newTemplateColumnName} onValueChange={setNewTemplateColumnName}>
+                  <SelectTrigger><SelectValue placeholder="בחר מסוגי העמודות..." /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="text">טקסט</SelectItem>
-                    <SelectItem value="worker">איוש</SelectItem>
+                    <SelectItem value="time">זמן התחלה</SelectItem>
+                    <SelectItem value="time_end">זמן סיום</SelectItem>
+                    {columnTypes.map(t => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                    <SelectItem value="worker_custom">איוש (מותאם אישית)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {newTemplateColumnName === "worker_custom" && (
+                <div>
+                  <Label dir="rtl">שם עמודת איוש</Label>
+                  <Input
+                    value={newTemplateColumnType}
+                    onChange={(e) => setNewTemplateColumnType(e.target.value)}
+                    placeholder="לדוגמה: שף, סו-שף..."
+                    dir="rtl"
+                  />
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => {
@@ -1443,11 +1449,20 @@ export default function Schedule() {
               <Button 
                 onClick={async () => {
                   if (!newTemplateColumnName || !selectedTemplate) return;
-                  const updatedColumns = [...selectedTemplate.columns, {
-                    name: newTemplateColumnName,
-                    type: newTemplateColumnType,
-                    width: 120
-                  }];
+                  if (newTemplateColumnName === "worker_custom" && !newTemplateColumnType) return;
+                  
+                  let columnToAdd;
+                  if (newTemplateColumnName === "time") {
+                    columnToAdd = { name: "התחלה", type: "time", width: 100 };
+                  } else if (newTemplateColumnName === "time_end") {
+                    columnToAdd = { name: "סיום", type: "time", width: 100 };
+                  } else if (newTemplateColumnName === "worker_custom") {
+                    columnToAdd = { name: newTemplateColumnType, type: "worker", width: 150 };
+                  } else {
+                    columnToAdd = { name: newTemplateColumnName, type: "text", width: 120 };
+                  }
+                  
+                  const updatedColumns = [...selectedTemplate.columns, columnToAdd];
                   await base44.entities.Template.update(selectedTemplate.id, { columns: updatedColumns });
                   setShowAddTemplateColumnDialog(false);
                   setNewTemplateColumnName("");
@@ -1455,7 +1470,7 @@ export default function Schedule() {
                   setSelectedTemplate(null);
                   loadData();
                 }}
-                disabled={!newTemplateColumnName}
+                disabled={!newTemplateColumnName || (newTemplateColumnName === "worker_custom" && !newTemplateColumnType)}
                 className="bg-blue-900 hover:bg-blue-800"
                 dir="rtl"
               >
