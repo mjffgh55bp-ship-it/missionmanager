@@ -48,6 +48,7 @@ export default function Schedule() {
   const [columnTypes, setColumnTypes] = useState([]);
   const [columnSubTypes, setColumnSubTypes] = useState({});
   const [cartColumns, setCartColumns] = useState({});
+  const [assignmentColumns, setAssignmentColumns] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
@@ -141,11 +142,12 @@ export default function Schedule() {
     ]);
     
     // Load settings
-    const [colTypesSettings, colSubTypesSettings, cartColsSettings, shiftStatusesSettings] = await Promise.all([
+    const [colTypesSettings, colSubTypesSettings, cartColsSettings, shiftStatusesSettings, assignmentColumnsSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_columns" }),
-      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
+      base44.entities.AppSettings.filter({ setting_key: "assignment_columns" })
     ]);
     
     // Load templates
@@ -169,6 +171,7 @@ export default function Schedule() {
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     if (cartColsSettings.length > 0) setCartColumns(JSON.parse(cartColsSettings[0].setting_value) || {});
     if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
+    if (assignmentColumnsSettings.length > 0) setAssignmentColumns(JSON.parse(assignmentColumnsSettings[0].setting_value) || []);
     
     // Load custom column orders for this date
     const columnOrderSettings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
@@ -1227,12 +1230,25 @@ export default function Schedule() {
             <DialogHeader><DialogTitle dir="rtl">הוסף עמודה</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label dir="rtl">סוג עמודה</Label>
+                <Label dir="rtl">בחר עמודה</Label>
                 <Select value={newColumnType} onValueChange={setNewColumnType}>
-                  <SelectTrigger><SelectValue placeholder="בחר סוג..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
                   <SelectContent>
-                    {columnTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    {columnTypes.length === 0 && <div className="p-2 text-xs text-gray-500" dir="rtl">לא הוגדרו סוגים. הוסף אותם בהגדרות.</div>}
+                    {assignmentColumns.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-gray-500">עמודות איוש</div>
+                        {assignmentColumns.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </>
+                    )}
+                    {columnTypes.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 border-t mt-1 pt-2">עמודות נוספות</div>
+                        {columnTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </>
+                    )}
+                    {columnTypes.length === 0 && assignmentColumns.length === 0 && (
+                      <div className="p-2 text-xs text-gray-500" dir="rtl">לא הוגדרו עמודות. הוסף אותן בהגדרות.</div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
