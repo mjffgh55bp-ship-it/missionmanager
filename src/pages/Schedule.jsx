@@ -405,38 +405,34 @@ export default function Schedule() {
       { start: "02:00", end: "06:00" }
     ];
 
-    // Create rows for all shifts
-    for (const shift of shifts) {
-      const values = {
+    // Create all rows at once using bulkCreate
+    const rowsToCreate = shifts.map(shift => ({
+      template_id: templateId,
+      template_name: template.name,
+      date: dateString,
+      values: {
         "התחלה": shift.start,
         "סיום": shift.end
-      };
+      },
+      group_id: groupId
+    }));
 
-      await base44.entities.TemplateRow.create({
-        template_id: templateId,
-        template_name: template.name,
-        date: dateString,
-        values: values,
-        group_id: groupId
-      });
-    }
-
+    await base44.entities.TemplateRow.bulkCreate(rowsToCreate);
     await loadData();
   };
 
   const handleDuplicateMoked = async (group) => {
     const newGroupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     
-    for (const row of group.rows) {
-      await base44.entities.TemplateRow.create({
-        template_id: row.template_id,
-        template_name: row.template_name,
-        date: dateString,
-        values: row.values,
-        group_id: newGroupId
-      });
-    }
+    const rowsToCreate = group.rows.map(row => ({
+      template_id: row.template_id,
+      template_name: row.template_name,
+      date: dateString,
+      values: row.values,
+      group_id: newGroupId
+    }));
     
+    await base44.entities.TemplateRow.bulkCreate(rowsToCreate);
     await loadData();
     toast.success('מוקד שוכפל בהצלחה');
   };
