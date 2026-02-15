@@ -65,6 +65,8 @@ export default function Schedule() {
   const [showAddTemplateColumnDialog, setShowAddTemplateColumnDialog] = useState(false);
   const [showCreateMokedDialog, setShowCreateMokedDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [editingMokedName, setEditingMokedName] = useState(null);
+  const [editingMokedNameValue, setEditingMokedNameValue] = useState("");
   const [newTemplateColumnName, setNewTemplateColumnName] = useState("");
   const [newTemplateColumnType, setNewTemplateColumnType] = useState("text");
   const [selectedPosition, setSelectedPosition] = useState(null);
@@ -737,7 +739,47 @@ export default function Schedule() {
                             </Button>
                           </div>
                         )}
-                        <CardTitle className="text-lg" dir="rtl">{template.name}</CardTitle>
+                        {editingMokedName === template.id ? (
+                          <Input
+                            value={editingMokedNameValue}
+                            onChange={(e) => setEditingMokedNameValue(e.target.value)}
+                            onBlur={async () => {
+                              if (editingMokedNameValue.trim()) {
+                                await base44.entities.Template.update(template.id, { name: editingMokedNameValue });
+                                loadData();
+                              }
+                              setEditingMokedName(null);
+                              setEditingMokedNameValue("");
+                            }}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter') {
+                                if (editingMokedNameValue.trim()) {
+                                  await base44.entities.Template.update(template.id, { name: editingMokedNameValue });
+                                  loadData();
+                                }
+                                setEditingMokedName(null);
+                                setEditingMokedNameValue("");
+                              } else if (e.key === 'Escape') {
+                                setEditingMokedName(null);
+                                setEditingMokedNameValue("");
+                              }
+                            }}
+                            autoFocus
+                            className="text-lg font-bold h-8 w-64 bg-white/20 border-white text-black"
+                            dir="rtl"
+                          />
+                        ) : (
+                          <CardTitle 
+                            className="text-lg cursor-pointer hover:underline" 
+                            onClick={() => {
+                              setEditingMokedName(template.id);
+                              setEditingMokedNameValue(template.name);
+                            }}
+                            dir="rtl"
+                          >
+                            {template.name}
+                          </CardTitle>
+                        )}
                       </div>
                       {editMode && (
                         <div className="flex gap-2">
