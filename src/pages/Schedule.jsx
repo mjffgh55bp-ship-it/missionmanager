@@ -63,7 +63,6 @@ export default function Schedule() {
   const [showCreateCategoryDialog, setShowCreateCategoryDialog] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState("#3b82f6");
-  const [showAddFromTemplatesDialog, setShowAddFromTemplatesDialog] = useState(false);
   const [showAddTemplateColumnDialog, setShowAddTemplateColumnDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [newTemplateColumnName, setNewTemplateColumnName] = useState("");
@@ -397,28 +396,21 @@ export default function Schedule() {
     setShowAddTemplateRowDialog(true);
   };
 
-  const handleAddTemplateRowForTemplate = async (templateId, useDefaults = false) => {
+  const handleAddTemplateRowForTemplate = async (templateId) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
 
     // צור group_id ייחודי למופע הזה של התבנית
     const groupId = Date.now().toString();
 
-    // אם useDefaults=true (הוספה מהשלדיות) ויש שורות ברירת מחדל, צור אותן
-    // אחרת, תמיד צור שורה ריקה אחת בלבד
-    const rowsToCreate = useDefaults && template.default_rows && template.default_rows.length > 0
-      ? template.default_rows
-      : [{}];
-
-    for (const rowValues of rowsToCreate) {
-      await base44.entities.TemplateRow.create({
-        template_id: templateId,
-        template_name: template.name,
-        date: dateString,
-        values: rowValues,
-        group_id: groupId
-      });
-    }
+    // תמיד צור שורה ריקה אחת
+    await base44.entities.TemplateRow.create({
+      template_id: templateId,
+      template_name: template.name,
+      date: dateString,
+      values: {},
+      group_id: groupId
+    });
 
     await loadData();
   };
@@ -587,12 +579,6 @@ export default function Schedule() {
                   <span className="text-xs text-gray-500" dir="rtl">
                     נשמר לאחרונה: {format(lastSaved, 'HH:mm')}
                   </span>
-                )}
-                {editMode && (
-                  <Button className="bg-green-600 hover:bg-green-700" onClick={() => setShowAddFromTemplatesDialog(true)} dir="rtl">
-                    <Plus className="w-4 h-4 ml-2" />
-                    הוסף תבנית מהשלדיות
-                  </Button>
                 )}
 
                 {editMode && templateRows.length > 0 && (
@@ -1399,45 +1385,6 @@ export default function Schedule() {
               >
                 צור קטגוריה
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add From Templates Dialog */}
-        <Dialog open={showAddFromTemplatesDialog} onOpenChange={setShowAddFromTemplatesDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">הוסף תבנית מהשלדיות</DialogTitle></DialogHeader>
-            <div className="space-y-3 py-4">
-              {allTemplates.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4" dir="rtl">אין שלדיות זמינות</p>
-              ) : (
-                allTemplates.map(template => (
-                  <button
-                    key={template.id}
-                    onClick={async () => {
-                      await handleAddTemplateRowForTemplate(template.id, true);
-                      setShowAddFromTemplatesDialog(false);
-                      await loadData();
-                    }}
-                    className="w-full p-3 rounded-lg border hover:border-blue-400 hover:bg-blue-50 text-right"
-                    dir="rtl"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-4 h-4 rounded" 
-                        style={{ backgroundColor: template.color }}
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">{template.name}</div>
-                        <div className="text-xs text-gray-500">{template.columns.length} עמודות</div>
-                      </div>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddFromTemplatesDialog(false)} dir="rtl">ביטול</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
