@@ -391,21 +391,35 @@ export default function Schedule() {
     await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
   };
 
-  const handleAddTemplateRowForTemplate = async (templateId) => {
+  const handleAddTemplateRowForTemplate = async (templateId, groupId) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
 
-    // צור group_id ייחודי למופע הזה של התבנית
-    const groupId = Date.now().toString();
+    // Generate shift times (4-hour shifts from 06:00 to 06:00 next day)
+    const shifts = [
+      { start: "06:00", end: "10:00" },
+      { start: "10:00", end: "14:00" },
+      { start: "14:00", end: "18:00" },
+      { start: "18:00", end: "22:00" },
+      { start: "22:00", end: "02:00" },
+      { start: "02:00", end: "06:00" }
+    ];
 
-    // תמיד צור שורה ריקה אחת
-    await base44.entities.TemplateRow.create({
-      template_id: templateId,
-      template_name: template.name,
-      date: dateString,
-      values: {},
-      group_id: groupId
-    });
+    // Create rows for all shifts
+    for (const shift of shifts) {
+      const values = {
+        "התחלה": shift.start,
+        "סיום": shift.end
+      };
+
+      await base44.entities.TemplateRow.create({
+        template_id: templateId,
+        template_name: template.name,
+        date: dateString,
+        values: values,
+        group_id: groupId
+      });
+    }
 
     await loadData();
   };
@@ -783,7 +797,7 @@ export default function Schedule() {
                       </div>
                       {editMode && (
                         <div className="flex gap-2">
-                          <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id)} dir="rtl">
+                          <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id, group.group_id)} dir="rtl">
                             <Plus className="w-3 h-3 ml-1" />
                             הוסף שורה
                           </Button>
