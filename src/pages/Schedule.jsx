@@ -58,14 +58,12 @@ export default function Schedule() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showAddShiftDialog, setShowAddShiftDialog] = useState(false);
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
-  const [showAddTemplateRowDialog, setShowAddTemplateRowDialog] = useState(false);
   const [showEditTemplateRowDialog, setShowEditTemplateRowDialog] = useState(false);
   const [showCreateCategoryDialog, setShowCreateCategoryDialog] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState("#3b82f6");
   const [showAddTemplateColumnDialog, setShowAddTemplateColumnDialog] = useState(false);
   const [showCreateMokedDialog, setShowCreateMokedDialog] = useState(false);
-  const [selectedTemplateForNewMoked, setSelectedTemplateForNewMoked] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [newTemplateColumnName, setNewTemplateColumnName] = useState("");
   const [newTemplateColumnType, setNewTemplateColumnType] = useState("text");
@@ -391,13 +389,6 @@ export default function Schedule() {
     await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
   };
 
-  const handleAddTemplateRow = () => {
-    setSelectedTemplateId("");
-    setTemplateRowValues({});
-    setCurrentTemplateRow(null);
-    setShowAddTemplateRowDialog(true);
-  };
-
   const handleAddTemplateRowForTemplate = async (templateId) => {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
@@ -435,23 +426,32 @@ export default function Schedule() {
   };
 
   const handleCreateNewMoked = async () => {
-    if (!selectedTemplateForNewMoked) return;
-    
-    const template = allTemplates.find(t => t.id === selectedTemplateForNewMoked);
-    if (!template) return;
+    // Create a new template for this moked with predefined columns
+    const newTemplate = await base44.entities.Template.create({
+      name: `מוקד ${format(currentDate, 'dd/MM')}`,
+      color: '#3b82f6',
+      columns: [
+        { name: "תדריך", type: "text", width: 120 },
+        { name: "התחלה", type: "time", width: 100 },
+        { name: "סיום", type: "time", width: 100 },
+        { name: "שף", type: "worker", width: 150 },
+        { name: "סו שף", type: "worker", width: 150 }
+      ],
+      default_rows: [],
+      active: true
+    });
 
     const newGroupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     
     await base44.entities.TemplateRow.create({
-      template_id: template.id,
-      template_name: template.name,
+      template_id: newTemplate.id,
+      template_name: newTemplate.name,
       date: dateString,
       values: {},
       group_id: newGroupId
     });
 
     setShowCreateMokedDialog(false);
-    setSelectedTemplateForNewMoked("");
     await loadData();
     toast.success('מוקד חדש נוצר בהצלחה');
   };
@@ -496,19 +496,7 @@ export default function Schedule() {
     }
   };
 
-  const handleTemplateChange = (templateId) => {
-    setSelectedTemplateId(templateId);
-    const template = templates.find(t => t.id === templateId);
-    if (template) {
-      const initialValues = {};
-      template.columns.forEach(col => {
-        if (col.default_value) {
-          initialValues[col.name] = col.default_value;
-        }
-      });
-      setTemplateRowValues(initialValues);
-    }
-  };
+
 
   const handleUpdateColumnValue = async (assignmentId, colType, value, subType) => {
     const assignment = assignments.find(a => a.id === assignmentId);
@@ -1335,56 +1323,6 @@ export default function Schedule() {
           </DialogContent>
         </Dialog>
 
-        {/* Add Template Row Dialog */}
-        <Dialog open={showAddTemplateRowDialog} onOpenChange={setShowAddTemplateRowDialog}>
-          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle dir="rtl">הוסף שורה מתבנית</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label dir="rtl">בחר תבנית</Label>
-                <Select value={selectedTemplateId} onValueChange={handleTemplateChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="בחר תבנית..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates.map(t => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {selectedTemplateId && templates.find(t => t.id === selectedTemplateId) && (
-                <div className="space-y-3 border-t pt-4">
-                  {templates.find(t => t.id === selectedTemplateId).columns.map((col, idx) => (
-                    <div key={idx}>
-                      <Label className="text-sm" dir="rtl">{col.name}</Label>
-                      {col.type === "time" ? (
-                        <Input
-                          type="time"
-                          value={templateRowValues[col.name] || ""}
-                          onChange={(e) => setTemplateRowValues({ ...templateRowValues, [col.name]: e.target.value })}
-                        />
-                      ) : (
-                        <Input
-                          value={templateRowValues[col.name] || ""}
-                          onChange={(e) => setTemplateRowValues({ ...templateRowValues, [col.name]: e.target.value })}
-                          placeholder={col.default_value || ""}
-                          dir="rtl"
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddTemplateRowDialog(false)} dir="rtl">ביטול</Button>
-              <Button onClick={handleSaveTemplateRow} disabled={!selectedTemplateId} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שמור</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
         {/* Create Category Dialog */}
         <Dialog open={showCreateCategoryDialog} onOpenChange={setShowCreateCategoryDialog}>
           <DialogContent className="sm:max-w-md">
@@ -1534,29 +1472,15 @@ export default function Schedule() {
         <Dialog open={showCreateMokedDialog} onOpenChange={setShowCreateMokedDialog}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle dir="rtl">צור מוקד חדש</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label dir="rtl">בחר תבנית</Label>
-                <Select value={selectedTemplateForNewMoked} onValueChange={setSelectedTemplateForNewMoked}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="בחר תבנית..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allTemplates.map(t => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="py-4">
+              <p className="text-sm text-gray-600" dir="rtl">
+                המוקד החדש יכלול: תדריך, התחלה, סיום, שף, סו שף וסטטוס
+              </p>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => {
-                setShowCreateMokedDialog(false);
-                setSelectedTemplateForNewMoked("");
-              }} dir="rtl">ביטול</Button>
+              <Button variant="outline" onClick={() => setShowCreateMokedDialog(false)} dir="rtl">ביטול</Button>
               <Button 
                 onClick={handleCreateNewMoked}
-                disabled={!selectedTemplateForNewMoked}
                 className="bg-blue-900 hover:bg-blue-800"
                 dir="rtl"
               >
