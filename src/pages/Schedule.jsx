@@ -64,6 +64,8 @@ export default function Schedule() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryColor, setNewCategoryColor] = useState("#3b82f6");
   const [showAddTemplateColumnDialog, setShowAddTemplateColumnDialog] = useState(false);
+  const [showCreateMokedDialog, setShowCreateMokedDialog] = useState(false);
+  const [selectedTemplateForNewMoked, setSelectedTemplateForNewMoked] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [newTemplateColumnName, setNewTemplateColumnName] = useState("");
   const [newTemplateColumnType, setNewTemplateColumnType] = useState("text");
@@ -415,6 +417,45 @@ export default function Schedule() {
     await loadData();
   };
 
+  const handleDuplicateMoked = async (group) => {
+    const newGroupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    
+    for (const row of group.rows) {
+      await base44.entities.TemplateRow.create({
+        template_id: row.template_id,
+        template_name: row.template_name,
+        date: dateString,
+        values: row.values,
+        group_id: newGroupId
+      });
+    }
+    
+    await loadData();
+    toast.success('מוקד שוכפל בהצלחה');
+  };
+
+  const handleCreateNewMoked = async () => {
+    if (!selectedTemplateForNewMoked) return;
+    
+    const template = allTemplates.find(t => t.id === selectedTemplateForNewMoked);
+    if (!template) return;
+
+    const newGroupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    
+    await base44.entities.TemplateRow.create({
+      template_id: template.id,
+      template_name: template.name,
+      date: dateString,
+      values: {},
+      group_id: newGroupId
+    });
+
+    setShowCreateMokedDialog(false);
+    setSelectedTemplateForNewMoked("");
+    await loadData();
+    toast.success('מוקד חדש נוצר בהצלחה');
+  };
+
   const handleEditTemplateRow = (row) => {
     setCurrentTemplateRow(row);
     setSelectedTemplateId(row.template_id);
@@ -580,6 +621,12 @@ export default function Schedule() {
                     נשמר לאחרונה: {format(lastSaved, 'HH:mm')}
                   </span>
                 )}
+                {editMode && (
+                  <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowCreateMokedDialog(true)} dir="rtl">
+                    <Plus className="w-4 h-4 ml-2" />
+                    צור מוקד חדש
+                  </Button>
+                )}
 
                 {editMode && templateRows.length > 0 && (
                   <Button 
@@ -724,10 +771,19 @@ export default function Schedule() {
                           </Button>
                           <Button 
                             size="sm" 
+                            variant="outline" 
+                            onClick={() => handleDuplicateMoked(group)}
+                            dir="rtl"
+                          >
+                            <Plus className="w-3 h-3 ml-1" />
+                            שכפל מוקד
+                          </Button>
+                          <Button 
+                            size="sm" 
                             variant="destructive" 
                             onClick={async () => {
-                              if (confirm(`האם למחוק את השלדית "${template.name}" מהלוח (רק ליום ${formatDateHebrew(currentDate)})?`)) {
-                                // מחק רק את השורות של התבנית לתאריך הנוכחי
+                              if (confirm(`האם למחוק את המוקד "${template.name}" מהלוח (רק ליום ${formatDateHebrew(currentDate)})?`)) {
+                                // מחק רק את השורות של המוקד לתאריך הנוכחי
                                 for (const row of templateRowsForTemplate) {
                                   await base44.entities.TemplateRow.delete(row.id);
                                 }
@@ -737,7 +793,7 @@ export default function Schedule() {
                             dir="rtl"
                           >
                             <Trash2 className="w-3 h-3 ml-1" />
-                            מחק מהלוח
+                            מחק מוקד
                           </Button>
                         </div>
                       )}
@@ -1469,6 +1525,42 @@ export default function Schedule() {
                 dir="rtl"
               >
                 הוסף עמודה
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create New Moked Dialog */}
+        <Dialog open={showCreateMokedDialog} onOpenChange={setShowCreateMokedDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle dir="rtl">צור מוקד חדש</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label dir="rtl">בחר תבנית</Label>
+                <Select value={selectedTemplateForNewMoked} onValueChange={setSelectedTemplateForNewMoked}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="בחר תבנית..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allTemplates.map(t => (
+                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setShowCreateMokedDialog(false);
+                setSelectedTemplateForNewMoked("");
+              }} dir="rtl">ביטול</Button>
+              <Button 
+                onClick={handleCreateNewMoked}
+                disabled={!selectedTemplateForNewMoked}
+                className="bg-blue-900 hover:bg-blue-800"
+                dir="rtl"
+              >
+                צור מוקד
               </Button>
             </DialogFooter>
           </DialogContent>
