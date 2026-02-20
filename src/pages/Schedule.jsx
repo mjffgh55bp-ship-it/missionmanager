@@ -1018,17 +1018,15 @@ export default function Schedule() {
                                      }}
                                     />
                                   ) : col.type === "time" ? (
-                                    <Input
-                                      type="time"
+                                    <TimeCell
+                                      rowId={row.id}
+                                      colName={col.name}
                                       value={row.values?.[col.name] || ""}
-                                      onChange={(e) => {
-                                        const newValues = { ...row.values, [col.name]: e.target.value };
-                                        base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                      defaultValue={col.default_value || ""}
+                                      onSaved={(newValues) => {
                                         setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
                                       }}
-                                      placeholder={col.default_value || ""}
-                                      dir="rtl"
-                                      className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+                                      rowValues={row.values || {}}
                                     />
                                   ) : (
                                     <ColumnCell 
