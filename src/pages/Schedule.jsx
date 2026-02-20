@@ -447,7 +447,7 @@ export default function Schedule() {
       name: `מוקד ${format(currentDate, 'dd/MM')}`,
       color: '#3b82f6',
       columns: [
-        { name: "תדריך", type: "text", width: 120 },
+        { name: "תדריך", type: "time", width: 100 },
         { name: "התחלה", type: "time", width: 100 },
         { name: "סיום", type: "time", width: 100 },
         { name: "שף", type: "worker", width: 150 },
