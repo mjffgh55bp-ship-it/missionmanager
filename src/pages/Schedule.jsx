@@ -1462,13 +1462,13 @@ export default function Schedule() {
                   </SelectContent>
                 </Select>
               </div>
-              {newTemplateColumnName === "worker_custom" && (
+              {(newTemplateColumnName === "worker_custom" || newTemplateColumnName?.startsWith("worker_role_")) && (
                 <div>
-                  <Label dir="rtl">שם עמודת איוש</Label>
+                  <Label dir="rtl">שם העמודה</Label>
                   <Input
                     value={newTemplateColumnType}
                     onChange={(e) => setNewTemplateColumnType(e.target.value)}
-                    placeholder="לדוגמה: שף, סו-שף..."
+                    placeholder={newTemplateColumnName?.startsWith("worker_role_") ? newTemplateColumnName.replace("worker_role_", "") : "לדוגמה: שף, סו-שף..."}
                     dir="rtl"
                   />
                 </div>
