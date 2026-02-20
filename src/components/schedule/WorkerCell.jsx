@@ -57,17 +57,9 @@ export default function WorkerCell({
     return "text-gray-900";
   };
 
-  // Try to guess the default role filter from column name
-  const guessDefaultRole = () => {
-    if (!workerRoles || workerRoles.length === 0) return "all";
-    // Find a role whose name appears in the column name
-    const match = workerRoles.find(role => columnName.includes(role));
-    return match || "all";
-  };
-
   const handleOpen = () => {
-    const defaultRole = guessDefaultRole();
-    setSelectedRole(defaultRole);
+    // Use the explicit role_filter if provided, otherwise default to "all"
+    setSelectedRole(roleFilter || "all");
     setSearchQuery("");
     setShowDialog(true);
   };
