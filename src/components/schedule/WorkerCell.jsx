@@ -94,6 +94,7 @@ export default function WorkerCell({
         w.nickname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         w.role?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesRole = selectedRole === "all" || w.role === selectedRole;
+      // If roleFilter is set, only show workers with that role (before user changes the dropdown)
       return matchesSearch && matchesRole;
     })
     .sort((a, b) => {
