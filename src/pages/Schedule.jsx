@@ -69,6 +69,7 @@ export default function Schedule() {
   const [editingMokedNameValue, setEditingMokedNameValue] = useState("");
   const [newTemplateColumnName, setNewTemplateColumnName] = useState("");
   const [newTemplateColumnType, setNewTemplateColumnType] = useState("text");
+  const [newTemplateColumnRole, setNewTemplateColumnRole] = useState("");
   const [selectedPosition, setSelectedPosition] = useState(null);
   const [currentAssignment, setCurrentAssignment] = useState(null);
   const [selectedCartId, setSelectedCartId] = useState(null);
