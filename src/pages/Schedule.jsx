@@ -166,10 +166,6 @@ export default function Schedule() {
     if (cartColsSettings.length > 0) setCartColumns(JSON.parse(cartColsSettings[0].setting_value) || {});
     if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     
-    const [shiftStatusesData, workerRolesSettings] = [shiftStatusesSettings, arguments[0]];
-    // workerRolesSettings is the last in the array
-    const workerRolesData = Array.isArray(arguments) ? null : null; // handled below
-    
     // Load custom column orders for this date
     const columnOrderSettings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
     if (columnOrderSettings.length > 0) {
