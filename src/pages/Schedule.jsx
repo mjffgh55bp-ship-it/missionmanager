@@ -81,6 +81,7 @@ export default function Schedule() {
   const [customColumnOrders, setCustomColumnOrders] = useState({});
   const [dailyCustomColumns, setDailyCustomColumns] = useState({});
   const [shiftStatuses, setShiftStatuses] = useState([]);
+  const [workerRoles, setWorkerRoles] = useState([]);
   const [editMode, setEditMode] = useState(false);
   
   const [editFormData, setEditFormData] = useState({
