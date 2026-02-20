@@ -146,7 +146,8 @@ export default function Schedule() {
       base44.entities.AppSettings.filter({ setting_key: "cart_columns" }),
       base44.entities.Template.filter({ active: true }),
       base44.entities.TemplateRow.filter({ date: dateString }),
-      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
     ]);
     setWorkers(workersData);
     setCarts(cartsData);
