@@ -1006,6 +1006,7 @@ export default function Schedule() {
                                      currentValue={row.values?.[col.name]}
                                      workers={workers}
                                      workerRoles={workerRoles}
+                                     roleFilter={col.role_filter || null}
                                      availabilities={availabilities}
                                      unavailabilities={unavailabilities}
                                      dateString={dateString}
