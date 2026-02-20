@@ -13,6 +13,7 @@ export default function WorkerCell({
   currentValue, 
   workers,
   workerRoles,
+  roleFilter,
   availabilities,
   unavailabilities,
   dateString,
