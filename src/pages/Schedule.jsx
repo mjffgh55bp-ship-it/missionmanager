@@ -1455,7 +1455,10 @@ export default function Schedule() {
                     {columnTypes.map(t => (
                       <SelectItem key={t} value={t}>{t}</SelectItem>
                     ))}
-                    <SelectItem value="worker_custom">איוש (מותאם אישית)</SelectItem>
+                    {workerRoles.map(role => (
+                    <SelectItem key={`worker_${role}`} value={`worker_role_${role}`}>{`איוש - ${role}`}</SelectItem>
+                  ))}
+                  <SelectItem value="worker_custom">איוש (ללא סינון תפקיד)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
