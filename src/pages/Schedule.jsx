@@ -140,7 +140,7 @@ export default function Schedule() {
       base44.entities.Unavailability.filter({ date: dateString })
     ]);
     
-    const [colTypesSettings, colSubTypesSettings, cartColsSettings, allTemplatesData, templateRowsData, shiftStatusesSettings] = await Promise.all([
+    const [colTypesSettings, colSubTypesSettings, cartColsSettings, allTemplatesData, templateRowsData, shiftStatusesSettings, workerRolesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_columns" }),
