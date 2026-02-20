@@ -1481,9 +1481,9 @@ export default function Schedule() {
                 setNewTemplateColumnType("text");
               }} dir="rtl">ביטול</Button>
               <Button 
-                onClick={async () => {
-                  if (!newTemplateColumnName || !selectedTemplate) return;
-                  if (newTemplateColumnName === "worker_custom" && !newTemplateColumnType) return;
+              onClick={async () => {
+                if (!newTemplateColumnName || !selectedTemplate) return;
+                if ((newTemplateColumnName === "worker_custom" || newTemplateColumnName?.startsWith("worker_role_")) && !newTemplateColumnType && !newTemplateColumnName?.startsWith("worker_role_")) return;
                   
                   let columnToAdd;
                   if (newTemplateColumnName === "time") {
