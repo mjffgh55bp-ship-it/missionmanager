@@ -4,13 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Search, AlertTriangle, Star, Check, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, AlertTriangle, Star, Check } from "lucide-react";
 
 export default function WorkerCell({ 
   rowId, 
   columnName, 
   currentValue, 
   workers,
+  workerRoles,
   availabilities,
   unavailabilities,
   dateString,
@@ -20,6 +22,7 @@ export default function WorkerCell({
 }) {
   const [showDialog, setShowDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRole, setSelectedRole] = useState("all");
 
   // Find the selected worker
   const selectedWorker = currentValue ? workers.find(w => w.id === currentValue) : null;
@@ -53,79 +56,38 @@ export default function WorkerCell({
     return "text-gray-900";
   };
 
-  // Determine role filter based on column name
-  const getRoleFromColumnName = (colName) => {
-    const lowerName = colName.toLowerCase();
-    if (lowerName.includes("שף") && !lowerName.includes("סו")) return "chef";
-    if (lowerName.includes("סו") || lowerName.includes("עוזר")) return "sous_chef";
-    return null; // No filter for other columns
+  // Try to guess the default role filter from column name
+  const guessDefaultRole = () => {
+    if (!workerRoles || workerRoles.length === 0) return "all";
+    // Find a role whose name appears in the column name
+    const match = workerRoles.find(role => columnName.includes(role));
+    return match || "all";
   };
 
-  const roleFilter = getRoleFromColumnName(columnName);
+  const handleOpen = () => {
+    const defaultRole = guessDefaultRole();
+    setSelectedRole(defaultRole);
+    setSearchQuery("");
+    setShowDialog(true);
+  };
 
   const handleWorkerSelect = async (workerId) => {
     const worker = workers.find(w => w.id === workerId);
     if (!worker) return;
 
-    // Update the template row with the worker ID
+    const newValues = { [columnName]: workerId };
     await base44.entities.TemplateRow.update(rowId, {
-      values: { [columnName]: workerId }
+      values: newValues
     });
-
-    // Create assignment in matrix if we have time info
-    if (rowStartTime && rowEndTime) {
-      const hours = calculateHours(rowStartTime, rowEndTime);
-      await base44.entities.Assignment.create({
-        date: dateString,
-        food_cart_id: null, // Template assignments don't have cart
-        food_cart_name: columnName,
-        start_time: rowStartTime,
-        end_time: rowEndTime,
-        hours,
-        chef_id: workerId,
-        chef_name: worker.nickname,
-        chef_seniority: worker.seniority,
-        notes: `${columnName} - מאוייש מהלוח`,
-        has_trainee: false,
-        column_values: {}
-      });
-    }
 
     setShowDialog(false);
     if (onSaved) onSaved(workerId);
   };
 
-  const calculateHours = (start, end) => {
-    if (!start || !end) return 4;
-    const [startHour, startMin] = start.split(':').map(Number);
-    const [endHour, endMin] = end.split(':').map(Number);
-    let hours = endHour - startHour;
-    if (endHour < startHour) hours += 24;
-    hours += (endMin - startMin) / 60;
-    return Math.max(0, hours);
-  };
-
   const handleRemoveWorker = async () => {
-    // Remove from template row
     await base44.entities.TemplateRow.update(rowId, {
       values: { [columnName]: null }
     });
-
-    // Remove assignment from matrix if exists
-    if (currentValue && rowStartTime && rowEndTime) {
-      const assignments = await base44.entities.Assignment.filter({ 
-        date: dateString,
-        chef_id: currentValue,
-        start_time: rowStartTime,
-        end_time: rowEndTime
-      });
-      
-      for (const assignment of assignments) {
-        if (assignment.notes?.includes('מאוייש מהלוח')) {
-          await base44.entities.Assignment.delete(assignment.id);
-        }
-      }
-    }
 
     setShowDialog(false);
     if (onSaved) onSaved(null);
@@ -135,25 +97,23 @@ export default function WorkerCell({
   const filteredWorkers = workers
     .filter(w => w.active)
     .filter(w => {
-      const matchesSearch = w.nickname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           w.role?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesRole = !roleFilter || w.role === roleFilter;
+      const matchesSearch = !searchQuery || 
+        w.nickname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        w.role?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesRole = selectedRole === "all" || w.role === selectedRole;
       return matchesSearch && matchesRole;
     })
     .sort((a, b) => {
-      // Only sort by availability if we have time info
       if (!rowStartTime || !rowEndTime) return 0;
 
       const aAvail = getWorkerAvailabilityPriority(a.id, rowStartTime, rowEndTime);
       const bAvail = getWorkerAvailabilityPriority(b.id, rowStartTime, rowEndTime);
       
-      // Unavailable workers go to the bottom
       const aUnavailable = isWorkerUnavailable(a.id, rowStartTime, rowEndTime);
       const bUnavailable = isWorkerUnavailable(b.id, rowStartTime, rowEndTime);
       if (aUnavailable && !bUnavailable) return 1;
       if (!aUnavailable && bUnavailable) return -1;
       
-      // Sort by availability type: wanted > available > no availability
       const aType = aAvail?.type;
       const bType = bAvail?.type;
       if (aType === 'wanted' && bType !== 'wanted') return -1;
@@ -161,7 +121,6 @@ export default function WorkerCell({
       if (aType === 'available' && !bType) return -1;
       if (!aType && bType === 'available') return 1;
       
-      // Sort by priority within the same type
       if (aAvail?.priority && bAvail?.priority) {
         return aAvail.priority - bAvail.priority;
       }
@@ -172,7 +131,7 @@ export default function WorkerCell({
   return (
     <>
       <button
-        onClick={() => setShowDialog(true)}
+        onClick={handleOpen}
         className={`w-full h-full text-right p-2 hover:bg-blue-50 transition-colors ${
           selectedWorker && rowStartTime && rowEndTime && isWorkerUnavailable(selectedWorker.id, rowStartTime, rowEndTime)
             ? "bg-red-50 border-red-300"
@@ -200,15 +159,30 @@ export default function WorkerCell({
             <DialogTitle dir="rtl">בחר עובד - {columnName}</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <div className="mb-4 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="חיפוש..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                dir="rtl"
-              />
+            <div className="flex gap-2 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="חיפוש..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                  dir="rtl"
+                />
+              </div>
+              {workerRoles && workerRoles.length > 0 && (
+                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <SelectTrigger className="w-40" dir="rtl">
+                    <SelectValue placeholder="כל התפקידים" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">כל התפקידים</SelectItem>
+                    {workerRoles.map(role => (
+                      <SelectItem key={role} value={role}>{role}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {filteredWorkers.length === 0 ? (
@@ -243,9 +217,11 @@ export default function WorkerCell({
                         <div className="flex-1">
                           <div className="font-medium text-gray-900">{worker.nickname}</div>
                           <div className="flex gap-2 mt-1 flex-wrap">
-                            <Badge variant="outline" className="text-xs" dir="rtl">
-                              {worker.role === 'chef' ? 'שף' : worker.role === 'sous_chef' ? 'סו-שף' : worker.role}
-                            </Badge>
+                            {worker.role && (
+                              <Badge variant="outline" className="text-xs" dir="rtl">
+                                {worker.role}
+                              </Badge>
+                            )}
                             <Badge variant="outline" className="text-xs" dir="rtl">
                               {worker.seniority === 'trainee' ? 'מתלמד' : worker.seniority === 'newbie' ? 'מתחיל' : worker.seniority === 'experienced_chef' ? 'מנוסה' : worker.seniority}
                             </Badge>
@@ -255,8 +231,8 @@ export default function WorkerCell({
                               </Badge>
                             )}
                             {availInfo && (
-                              <Badge variant="outline" className="text-xs capitalize" dir="rtl">
-                                {availInfo.type === 'wanted' ? 'רצוי' : availInfo.type === 'available' ? 'זמין' : 'לא זמין'} #{availInfo.priority}
+                              <Badge variant="outline" className="text-xs" dir="rtl">
+                                {availInfo.type === 'wanted' ? 'רצוי' : 'זמין'} #{availInfo.priority}
                               </Badge>
                             )}
                             {isUnavailable && (
