@@ -1490,6 +1490,10 @@ export default function Schedule() {
                     columnToAdd = { name: "התחלה", type: "time", width: 100 };
                   } else if (newTemplateColumnName === "time_end") {
                     columnToAdd = { name: "סיום", type: "time", width: 100 };
+                  } else if (newTemplateColumnName?.startsWith("worker_role_")) {
+                    const role = newTemplateColumnName.replace("worker_role_", "");
+                    const colName = newTemplateColumnType.trim() || role;
+                    columnToAdd = { name: colName, type: "worker", width: 150, role_filter: role };
                   } else if (newTemplateColumnName === "worker_custom") {
                     columnToAdd = { name: newTemplateColumnType, type: "worker", width: 150 };
                   } else {
