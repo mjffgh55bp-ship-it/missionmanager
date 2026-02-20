@@ -1447,7 +1447,7 @@ export default function Schedule() {
             <div className="space-y-4 py-4">
               <div>
                 <Label dir="rtl">בחר סוג עמודה</Label>
-                <Select value={newTemplateColumnName} onValueChange={setNewTemplateColumnName}>
+                <Select value={newTemplateColumnName} onValueChange={(val) => { setNewTemplateColumnName(val); setNewTemplateColumnType(""); }}>
                   <SelectTrigger><SelectValue placeholder="בחר מסוגי העמודות..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="time">זמן התחלה</SelectItem>
@@ -1456,19 +1456,18 @@ export default function Schedule() {
                       <SelectItem key={t} value={t}>{t}</SelectItem>
                     ))}
                     {workerRoles.map(role => (
-                    <SelectItem key={`worker_${role}`} value={`worker_role_${role}`}>{`איוש - ${role}`}</SelectItem>
-                  ))}
-                  <SelectItem value="worker_custom">איוש (ללא סינון תפקיד)</SelectItem>
+                      <SelectItem key={`worker_role_${role}`} value={`worker_role_${role}`}>{`איוש - ${role}`}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-              {(newTemplateColumnName === "worker_custom" || newTemplateColumnName?.startsWith("worker_role_")) && (
+              {newTemplateColumnName?.startsWith("worker_role_") && (
                 <div>
-                  <Label dir="rtl">שם העמודה</Label>
+                  <Label dir="rtl">שם העמודה (אופציונלי - ברירת מחדל: שם התפקיד)</Label>
                   <Input
                     value={newTemplateColumnType}
                     onChange={(e) => setNewTemplateColumnType(e.target.value)}
-                    placeholder={newTemplateColumnName?.startsWith("worker_role_") ? newTemplateColumnName.replace("worker_role_", "") : "לדוגמה: שף, סו-שף..."}
+                    placeholder={newTemplateColumnName.replace("worker_role_", "")}
                     dir="rtl"
                   />
                 </div>
