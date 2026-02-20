@@ -1000,19 +1000,20 @@ export default function Schedule() {
                                   <TableCell key={idx} dir="rtl" className="p-0">
                                   {col.type === "worker" ? (
                                     <WorkerCell
-                                      rowId={row.id}
-                                      columnName={col.name}
-                                      currentValue={row.values?.[col.name]}
-                                      workers={workers}
-                                      availabilities={availabilities}
-                                      unavailabilities={unavailabilities}
-                                      dateString={dateString}
-                                      rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
-                                      rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
-                                      onSaved={(workerId) => {
-                                        const newValues = { ...row.values, [col.name]: workerId };
-                                        setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                      }}
+                                     rowId={row.id}
+                                     columnName={col.name}
+                                     currentValue={row.values?.[col.name]}
+                                     workers={workers}
+                                     workerRoles={workerRoles}
+                                     availabilities={availabilities}
+                                     unavailabilities={unavailabilities}
+                                     dateString={dateString}
+                                     rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
+                                     rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
+                                     onSaved={(workerId) => {
+                                       const newValues = { ...row.values, [col.name]: workerId };
+                                       setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                     }}
                                     />
                                   ) : col.type === "time" ? (
                                     <Input
