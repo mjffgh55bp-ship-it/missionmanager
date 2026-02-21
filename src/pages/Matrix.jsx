@@ -815,7 +815,7 @@ export default function Matrix() {
     const startPercent = timeToPercentage(preview.start, preview.day || 0, viewMode, zoomRange);
     const endPercent = timeToPercentage(preview.end, preview.day || 0, viewMode, zoomRange);
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
-    const rightPercent = 100 - startPercent - width;
+    const rightPercent = startPercent;
 
     return (
       <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80" style={{ right: `${rightPercent}%`, width: `${width}%` }}>
