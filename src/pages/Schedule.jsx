@@ -1447,7 +1447,7 @@ export default function Schedule() {
             <div className="space-y-4 py-4">
               <div>
                 <Label dir="rtl">בחר סוג עמודה</Label>
-                <Select value={newTemplateColumnName} onValueChange={(val) => { setNewTemplateColumnName(val); setNewTemplateColumnType(""); }}>
+                <Select value={newTemplateColumnName} onValueChange={(val) => { setNewTemplateColumnName(val); setNewTemplateColumnType(""); setNewTemplateColumnRole(""); }}>
                   <SelectTrigger><SelectValue placeholder="בחר מסוגי העמודות..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="time">זמן התחלה</SelectItem>
@@ -1455,22 +1455,35 @@ export default function Schedule() {
                     {columnTypes.map(t => (
                       <SelectItem key={t} value={t}>{t}</SelectItem>
                     ))}
-                    {workerRoles.map(role => (
-                      <SelectItem key={`worker_role_${role}`} value={`worker_role_${role}`}>{`איוש - ${role}`}</SelectItem>
-                    ))}
+                    <SelectItem value="worker_member">חבר צוות</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {newTemplateColumnName?.startsWith("worker_role_") && (
-                <div>
-                  <Label dir="rtl">שם העמודה (אופציונלי - ברירת מחדל: שם התפקיד)</Label>
-                  <Input
-                    value={newTemplateColumnType}
-                    onChange={(e) => setNewTemplateColumnType(e.target.value)}
-                    placeholder={newTemplateColumnName.replace("worker_role_", "")}
-                    dir="rtl"
-                  />
-                </div>
+              {newTemplateColumnName === "worker_member" && (
+                <>
+                  <div>
+                    <Label dir="rtl">תפקיד</Label>
+                    <Select value={newTemplateColumnRole} onValueChange={(val) => { setNewTemplateColumnRole(val); setNewTemplateColumnType(val); }}>
+                      <SelectTrigger dir="rtl"><SelectValue placeholder="בחר תפקיד..." /></SelectTrigger>
+                      <SelectContent>
+                        {workerRoles.map(role => (
+                          <SelectItem key={role} value={role}>{role}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newTemplateColumnRole && (
+                    <div>
+                      <Label dir="rtl">שם העמודה (אופציונלי - ברירת מחדל: שם התפקיד)</Label>
+                      <Input
+                        value={newTemplateColumnType === newTemplateColumnRole ? "" : newTemplateColumnType}
+                        onChange={(e) => setNewTemplateColumnType(e.target.value || newTemplateColumnRole)}
+                        placeholder={newTemplateColumnRole}
+                        dir="rtl"
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <DialogFooter>
