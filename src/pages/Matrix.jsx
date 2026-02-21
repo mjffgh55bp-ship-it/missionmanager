@@ -1133,11 +1133,11 @@ export default function Matrix() {
                             handleMouseDown(e, worker, null, 'create');
                           }}
                         >
-                          <div className="absolute inset-0 flex h-16">
+                          <div className="absolute inset-0 flex h-16" dir="rtl">
                             {viewMode === 'daily' ? (
-                              getDailyTimeSlots(zoomRange).map(hour => (<div key={hour} className="flex-1 border-r time-slot h-16"></div>))
+                              getDailyTimeSlots(zoomRange).map(hour => (<div key={hour} className="flex-1 border-l time-slot h-16"></div>))
                             ) : (
-                              getWeeklyTimeSlots(zoomRange).map((slot, idx) => (<div key={idx} className="flex-1 border-r time-slot h-16"></div>))
+                              getWeeklyTimeSlots(zoomRange).map((slot, idx) => (<div key={idx} className="flex-1 border-l time-slot h-16"></div>))
                             )}
                           </div>
                           <div className="absolute inset-0">
