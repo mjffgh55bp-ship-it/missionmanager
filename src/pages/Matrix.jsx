@@ -136,6 +136,20 @@ export default function Matrix() {
     loadDynamicData(); 
   }, [currentDate, viewMode]);
 
+  // Real-time subscriptions - refresh when assignments or template rows change
+  useEffect(() => {
+    const unsubAssignment = base44.entities.Assignment.subscribe(() => {
+      debouncedLoadData();
+    });
+    const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
+      debouncedLoadData();
+    });
+    return () => {
+      unsubAssignment();
+      unsubTemplateRow();
+    };
+  }, [currentDate, viewMode]);
+
   const loadStaticData = async () => {
     // Load workers and settings only once
     const [workersData, populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
