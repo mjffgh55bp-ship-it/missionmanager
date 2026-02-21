@@ -776,7 +776,7 @@ export default function Matrix() {
             <span className="text-[9px]">{shift.start_time}-{shift.end_time}</span>
           </div>
         </div>
-        <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end', dayIndex); }} />
+        <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end', dayIndex); }} />
       </div>
     );
   };
