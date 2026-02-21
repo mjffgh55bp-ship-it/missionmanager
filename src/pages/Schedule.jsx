@@ -529,50 +529,35 @@ export default function Schedule() {
   };
 
   const handleExportToExcel = () => {
-    const exportData = [];
-    
+    const rows = [];
+    const headers = ["עגלה", "מיקום", "תאריך", "שעה", "שעות", "טבח ראשי", "עוזר טבח", "נוסף", "הערות"];
+    rows.push(headers);
+
     carts.forEach(cart => {
       const cartAssignments = getCartAssignments(cart.id);
-      const columns = cartColumns[cart.id] || [];
-      
       cartAssignments.forEach(assignment => {
-        const row = {
-          "Food Cart": cart.name,
-          "Location": cart.location,
-          "Date": dateString,
-          "Time": `${assignment.start_time || "?"}-${assignment.end_time || "?"}`,
-          "Hours": assignment.hours || 0,
-          "Chef": assignment.chef_name || "",
-          "Sous-Chef": assignment.sous_chef_name || "",
-          "Additional": assignment.additional_chef_name || "",
-        };
-        
-        columns.forEach(col => {
-          const colValue = assignment.column_values?.[col];
-          if (colValue) {
-            row[col] = colValue.value || "";
-            if (colValue.subType) {
-              row[`${col} Type`] = colValue.subType;
-            }
-          } else {
-            row[col] = "";
-          }
-        });
-        
-        if (assignment.notes) {
-          row["Notes"] = assignment.notes;
-        }
-        
-        exportData.push(row);
+        rows.push([
+          cart.name,
+          cart.location,
+          dateString,
+          `${assignment.start_time || "?"}-${assignment.end_time || "?"}`,
+          assignment.hours || 0,
+          assignment.chef_name || "",
+          assignment.sous_chef_name || "",
+          assignment.additional_chef_name || "",
+          assignment.notes || ""
+        ]);
       });
     });
-    
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Schedule");
-    
-    const fileName = `schedule_${dateString}.xlsx`;
-    XLSX.writeFile(wb, fileName);
+
+    const csvContent = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `schedule_${dateString}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
 
