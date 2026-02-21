@@ -984,7 +984,7 @@ export default function Schedule() {
                                   </TableCell>
                                 )}
                                   {orderedColumns.map((col, idx) => (
-                                  <TableCell key={idx} dir="rtl" className="p-0">
+                                  <TableCell key={idx} dir="rtl" className="p-0 text-center">
                                   {col.type === "worker" ? (
                                     <WorkerCell
                                     rowId={row.id}
