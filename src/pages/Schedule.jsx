@@ -834,9 +834,9 @@ export default function Schedule() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            {editMode && <TableHead className="w-[60px]" dir="rtl"></TableHead>}
+                            {editMode && <TableHead className="w-[60px] text-center" dir="rtl"></TableHead>}
                             {orderedColumns.map((col, idx) => (
-                              <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl">
+                              <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl" className="text-center">
                                 <div className="flex items-center gap-1 justify-center">
                                   <span>{col.name}</span>
                                   {editMode && (
