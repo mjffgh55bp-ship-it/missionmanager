@@ -1531,7 +1531,7 @@ export default function Schedule() {
                   await loadData();
                   toast.success('עמודה נוספה בהצלחה');
                 }}
-                disabled={!newTemplateColumnName}
+                disabled={!newTemplateColumnName || (newTemplateColumnName === "worker_member" && !newTemplateColumnRole)}
                 className="bg-blue-900 hover:bg-blue-800"
                 dir="rtl"
               >
