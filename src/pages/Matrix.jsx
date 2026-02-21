@@ -171,28 +171,36 @@ export default function Matrix() {
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     
-    const [assignmentsData, availabilitiesData, unavailabilitiesData] = await Promise.all([
+    const dateStr = format(currentDate, "yyyy-MM-dd");
+
+    const [assignmentsData, availabilitiesData, unavailabilitiesData, templateRowsData, allTemplatesData] = await Promise.all([
       viewMode === "daily" 
-        ? base44.entities.Assignment.filter({ date: format(currentDate, "yyyy-MM-dd") })
+        ? base44.entities.Assignment.filter({ date: dateStr })
         : base44.entities.Assignment.list(),
       base44.entities.Availability.list(),
       viewMode === "daily"
-        ? base44.entities.Unavailability.filter({ date: format(currentDate, "yyyy-MM-dd") })
-        : base44.entities.Unavailability.list()
+        ? base44.entities.Unavailability.filter({ date: dateStr })
+        : base44.entities.Unavailability.list(),
+      viewMode === "daily"
+        ? base44.entities.TemplateRow.filter({ date: dateStr })
+        : base44.entities.TemplateRow.list(),
+      base44.entities.Template.filter({ active: true })
     ]);
     
-    // Filter weekly assignments
+    // Filter weekly assignments and template rows
     let filteredAssignments = assignmentsData;
+    let filteredTemplateRows = templateRowsData;
     if (viewMode === "weekly") {
-      filteredAssignments = assignmentsData.filter(a => {
-        const d = a.date;
-        return d >= weekStartStr && d <= format(weekEnd, "yyyy-MM-dd");
-      });
+      const weekEndStr = format(weekEnd, "yyyy-MM-dd");
+      filteredAssignments = assignmentsData.filter(a => a.date >= weekStartStr && a.date <= weekEndStr);
+      filteredTemplateRows = templateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
     }
     
     setAssignments(filteredAssignments);
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
+    setTemplateRows(filteredTemplateRows);
+    setAllTemplates(allTemplatesData);
     setLoading(false);
     setIsLoadingData(false);
   };
