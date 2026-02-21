@@ -102,13 +102,7 @@ export default function Schedule() {
 
   useEffect(() => { loadData(); }, [currentDate]);
 
-  // Auto-save every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      handleSave(true);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   const handleSave = async (isAutoSave = false) => {
     setIsSaving(true);
