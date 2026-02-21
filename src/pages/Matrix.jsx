@@ -125,6 +125,8 @@ export default function Matrix() {
   const loadingTimeoutRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState("__all__");
   const [shiftStatuses, setShiftStatuses] = useState([]);
+  const [templateRows, setTemplateRows] = useState([]);
+  const [allTemplates, setAllTemplates] = useState([]);
 
   useEffect(() => { 
     loadStaticData();
