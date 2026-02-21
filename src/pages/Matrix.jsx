@@ -790,7 +790,8 @@ export default function Matrix() {
     
     // Hide if outside zoom range
     if (startPercent < 0 || startPercent > 100) return null;
-    const rightPercent = 100 - startPercent - width;
+    // In RTL layout: 0% from timeToPercentage = 06:00 = rightmost side.
+    const rightPercent = startPercent;
 
     return (
       <TooltipProvider>
