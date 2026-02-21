@@ -104,18 +104,14 @@ export default function Schedule() {
 
 
 
-  const handleSave = async (isAutoSave = false) => {
+  const handleSave = async () => {
     setIsSaving(true);
     try {
       await loadData();
       setLastSaved(new Date());
-      if (!isAutoSave) {
-        toast.success('הלוח נשמר בהצלחה!');
-      }
+      toast.success('הלוח נשמר בהצלחה!');
     } catch (error) {
-      if (!isAutoSave) {
-        toast.error('שגיאה בשמירת הלוח');
-      }
+      toast.error('שגיאה בשמירת הלוח');
     } finally {
       setIsSaving(false);
     }
