@@ -160,18 +160,10 @@ export default function WorkerCell({
                   dir="rtl"
                 />
               </div>
-              {workerRoles && workerRoles.length > 0 && (
-                <Select value={selectedRole} onValueChange={setSelectedRole}>
-                  <SelectTrigger className="w-40" dir="rtl">
-                    <SelectValue placeholder="כל התפקידים" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">כל התפקידים</SelectItem>
-                    {workerRoles.map(role => (
-                      <SelectItem key={role} value={role}>{role}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {roleFilter && (
+                <div className="flex items-center px-3 py-1 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700" dir="rtl">
+                  תפקיד: {roleFilter}
+                </div>
               )}
             </div>
             <div className="space-y-2 max-h-96 overflow-y-auto">
