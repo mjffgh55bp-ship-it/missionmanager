@@ -57,8 +57,6 @@ export default function WorkerCell({
   };
 
   const handleOpen = () => {
-    // Use the explicit role_filter if provided, otherwise default to "all"
-    setSelectedRole(roleFilter || "all");
     setSearchQuery("");
     setShowDialog(true);
   };
