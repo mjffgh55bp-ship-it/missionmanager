@@ -1031,7 +1031,7 @@ export default function Schedule() {
                                   )}
                                   </TableCell>
                                   ))}
-                                  <TableCell className="p-0">
+                                  <TableCell className="p-0 text-center">
                                   <Select 
                                    value={row.values?.status || ""} 
                                    onValueChange={async (value) => {
@@ -1040,7 +1040,7 @@ export default function Schedule() {
                                      setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
                                    }}
                                   >
-                                   <SelectTrigger className="h-full border-0 rounded-none text-xs">
+                                   <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
                                      <SelectValue placeholder="-" />
                                    </SelectTrigger>
                                    <SelectContent>
