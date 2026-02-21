@@ -1002,10 +1002,11 @@ export default function Schedule() {
                                   <TableCell key={idx} dir="rtl" className="p-0">
                                   {col.type === "worker" ? (
                                     <WorkerCell
-                                     rowId={row.id}
-                                     columnName={col.name}
-                                     currentValue={row.values?.[col.name]}
-                                     workers={workers}
+                                    rowId={row.id}
+                                    columnName={col.name}
+                                    currentValue={row.values?.[col.name]}
+                                    currentRowValues={row.values || {}}
+                                    workers={workers}
                                      workerRoles={workerRoles}
                                      roleFilter={col.role_filter || null}
                                      availabilities={availabilities}
