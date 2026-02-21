@@ -734,50 +734,114 @@ export default function Matrix() {
     );
   };
 
+  // Helper: check if two time ranges overlap (handles overnight)
+  const timesOverlap = (aStart, aEnd, bStart, bEnd) => {
+    const toMins = t => { const [h,m] = t.split(':').map(Number); return h < 6 ? h * 60 + m + 24*60 : h * 60 + m; };
+    const as = toMins(aStart), ae = toMins(aEnd) || toMins(aStart) + 24*60;
+    const bs = toMins(bStart), be = toMins(bEnd) || toMins(bStart) + 24*60;
+    const aeN = ae <= as ? ae + 24*60 : ae;
+    const beN = be <= bs ? be + 24*60 : be;
+    return as < beN && aeN > bs;
+  };
+
+  const isStandbyStatus = (status) => /^\d{1,2}[׳']/.test(status || '');
+
   const AvailabilityBar = ({ shift, worker }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
     const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode, zoomRange);
     const endPercent = timeToPercentage(shift.end_time, dayIndex, viewMode, zoomRange);
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
     
-    // Hide if outside zoom range
     if (startPercent < 0 || startPercent > 100) return null;
 
-    const icons = { wanted: <Star className="w-3 h-3 fill-current" />, available: <Check className="w-3 h-3" />, unavailable: <Ban className="w-3 h-3" /> };
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
-    // In RTL layout: 0% from timeToPercentage = 06:00 = rightmost side.
+    const borderColors = { wanted: '#16a34a', available: '#3b82f6', unavailable: '#dc2626' };
+    const borderColor = borderColors[shift.type] || '#3b82f6';
     const rightPercent = startPercent;
+
+    // Find assignments that overlap this availability window (for this worker on this date)
+    const shiftDate = shift.date;
+    const overlappingAssignments = [
+      ...assignments.filter(a =>
+        (a.chef_id === worker.id || a.sous_chef_id === worker.id || a.additional_chef_id === worker.id) &&
+        a.date === shiftDate && a.start_time && a.end_time &&
+        timesOverlap(shift.start_time, shift.end_time, a.start_time, a.end_time)
+      ),
+      ...templateRows.filter(r => {
+        if (r.date !== shiftDate) return false;
+        if (!r.values) return false;
+        const isAssigned = Object.values(r.values).some(val => val === worker.id);
+        if (!isAssigned) return false;
+        const st = r.values?.["התחלה"] || r.values?.["שעת התחלה"];
+        const et = r.values?.["סיום"] || r.values?.["שעת סיום"];
+        return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
+      }).map(r => ({
+        start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"],
+        end_time: r.values?.["סיום"] || r.values?.["שעת סיום"],
+        status: r.values?.status || null,
+        isTemplateShift: true
+      }))
+    ];
 
     return (
       <div
-        className="absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-1 z-10 cursor-move bg-cyan-300 border-cyan-500"
+        className="absolute h-full rounded-sm z-10 cursor-move overflow-visible"
         style={{ 
           right: `${rightPercent}%`, 
           width: `${width}%`,
-          opacity: 0.9
+          backgroundColor: 'transparent',
+          border: `2px solid ${borderColor}`,
         }}
         onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }}
         onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
       >
-        <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start', dayIndex); }} />
-        
-        {/* Type indicator - clickable circle */}
+        {/* Resize handles */}
+        <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start', dayIndex); }} />
+        <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end', dayIndex); }} />
+
+        {/* Type indicator circle */}
         <button
           className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform"
-          style={{ borderColor: shift.type === 'wanted' ? '#16a34a' : shift.type === 'unavailable' ? '#dc2626' : '#3b82f6' }}
+          style={{ borderColor }}
           onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
           onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }}
         >
           {typeLabels[shift.type] || "A"}
         </button>
-        
-        <div className="flex flex-col items-center gap-0 text-gray-800 text-[10px] font-medium truncate pointer-events-none w-full px-1 mt-2">
-          <div className="flex items-center gap-1">
-            {icons[shift.type]}
-            <span className="text-[9px]">{shift.start_time}-{shift.end_time}</span>
-          </div>
-        </div>
-        <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end', dayIndex); }} />
+
+        {/* Filled segments for overlapping assignments */}
+        {overlappingAssignments.map((ass, i) => {
+          const overlapStart = (() => {
+            const toMins = t => { const [h,m] = t.split(':').map(Number); return h < 6 ? h * 60 + m + 24*60 : h * 60 + m; };
+            const avS = toMins(shift.start_time), avE = toMins(shift.end_time) || toMins(shift.start_time)+24*60;
+            const avEn = avE <= avS ? avE + 24*60 : avE;
+            const assS = toMins(ass.start_time), assE = toMins(ass.end_time) || toMins(ass.start_time)+24*60;
+            const assEn = assE <= assS ? assE + 24*60 : assE;
+            const overS = Math.max(avS, assS);
+            const overE = Math.min(avEn, assEn);
+            const totalMins = avEn - avS;
+            const leftPct = ((overS - avS) / totalMins) * 100;
+            const widthPct = ((overE - overS) / totalMins) * 100;
+            return { leftPct, widthPct };
+          })();
+          const standby = isStandbyStatus(ass.status);
+          return (
+            <div
+              key={i}
+              className="absolute top-0 h-full"
+              style={{
+                left: `${overlapStart.leftPct}%`,
+                width: `${overlapStart.widthPct}%`,
+                backgroundColor: standby
+                  ? 'rgba(200,200,210,0.55)'
+                  : ass.isTemplateShift
+                    ? 'rgba(192,132,252,0.55)'
+                    : 'rgba(96,165,250,0.55)',
+                pointerEvents: 'none'
+              }}
+            />
+          );
+        })}
       </div>
     );
   };
