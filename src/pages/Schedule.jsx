@@ -17,7 +17,7 @@ const formatDateHebrew = (date) => {
   const year = d.getFullYear();
   return `${day} ${monthName}, ${year}`;
 };
-import * as XLSX from "xlsx";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
