@@ -704,18 +704,20 @@ export default function Matrix() {
     if (startPercent < 0 || startPercent > 100) return null;
 
     const isTemplate = assignment.isTemplateShift;
+    // In RTL layout, "left" in time = "right" in CSS
+    const rightPercent = 100 - startPercent - Math.max(width, 0.5);
 
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className={`absolute h-full border-l-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${
+              className={`absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${
                 isTemplate 
                   ? "bg-purple-400 border-purple-600" 
                   : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"
               }`}
-              style={{ left: `${startPercent}%`, width: `${Math.max(width, 0.5)}%` }}
+              style={{ right: `${rightPercent}%`, width: `${Math.max(width, 0.5)}%` }}
             >
               {!isTemplate && <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>}
               {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
