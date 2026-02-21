@@ -23,7 +23,6 @@ export default function WorkerCell({
 }) {
   const [showDialog, setShowDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedRole, setSelectedRole] = useState("all");
 
   // Find the selected worker
   const selectedWorker = currentValue ? workers.find(w => w.id === currentValue) : null;
