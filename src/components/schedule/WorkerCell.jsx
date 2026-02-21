@@ -39,15 +39,26 @@ export default function WorkerCell({
 
   const getWorkerAvailabilityPriority = (workerId, startTime, endTime) => {
     if (!workerId || !startTime || !endTime) return null;
-    const workerAvail = availabilities.find(a => a.worker_id === workerId && a.status === "approved");
+    const workerAvail = availabilities.find(a => 
+      a.worker_id === workerId && (a.status === "approved" || a.status === "submitted")
+    );
     if (!workerAvail || !workerAvail.shifts) return null;
-    const shift = workerAvail.shifts.find(s => 
+    // Find best matching shift - prefer exact cover, fallback to any overlap
+    const exactShift = workerAvail.shifts.find(s => 
       s.date === dateString && 
       s.type !== "unavailable" && 
       startTime >= s.start_time && 
       endTime <= s.end_time
     );
-    return shift ? { priority: shift.priority, type: shift.type } : null;
+    if (exactShift) return { priority: exactShift.priority, type: exactShift.type };
+    // Partial overlap
+    const overlapShift = workerAvail.shifts.find(s => 
+      s.date === dateString && 
+      s.type !== "unavailable" && 
+      startTime < s.end_time && 
+      endTime > s.start_time
+    );
+    return overlapShift ? { priority: overlapShift.priority, type: overlapShift.type } : null;
   };
 
   const getSeniorityColor = (seniority) => {
