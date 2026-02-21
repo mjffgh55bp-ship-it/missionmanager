@@ -422,7 +422,8 @@ export default function Matrix() {
     
     const { workerId, worker, shift, action, startPercent, originalStart, originalEnd, originalDay, rect } = dragging;
     const currentX = e.clientX - rect.left;
-    const currentPercent = Math.max(0, Math.min(100, (currentX / rect.width) * 100));
+    // RTL: invert so right side = 0% (06:00)
+    const currentPercent = Math.max(0, Math.min(100, 100 - (currentX / rect.width) * 100));
     
     let newStart = originalStart;
     let newEnd = originalEnd;
