@@ -83,15 +83,14 @@ export default function WorkerCell({
     if (onSaved) onSaved(null);
   };
 
-  // Filter and sort workers
+  // Filter and sort workers - if roleFilter is set, show ONLY workers with that exact role
   const filteredWorkers = workers
     .filter(w => w.active)
     .filter(w => {
       const matchesSearch = !searchQuery || 
         w.nickname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         w.role?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesRole = selectedRole === "all" || w.role === selectedRole;
-      // If roleFilter is set, only show workers with that role (before user changes the dropdown)
+      const matchesRole = !roleFilter || w.role === roleFilter;
       return matchesSearch && matchesRole;
     })
     .sort((a, b) => {
