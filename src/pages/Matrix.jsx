@@ -744,19 +744,21 @@ export default function Matrix() {
 
     const icons = { wanted: <Star className="w-3 h-3 fill-current" />, available: <Check className="w-3 h-3" />, unavailable: <Ban className="w-3 h-3" /> };
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
+    // In RTL layout: right% = 100 - startPercent - width
+    const rightPercent = 100 - startPercent - width;
 
     return (
       <div
-        className="absolute h-full border-l-2 rounded-sm flex flex-col items-center justify-center px-1 z-10 cursor-move bg-cyan-300 border-cyan-500"
+        className="absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-1 z-10 cursor-move bg-cyan-300 border-cyan-500"
         style={{ 
-          left: `${startPercent}%`, 
+          right: `${rightPercent}%`, 
           width: `${width}%`,
           opacity: 0.9
         }}
         onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }}
         onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
       >
-        <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start', dayIndex); }} />
+        <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start', dayIndex); }} />
         
         {/* Type indicator - clickable circle */}
         <button
