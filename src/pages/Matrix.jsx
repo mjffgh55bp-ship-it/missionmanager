@@ -704,8 +704,9 @@ export default function Matrix() {
     if (startPercent < 0 || startPercent > 100) return null;
 
     const isTemplate = assignment.isTemplateShift;
-    // In RTL layout, "left" in time = "right" in CSS
-    const rightPercent = 100 - startPercent - Math.max(width, 0.5);
+    // In RTL layout: 0% from timeToPercentage = 06:00 = rightmost side.
+    // So right% = startPercent (element starts at that % from the right edge)
+    const rightPercent = startPercent;
 
     return (
       <TooltipProvider>
