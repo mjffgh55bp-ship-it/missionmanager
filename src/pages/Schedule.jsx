@@ -918,8 +918,8 @@ export default function Schedule() {
                                 </div>
                               </TableHead>
                             ))}
-                            <TableHead className="w-[100px]" dir="rtl">סטטוס</TableHead>
-                            {editMode && <TableHead className="w-[60px]" dir="rtl"></TableHead>}
+                            <TableHead className="w-[100px] text-center" dir="rtl">סטטוס</TableHead>
+                            {editMode && <TableHead className="w-[60px] text-center" dir="rtl"></TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
