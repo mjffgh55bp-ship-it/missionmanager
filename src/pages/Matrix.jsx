@@ -789,12 +789,13 @@ export default function Matrix() {
     
     // Hide if outside zoom range
     if (startPercent < 0 || startPercent > 100) return null;
+    const rightPercent = 100 - startPercent - width;
 
     return (
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-l-2 border-red-500' : 'bg-gray-300 border-l-2 border-gray-500'}`} style={{ left: `${startPercent}%`, width: `${width}%` }}>
+            <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${rightPercent}%`, width: `${width}%` }}>
               <Ban className="w-3 h-3 text-gray-600" />
             </div>
           </TooltipTrigger>
