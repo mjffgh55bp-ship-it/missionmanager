@@ -1077,10 +1077,9 @@ export default function Matrix() {
                     .map((worker, index) => {
                     const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
                     const workerAssignments = getWorkerAssignments(worker.id);
+                    const workerTemplateShifts = getWorkerTemplateShifts(worker.id);
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
                     const summary = viewMode === 'weekly' ? calculateWorkerSummary(worker.id) : null;
-                    
-                    console.log(`Row ${index}: ${worker.nickname} (${worker.id}) - Assignments:`, workerAssignments.length, 'Availability:', availabilityShifts.length);
                     
                     return (
                       <React.Fragment key={worker.id}>
