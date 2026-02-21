@@ -392,7 +392,9 @@ export default function Matrix() {
     
     const rect = timeline.getBoundingClientRect();
     const startX = e.clientX - rect.left;
-    const startPercent = (startX / rect.width) * 100;
+    // RTL: timeline right edge = 0% (06:00), left edge = 100% (next 06:00)
+    // So invert: percent from left → percent from right
+    const startPercent = 100 - (startX / rect.width) * 100;
     
     setDragging({
       workerId: worker.id,
