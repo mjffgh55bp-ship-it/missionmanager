@@ -232,6 +232,45 @@ export default function Matrix() {
     return filtered;
   };
 
+  // Get template row shifts for a worker (from worker-type columns in TemplateRow)
+  const getWorkerTemplateShifts = (workerId, date = null) => {
+    const targetDate = date || dateString;
+    const shifts = [];
+
+    const rowsToCheck = date
+      ? templateRows.filter(r => r.date === targetDate)
+      : templateRows.filter(r => !date || r.date === targetDate);
+
+    rowsToCheck.forEach(row => {
+      if (!row.values) return;
+      // Check if this worker is assigned to any worker column in this row
+      const isAssigned = Object.values(row.values).some(val => val === workerId);
+      if (!isAssigned) return;
+
+      // Find the template to get worker-type columns
+      const template = allTemplates.find(t => t.id === row.template_id);
+      if (!template) return;
+
+      const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
+      const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
+
+      if (startTime && endTime) {
+        shifts.push({
+          id: `template_${row.id}`,
+          date: row.date,
+          start_time: startTime,
+          end_time: endTime,
+          food_cart_name: template.name || row.template_name,
+          hours: null,
+          status: row.values?.status || null,
+          isTemplateShift: true
+        });
+      }
+    });
+
+    return shifts;
+  };
+
   const getWorkerAvailabilityForDate = (workerId, date = null) => {
     const targetDate = date || dateString;
     const workerAvail = availabilities.find(a => 
