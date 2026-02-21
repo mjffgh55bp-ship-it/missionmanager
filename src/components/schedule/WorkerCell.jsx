@@ -10,6 +10,7 @@ export default function WorkerCell({
   rowId, 
   columnName, 
   currentValue, 
+  currentRowValues,
   workers,
   workerRoles,
   roleFilter,
