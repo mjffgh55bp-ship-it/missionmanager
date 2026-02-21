@@ -588,7 +588,7 @@ export default function Schedule() {
                 </Button>
                 <Button 
                   variant="outline" 
-                  onClick={() => handleSave(false)} 
+                  onClick={() => handleSave()} 
                   disabled={isSaving}
                   className="gap-2"
                   dir="rtl"
