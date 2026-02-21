@@ -745,8 +745,8 @@ export default function Matrix() {
 
     const icons = { wanted: <Star className="w-3 h-3 fill-current" />, available: <Check className="w-3 h-3" />, unavailable: <Ban className="w-3 h-3" /> };
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
-    // In RTL layout: right% = 100 - startPercent - width
-    const rightPercent = 100 - startPercent - width;
+    // In RTL layout: 0% from timeToPercentage = 06:00 = rightmost side.
+    const rightPercent = startPercent;
 
     return (
       <div
