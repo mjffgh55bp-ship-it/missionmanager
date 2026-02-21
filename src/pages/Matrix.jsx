@@ -1047,14 +1047,14 @@ export default function Matrix() {
               <div className="min-w-[1400px]">
                 <div className="flex sticky top-0 bg-gray-100 z-50 border-b">
                   <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50" dir="rtl">עובד</div>
-                  <div className="flex-1 relative flex" dir="ltr">
+                  <div className="flex-1 relative flex" dir="rtl">
                     {viewMode === 'daily' ? (
                       getDailyTimeSlots(zoomRange).map((hour) => (
-                        <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">{String(hour).padStart(2, '0')}:00</div>
+                        <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium">{String(hour).padStart(2, '0')}:00</div>
                       ))
                     ) : (
                       getWeeklyTimeSlots(zoomRange, startOfWeek(currentDate, { weekStartsOn: 0 })).map((slot, idx) => (
-                        <div key={idx} className="flex-1 text-xs text-gray-600 py-3 border-r text-center font-medium">
+                        <div key={idx} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium">
                           {slot.label && <div className="font-bold">{slot.label}</div>}
                           {slot.dateLabel && <div className="text-[9px] text-gray-500">{slot.dateLabel}</div>}
                           {slot.hour === 6 && <div className="text-[10px]">{String(slot.hour).padStart(2, '0')}:00</div>}
