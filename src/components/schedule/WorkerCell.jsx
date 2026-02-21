@@ -65,9 +65,9 @@ export default function WorkerCell({
     const worker = workers.find(w => w.id === workerId);
     if (!worker) return;
 
-    const newValues = { [columnName]: workerId };
+    const updatedValues = { ...(currentRowValues || {}), [columnName]: workerId };
     await base44.entities.TemplateRow.update(rowId, {
-      values: newValues
+      values: updatedValues
     });
 
     setShowDialog(false);
@@ -75,8 +75,9 @@ export default function WorkerCell({
   };
 
   const handleRemoveWorker = async () => {
+    const updatedValues = { ...(currentRowValues || {}), [columnName]: null };
     await base44.entities.TemplateRow.update(rowId, {
-      values: { [columnName]: null }
+      values: updatedValues
     });
 
     setShowDialog(false);
