@@ -843,6 +843,7 @@ export default function Matrix() {
                   <Badge className="bg-cyan-100 text-cyan-800" dir="rtl"><Check className="w-3 h-3 mr-1" />זמין</Badge>
                   <Badge className="bg-red-100 text-red-800" dir="rtl"><Ban className="w-3 h-3 mr-1" />לא זמין</Badge>
                   <Badge className="bg-blue-400 text-white" dir="rtl">שיבוץ</Badge>
+                  <Badge className="bg-purple-400 text-white" dir="rtl">שיבוץ (לוח)</Badge>
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
