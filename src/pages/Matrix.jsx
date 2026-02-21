@@ -1128,7 +1128,7 @@ export default function Matrix() {
                             }
                           }}
                           className="flex-1 relative border-r cursor-crosshair h-16"
-                          dir="ltr"
+                          dir="rtl"
                           onMouseDown={(e) => {
                             handleMouseDown(e, worker, null, 'create');
                           }}
