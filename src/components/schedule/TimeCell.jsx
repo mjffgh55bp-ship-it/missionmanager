@@ -29,7 +29,7 @@ export default function TimeCell({ rowId, colName, value, defaultValue, rowValue
       onChange={handleChange}
       placeholder={defaultValue}
       dir="rtl"
-      className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm"
+      className="border-0 rounded-none h-full focus:ring-0 focus:ring-offset-0 text-sm text-center"
     />
   );
 }
