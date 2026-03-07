@@ -55,6 +55,7 @@ export default function Schedule() {
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
   const [editMode, setEditMode] = useState(false);
+  const [showPresetsDialog, setShowPresetsDialog] = useState(false);
 
   useEffect(() => { loadData(); }, [currentDate]);
 
