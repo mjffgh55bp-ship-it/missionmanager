@@ -127,6 +127,8 @@ export default function Matrix() {
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
+  // sentState: { [workerId]: { sentAssignmentIds: string[], sentDate: string } }
+  const [sentState, setSentState] = useState({});
 
   useEffect(() => { 
     loadStaticData();
