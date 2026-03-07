@@ -637,6 +637,12 @@ export default function Schedule() {
           </div>
         )}
 
+        <PresetsDialog
+          open={showPresetsDialog}
+          onOpenChange={setShowPresetsDialog}
+          onAddPreset={handleAddPresetToSchedule}
+        />
+
         {/* Create New Moked Dialog */}
         <Dialog open={showCreateMokedDialog} onOpenChange={setShowCreateMokedDialog}>
           <DialogContent className="sm:max-w-md">
