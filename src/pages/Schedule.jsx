@@ -26,6 +26,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import ColumnCell from "../components/schedule/ColumnCell";
 import WorkerCell from "../components/schedule/WorkerCell";
 import TimeCell from "../components/schedule/TimeCell";
+import PresetsDialog from "../components/schedule/PresetsDialog";
+import { BookmarkPlus } from "lucide-react";
 
 export default function Schedule() {
   const [currentDate, setCurrentDate] = useState(new Date());
