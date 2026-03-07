@@ -300,10 +300,16 @@ export default function Schedule() {
                     </span>
                   )}
                   {editMode && (
-                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowCreateMokedDialog(true)} dir="rtl">
-                      <Plus className="w-4 h-4 ml-2" />
-                      צור מוקד חדש
-                    </Button>
+                    <>
+                      <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowCreateMokedDialog(true)} dir="rtl">
+                        <Plus className="w-4 h-4 ml-2" />
+                        צור מוקד חדש
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowPresetsDialog(true)} dir="rtl">
+                        <BookmarkPlus className="w-4 h-4 ml-2" />
+                        בחירה מפריסט
+                      </Button>
+                    </>
                   )}
                   {editMode && templateRows.length > 0 && (
                     <Button
