@@ -15,7 +15,7 @@ import {
   SidebarHeader,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar";
+} from "@/components/ui/sidebar.jsx";
 
 const managerNavigationItems = [
   { title: "לוח", url: createPageUrl("Schedule"), icon: Calendar },
