@@ -134,7 +134,7 @@ export default function WorkerCell({
     <>
       <button
         onClick={handleOpen}
-        className={`w-full h-full text-right p-2 hover:bg-blue-50 transition-colors ${
+        className={`w-full h-full text-center p-2 hover:bg-blue-50 transition-colors ${
           selectedWorker && rowStartTime && rowEndTime && isWorkerUnavailable(selectedWorker.id, rowStartTime, rowEndTime)
             ? "bg-red-50 border-red-300"
             : "border-transparent"
@@ -142,7 +142,7 @@ export default function WorkerCell({
         dir="rtl"
       >
         {selectedWorker ? (
-          <div className="flex items-center gap-2 justify-end">
+          <div className="flex items-center gap-2 justify-center">
             <span className={`text-xs font-medium truncate ${getSeniorityColor(selectedWorker.seniority)}`}>
               {selectedWorker.nickname}
             </span>
