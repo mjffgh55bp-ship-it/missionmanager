@@ -168,6 +168,32 @@ export default function Schedule() {
     await loadData();
   };
 
+  const handleAddPresetToSchedule = async (preset) => {
+    const config = preset.template_config;
+    const newTemplate = await base44.entities.Template.create({
+      name: preset.name,
+      color: config.color || '#3b82f6',
+      columns: config.columns || [],
+      default_rows: config.default_rows || [],
+      active: true
+    });
+    const newGroupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+    const rowsToCreate = config.default_rows && config.default_rows.length > 0
+      ? config.default_rows
+      : [{}];
+    for (const rowValues of rowsToCreate) {
+      await base44.entities.TemplateRow.create({
+        template_id: newTemplate.id,
+        template_name: newTemplate.name,
+        date: dateString,
+        values: rowValues,
+        group_id: newGroupId
+      });
+    }
+    await loadData();
+    toast.success(`מוקד "${preset.name}" נוסף ללוח`);
+  };
+
   const handleDuplicateMoked = async (group) => {
     const newGroupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
     const rowsToCreate = group.rows.map(row => ({
