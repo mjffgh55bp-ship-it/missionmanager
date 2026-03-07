@@ -390,6 +390,12 @@ export default function Matrix() {
       });
     }
     
+    // Mark as sent
+    const sentWorker = selectedWorkerForNotification;
+    const allAssigned = [...getWorkerAssignments(sentWorker.id), ...getWorkerTemplateShifts(sentWorker.id)];
+    const currentIds = allAssigned.map(a => a.id).sort().join(',');
+    setSentState(prev => ({ ...prev, [sentWorker.id]: { assignmentIds: currentIds, date: dateString } }));
+
     setShowNotificationDialog(false);
     setSelectedWorkerForNotification(null);
     setNotificationNotes("");
