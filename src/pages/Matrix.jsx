@@ -328,6 +328,19 @@ export default function Matrix() {
     setShowNotificationDialog(true);
   };
 
+  // Returns: 'none' | 'needs_update' | 'synced'
+  const getWorkerSendStatus = (worker) => {
+    const workerAssignments = getWorkerAssignments(worker.id);
+    const workerTemplateShifts = getWorkerTemplateShifts(worker.id);
+    const allAssigned = [...workerAssignments, ...workerTemplateShifts];
+    if (allAssigned.length === 0) return 'none';
+    const sent = sentState[worker.id];
+    if (!sent) return 'needs_update';
+    const currentIds = allAssigned.map(a => a.id).sort().join(',');
+    if (sent.assignmentIds === currentIds && sent.date === dateString) return 'synced';
+    return 'needs_update';
+  };
+
   const sendNotification = async () => {
     if (!selectedWorkerForNotification) return;
     
