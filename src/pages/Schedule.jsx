@@ -248,64 +248,62 @@ export default function Schedule() {
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b bg-white">
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-wrap">
                 <CardTitle className="text-2xl" dir="rtl">לוח</CardTitle>
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
                   <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center" dir="rtl">{formatDateHebrew(currentDate)}</div>
                   <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
                   <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 flex-wrap">
-                <Button
-                  variant={editMode ? "default" : "outline"}
-                  onClick={() => setEditMode(!editMode)}
-                  className={editMode ? "bg-purple-600 hover:bg-purple-700" : ""}
-                  dir="rtl"
-                >
-                  <Pencil className="w-4 h-4 ml-2" />
-                  {editMode ? 'יציאה ממצב עריכה' : 'מצב עריכה'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleSave()}
-                  disabled={isSaving}
-                  className="gap-2"
-                  dir="rtl"
-                >
-                  <Save className="w-4 h-4" />
-                  {isSaving ? 'שומר...' : 'שמור לוח'}
-                </Button>
-                {lastSaved && (
-                  <span className="text-xs text-gray-500" dir="rtl">
-                    נשמר לאחרונה: {format(lastSaved, 'HH:mm')}
-                  </span>
-                )}
-                {editMode && (
-                  <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowCreateMokedDialog(true)} dir="rtl">
-                    <Plus className="w-4 h-4 ml-2" />
-                    צור מוקד חדש
-                  </Button>
-                )}
-                {editMode && templateRows.length > 0 && (
+                  <div className="w-px h-6 bg-gray-300 mx-1" />
                   <Button
-                    variant="destructive"
-                    onClick={async () => {
-                      if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
-                        for (const row of templateRows) {
-                          await base44.entities.TemplateRow.delete(row.id);
-                        }
-                        loadData();
-                      }
-                    }}
+                    variant={editMode ? "default" : "outline"}
+                    onClick={() => setEditMode(!editMode)}
+                    className={editMode ? "bg-purple-600 hover:bg-purple-700" : ""}
                     dir="rtl"
                   >
-                    <Trash2 className="w-4 h-4 ml-2" />
-                    מחק הכל
+                    <Pencil className="w-4 h-4 ml-2" />
+                    {editMode ? 'יציאה ממצב עריכה' : 'מצב עריכה'}
                   </Button>
-                )}
+                  <Button
+                    variant="outline"
+                    onClick={() => handleSave()}
+                    disabled={isSaving}
+                    className="gap-2"
+                    dir="rtl"
+                  >
+                    <Save className="w-4 h-4" />
+                    {isSaving ? 'שומר...' : 'שמור לוח'}
+                  </Button>
+                  {lastSaved && (
+                    <span className="text-xs text-gray-500" dir="rtl">
+                      נשמר לאחרונה: {format(lastSaved, 'HH:mm')}
+                    </span>
+                  )}
+                  {editMode && (
+                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowCreateMokedDialog(true)} dir="rtl">
+                      <Plus className="w-4 h-4 ml-2" />
+                      צור מוקד חדש
+                    </Button>
+                  )}
+                  {editMode && templateRows.length > 0 && (
+                    <Button
+                      variant="destructive"
+                      onClick={async () => {
+                        if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
+                          for (const row of templateRows) {
+                            await base44.entities.TemplateRow.delete(row.id);
+                          }
+                          loadData();
+                        }
+                      }}
+                      dir="rtl"
+                    >
+                      <Trash2 className="w-4 h-4 ml-2" />
+                      מחק הכל
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </CardHeader>
