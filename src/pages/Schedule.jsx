@@ -154,24 +154,14 @@ export default function Schedule() {
     const template = allTemplates.find(t => t.id === templateId);
     if (!template) return;
 
-    const shifts = [
-      { start: "06:00", end: "10:00" },
-      { start: "10:00", end: "14:00" },
-      { start: "14:00", end: "18:00" },
-      { start: "18:00", end: "22:00" },
-      { start: "22:00", end: "02:00" },
-      { start: "02:00", end: "06:00" }
-    ];
-
-    const rowsToCreate = shifts.map(shift => ({
+    await base44.entities.TemplateRow.create({
       template_id: templateId,
       template_name: template.name,
       date: dateString,
-      values: { "התחלה": shift.start, "סיום": shift.end },
+      values: {},
       group_id: groupId
-    }));
+    });
 
-    await base44.entities.TemplateRow.bulkCreate(rowsToCreate);
     await loadData();
   };
 
