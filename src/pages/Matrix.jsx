@@ -1214,6 +1214,24 @@ export default function Matrix() {
                                 <LockOpen className="w-5 h-5 text-blue-500" />
                               )}
                             </button>
+                            {/* Send button - between lock and worker name */}
+                            {(() => {
+                              const sendStatus = getWorkerSendStatus(worker);
+                              const btnClass = sendStatus === 'none'
+                                ? 'text-gray-400 hover:text-gray-500'
+                                : sendStatus === 'needs_update'
+                                ? 'text-green-500 hover:text-green-600'
+                                : 'text-gray-900 hover:text-gray-700';
+                              return (
+                                <button
+                                  onClick={() => handleSendNotification(worker)}
+                                  className={`rounded p-1 transition-colors hover:bg-gray-100 ${btnClass}`}
+                                  title="שלח לוח משמרות"
+                                >
+                                  <Send className="w-4 h-4" />
+                                </button>
+                              );
+                            })()}
                             <div className="flex items-center">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'}`}>
                                 <ChefHat className="w-4 h-4" />
@@ -1226,7 +1244,6 @@ export default function Matrix() {
                           </div>
                           <div className="flex gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleSendNotification(worker)}><Send className="w-3 h-3" /></Button>
                           </div>
                         </div>
                         <div 
