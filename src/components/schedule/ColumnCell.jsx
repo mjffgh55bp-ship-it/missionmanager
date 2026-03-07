@@ -70,9 +70,9 @@ export default function ColumnCell({ assignmentId, colType, columnValues, availa
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="w-full text-left p-1 rounded border border-gray-200 hover:bg-blue-50 min-h-[28px]">
-          <span className="text-xs truncate block">{savedValue || "-"}</span>
-          {savedSubTypes.length > 0 && <span className="text-[10px] text-gray-400">({savedSubTypes.join(", ")})</span>}
+        <button className="w-full text-center p-1 rounded border border-gray-200 hover:bg-blue-50 min-h-[28px]">
+          <span className="text-xs truncate block text-center">{savedValue || "-"}</span>
+          {savedSubTypes.length > 0 && <span className="text-[10px] text-gray-400 text-center block">({savedSubTypes.join(", ")})</span>}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-56 p-2" onOpenAutoFocus={(e) => e.preventDefault()}>
