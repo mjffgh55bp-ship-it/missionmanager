@@ -767,12 +767,10 @@ export default function Matrix() {
 
   // Helper: check if two time ranges overlap (handles overnight)
   const timesOverlap = (aStart, aEnd, bStart, bEnd) => {
-    const toMins = t => { const [h,m] = t.split(':').map(Number); return h < 6 ? h * 60 + m + 24*60 : h * 60 + m; };
+    const toMins = t => { const [h,m] = t.split(':').map(Number); return h * 60 + m; };
     const as = toMins(aStart), ae = toMins(aEnd) || toMins(aStart) + 24*60;
     const bs = toMins(bStart), be = toMins(bEnd) || toMins(bStart) + 24*60;
-    const aeN = ae <= as ? ae + 24*60 : ae;
-    const beN = be <= bs ? be + 24*60 : be;
-    return as < beN && aeN > bs;
+    return as < be && ae > bs;
   };
 
   const isStandbyStatus = (status) => /^\d{1,2}[׳']/.test(status || '');
