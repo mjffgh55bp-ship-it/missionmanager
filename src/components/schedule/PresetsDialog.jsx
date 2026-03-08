@@ -343,5 +343,52 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Add Column Dialog - same as Schedule page */}
+    <Dialog open={showAddColumnDialog} onOpenChange={setShowAddColumnDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle dir="rtl">הוסף עמודה</DialogTitle></DialogHeader>
+        <div className="space-y-4 py-4">
+          <div>
+            <Label dir="rtl">בחר סוג עמודה</Label>
+            <Select value={newColumnName} onValueChange={(val) => { setNewColumnName(val); setNewColumnRole(""); }}>
+              <SelectTrigger><SelectValue placeholder="בחר מסוגי העמודות..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="time">זמן התחלה</SelectItem>
+                <SelectItem value="time_end">זמן סיום</SelectItem>
+                {columnTypes.map(t => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+                <SelectItem value="worker_member">חבר צוות</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {newColumnName === "worker_member" && (
+            <div>
+              <Label dir="rtl">תפקיד</Label>
+              <Select value={newColumnRole} onValueChange={setNewColumnRole}>
+                <SelectTrigger dir="rtl"><SelectValue placeholder="בחר תפקיד..." /></SelectTrigger>
+                <SelectContent>
+                  {workerRoles.map(role => (
+                    <SelectItem key={role} value={role}>{role}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowAddColumnDialog(false)} dir="rtl">ביטול</Button>
+          <Button
+            onClick={handleAddColumnConfirm}
+            disabled={!newColumnName || (newColumnName === "worker_member" && !newColumnRole)}
+            className="bg-blue-900 hover:bg-blue-800"
+            dir="rtl"
+          >
+            הוסף עמודה
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
