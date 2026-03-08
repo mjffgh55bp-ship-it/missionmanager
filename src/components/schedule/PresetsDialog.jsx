@@ -118,137 +118,124 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
 
         {editingPreset ? (
           /* ── Edit / Create view ── */
-          <div className="space-y-4 py-2" dir="rtl">
-            {/* Settings row: name + color */}
-            <div className="flex items-end gap-3">
-              <div className="flex-1">
-                <Label>שם המוקד</Label>
-                <Input
-                  value={editingPreset.name}
-                  onChange={(e) => setEditingPreset({ ...editingPreset, name: e.target.value })}
-                  dir="rtl"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label>צבע</Label>
-                <div className="flex items-center gap-2 mt-1">
+          <div className="space-y-3 py-2" dir="rtl">
+            {/* Moked card - exactly like Schedule page */}
+            <div className="rounded-lg overflow-hidden border shadow-sm">
+              {/* Header with editable name + color */}
+              <div
+                className="px-4 py-3 flex justify-between items-center"
+                style={{ background: `linear-gradient(to left, ${editingPreset.template_config.color}, ${editingPreset.template_config.color}dd)` }}
+              >
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={editingPreset.name}
+                    onChange={(e) => setEditingPreset({ ...editingPreset, name: e.target.value })}
+                    dir="rtl"
+                    className="text-base font-bold h-8 w-48 bg-white/20 border-white/50 text-black placeholder:text-black/50"
+                    placeholder="שם המוקד"
+                  />
                   <input
                     type="color"
                     value={editingPreset.template_config.color}
-                    onChange={(e) =>
-                      setEditingPreset({
-                        ...editingPreset,
-                        template_config: { ...editingPreset.template_config, color: e.target.value },
-                      })
-                    }
-                    className="w-10 h-10 rounded cursor-pointer border border-gray-300"
+                    onChange={(e) => setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, color: e.target.value } })}
+                    className="w-7 h-7 rounded cursor-pointer border border-white/50"
+                    title="צבע"
                   />
                 </div>
-              </div>
-            </div>
-
-            {/* Live Preview - looks exactly like Schedule page */}
-            <div>
-              <Label className="mb-2 block">תצוגה מקדימה</Label>
-              <div className="rounded-lg overflow-hidden border shadow-sm">
-                {/* Header */}
-                <div
-                  className="px-4 py-3 flex justify-between items-center"
-                  style={{ background: `linear-gradient(to left, ${editingPreset.template_config.color}, ${editingPreset.template_config.color}dd)` }}
-                >
-                  <span className="font-bold text-base text-black">{editingPreset.name || "שם המוקד"}</span>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={addColumn} dir="rtl">
+                    <Plus className="w-3 h-3 ml-1" />הוסף עמודה
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => {
+                    const rows = [...(editingPreset.template_config.default_rows || []), {}];
+                    setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, default_rows: rows } });
+                  }} dir="rtl">
+                    <Plus className="w-3 h-3 ml-1" />הוסף שורה
+                  </Button>
                 </div>
-                {/* Table */}
-                <div className="overflow-x-auto bg-white">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {editingPreset.template_config.columns.map((col, idx) => (
-                          <TableHead key={idx} className="text-center text-xs" dir="rtl">
-                            {col.name || <span className="text-gray-300">עמודה {idx + 1}</span>}
-                          </TableHead>
-                        ))}
-                        <TableHead className="text-center text-xs w-20" dir="rtl">סטטוס</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[1].map((rowIdx) => (
-                        <TableRow key={rowIdx}>
-                          {editingPreset.template_config.columns.map((col, idx) => (
-                            <TableCell key={idx} className="text-center text-xs text-gray-400 py-2" dir="rtl">
-                              {col.type === "time" ? "00:00" : col.type === "worker" ? "— איש צוות —" : "—"}
-                            </TableCell>
-                          ))}
-                          <TableCell className="text-center text-xs text-gray-400 py-2" dir="rtl">—</TableCell>
-                        </TableRow>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto bg-white">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {editingPreset.template_config.columns.map((col, idx) => (
+                        <TableHead key={idx} className="text-center p-1" dir="rtl" style={{ minWidth: 90 }}>
+                          <div className="flex flex-col items-center gap-1">
+                            <Input
+                              value={col.name}
+                              onChange={(e) => updateColumn(idx, "name", e.target.value)}
+                              placeholder={`עמודה ${idx + 1}`}
+                              className="h-6 text-xs text-center px-1 border-dashed"
+                              dir="rtl"
+                            />
+                            <div className="flex items-center gap-0.5">
+                              <Select value={col.type} onValueChange={(v) => updateColumn(idx, "type", v)}>
+                                <SelectTrigger className="h-5 w-20 text-[10px] px-1">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {COLUMN_TYPE_OPTIONS.map((o) => (
+                                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button size="icon" variant="ghost" className="h-5 w-5 p-0" disabled={idx === 0}
+                                onClick={() => {
+                                  const cols = [...editingPreset.template_config.columns];
+                                  [cols[idx - 1], cols[idx]] = [cols[idx], cols[idx - 1]];
+                                  setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
+                                }}>
+                                <ChevronRight className="w-3 h-3" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-5 w-5 p-0" disabled={idx === editingPreset.template_config.columns.length - 1}
+                                onClick={() => {
+                                  const cols = [...editingPreset.template_config.columns];
+                                  [cols[idx], cols[idx + 1]] = [cols[idx + 1], cols[idx]];
+                                  setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
+                                }}>
+                                <ChevronLeft className="w-3 h-3" />
+                              </Button>
+                              <Button size="icon" variant="ghost" className="h-5 w-5 p-0 text-red-500 hover:text-red-700"
+                                onClick={() => removeColumn(idx)}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </TableHead>
                       ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </div>
-
-            {/* Columns editor */}
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <Label>עמודות</Label>
-                <Button size="sm" variant="outline" onClick={addColumn}>
-                  <Plus className="w-3 h-3 ml-1" /> הוסף עמודה
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {editingPreset.template_config.columns.map((col, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded p-2">
-                    <Button
-                      size="icon" variant="ghost" className="h-7 w-7"
-                      disabled={idx === 0}
-                      onClick={() => {
-                        const cols = [...editingPreset.template_config.columns];
-                        [cols[idx - 1], cols[idx]] = [cols[idx], cols[idx - 1]];
-                        setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
-                      }}
-                    ><ChevronRight className="w-3 h-3" /></Button>
-                    <Button
-                      size="icon" variant="ghost" className="h-7 w-7"
-                      disabled={idx === editingPreset.template_config.columns.length - 1}
-                      onClick={() => {
-                        const cols = [...editingPreset.template_config.columns];
-                        [cols[idx], cols[idx + 1]] = [cols[idx + 1], cols[idx]];
-                        setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
-                      }}
-                    ><ChevronLeft className="w-3 h-3" /></Button>
-                    <Input
-                      value={col.name}
-                      onChange={(e) => updateColumn(idx, "name", e.target.value)}
-                      placeholder="שם עמודה"
-                      className="h-7 text-sm flex-1"
-                      dir="rtl"
-                    />
-                    <Select value={col.type} onValueChange={(v) => updateColumn(idx, "type", v)}>
-                      <SelectTrigger className="h-7 w-28 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COLUMN_TYPE_OPTIONS.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      <TableHead className="text-center text-xs w-20" dir="rtl">סטטוס</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(editingPreset.template_config.default_rows || [{}]).map((row, rowIdx) => (
+                      <TableRow key={rowIdx}>
+                        {editingPreset.template_config.columns.map((col, idx) => (
+                          <TableCell key={idx} className="text-center text-xs text-gray-400 py-2" dir="rtl">
+                            {col.type === "time" ? "00:00" : col.type === "worker" ? "— איש צוות —" : "—"}
+                          </TableCell>
                         ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7 text-red-500 hover:text-red-700"
-                      onClick={() => removeColumn(idx)}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                ))}
+                        <TableCell className="text-center py-2" dir="rtl">
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-xs text-gray-400">—</span>
+                            <Button size="icon" variant="ghost" className="h-5 w-5 p-0 text-red-400 hover:text-red-600"
+                              onClick={() => {
+                                const rows = (editingPreset.template_config.default_rows || []).filter((_, i) => i !== rowIdx);
+                                setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, default_rows: rows } });
+                              }}>
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </div>
 
-            <div className="flex gap-2 justify-end pt-2">
+            <div className="flex gap-2 justify-end pt-1">
               <Button variant="outline" onClick={() => setEditingPreset(null)}>ביטול</Button>
               <Button onClick={handleSavePreset} className="bg-blue-700 hover:bg-blue-800">
                 <Check className="w-4 h-4 ml-1" /> שמור פריסט
