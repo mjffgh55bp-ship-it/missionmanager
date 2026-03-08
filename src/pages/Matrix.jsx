@@ -736,7 +736,12 @@ export default function Matrix() {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(assignment.date) : 0;
     const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
     const endPercent = timeToPercentage(assignment.end_time, dayIndex, viewMode, zoomRange);
-    const width = endPercent > startPercent ? endPercent - startPercent : (viewMode === 'daily' ? (100 - startPercent) + endPercent : 0);
+    // Handle overnight shifts: if end < start on timeline, wrap around
+    const width = endPercent >= startPercent
+      ? endPercent - startPercent
+      : viewMode === 'daily'
+        ? (100 - startPercent) + endPercent
+        : 0;
     
     // Hide if outside zoom range
     if (startPercent < 0 || startPercent > 100) return null;
