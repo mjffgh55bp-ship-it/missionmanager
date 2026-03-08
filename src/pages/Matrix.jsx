@@ -338,6 +338,13 @@ export default function Matrix() {
     
     let emailBody = `שלום ${selectedWorkerForNotification.nickname},\n\n`;
     
+    const formatShiftLine = (a, prefix = '  ') => {
+      const standby = isStandbyStatus(a.status);
+      const label = standby ? `כוננות (${a.status})` : a.food_cart_name;
+      const duration = standby ? a.status : (a.hours ? `${a.hours}h` : '');
+      return `${prefix}${label}: ${a.start_time} - ${a.end_time}${duration && !standby ? ` (${duration})` : ''}\n`;
+    };
+
     if (viewMode === "weekly") {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
       emailBody += `הנה לוח המשמרות שלך לשבוע של ${format(weekStart, "d.M.yyyy")}:\n\n`;
@@ -346,25 +353,30 @@ export default function Matrix() {
         const d = addDays(weekStart, i);
         const dStr = format(d, "yyyy-MM-dd");
         const dayAssignments = getWorkerAssignments(selectedWorkerForNotification.id, dStr);
+        const dayTemplateShifts = getWorkerTemplateShifts(selectedWorkerForNotification.id, dStr);
+        const allDayShifts = [...dayAssignments, ...dayTemplateShifts];
         const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
         emailBody += `${hebrewDays[d.getDay()]}, ${format(d, "d.M")}:\n`;
-        if (dayAssignments.length === 0) {
+        if (allDayShifts.length === 0) {
           emailBody += "  אין משמרות\n";
         } else {
-          dayAssignments.forEach(a => {
-            emailBody += `  ${a.food_cart_name}: ${a.start_time} - ${a.end_time} (${a.hours}h)\n`;
+          allDayShifts.forEach(a => {
+            emailBody += formatShiftLine(a);
           });
         }
         emailBody += "\n";
       }
     } else {
       const workerAssignments = getWorkerAssignments(selectedWorkerForNotification.id);
+      const workerTemplateShifts = getWorkerTemplateShifts(selectedWorkerForNotification.id);
+      const allShifts = [...workerAssignments, ...workerTemplateShifts];
       emailBody += `הנה לוח המשמרות שלך ל-${format(currentDate, "d.M.yyyy")}:\n\n`;
-      if (workerAssignments.length === 0) {
+      if (allShifts.length === 0) {
         emailBody += "אין משמרות מתוכננות ליום זה.\n\n";
       } else {
-        workerAssignments.forEach((a, i) => {
-          emailBody += `משמרת ${i + 1}: ${a.food_cart_name}\n  זמן: ${a.start_time} - ${a.end_time} (${a.hours}h)\n\n`;
+        allShifts.forEach((a, i) => {
+          const standby = isStandbyStatus(a.status);
+          emailBody += `משמרת ${i + 1}: ${standby ? `כוננות (${a.status})` : a.food_cart_name}\n  זמן: ${a.start_time} - ${a.end_time}${a.hours && !standby ? ` (${a.hours}h)` : ''}\n\n`;
         });
       }
     }
