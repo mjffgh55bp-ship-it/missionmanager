@@ -637,22 +637,6 @@ export default function Schedule() {
           onAddPreset={handleAddPresetToSchedule}
         />
 
-        {/* Create New Moked Dialog */}
-        <Dialog open={showCreateMokedDialog} onOpenChange={setShowCreateMokedDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">צור מוקד חדש</DialogTitle></DialogHeader>
-            <div className="py-4">
-              <p className="text-sm text-gray-600" dir="rtl">
-                המוקד החדש יכלול: תדריך, התחלה, סיום, שף, סו שף וסטטוס
-              </p>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreateMokedDialog(false)} dir="rtl">ביטול</Button>
-              <Button onClick={handleCreateNewMoked} className="bg-blue-900 hover:bg-blue-800" dir="rtl">צור מוקד</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
         {/* Add Template Column Dialog */}
         <Dialog open={showAddTemplateColumnDialog} onOpenChange={setShowAddTemplateColumnDialog}>
           <DialogContent className="sm:max-w-md">
