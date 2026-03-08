@@ -46,17 +46,32 @@ const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
 const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
   if (!timeStr) return 0;
-  const [hours, minutes] = timeStr.split(':').map(Number);
+  const parts = timeStr.split(':').map(Number);
+  let hours = parts[0];
+  const minutes = parts[1] || 0;
+  // 24:00 = סוף יממה = 100% (תחילת יום הבא 00:00 מבחינת timeline)
+  if (hours === 24) hours = 24; // נטפל בנפרד
   let basePercent;
   if (viewMode === 'weekly') {
     // For weekly: day 0 starts at 06:00
-    const hoursFromWeekStart = (hours >= 6 ? hours - 6 : hours + 18) + day * 24;
-    const totalMinutes = hoursFromWeekStart * 60 + minutes;
+    // 24:00 = ממש בסוף היום = 24h מ-00:00 = 18h מ-06:00
+    const effectiveHours = hours === 24 ? 24 : hours;
+    const hoursFromWeekStart = (effectiveHours >= 6 ? effectiveHours - 6 : effectiveHours === 24 ? 18 : effectiveHours + 18) + day * 24;
+    const totalMinutes = hoursFromWeekStart * 60 + (hours === 24 ? 0 : minutes);
     basePercent = (totalMinutes / (7 * 24 * 60)) * 100;
   } else {
-    // For daily: timeline starts at 06:00, so adjust hours
-    const hoursFromDayStart = hours >= 6 ? hours - 6 : hours + 18;
-    const totalMinutes = hoursFromDayStart * 60 + minutes;
+    // For daily: timeline starts at 06:00
+    // 00:00 of the same calendar day = 18 hours from 06:00 of previous day... but
+    // we treat the schedule as: 00:00 = start of calendar day = 18h on timeline (right side near end)
+    // 24:00 = end of calendar day = also 18h on timeline (wraps to same spot as 00:00 next day)
+    let hoursFromDayStart;
+    if (hours === 24) {
+      // 24:00 = same position as 00:00 on the next cycle = 18 hours from 06:00
+      hoursFromDayStart = 18;
+    } else {
+      hoursFromDayStart = hours >= 6 ? hours - 6 : hours + 18;
+    }
+    const totalMinutes = hoursFromDayStart * 60 + (hours === 24 ? 0 : minutes);
     basePercent = (totalMinutes / (24 * 60)) * 100;
   }
   
