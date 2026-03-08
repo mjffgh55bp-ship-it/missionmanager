@@ -554,7 +554,7 @@ export default function Schedule() {
                                           currentRowValues={row.values || {}}
                                           workers={workers}
                                           workerRoles={workerRoles}
-                                          roleFilter={col.role_filter || null}
+                                          roleFilter={col.role_filter || (col.type === "worker" ? col.name : null)}
                                           availabilities={availabilities}
                                           unavailabilities={unavailabilities}
                                           dateString={dateString}
