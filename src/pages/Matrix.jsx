@@ -737,11 +737,13 @@ export default function Matrix() {
     const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
     const endPercent = timeToPercentage(assignment.end_time, dayIndex, viewMode, zoomRange);
     // Handle overnight shifts: if end < start on timeline, wrap around
-    const width = endPercent >= startPercent
+    const rawWidth = endPercent >= startPercent
       ? endPercent - startPercent
       : viewMode === 'daily'
         ? (100 - startPercent) + endPercent
         : 0;
+    // Clamp so bar doesn't overflow beyond 100%
+    const width = Math.min(rawWidth, 100 - startPercent);
     
     // Hide if outside zoom range
     if (startPercent < 0 || startPercent > 100) return null;
