@@ -841,14 +841,12 @@ export default function Matrix() {
         {/* Filled segments for overlapping assignments */}
         {overlappingAssignments.map((ass, i) => {
           const overlapStart = (() => {
-            const toMins = t => { const [h,m] = t.split(':').map(Number); return h < 6 ? h * 60 + m + 24*60 : h * 60 + m; };
+            const toMins = t => { const [h,m] = t.split(':').map(Number); return h * 60 + m; };
             const avS = toMins(shift.start_time), avE = toMins(shift.end_time) || toMins(shift.start_time)+24*60;
-            const avEn = avE <= avS ? avE + 24*60 : avE;
             const assS = toMins(ass.start_time), assE = toMins(ass.end_time) || toMins(ass.start_time)+24*60;
-            const assEn = assE <= assS ? assE + 24*60 : assE;
             const overS = Math.max(avS, assS);
-            const overE = Math.min(avEn, assEn);
-            const totalMins = avEn - avS;
+            const overE = Math.min(avE, assE);
+            const totalMins = avE - avS;
             const leftPct = ((overS - avS) / totalMins) * 100;
             const widthPct = ((overE - overS) / totalMins) * 100;
             return { leftPct, widthPct };
