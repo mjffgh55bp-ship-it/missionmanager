@@ -35,7 +35,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
   const [columnTypes, setColumnTypes] = useState([]);
 
   useEffect(() => {
-    if (open) loadPresets();
+    if (open) { loadPresets(); loadSettings(); }
   }, [open]);
 
   const loadPresets = async () => {
@@ -43,6 +43,33 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
     const data = await base44.entities.MokedPreset.list();
     setPresets(data);
     setLoading(false);
+  };
+
+  const loadSettings = async () => {
+    const [rolesSettings, colTypesSettings] = await Promise.all([
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
+      base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
+    ]);
+    if (rolesSettings.length > 0) setWorkerRoles(JSON.parse(rolesSettings[0].setting_value) || []);
+    if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
+  };
+
+  const handleAddColumnConfirm = () => {
+    let columnToAdd;
+    if (newColumnName === "time") {
+      columnToAdd = { name: "התחלה", type: "time", width: 100 };
+    } else if (newColumnName === "time_end") {
+      columnToAdd = { name: "סיום", type: "time", width: 100 };
+    } else if (newColumnName === "worker_member") {
+      columnToAdd = { name: newColumnRole, type: "worker", width: 150, role_filter: newColumnRole };
+    } else {
+      columnToAdd = { name: newColumnName, type: "text", width: 120 };
+    }
+    const cols = [...editingPreset.template_config.columns, columnToAdd];
+    setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
+    setShowAddColumnDialog(false);
+    setNewColumnName("");
+    setNewColumnRole("");
   };
 
   const handleNewPreset = () => {
