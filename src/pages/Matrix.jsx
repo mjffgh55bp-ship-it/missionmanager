@@ -724,20 +724,48 @@ export default function Matrix() {
     };
   };
 
+  const isStandbyStatus = (status) => /^\d{1,2}[׳']/.test(status || '');
+
   const AssignmentBar = ({ assignment }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(assignment.date) : 0;
     const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
     const endPercent = timeToPercentage(assignment.end_time, dayIndex, viewMode, zoomRange);
-    // With 00:00→24:00 timeline, endPercent is always >= startPercent for same-day shifts
     const width = endPercent >= startPercent ? endPercent - startPercent : 0;
     
-    // Hide if outside zoom range
     if (startPercent < 0 || startPercent > 100) return null;
 
     const isTemplate = assignment.isTemplateShift;
-    // In RTL layout: 0% from timeToPercentage = 06:00 = rightmost side.
-    // So right% = startPercent (element starts at that % from the right edge)
     const rightPercent = startPercent;
+    const standby = isStandbyStatus(assignment.status);
+
+    // Standby shifts: render as empty outline bar (like availability window)
+    if (standby) {
+      const borderColor = isTemplate ? '#a855f7' : '#3b82f6';
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden"
+                style={{
+                  right: `${rightPercent}%`,
+                  width: `${Math.max(width, 0.5)}%`,
+                  backgroundColor: 'transparent',
+                  border: `2px dashed ${borderColor}`,
+                }}
+              >
+                <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{assignment.status}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="bg-gray-800 text-white border-none">
+              <p className="font-bold">{assignment.food_cart_name}</p>
+              <p>זמן: {assignment.start_time} - {assignment.end_time}</p>
+              <p>סטטוס כוננות: {assignment.status}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
 
     return (
       <TooltipProvider>
