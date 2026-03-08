@@ -13,8 +13,9 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
+// Timeline: 00:00 → 24:00 (right to left in RTL)
 const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
-  const allSlots = Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
+  const allSlots = Array.from({ length: 24 }, (_, i) => i); // 0..23
   const startIdx = Math.floor((zoomRange.start / 100) * allSlots.length);
   const endIdx = Math.ceil((zoomRange.end / 100) * allSlots.length);
   return allSlots.slice(startIdx, endIdx);
@@ -27,12 +28,12 @@ const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }, weekStartDate = 
       const date = addDays(weekStartDate, day);
       dateLabel = format(date, 'd.M');
     }
-    for (let hour = 6; hour < 30; hour++) {
+    for (let hour = 0; hour < 24; hour++) {
       allSlots.push({ 
         day, 
-        hour: hour % 24, 
-        label: hour === 6 ? DAYS_OF_WEEK[day] : null,
-        dateLabel: hour === 6 ? dateLabel : null
+        hour: hour, 
+        label: hour === 0 ? DAYS_OF_WEEK[day] : null,
+        dateLabel: hour === 0 ? dateLabel : null
       });
     }
   }
