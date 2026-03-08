@@ -26,8 +26,13 @@ const COLUMN_TYPE_OPTIONS = [
 
 export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
   const [presets, setPresets] = useState([]);
-  const [editingPreset, setEditingPreset] = useState(null); // null = list view, object = edit view
+  const [editingPreset, setEditingPreset] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
+  const [newColumnName, setNewColumnName] = useState("");
+  const [newColumnRole, setNewColumnRole] = useState("");
+  const [workerRoles, setWorkerRoles] = useState([]);
+  const [columnTypes, setColumnTypes] = useState([]);
 
   useEffect(() => {
     if (open) loadPresets();
