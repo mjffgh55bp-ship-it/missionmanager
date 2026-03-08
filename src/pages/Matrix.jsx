@@ -801,8 +801,6 @@ export default function Matrix() {
     return as < be && ae > bs;
   };
 
-  const isStandbyStatus = (status) => /^\d{1,2}[׳']/.test(status || '');
-
   const AvailabilityBar = ({ shift, worker }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
     const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode, zoomRange);
