@@ -724,7 +724,7 @@ export default function Matrix() {
     };
   };
 
-  const isStandbyStatus = (status) => /^\d{1,2}[׳']/.test(status || '');
+  const isStandbyStatus = (status) => /^\d+[׳']/.test(status || '');
 
   const AssignmentBar = ({ assignment }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(assignment.date) : 0;
