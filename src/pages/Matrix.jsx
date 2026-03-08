@@ -779,7 +779,7 @@ export default function Matrix() {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
     const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode, zoomRange);
     const endPercent = timeToPercentage(shift.end_time, dayIndex, viewMode, zoomRange);
-    const width = endPercent > startPercent ? endPercent - startPercent : 0;
+    const width = endPercent >= startPercent ? endPercent - startPercent : 0;
     
     if (startPercent < 0 || startPercent > 100) return null;
 
