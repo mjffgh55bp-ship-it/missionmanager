@@ -45,69 +45,45 @@ const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
 
 
+// Timeline: 00:00 (right, 0%) → 24:00 (left, 100%) in RTL
 const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
   if (!timeStr) return 0;
   const parts = timeStr.split(':').map(Number);
-  let hours = parts[0];
+  const hours = parts[0]; // 0-24
   const minutes = parts[1] || 0;
-  // 24:00 = סוף יממה = 100% (תחילת יום הבא 00:00 מבחינת timeline)
-  if (hours === 24) hours = 24; // נטפל בנפרד
   let basePercent;
   if (viewMode === 'weekly') {
-    // For weekly: day 0 starts at 06:00
-    // 24:00 = ממש בסוף היום = 24h מ-00:00 = 18h מ-06:00
-    const effectiveHours = hours === 24 ? 24 : hours;
-    const hoursFromWeekStart = (effectiveHours >= 6 ? effectiveHours - 6 : effectiveHours === 24 ? 18 : effectiveHours + 18) + day * 24;
-    const totalMinutes = hoursFromWeekStart * 60 + (hours === 24 ? 0 : minutes);
+    const totalMinutes = (day * 24 + hours) * 60 + minutes;
     basePercent = (totalMinutes / (7 * 24 * 60)) * 100;
   } else {
-    // For daily: timeline starts at 06:00
-    // 00:00 of the same calendar day = 18 hours from 06:00 of previous day... but
-    // we treat the schedule as: 00:00 = start of calendar day = 18h on timeline (right side near end)
-    // 24:00 = end of calendar day = also 18h on timeline (wraps to same spot as 00:00 next day)
-    let hoursFromDayStart;
-    if (hours === 24) {
-      // 24:00 = same position as 00:00 on the next cycle = 18 hours from 06:00
-      hoursFromDayStart = 18;
-    } else {
-      hoursFromDayStart = hours >= 6 ? hours - 6 : hours + 18;
-    }
-    const totalMinutes = hoursFromDayStart * 60 + (hours === 24 ? 0 : minutes);
+    // 00:00 = 0%, 24:00 = 100%
+    const totalMinutes = hours * 60 + minutes;
     basePercent = (totalMinutes / (24 * 60)) * 100;
   }
   
-  // Check if time is outside zoom range
   if (basePercent < zoomRange.start || basePercent > zoomRange.end) {
     return basePercent < zoomRange.start ? -1 : 101;
   }
   
-  // Map to zoomed range (0-100% of visible area)
   const zoomWidth = zoomRange.end - zoomRange.start;
   return ((basePercent - zoomRange.start) / zoomWidth) * 100;
 };
 
 const percentageToTime = (percentage, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
-  // Map from zoomed percentage (0-100% of visible area) back to full range (0-100% of timeline)
   const zoomWidth = zoomRange.end - zoomRange.start;
   const basePercent = (percentage / 100) * zoomWidth + zoomRange.start;
-  
-  // Round to nearest minute for precision
   const totalMinutes = (basePercent / 100) * (viewMode === 'weekly' ? 7 * 24 * 60 : 24 * 60);
   
   if (viewMode === 'weekly') {
     const day = Math.floor(totalMinutes / (24 * 60));
     const minutesInDay = totalMinutes % (24 * 60);
-    const hoursFromDayStart = Math.floor(minutesInDay / 60);
+    const hours = Math.floor(minutesInDay / 60);
     const mins = Math.round((minutesInDay % 60) / 15) * 15;
-    // Convert back to actual hour (timeline starts at 06:00)
-    const actualHour = (hoursFromDayStart + 6) % 24;
-    return { day: Math.max(0, Math.min(6, day)), time: `${String(actualHour).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}` };
+    return { day: Math.max(0, Math.min(6, day)), time: `${String(hours).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}` };
   } else {
-    const hoursFromDayStart = Math.floor(totalMinutes / 60);
+    const hours = Math.floor(totalMinutes / 60);
     const mins = Math.round((totalMinutes % 60) / 15) * 15;
-    // Convert back to actual hour (timeline starts at 06:00)
-    const actualHour = (hoursFromDayStart + 6) % 24;
-    return { day: 0, time: `${String(actualHour).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}` };
+    return { day: 0, time: `${String(hours).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}` };
   }
 };
 
