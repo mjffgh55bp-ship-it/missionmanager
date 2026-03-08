@@ -391,5 +391,6 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
