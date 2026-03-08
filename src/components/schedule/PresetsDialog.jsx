@@ -175,7 +175,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="secondary" onClick={addColumn} dir="rtl">
+                  <Button size="sm" variant="secondary" onClick={() => { setNewColumnName(""); setNewColumnRole(""); setShowAddColumnDialog(true); }} dir="rtl">
                     <Plus className="w-3 h-3 ml-1" />הוסף עמודה
                   </Button>
                   <Button size="sm" variant="secondary" onClick={() => {
