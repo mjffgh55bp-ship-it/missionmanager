@@ -119,34 +119,77 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
         {editingPreset ? (
           /* ── Edit / Create view ── */
           <div className="space-y-4 py-2" dir="rtl">
-            <div>
-              <Label>שם המוקד</Label>
-              <Input
-                value={editingPreset.name}
-                onChange={(e) => setEditingPreset({ ...editingPreset, name: e.target.value })}
-                dir="rtl"
-                className="mt-1"
-              />
-            </div>
-
-            <div>
-              <Label>צבע</Label>
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  type="color"
-                  value={editingPreset.template_config.color}
-                  onChange={(e) =>
-                    setEditingPreset({
-                      ...editingPreset,
-                      template_config: { ...editingPreset.template_config, color: e.target.value },
-                    })
-                  }
-                  className="w-10 h-10 rounded cursor-pointer border border-gray-300"
+            {/* Settings row: name + color */}
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <Label>שם המוקד</Label>
+                <Input
+                  value={editingPreset.name}
+                  onChange={(e) => setEditingPreset({ ...editingPreset, name: e.target.value })}
+                  dir="rtl"
+                  className="mt-1"
                 />
-                <span className="text-sm text-gray-500">{editingPreset.template_config.color}</span>
+              </div>
+              <div>
+                <Label>צבע</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="color"
+                    value={editingPreset.template_config.color}
+                    onChange={(e) =>
+                      setEditingPreset({
+                        ...editingPreset,
+                        template_config: { ...editingPreset.template_config, color: e.target.value },
+                      })
+                    }
+                    className="w-10 h-10 rounded cursor-pointer border border-gray-300"
+                  />
+                </div>
               </div>
             </div>
 
+            {/* Live Preview - looks exactly like Schedule page */}
+            <div>
+              <Label className="mb-2 block">תצוגה מקדימה</Label>
+              <div className="rounded-lg overflow-hidden border shadow-sm">
+                {/* Header */}
+                <div
+                  className="px-4 py-3 flex justify-between items-center"
+                  style={{ background: `linear-gradient(to left, ${editingPreset.template_config.color}, ${editingPreset.template_config.color}dd)` }}
+                >
+                  <span className="font-bold text-base text-black">{editingPreset.name || "שם המוקד"}</span>
+                </div>
+                {/* Table */}
+                <div className="overflow-x-auto bg-white">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        {editingPreset.template_config.columns.map((col, idx) => (
+                          <TableHead key={idx} className="text-center text-xs" dir="rtl">
+                            {col.name || <span className="text-gray-300">עמודה {idx + 1}</span>}
+                          </TableHead>
+                        ))}
+                        <TableHead className="text-center text-xs w-20" dir="rtl">סטטוס</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {[1].map((rowIdx) => (
+                        <TableRow key={rowIdx}>
+                          {editingPreset.template_config.columns.map((col, idx) => (
+                            <TableCell key={idx} className="text-center text-xs text-gray-400 py-2" dir="rtl">
+                              {col.type === "time" ? "00:00" : col.type === "worker" ? "— איש צוות —" : "—"}
+                            </TableCell>
+                          ))}
+                          <TableCell className="text-center text-xs text-gray-400 py-2" dir="rtl">—</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
+
+            {/* Columns editor */}
             <div>
               <div className="flex justify-between items-center mb-2">
                 <Label>עמודות</Label>
@@ -157,6 +200,24 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
               <div className="space-y-2">
                 {editingPreset.template_config.columns.map((col, idx) => (
                   <div key={idx} className="flex items-center gap-2 bg-gray-50 rounded p-2">
+                    <Button
+                      size="icon" variant="ghost" className="h-7 w-7"
+                      disabled={idx === 0}
+                      onClick={() => {
+                        const cols = [...editingPreset.template_config.columns];
+                        [cols[idx - 1], cols[idx]] = [cols[idx], cols[idx - 1]];
+                        setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
+                      }}
+                    ><ChevronRight className="w-3 h-3" /></Button>
+                    <Button
+                      size="icon" variant="ghost" className="h-7 w-7"
+                      disabled={idx === editingPreset.template_config.columns.length - 1}
+                      onClick={() => {
+                        const cols = [...editingPreset.template_config.columns];
+                        [cols[idx], cols[idx + 1]] = [cols[idx + 1], cols[idx]];
+                        setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
+                      }}
+                    ><ChevronLeft className="w-3 h-3" /></Button>
                     <Input
                       value={col.name}
                       onChange={(e) => updateColumn(idx, "name", e.target.value)}
