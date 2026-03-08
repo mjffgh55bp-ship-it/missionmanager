@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Search, AlertTriangle, Star, Check } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, AlertTriangle, Star, Check, X } from "lucide-react";
 
 export default function WorkerCell({ 
   rowId, 
@@ -21,42 +20,34 @@ export default function WorkerCell({
   rowEndTime,
   onSaved
 }) {
-  const [showDialog, setShowDialog] = useState(false);
+  const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Find the selected worker
   const selectedWorker = currentValue ? workers.find(w => w.id === currentValue) : null;
 
   const isWorkerUnavailable = (workerId, startTime, endTime) => {
     if (!workerId || !startTime || !endTime) return false;
-    const workerUnavail = unavailabilities.filter(u => u.worker_id === workerId);
-    return workerUnavail.some(u => {
-      return (startTime >= u.start_time && startTime < u.end_time) ||
-             (endTime > u.start_time && endTime <= u.end_time) ||
-             (startTime <= u.start_time && endTime >= u.end_time);
-    });
+    return unavailabilities.filter(u => u.worker_id === workerId).some(u =>
+      (startTime >= u.start_time && startTime < u.end_time) ||
+      (endTime > u.start_time && endTime <= u.end_time) ||
+      (startTime <= u.start_time && endTime >= u.end_time)
+    );
   };
 
   const getWorkerAvailabilityPriority = (workerId, startTime, endTime) => {
     if (!workerId || !startTime || !endTime) return null;
-    const workerAvail = availabilities.find(a => 
+    const workerAvail = availabilities.find(a =>
       a.worker_id === workerId && (a.status === "approved" || a.status === "submitted")
     );
-    if (!workerAvail || !workerAvail.shifts) return null;
-    // Find best matching shift - prefer exact cover, fallback to any overlap
-    const exactShift = workerAvail.shifts.find(s => 
-      s.date === dateString && 
-      s.type !== "unavailable" && 
-      startTime >= s.start_time && 
-      endTime <= s.end_time
+    if (!workerAvail?.shifts) return null;
+    const exactShift = workerAvail.shifts.find(s =>
+      s.date === dateString && s.type !== "unavailable" &&
+      startTime >= s.start_time && endTime <= s.end_time
     );
     if (exactShift) return { priority: exactShift.priority, type: exactShift.type };
-    // Partial overlap
-    const overlapShift = workerAvail.shifts.find(s => 
-      s.date === dateString && 
-      s.type !== "unavailable" && 
-      startTime < s.end_time && 
-      endTime > s.start_time
+    const overlapShift = workerAvail.shifts.find(s =>
+      s.date === dateString && s.type !== "unavailable" &&
+      startTime < s.end_time && endTime > s.start_time
     );
     return overlapShift ? { priority: overlapShift.priority, type: overlapShift.type } : null;
   };
@@ -67,39 +58,24 @@ export default function WorkerCell({
     return "text-gray-900";
   };
 
-  const handleOpen = () => {
-    setSearchQuery("");
-    setShowDialog(true);
-  };
-
   const handleWorkerSelect = async (workerId) => {
-    const worker = workers.find(w => w.id === workerId);
-    if (!worker) return;
-
     const updatedValues = { ...(currentRowValues || {}), [columnName]: workerId };
-    await base44.entities.TemplateRow.update(rowId, {
-      values: updatedValues
-    });
-
-    setShowDialog(false);
+    await base44.entities.TemplateRow.update(rowId, { values: updatedValues });
+    setOpen(false);
     if (onSaved) onSaved(workerId);
   };
 
   const handleRemoveWorker = async () => {
     const updatedValues = { ...(currentRowValues || {}), [columnName]: null };
-    await base44.entities.TemplateRow.update(rowId, {
-      values: updatedValues
-    });
-
-    setShowDialog(false);
+    await base44.entities.TemplateRow.update(rowId, { values: updatedValues });
+    setOpen(false);
     if (onSaved) onSaved(null);
   };
 
-  // Filter and sort workers - if roleFilter is set, show ONLY workers with that exact role
   const filteredWorkers = workers
     .filter(w => w.active)
     .filter(w => {
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
         w.nickname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         w.role?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesRole = !roleFilter || w.role === roleFilter;
@@ -107,154 +83,129 @@ export default function WorkerCell({
     })
     .sort((a, b) => {
       if (!rowStartTime || !rowEndTime) return 0;
-
       const aAvail = getWorkerAvailabilityPriority(a.id, rowStartTime, rowEndTime);
       const bAvail = getWorkerAvailabilityPriority(b.id, rowStartTime, rowEndTime);
-      
-      const aUnavailable = isWorkerUnavailable(a.id, rowStartTime, rowEndTime);
-      const bUnavailable = isWorkerUnavailable(b.id, rowStartTime, rowEndTime);
-      if (aUnavailable && !bUnavailable) return 1;
-      if (!aUnavailable && bUnavailable) return -1;
-      
-      const aType = aAvail?.type;
-      const bType = bAvail?.type;
-      if (aType === 'wanted' && bType !== 'wanted') return -1;
-      if (aType !== 'wanted' && bType === 'wanted') return 1;
-      if (aType === 'available' && !bType) return -1;
-      if (!aType && bType === 'available') return 1;
-      
-      if (aAvail?.priority && bAvail?.priority) {
-        return aAvail.priority - bAvail.priority;
-      }
-      
+      const aUnavail = isWorkerUnavailable(a.id, rowStartTime, rowEndTime);
+      const bUnavail = isWorkerUnavailable(b.id, rowStartTime, rowEndTime);
+      if (aUnavail && !bUnavail) return 1;
+      if (!aUnavail && bUnavail) return -1;
+      if (aAvail?.type === 'wanted' && bAvail?.type !== 'wanted') return -1;
+      if (aAvail?.type !== 'wanted' && bAvail?.type === 'wanted') return 1;
+      if (aAvail?.type === 'available' && !bAvail?.type) return -1;
+      if (!aAvail?.type && bAvail?.type === 'available') return 1;
+      if (aAvail?.priority && bAvail?.priority) return aAvail.priority - bAvail.priority;
       return 0;
     });
 
-  return (
-    <>
-      <button
-        onClick={handleOpen}
-        className={`w-full h-full text-center p-2 hover:bg-blue-50 transition-colors ${
-          selectedWorker && rowStartTime && rowEndTime && isWorkerUnavailable(selectedWorker.id, rowStartTime, rowEndTime)
-            ? "bg-red-50 border-red-300"
-            : "border-transparent"
-        }`}
-        dir="rtl"
-      >
-        {selectedWorker ? (
-          <div className="flex items-center gap-2 justify-center">
-            <span className={`text-xs font-medium truncate ${getSeniorityColor(selectedWorker.seniority)}`}>
-              {selectedWorker.nickname}
-            </span>
-            {rowStartTime && rowEndTime && isWorkerUnavailable(selectedWorker.id, rowStartTime, rowEndTime) && (
-              <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />
-            )}
-          </div>
-        ) : (
-          <span className="text-xs text-gray-400">+ בחר עובד</span>
-        )}
-      </button>
+  const isCurrentUnavailable = selectedWorker && rowStartTime && rowEndTime &&
+    isWorkerUnavailable(selectedWorker.id, rowStartTime, rowEndTime);
 
-      <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle dir="rtl">בחר עובד - {columnName}</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="flex gap-2 mb-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="חיפוש..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+  return (
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (v) setSearchQuery(""); }}>
+      <PopoverTrigger asChild>
+        <button
+          className={`w-full h-full text-center p-2 hover:bg-blue-50 transition-colors ${
+            isCurrentUnavailable ? "bg-red-50" : ""
+          }`}
+          dir="rtl"
+        >
+          {selectedWorker ? (
+            <div className="flex items-center gap-1 justify-center">
+              <span className={`text-xs font-medium truncate ${getSeniorityColor(selectedWorker.seniority)}`}>
+                {selectedWorker.nickname}
+              </span>
+              {isCurrentUnavailable && <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />}
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400">+ בחר עובד</span>
+          )}
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent className="w-64 p-2 z-50" align="start" dir="rtl">
+        {/* Search */}
+        <div className="relative mb-2">
+          <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+          <Input
+            placeholder="חיפוש..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-7 text-xs pr-7"
+            dir="rtl"
+            autoFocus
+          />
+        </div>
+
+        {/* Worker list */}
+        <div className="max-h-52 overflow-y-auto space-y-0.5">
+          {/* Remove option if worker selected */}
+          {selectedWorker && (
+            <button
+              onClick={handleRemoveWorker}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs text-red-600 hover:bg-red-50"
+              dir="rtl"
+            >
+              <X className="w-3 h-3" />
+              הסר עובד
+            </button>
+          )}
+
+          {filteredWorkers.length === 0 ? (
+            <div className="text-center text-gray-400 text-xs py-4">לא נמצאו עובדים</div>
+          ) : (
+            filteredWorkers.map((worker) => {
+              const availInfo = rowStartTime && rowEndTime
+                ? getWorkerAvailabilityPriority(worker.id, rowStartTime, rowEndTime)
+                : null;
+              const isUnavailable = rowStartTime && rowEndTime
+                ? isWorkerUnavailable(worker.id, rowStartTime, rowEndTime)
+                : false;
+              const isSelected = worker.id === currentValue;
+
+              return (
+                <button
+                  key={worker.id}
+                  onClick={() => handleWorkerSelect(worker.id)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
+                    isSelected
+                      ? "bg-blue-100 text-blue-800"
+                      : isUnavailable
+                      ? "bg-red-50 hover:bg-red-100"
+                      : availInfo?.type === "wanted"
+                      ? "bg-green-50 hover:bg-green-100"
+                      : "hover:bg-gray-100"
+                  }`}
                   dir="rtl"
-                />
-              </div>
-              {roleFilter && (
-                <div className="flex items-center px-3 py-1 bg-blue-50 border border-blue-200 rounded-md text-sm text-blue-700" dir="rtl">
-                  תפקיד: {roleFilter}
-                </div>
-              )}
-            </div>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {filteredWorkers.length === 0 ? (
-                <div className="text-center text-gray-500 py-8" dir="rtl">
-                  לא נמצאו עובדים
-                </div>
-              ) : (
-                filteredWorkers.map((worker) => {
-                  const availInfo = rowStartTime && rowEndTime 
-                    ? getWorkerAvailabilityPriority(worker.id, rowStartTime, rowEndTime)
-                    : null;
-                  const isUnavailable = rowStartTime && rowEndTime 
-                    ? isWorkerUnavailable(worker.id, rowStartTime, rowEndTime)
-                    : false;
-                  
-                  return (
-                    <button
-                      key={worker.id}
-                      onClick={() => handleWorkerSelect(worker.id)}
-                      className={`w-full p-3 rounded-lg border hover:border-blue-400 hover:bg-blue-50 text-left ${
-                        isUnavailable 
-                          ? "border-red-300 bg-red-50" 
-                          : availInfo?.type === 'wanted' 
-                          ? "border-green-300 bg-green-50" 
-                          : ""
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {isUnavailable && <AlertTriangle className="w-4 h-4 text-red-500" />}
-                        {availInfo?.type === "wanted" && <Star className="w-4 h-4 text-green-600 fill-green-600" />}
-                        {availInfo?.type === "available" && <Check className="w-4 h-4 text-blue-600" />}
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{worker.nickname}</div>
-                          <div className="flex gap-2 mt-1 flex-wrap">
-                            {worker.role && (
-                              <Badge variant="outline" className="text-xs" dir="rtl">
-                                {worker.role}
-                              </Badge>
-                            )}
-                            <Badge variant="outline" className="text-xs" dir="rtl">
-                              {worker.seniority === 'trainee' ? 'מתלמד' : worker.seniority === 'newbie' ? 'מתחיל' : worker.seniority === 'experienced_chef' ? 'מנוסה' : worker.seniority}
-                            </Badge>
-                            {worker.is_guide && (
-                              <Badge className="text-xs bg-yellow-100 text-yellow-800" dir="rtl">
-                                מדריך
-                              </Badge>
-                            )}
-                            {availInfo && (
-                              <Badge variant="outline" className="text-xs" dir="rtl">
-                                {availInfo.type === 'wanted' ? 'רצוי' : 'זמין'} #{availInfo.priority}
-                              </Badge>
-                            )}
-                            {isUnavailable && (
-                              <Badge className="text-xs bg-red-100 text-red-800" dir="rtl">
-                                לא זמין
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            {selectedWorker && (
-              <Button variant="destructive" onClick={handleRemoveWorker} dir="rtl">
-                הסר עובד
-              </Button>
-            )}
-            <Button variant="outline" onClick={() => setShowDialog(false)} dir="rtl">
-              ביטול
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+                >
+                  {/* Availability indicator */}
+                  <span className="flex-shrink-0">
+                    {isUnavailable
+                      ? <AlertTriangle className="w-3 h-3 text-red-500" />
+                      : availInfo?.type === "wanted"
+                      ? <Star className="w-3 h-3 text-green-600 fill-green-600" />
+                      : availInfo?.type === "available"
+                      ? <Check className="w-3 h-3 text-blue-500" />
+                      : <span className="w-3 h-3 inline-block" />
+                    }
+                  </span>
+
+                  {/* Name */}
+                  <span className={`flex-1 text-right font-medium ${getSeniorityColor(worker.seniority)}`}>
+                    {worker.nickname}
+                  </span>
+
+                  {/* Role badge */}
+                  {worker.role && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 flex-shrink-0">
+                      {worker.role}
+                    </Badge>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
