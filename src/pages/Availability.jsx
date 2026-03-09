@@ -458,22 +458,23 @@ END:VEVENT
     });
   };
 
-  const getEventBarPosition = (eventStart, eventEnd, shiftStart, shiftEnd) => {
-    const timeToMinutes = (time) => {
-      const [h, m] = time.split(':').map(Number);
-      return h * 60 + m;
+  // Convert time to minutes offset from 06:00 (handles midnight crossing)
+  const timeToMinsFrom6 = (time) => {
+    const [h, m] = time.split(':').map(Number);
+    let mins = h * 60 + m;
+    if (mins < 360) mins += 1440; // 00:00-05:59 → next day
+    return mins - 360;
+  };
+
+  const getEventBarPositionFull = (eventStart, eventEnd) => {
+    const totalMins = 1440;
+    const startMins = Math.max(timeToMinsFrom6(eventStart), 0);
+    const endMins = Math.min(timeToMinsFrom6(eventEnd), totalMins);
+    if (endMins <= startMins) return null;
+    return {
+      right: `${(startMins / totalMins) * 100}%`,
+      width: `${((endMins - startMins) / totalMins) * 100}%`
     };
-    
-    const shiftStartMin = timeToMinutes(shiftStart);
-    const shiftEndMin = timeToMinutes(shiftEnd);
-    const eventStartMin = Math.max(timeToMinutes(eventStart), shiftStartMin);
-    const eventEndMin = Math.min(timeToMinutes(eventEnd), shiftEndMin);
-    
-    const shiftDuration = shiftEndMin - shiftStartMin;
-    const left = ((eventStartMin - shiftStartMin) / shiftDuration) * 100;
-    const width = ((eventEndMin - eventStartMin) / shiftDuration) * 100;
-    
-    return { left: `${left}%`, width: `${width}%` };
   };
 
   const getAssignmentForDate = (date) => {
@@ -657,36 +658,44 @@ END:VEVENT
                             </Badge>
                           )}
                         </div>
+                        {(() => {
+                            const dayYearlyEvts = yearlyEvents.filter(e =>
+                              e.worker_ids?.includes(currentWorker?.id) &&
+                              e.start_date <= date && e.end_date >= date &&
+                              e.start_time && e.end_time
+                            );
+                            return dayYearlyEvts.length > 0 ? (
+                              <div className="relative h-4 mb-1">
+                                {dayYearlyEvts.map(evt => {
+                                  const pos = getEventBarPositionFull(evt.start_time, evt.end_time);
+                                  if (!pos) return null;
+                                  return (
+                                    <div
+                                      key={evt.id}
+                                      className="absolute h-3.5 bg-purple-500 rounded text-white text-[8px] flex items-center px-1 overflow-hidden whitespace-nowrap"
+                                      style={{ right: pos.right, width: pos.width }}
+                                      title={`${evt.title} (${evt.start_time}-${evt.end_time})`}
+                                    >
+                                      {evt.title}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : null;
+                          })()}
                         <div className="grid grid-cols-6 gap-1">
                           {SHIFT_BLOCKS.map((shift) => {
                             const state = getShiftState(date, shift);
-                            const yearlyEvts = getYearlyEventsForShift(addDays(weekStart, dayIndex), shift.start, shift.end);
                             return (
-                              <div key={shift.start} className="flex flex-col gap-0.5 relative">
-                                {yearlyEvts.length > 0 && (
-                                  <div className="h-3 relative mb-0.5">
-                                    {yearlyEvts.map(evt => {
-                                      const barPos = getEventBarPosition(evt.start_time, evt.end_time, shift.start, shift.end);
-                                      return (
-                                        <div 
-                                          key={evt.id} 
-                                          className="absolute h-2.5 bg-purple-500 rounded-sm border border-purple-600" 
-                                          style={{ left: barPos.left, width: barPos.width, top: '0px' }}
-                                          title={`${evt.title} (${evt.start_time}-${evt.end_time})`}
-                                        />
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                                <button
-                                  onClick={() => cycleShiftState(date, shift)}
-                                  disabled={!canEdit || currentWorker?.availability_locked}
-                                  className={`p-1.5 rounded border-2 transition-all flex flex-col items-center justify-center ${getShiftStyle(state)} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                                >
-                                  {getShiftIcon(state)}
-                                  <span className="text-[10px] mt-0.5">{shift.start}</span>
-                                </button>
-                              </div>
+                              <button
+                                key={shift.start}
+                                onClick={() => cycleShiftState(date, shift)}
+                                disabled={!canEdit || currentWorker?.availability_locked}
+                                className={`p-1.5 rounded border-2 transition-all flex flex-col items-center justify-center ${getShiftStyle(state)} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                              >
+                                {getShiftIcon(state)}
+                                <span className="text-[10px] mt-0.5">{shift.start}</span>
+                              </button>
                             );
                           })}
                         </div>
