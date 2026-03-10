@@ -655,31 +655,72 @@ END:VEVENT
                   <CardTitle className="text-base" dir="rtl">משימות נוספות</CardTitle>
                 </CardHeader>
                 <CardContent className="py-3 px-4">
-                  <p className="text-xs text-gray-500 mb-3" dir="rtl">לחץ כדי לציין העדפה: רצוי → זמין → לא זמין</p>
-                  <div className="flex flex-wrap gap-2">
-                    {openRegistrations.map((taskName) => {
-                      const state = extraTaskStates[taskName] || null;
-                      const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white" 
-                        : state === "available" ? "bg-cyan-500 border-cyan-600 text-white"
-                        : state === "unavailable" ? "bg-red-500 border-red-600 text-white"
-                        : "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
-                      const stateIcon = state === "wanted" ? <Star className="w-3 h-3 ml-1" />
-                        : state === "available" ? <Check className="w-3 h-3 ml-1" />
-                        : state === "unavailable" ? <Ban className="w-3 h-3 ml-1" />
-                        : null;
-                      const stateLabel = state === "wanted" ? "רצוי" : state === "available" ? "זמין" : state === "unavailable" ? "לא זמין" : null;
+                  <p className="text-xs text-gray-500 mb-3" dir="rtl">לחץ על משמרת כדי לציין העדפה: רצוי → זמין → לא זמין</p>
+                  <div className="space-y-3">
+                    {openRegistrations.map((reg) => {
+                      // Support both old format (string) and new format (object with key/name/shifts)
+                      const regKey = reg?.key || reg;
+                      const regName = reg?.name || reg;
+                      const regDate = reg?.date || null;
+                      const regShifts = reg?.shifts || [];
                       return (
-                        <button
-                          key={taskName}
-                          onClick={() => cycleExtraTask(taskName)}
-                          disabled={!canEdit || currentWorker?.availability_locked}
-                          className={`flex items-center gap-1 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                          dir="rtl"
-                        >
-                          {stateIcon}
-                          <span>{taskName}</span>
-                          {stateLabel && <span className="text-xs opacity-80">({stateLabel})</span>}
-                        </button>
+                        <div key={regKey} className="border rounded-lg p-3" dir="rtl">
+                          <div className="font-semibold text-sm mb-2">{regName}
+                            {regDate && <span className="text-xs text-gray-400 font-normal mr-2">{regDate}</span>}
+                          </div>
+                          {regShifts.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {regShifts.map((shift, si) => {
+                                const taskKey = `${regKey}__${shift.start_time}-${shift.end_time}`;
+                                const state = extraTaskStates[taskKey] || null;
+                                const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white"
+                                  : state === "available" ? "bg-cyan-500 border-cyan-600 text-white"
+                                  : state === "unavailable" ? "bg-red-500 border-red-600 text-white"
+                                  : "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
+                                const stateIcon = state === "wanted" ? <Star className="w-3 h-3 ml-1" />
+                                  : state === "available" ? <Check className="w-3 h-3 ml-1" />
+                                  : state === "unavailable" ? <Ban className="w-3 h-3 ml-1" />
+                                  : null;
+                                return (
+                                  <button
+                                    key={si}
+                                    onClick={() => cycleExtraTask(taskKey)}
+                                    disabled={!canEdit || currentWorker?.availability_locked}
+                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                  >
+                                    {stateIcon}
+                                    <span>{shift.start_time} - {shift.end_time}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            // No specific shifts — show a single button for the whole task
+                            (() => {
+                              const taskKey = regKey;
+                              const state = extraTaskStates[taskKey] || null;
+                              const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white"
+                                : state === "available" ? "bg-cyan-500 border-cyan-600 text-white"
+                                : state === "unavailable" ? "bg-red-500 border-red-600 text-white"
+                                : "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
+                              const stateIcon = state === "wanted" ? <Star className="w-3 h-3 ml-1" />
+                                : state === "available" ? <Check className="w-3 h-3 ml-1" />
+                                : state === "unavailable" ? <Ban className="w-3 h-3 ml-1" />
+                                : null;
+                              const stateLabel = state === "wanted" ? "רצוי" : state === "available" ? "זמין" : state === "unavailable" ? "לא זמין" : "לחץ לסימון";
+                              return (
+                                <button
+                                  onClick={() => cycleExtraTask(taskKey)}
+                                  disabled={!canEdit || currentWorker?.availability_locked}
+                                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                >
+                                  {stateIcon}
+                                  <span>{stateLabel}</span>
+                                </button>
+                              );
+                            })()
+                          )}
+                        </div>
                       );
                     })}
                   </div>
