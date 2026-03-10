@@ -233,7 +233,7 @@ export default function CombinedReport({ isOpen, onClose, chefsData, sousData })
                 });
                 return (
                   <div key={label}>
-                    <h3 className={`text-sm font-bold text-${color}-600 mb-1 print:text-[10px]`}>{label} - משמרות שבועיות לאוכלוסייה</h3>
+                    <h3 className={`text-sm font-bold text-${color}-600 mb-1 print:text-[10px]`}>{label} - ממוצע משמרות שבועי לעובד</h3>
                     <table className="w-full border-collapse text-[9px] print:text-[7px]">
                       <thead>
                         <tr className={`bg-${color}-50`}>
