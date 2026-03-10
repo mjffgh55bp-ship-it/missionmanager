@@ -58,7 +58,7 @@ export default function Schedule() {
   const [showPresetsDialog, setShowPresetsDialog] = useState(false);
   const [openRegistrations, setOpenRegistrations] = useState([]);
 
-  useEffect(() => { loadData(); }, [currentDate]);
+  useEffect(() => {loadData();}, [currentDate]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -80,19 +80,19 @@ export default function Schedule() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
 
     const [workersData, availabilitiesData, unavailabilitiesData] = await Promise.all([
-      base44.entities.Worker.filter({ active: true }),
-      base44.entities.Availability.filter({ week_start_date: weekStartStr }),
-      base44.entities.Unavailability.filter({ date: dateString })
-    ]);
+    base44.entities.Worker.filter({ active: true }),
+    base44.entities.Availability.filter({ week_start_date: weekStartStr }),
+    base44.entities.Unavailability.filter({ date: dateString })]
+    );
 
     const [colTypesSettings, colSubTypesSettings, allTemplatesData, templateRowsData, shiftStatusesSettings, workerRolesSettings] = await Promise.all([
-      base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
-      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
-      base44.entities.Template.filter({ active: true }),
-      base44.entities.TemplateRow.filter({ date: dateString }),
-      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
-    ]);
+    base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
+    base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
+    base44.entities.Template.filter({ active: true }),
+    base44.entities.TemplateRow.filter({ date: dateString }),
+    base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
+    base44.entities.AppSettings.filter({ setting_key: "worker_roles" })]
+    );
 
     setWorkers(workersData);
     setAvailabilities(availabilitiesData);
@@ -100,8 +100,8 @@ export default function Schedule() {
     setTemplateRows(templateRowsData);
     setAllTemplates(allTemplatesData);
 
-    const uniqueTemplateIds = [...new Set(templateRowsData.map(row => row.template_id))];
-    const templatesInUse = allTemplatesData.filter(t => uniqueTemplateIds.includes(t.id));
+    const uniqueTemplateIds = [...new Set(templateRowsData.map((row) => row.template_id))];
+    const templatesInUse = allTemplatesData.filter((t) => uniqueTemplateIds.includes(t.id));
     setTemplates(templatesInUse);
 
     if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
@@ -132,12 +132,12 @@ export default function Schedule() {
 
     // Auto-add default templates if no rows exist for this date
     if (templateRowsData.length === 0) {
-      const defaultTemplates = allTemplatesData.filter(t => t.is_default && t.active);
+      const defaultTemplates = allTemplatesData.filter((t) => t.is_default && t.active);
       for (const template of defaultTemplates) {
         const groupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-        const rowsToCreate = template.default_rows && template.default_rows.length > 0
-          ? template.default_rows
-          : [{}];
+        const rowsToCreate = template.default_rows && template.default_rows.length > 0 ?
+        template.default_rows :
+        [{}];
         for (const rowValues of rowsToCreate) {
           await base44.entities.TemplateRow.create({
             template_id: template.id,
@@ -151,8 +151,8 @@ export default function Schedule() {
       if (defaultTemplates.length > 0) {
         const updatedTemplateRows = await base44.entities.TemplateRow.filter({ date: dateString });
         setTemplateRows(updatedTemplateRows);
-        const updatedUniqueIds = [...new Set(updatedTemplateRows.map(row => row.template_id))];
-        setTemplates(allTemplatesData.filter(t => updatedUniqueIds.includes(t.id)));
+        const updatedUniqueIds = [...new Set(updatedTemplateRows.map((row) => row.template_id))];
+        setTemplates(allTemplatesData.filter((t) => updatedUniqueIds.includes(t.id)));
       }
     }
 
@@ -162,7 +162,7 @@ export default function Schedule() {
   const dateString = format(currentDate, "yyyy-MM-dd");
 
   const handleAddTemplateRowForTemplate = async (templateId, groupId) => {
-    const template = allTemplates.find(t => t.id === templateId);
+    const template = allTemplates.find((t) => t.id === templateId);
     if (!template) return;
 
     await base44.entities.TemplateRow.create({
@@ -186,9 +186,9 @@ export default function Schedule() {
       active: true
     });
     const newGroupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-    const rowsToCreate = config.default_rows && config.default_rows.length > 0
-      ? config.default_rows
-      : [{}];
+    const rowsToCreate = config.default_rows && config.default_rows.length > 0 ?
+    config.default_rows :
+    [{}];
     for (const rowValues of rowsToCreate) {
       await base44.entities.TemplateRow.create({
         template_id: newTemplate.id,
@@ -204,7 +204,7 @@ export default function Schedule() {
 
   const handleDuplicateMoked = async (group) => {
     const newGroupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-    const rowsToCreate = group.rows.map(row => ({
+    const rowsToCreate = group.rows.map((row) => ({
       template_id: row.template_id,
       template_name: row.template_name,
       date: dateString,
@@ -221,12 +221,12 @@ export default function Schedule() {
       name: `מוקד ${format(currentDate, 'dd/MM')}`,
       color: '#3b82f6',
       columns: [
-        { name: "תדריך", type: "time", width: 100 },
-        { name: "התחלה", type: "time", width: 100 },
-        { name: "סיום", type: "time", width: 100 },
-        { name: "שף", type: "worker", width: 150 },
-        { name: "סו שף", type: "worker", width: 150 }
-      ],
+      { name: "תדריך", type: "time", width: 100 },
+      { name: "התחלה", type: "time", width: 100 },
+      { name: "סיום", type: "time", width: 100 },
+      { name: "שף", type: "worker", width: 150 },
+      { name: "סו שף", type: "worker", width: 150 }],
+
       default_rows: [],
       active: true
     });
@@ -255,7 +255,7 @@ export default function Schedule() {
     if (!plusMatch) return;
     const daysAhead = parseInt(plusMatch[2]);
     const realEndTime = `${plusMatch[3]}:${plusMatch[4]}`;
-    
+
     // Only create continuation if end time is >= 06:00 (crosses the day boundary)
     if (daysAhead === 1 && realEndTime < "06:00") return;
 
@@ -264,10 +264,10 @@ export default function Schedule() {
       const futureDate = format(addDays(currentDate, d), "yyyy-MM-dd");
       // Check if a continuation row already exists for this group on that day
       const existingRows = await base44.entities.TemplateRow.filter({ date: futureDate });
-      const alreadyExists = existingRows.some(r => r.values?.continuation_source_row_id === row.id);
+      const alreadyExists = existingRows.some((r) => r.values?.continuation_source_row_id === row.id);
       if (alreadyExists) continue;
 
-      const template = allTemplates.find(t => t.id === row.template_id);
+      const template = allTemplates.find((t) => t.id === row.template_id);
       const isLastDay = d === daysAhead;
 
       const continuationValues = {
@@ -277,10 +277,10 @@ export default function Schedule() {
         "סיום": isLastDay ? realEndTime : "06:00",
         "שעת סיום": isLastDay ? realEndTime : "06:00",
         is_continuation: true,
-        continuation_from_date: dateString,
+        continuation_from_date: dateString
       };
       // Remove worker assignments from continuation rows — they'll be assigned separately
-      for (const col of (template?.columns || [])) {
+      for (const col of template?.columns || []) {
         if (col.type === "worker") delete continuationValues[col.name];
       }
 
@@ -289,7 +289,7 @@ export default function Schedule() {
         template_name: row.template_name,
         date: futureDate,
         values: { ...continuationValues, continuation_source_row_id: row.id },
-        group_id: row.group_id,
+        group_id: row.group_id
       });
     }
   };
@@ -314,8 +314,8 @@ export default function Schedule() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8 flex items-center justify-center">
         <div className="text-gray-600" dir="rtl">טוען...</div>
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -336,8 +336,8 @@ export default function Schedule() {
                     variant={editMode ? "default" : "outline"}
                     onClick={() => setEditMode(!editMode)}
                     className={editMode ? "bg-purple-600 hover:bg-purple-700" : ""}
-                    dir="rtl"
-                  >
+                    dir="rtl">
+
                     <Pencil className="w-4 h-4 ml-2" />
                     {editMode ? 'יציאה ממצב עריכה' : 'מצב עריכה'}
                   </Button>
@@ -346,203 +346,203 @@ export default function Schedule() {
                     onClick={() => handleSave()}
                     disabled={isSaving}
                     className="gap-2"
-                    dir="rtl"
-                  >
+                    dir="rtl">
+
                     <Save className="w-4 h-4" />
                     {isSaving ? 'שומר...' : 'שמור לוח'}
                   </Button>
-                  {lastSaved && (
-                    <span className="text-xs text-gray-500" dir="rtl">
+                  {lastSaved &&
+                  <span className="text-xs text-gray-500" dir="rtl">
                       נשמר לאחרונה: {format(lastSaved, 'HH:mm')}
                     </span>
-                  )}
-                  {editMode && (
-                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowPresetsDialog(true)} dir="rtl">
+                  }
+                  {editMode &&
+                  <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowPresetsDialog(true)} dir="rtl">
                       <Plus className="w-4 h-4 ml-2" />
                       הוסף מוקד
                     </Button>
-                  )}
-                  {editMode && templateRows.length > 0 && (
-                    <Button
-                      variant="destructive"
-                      onClick={async () => {
-                        if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
-                          for (const row of templateRows) {
-                            await base44.entities.TemplateRow.delete(row.id);
-                          }
-                          loadData();
+                  }
+                  {editMode && templateRows.length > 0 &&
+                  <Button
+                    variant="destructive"
+                    onClick={async () => {
+                      if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
+                        for (const row of templateRows) {
+                          await base44.entities.TemplateRow.delete(row.id);
                         }
-                      }}
-                      dir="rtl"
-                    >
+                        loadData();
+                      }
+                    }}
+                    dir="rtl">
+
                       <Trash2 className="w-4 h-4 ml-2" />
                       מחק הכל
                     </Button>
-                  )}
+                  }
                 </div>
               </div>
             </div>
           </CardHeader>
         </Card>
 
-        {templates.length === 0 && templateRows.length === 0 ? (
-          <Card className="border-none shadow-lg">
+        {templates.length === 0 && templateRows.length === 0 ?
+        <Card className="border-none shadow-lg">
             <CardContent className="py-16 text-center" dir="rtl">
               <h3 className="text-xl font-semibold text-gray-900 mb-2">אין מוקדים ליום זה</h3>
               <p className="text-gray-600">לחץ על "מצב עריכה" ואז "צור מוקד חדש" להתחיל.</p>
             </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
+          </Card> :
+
+        <div className="space-y-4">
             {(() => {
-              const groupedRows = {};
-              templateRows.forEach(row => {
-                const key = `${row.template_id}_${row.group_id || 'default'}`;
-                if (!groupedRows[key]) groupedRows[key] = [];
-                groupedRows[key].push(row);
-              });
+            const groupedRows = {};
+            templateRows.forEach((row) => {
+              const key = `${row.template_id}_${row.group_id || 'default'}`;
+              if (!groupedRows[key]) groupedRows[key] = [];
+              groupedRows[key].push(row);
+            });
 
-              const groups = Object.entries(groupedRows).map(([key, rows]) => ({
-                key,
-                template_id: rows[0].template_id,
-                group_id: rows[0].group_id,
-                rows: rows.sort((a, b) => new Date(a.created_date) - new Date(b.created_date))
-              }));
+            const groups = Object.entries(groupedRows).map(([key, rows]) => ({
+              key,
+              template_id: rows[0].template_id,
+              group_id: rows[0].group_id,
+              rows: rows.sort((a, b) => new Date(a.created_date) - new Date(b.created_date))
+            }));
 
-              return groups.map((group, groupIndex) => {
-                const template = allTemplates.find(t => t.id === group.template_id);
-                if (!template) return null;
-                const templateRowsForTemplate = group.rows;
+            return groups.map((group, groupIndex) => {
+              const template = allTemplates.find((t) => t.id === group.template_id);
+              if (!template) return null;
+              const templateRowsForTemplate = group.rows;
 
-                const dailyColumns = dailyCustomColumns[template.id] || [];
-                const allColumns = [...(template.columns || []), ...dailyColumns];
+              const dailyColumns = dailyCustomColumns[template.id] || [];
+              const allColumns = [...(template.columns || []), ...dailyColumns];
 
-                const customOrder = customColumnOrders[template.id];
-                const orderedColumns = customOrder
-                  ? customOrder.map(name => allColumns.find(col => col.name === name)).filter(Boolean)
-                  : allColumns;
+              const customOrder = customColumnOrders[template.id];
+              const orderedColumns = customOrder ?
+              customOrder.map((name) => allColumns.find((col) => col.name === name)).filter(Boolean) :
+              allColumns;
 
-                return (
-                  <Card key={group.key} className="border-none shadow-lg overflow-hidden">
+              return (
+                <Card key={group.key} className="border-none shadow-lg overflow-hidden">
                     <CardHeader className="text-black py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                          {editMode && (
-                            <div className="flex flex-col gap-1">
+                          {editMode &&
+                        <div className="flex flex-col gap-1">
                               <Button size="icon" variant="ghost" className="h-6 w-6 text-black hover:bg-black/10"
-                                disabled={groupIndex === 0}
-                                onClick={async () => {
-                                  const prevGroup = groups[groupIndex - 1];
-                                  await base44.entities.TemplateRow.update(group.rows[0].id, { created_date: prevGroup.rows[0].created_date });
-                                  await base44.entities.TemplateRow.update(prevGroup.rows[0].id, { created_date: group.rows[0].created_date });
-                                  loadData();
-                                }}>
+                          disabled={groupIndex === 0}
+                          onClick={async () => {
+                            const prevGroup = groups[groupIndex - 1];
+                            await base44.entities.TemplateRow.update(group.rows[0].id, { created_date: prevGroup.rows[0].created_date });
+                            await base44.entities.TemplateRow.update(prevGroup.rows[0].id, { created_date: group.rows[0].created_date });
+                            loadData();
+                          }}>
                                 <ChevronUp className="w-4 h-4" />
                               </Button>
                               <Button size="icon" variant="ghost" className="h-6 w-6 text-black hover:bg-black/10"
-                                disabled={groupIndex === groups.length - 1}
-                                onClick={async () => {
-                                  const nextGroup = groups[groupIndex + 1];
-                                  await base44.entities.TemplateRow.update(group.rows[0].id, { created_date: nextGroup.rows[0].created_date });
-                                  await base44.entities.TemplateRow.update(nextGroup.rows[0].id, { created_date: group.rows[0].created_date });
-                                  loadData();
-                                }}>
+                          disabled={groupIndex === groups.length - 1}
+                          onClick={async () => {
+                            const nextGroup = groups[groupIndex + 1];
+                            await base44.entities.TemplateRow.update(group.rows[0].id, { created_date: nextGroup.rows[0].created_date });
+                            await base44.entities.TemplateRow.update(nextGroup.rows[0].id, { created_date: group.rows[0].created_date });
+                            loadData();
+                          }}>
                                 <ChevronDown className="w-4 h-4" />
                               </Button>
                             </div>
-                          )}
-                          {group.rows.some(r => r.values?.is_continuation) && (
-                            <span className="text-[10px] bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded font-normal" dir="rtl">
-                              המשך מ-{group.rows.find(r => r.values?.continuation_from_date)?.values?.continuation_from_date || "יום קודם"}
+                        }
+                          {group.rows.some((r) => r.values?.is_continuation) &&
+                        <span className="text-[10px] bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded font-normal" dir="rtl">
+                              המשך מ-{group.rows.find((r) => r.values?.continuation_from_date)?.values?.continuation_from_date || "יום קודם"}
                             </span>
-                          )}
-                          {editingMokedName === `${group.key}` ? (
-                            <Input
-                              value={editingMokedNameValue}
-                              onChange={(e) => setEditingMokedNameValue(e.target.value)}
-                              onBlur={() => saveMokedName(template.id, editingMokedNameValue)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') saveMokedName(template.id, editingMokedNameValue);
-                                else if (e.key === 'Escape') { setEditingMokedName(null); setEditingMokedNameValue(""); }
-                              }}
-                              autoFocus
-                              className="text-lg font-bold h-8 w-64 bg-white/20 border-white text-black"
-                              dir="rtl"
-                            />
-                          ) : (
-                            <CardTitle
-                              className="text-lg cursor-pointer hover:underline flex items-center gap-2"
-                              onClick={() => { setEditingMokedName(`${group.key}`); setEditingMokedNameValue(template.name); }}
-                              dir="rtl"
-                            >
+                        }
+                          {editingMokedName === `${group.key}` ?
+                        <Input
+                          value={editingMokedNameValue}
+                          onChange={(e) => setEditingMokedNameValue(e.target.value)}
+                          onBlur={() => saveMokedName(template.id, editingMokedNameValue)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveMokedName(template.id, editingMokedNameValue);else
+                            if (e.key === 'Escape') {setEditingMokedName(null);setEditingMokedNameValue("");}
+                          }}
+                          autoFocus
+                          className="text-lg font-bold h-8 w-64 bg-white/20 border-white text-black"
+                          dir="rtl" /> :
+
+
+                        <CardTitle className="text-slate-50 text-lg font-semibold tracking-tight cursor-pointer hover:underline flex items-center gap-2"
+
+                        onClick={() => {setEditingMokedName(`${group.key}`);setEditingMokedNameValue(template.name);}}
+                        dir="rtl">
+
                               {template.name}
                               <Pencil className="w-3 h-3 opacity-60" />
                             </CardTitle>
-                          )}
+                        }
                         </div>
-                        {editMode && (
-                          <div className="flex gap-2">
+                        {editMode &&
+                      <div className="flex gap-2">
                             <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id, group.group_id)} dir="rtl">
                               <Plus className="w-3 h-3 ml-1" />הוסף שורה
                             </Button>
-                            <Button size="sm" variant="secondary" onClick={() => { setSelectedTemplate(template); setShowAddTemplateColumnDialog(true); }} dir="rtl">
+                            <Button size="sm" variant="secondary" onClick={() => {setSelectedTemplate(template);setShowAddTemplateColumnDialog(true);}} dir="rtl">
                               <Plus className="w-3 h-3 ml-1" />הוסף עמודה
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => handleDuplicateMoked(group)} dir="rtl">
                               <Plus className="w-3 h-3 ml-1" />שכפל מוקד
                             </Button>
                             {(() => {
-                              const isOpen = openRegistrations.some(r => r && r.key === group.key);
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant={isOpen ? "default" : "outline"}
-                                  className={isOpen ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
-                                  onClick={async () => {
-                                    let updated;
-                                    if (isOpen) {
-                                      updated = openRegistrations.filter(r => r && r.key !== group.key);
-                                    } else {
-                                      const rowShifts = templateRowsForTemplate
-                                        .map(row => ({
-                                          start_time: row.values?.["התחלה"] || row.values?.["שעת התחלה"] || null,
-                                          end_time: row.values?.["סיום"] || row.values?.["שעת סיום"] || null
-                                        }))
-                                        .filter(s => s.start_time && s.end_time);
-                                      const entry = {
-                                        key: group.key,
-                                        name: template.name,
-                                        date: dateString,
-                                        shifts: rowShifts.length > 0 ? rowShifts : []
-                                      };
-                                      updated = [...openRegistrations, entry];
-                                    }
-                                    setOpenRegistrations(updated);
-                                    const settings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
-                                    const data = { setting_key: "open_registrations", setting_value: JSON.stringify(updated) };
-                                    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                                    else await base44.entities.AppSettings.create(data);
-                                    toast.success(!isOpen ? `הרשמה לـ"${template.name}" נפתחה` : `הרשמה לـ"${template.name}" נסגרה`);
-                                  }}
-                                  dir="rtl"
-                                >
-                                  <Plus className="w-3 h-3 ml-1" />{isOpen ? "בטל הרשמה" : "אפשר הרשמה"}
-                                </Button>
-                              );
-                            })()}
-                            <Button size="sm" variant="destructive"
-                             onClick={async () => {
-                                if (confirm(`האם למחוק את המוקד "${template.name}" מהלוח?`)) {
-                                  for (const row of templateRowsForTemplate) {
-                                    await base44.entities.TemplateRow.delete(row.id);
-                                  }
-                                  loadData();
+                          const isOpen = openRegistrations.some((r) => r && r.key === group.key);
+                          return (
+                            <Button
+                              size="sm"
+                              variant={isOpen ? "default" : "outline"}
+                              className={isOpen ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
+                              onClick={async () => {
+                                let updated;
+                                if (isOpen) {
+                                  updated = openRegistrations.filter((r) => r && r.key !== group.key);
+                                } else {
+                                  const rowShifts = templateRowsForTemplate.
+                                  map((row) => ({
+                                    start_time: row.values?.["התחלה"] || row.values?.["שעת התחלה"] || null,
+                                    end_time: row.values?.["סיום"] || row.values?.["שעת סיום"] || null
+                                  })).
+                                  filter((s) => s.start_time && s.end_time);
+                                  const entry = {
+                                    key: group.key,
+                                    name: template.name,
+                                    date: dateString,
+                                    shifts: rowShifts.length > 0 ? rowShifts : []
+                                  };
+                                  updated = [...openRegistrations, entry];
                                 }
-                              }} dir="rtl">
+                                setOpenRegistrations(updated);
+                                const settings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
+                                const data = { setting_key: "open_registrations", setting_value: JSON.stringify(updated) };
+                                if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);else
+                                await base44.entities.AppSettings.create(data);
+                                toast.success(!isOpen ? `הרשמה לـ"${template.name}" נפתחה` : `הרשמה לـ"${template.name}" נסגרה`);
+                              }}
+                              dir="rtl">
+
+                                  <Plus className="w-3 h-3 ml-1" />{isOpen ? "בטל הרשמה" : "אפשר הרשמה"}
+                                </Button>);
+
+                        })()}
+                            <Button size="sm" variant="destructive"
+                        onClick={async () => {
+                          if (confirm(`האם למחוק את המוקד "${template.name}" מהלוח?`)) {
+                            for (const row of templateRowsForTemplate) {
+                              await base44.entities.TemplateRow.delete(row.id);
+                            }
+                            loadData();
+                          }
+                        }} dir="rtl">
                               <Trash2 className="w-3 h-3 ml-1" />מחק מוקד
                             </Button>
                           </div>
-                        )}
+                      }
                       </div>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -551,193 +551,193 @@ export default function Schedule() {
                           <TableHeader>
                             <TableRow>
                               {editMode && <TableHead className="w-[60px] text-center" dir="rtl"></TableHead>}
-                              {orderedColumns.map((col, idx) => (
-                                <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl" className="text-center">
+                              {orderedColumns.map((col, idx) =>
+                            <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl" className="text-center">
                                   <div className="flex items-center gap-1 justify-center">
                                     <span>{col.name}</span>
-                                    {editMode && (
-                                      <div className="flex gap-0.5">
+                                    {editMode &&
+                                <div className="flex gap-0.5">
                                         <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === 0}
-                                          onClick={async () => {
-                                            const newOrder = [...orderedColumns];
-                                            [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
-                                            const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map(c => c.name) };
-                                            setCustomColumnOrders(newCustomOrders);
-                                            const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
-                                            const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
-                                            if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                                            else await base44.entities.AppSettings.create(data);
-                                          }}>
+                                  onClick={async () => {
+                                    const newOrder = [...orderedColumns];
+                                    [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+                                    const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map((c) => c.name) };
+                                    setCustomColumnOrders(newCustomOrders);
+                                    const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
+                                    const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
+                                    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);else
+                                    await base44.entities.AppSettings.create(data);
+                                  }}>
                                           <ChevronRight className="w-3 h-3" />
                                         </Button>
                                         <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === orderedColumns.length - 1}
-                                          onClick={async () => {
-                                            const newOrder = [...orderedColumns];
-                                            [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
-                                            const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map(c => c.name) };
-                                            setCustomColumnOrders(newCustomOrders);
-                                            const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
-                                            const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
-                                            if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                                            else await base44.entities.AppSettings.create(data);
-                                          }}>
+                                  onClick={async () => {
+                                    const newOrder = [...orderedColumns];
+                                    [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
+                                    const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map((c) => c.name) };
+                                    setCustomColumnOrders(newCustomOrders);
+                                    const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
+                                    const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
+                                    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);else
+                                    await base44.entities.AppSettings.create(data);
+                                  }}>
                                           <ChevronLeft className="w-3 h-3" />
                                         </Button>
                                         <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
-                                          onClick={async () => {
-                                            if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
-                                              const isDailyColumn = (dailyCustomColumns[template.id] || []).some(c => c.name === col.name);
-                                              if (isDailyColumn) {
-                                                const updatedDailyColumns = { ...dailyCustomColumns, [template.id]: (dailyCustomColumns[template.id] || []).filter(c => c.name !== col.name) };
-                                                setDailyCustomColumns(updatedDailyColumns);
-                                                const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
-                                                const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
-                                                if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                                              } else {
-                                                const updatedColumns = template.columns.filter(c => c.name !== col.name);
-                                                await base44.entities.Template.update(template.id, { columns: updatedColumns });
-                                              }
-                                              loadData();
-                                            }
-                                          }}>
+                                  onClick={async () => {
+                                    if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
+                                      const isDailyColumn = (dailyCustomColumns[template.id] || []).some((c) => c.name === col.name);
+                                      if (isDailyColumn) {
+                                        const updatedDailyColumns = { ...dailyCustomColumns, [template.id]: (dailyCustomColumns[template.id] || []).filter((c) => c.name !== col.name) };
+                                        setDailyCustomColumns(updatedDailyColumns);
+                                        const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
+                                        const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
+                                        if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+                                      } else {
+                                        const updatedColumns = template.columns.filter((c) => c.name !== col.name);
+                                        await base44.entities.Template.update(template.id, { columns: updatedColumns });
+                                      }
+                                      loadData();
+                                    }
+                                  }}>
                                           <Trash2 className="w-3 h-3" />
                                         </Button>
                                       </div>
-                                    )}
+                                }
                                   </div>
                                 </TableHead>
-                              ))}
+                            )}
                               <TableHead className="w-[100px] text-center" dir="rtl">סטטוס</TableHead>
                               {editMode && <TableHead className="w-[60px] text-center" dir="rtl"></TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {templateRowsForTemplate.length === 0 ? (
-                              <TableRow>
-                                <TableCell colSpan={(orderedColumns.length) + 3} className="text-center text-gray-500 py-8" dir="rtl">
+                            {templateRowsForTemplate.length === 0 ?
+                          <TableRow>
+                                <TableCell colSpan={orderedColumns.length + 3} className="text-center text-gray-500 py-8" dir="rtl">
                                   אין שורות. לחץ "הוסף שורה" להוספה.
                                 </TableCell>
-                              </TableRow>
-                            ) : (
-                              templateRowsForTemplate.map((row, rowIndex) => (
-                                 <TableRow key={row.id} className={row.values?.is_continuation ? "bg-orange-50" : ""}>
-                                  {editMode && (
-                                    <TableCell className="w-[60px]">
+                              </TableRow> :
+
+                          templateRowsForTemplate.map((row, rowIndex) =>
+                          <TableRow key={row.id} className={row.values?.is_continuation ? "bg-orange-50" : ""}>
+                                  {editMode &&
+                            <TableCell className="w-[60px]">
                                       <div className="flex flex-col gap-1 items-center">
                                         <Button size="icon" variant="ghost" className="h-6 w-6" disabled={rowIndex === 0}
-                                          onClick={async () => {
-                                            const prevRow = templateRowsForTemplate[rowIndex - 1];
-                                            await base44.entities.TemplateRow.update(row.id, { created_date: prevRow.created_date });
-                                            await base44.entities.TemplateRow.update(prevRow.id, { created_date: row.created_date });
-                                            loadData();
-                                          }}>
+                                onClick={async () => {
+                                  const prevRow = templateRowsForTemplate[rowIndex - 1];
+                                  await base44.entities.TemplateRow.update(row.id, { created_date: prevRow.created_date });
+                                  await base44.entities.TemplateRow.update(prevRow.id, { created_date: row.created_date });
+                                  loadData();
+                                }}>
                                           <ChevronUp className="w-3 h-3" />
                                         </Button>
                                         <Button size="icon" variant="ghost" className="h-6 w-6" disabled={rowIndex === templateRowsForTemplate.length - 1}
-                                          onClick={async () => {
-                                            const nextRow = templateRowsForTemplate[rowIndex + 1];
-                                            await base44.entities.TemplateRow.update(row.id, { created_date: nextRow.created_date });
-                                            await base44.entities.TemplateRow.update(nextRow.id, { created_date: row.created_date });
-                                            loadData();
-                                          }}>
+                                onClick={async () => {
+                                  const nextRow = templateRowsForTemplate[rowIndex + 1];
+                                  await base44.entities.TemplateRow.update(row.id, { created_date: nextRow.created_date });
+                                  await base44.entities.TemplateRow.update(nextRow.id, { created_date: row.created_date });
+                                  loadData();
+                                }}>
                                           <ChevronDown className="w-3 h-3" />
                                         </Button>
                                       </div>
                                     </TableCell>
-                                  )}
-                                  {orderedColumns.map((col, idx) => (
-                                    <TableCell key={idx} dir="rtl" className="p-0 text-center">
-                                      {col.type === "worker" ? (
-                                        <WorkerCell
-                                          rowId={row.id}
-                                          columnName={col.name}
-                                          currentValue={row.values?.[col.name]}
-                                          currentRowValues={row.values || {}}
-                                          workers={workers}
-                                          workerRoles={workerRoles}
-                                          roleFilter={col.role_filter || (col.type === "worker" ? col.name : null)}
-                                          availabilities={availabilities}
-                                          unavailabilities={unavailabilities}
-                                          dateString={dateString}
-                                          rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
-                                          rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
-                                          onSaved={(workerId) => {
-                                            const newValues = { ...row.values, [col.name]: workerId };
-                                            setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                          }}
-                                        />
-                                      ) : col.type === "time" ? (
-                                        <TimeCell
-                                          rowId={row.id}
-                                          colName={col.name}
-                                          value={row.values?.[col.name] || ""}
-                                          defaultValue={col.default_value || ""}
-                                          onSaved={(newValues) => {
-                                            setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                            handleTimeSaved(row, newValues);
-                                          }}
-                                          rowValues={row.values || {}}
-                                        />
-                                      ) : (
-                                        <ColumnCell
-                                          assignmentId={row.id}
-                                          colType={col.name}
-                                          columnValues={row.values || {}}
-                                          availableSubTypes={columnSubTypes[col.name] || []}
-                                          isTemplateRow={true}
-                                          onSaved={(updatedColumnValues) => {
-                                            const newValues = { ...row.values, ...updatedColumnValues };
-                                            base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                            setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                          }}
-                                        />
-                                      )}
+                            }
+                                  {orderedColumns.map((col, idx) =>
+                            <TableCell key={idx} dir="rtl" className="p-0 text-center">
+                                      {col.type === "worker" ?
+                              <WorkerCell
+                                rowId={row.id}
+                                columnName={col.name}
+                                currentValue={row.values?.[col.name]}
+                                currentRowValues={row.values || {}}
+                                workers={workers}
+                                workerRoles={workerRoles}
+                                roleFilter={col.role_filter || (col.type === "worker" ? col.name : null)}
+                                availabilities={availabilities}
+                                unavailabilities={unavailabilities}
+                                dateString={dateString}
+                                rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
+                                rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
+                                onSaved={(workerId) => {
+                                  const newValues = { ...row.values, [col.name]: workerId };
+                                  setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                }} /> :
+
+                              col.type === "time" ?
+                              <TimeCell
+                                rowId={row.id}
+                                colName={col.name}
+                                value={row.values?.[col.name] || ""}
+                                defaultValue={col.default_value || ""}
+                                onSaved={(newValues) => {
+                                  setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                  handleTimeSaved(row, newValues);
+                                }}
+                                rowValues={row.values || {}} /> :
+
+
+                              <ColumnCell
+                                assignmentId={row.id}
+                                colType={col.name}
+                                columnValues={row.values || {}}
+                                availableSubTypes={columnSubTypes[col.name] || []}
+                                isTemplateRow={true}
+                                onSaved={(updatedColumnValues) => {
+                                  const newValues = { ...row.values, ...updatedColumnValues };
+                                  base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                  setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                }} />
+
+                              }
                                     </TableCell>
-                                  ))}
+                            )}
                                   <TableCell className="p-0 text-center">
                                     <Select
-                                      value={row.values?.status || ""}
-                                      onValueChange={async (value) => {
-                                        const newValues = { ...row.values, status: value };
-                                        await base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                        setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
-                                      }}
-                                    >
+                                value={row.values?.status || ""}
+                                onValueChange={async (value) => {
+                                  const newValues = { ...row.values, status: value };
+                                  await base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                  setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                }}>
+
                                       <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
                                         <SelectValue placeholder="-" />
                                       </SelectTrigger>
                                       <SelectContent>
                                         <SelectItem value={null}>ללא</SelectItem>
-                                        {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                        {shiftStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                       </SelectContent>
                                     </Select>
                                   </TableCell>
-                                  {editMode && (
-                                    <TableCell className="p-1">
+                                  {editMode &&
+                            <TableCell className="p-1">
                                       <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => handleDeleteTemplateRow(row.id)}>
                                         <Trash2 className="w-3 h-3" />
                                       </Button>
                                     </TableCell>
-                                  )}
+                            }
                                 </TableRow>
-                              ))
-                            )}
+                          )
+                          }
                           </TableBody>
                         </Table>
                       </div>
                     </CardContent>
-                  </Card>
-                );
-              });
-            })()}
+                  </Card>);
+
+            });
+          })()}
           </div>
-        )}
+        }
 
         <PresetsDialog
           open={showPresetsDialog}
           onOpenChange={setShowPresetsDialog}
-          onAddPreset={handleAddPresetToSchedule}
-        />
+          onAddPreset={handleAddPresetToSchedule} />
+
 
         {/* Add Template Column Dialog */}
         <Dialog open={showAddTemplateColumnDialog} onOpenChange={setShowAddTemplateColumnDialog}>
@@ -746,47 +746,47 @@ export default function Schedule() {
             <div className="space-y-4 py-4">
               <div>
                 <Label dir="rtl">בחר סוג עמודה</Label>
-                <Select value={newTemplateColumnName} onValueChange={(val) => { setNewTemplateColumnName(val); setNewTemplateColumnType(""); setNewTemplateColumnRole(""); }}>
+                <Select value={newTemplateColumnName} onValueChange={(val) => {setNewTemplateColumnName(val);setNewTemplateColumnType("");setNewTemplateColumnRole("");}}>
                   <SelectTrigger><SelectValue placeholder="בחר מסוגי העמודות..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="time">זמן התחלה</SelectItem>
                     <SelectItem value="time_end">זמן סיום</SelectItem>
-                    {columnTypes.map(t => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
+                    {columnTypes.map((t) =>
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                    )}
                     <SelectItem value="worker_member">חבר צוות</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {newTemplateColumnName === "worker_member" && (
-                <>
+              {newTemplateColumnName === "worker_member" &&
+              <>
                   <div>
                     <Label dir="rtl">תפקיד</Label>
-                    <Select value={newTemplateColumnRole} onValueChange={(val) => { setNewTemplateColumnRole(val); setNewTemplateColumnType(val); }}>
+                    <Select value={newTemplateColumnRole} onValueChange={(val) => {setNewTemplateColumnRole(val);setNewTemplateColumnType(val);}}>
                       <SelectTrigger dir="rtl"><SelectValue placeholder="בחר תפקיד..." /></SelectTrigger>
                       <SelectContent>
-                        {workerRoles.map(role => (
-                          <SelectItem key={role} value={role}>{role}</SelectItem>
-                        ))}
+                        {workerRoles.map((role) =>
+                      <SelectItem key={role} value={role}>{role}</SelectItem>
+                      )}
                       </SelectContent>
                     </Select>
                   </div>
-                  {newTemplateColumnRole && (
-                    <div>
+                  {newTemplateColumnRole &&
+                <div>
                       <Label dir="rtl">שם העמודה (אופציונלי)</Label>
                       <Input
-                        value={newTemplateColumnType === newTemplateColumnRole ? "" : newTemplateColumnType}
-                        onChange={(e) => setNewTemplateColumnType(e.target.value || newTemplateColumnRole)}
-                        placeholder={newTemplateColumnRole}
-                        dir="rtl"
-                      />
+                    value={newTemplateColumnType === newTemplateColumnRole ? "" : newTemplateColumnType}
+                    onChange={(e) => setNewTemplateColumnType(e.target.value || newTemplateColumnRole)}
+                    placeholder={newTemplateColumnRole}
+                    dir="rtl" />
+
                     </div>
-                  )}
+                }
                 </>
-              )}
+              }
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => { setShowAddTemplateColumnDialog(false); setNewTemplateColumnName(""); setNewTemplateColumnType("text"); }} dir="rtl">ביטול</Button>
+              <Button variant="outline" onClick={() => {setShowAddTemplateColumnDialog(false);setNewTemplateColumnName("");setNewTemplateColumnType("text");}} dir="rtl">ביטול</Button>
               <Button
                 onClick={async () => {
                   if (!newTemplateColumnName || !selectedTemplate) return;
@@ -810,8 +810,8 @@ export default function Schedule() {
 
                   const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
                   const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
-                  if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                  else await base44.entities.AppSettings.create(data);
+                  if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);else
+                  await base44.entities.AppSettings.create(data);
 
                   setShowAddTemplateColumnDialog(false);
                   setNewTemplateColumnName("");
@@ -820,16 +820,16 @@ export default function Schedule() {
                   await loadData();
                   toast.success('עמודה נוספה בהצלחה');
                 }}
-                disabled={!newTemplateColumnName || (newTemplateColumnName === "worker_member" && !newTemplateColumnRole)}
+                disabled={!newTemplateColumnName || newTemplateColumnName === "worker_member" && !newTemplateColumnRole}
                 className="bg-blue-900 hover:bg-blue-800"
-                dir="rtl"
-              >
+                dir="rtl">
+
                 הוסף עמודה
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
-    </div>
-  );
+    </div>);
+
 }
