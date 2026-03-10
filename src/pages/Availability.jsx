@@ -691,14 +691,15 @@ END:VEVENT
                                   : null;
 
                                 const endParsed = parseTime(shift.end_time);
-                                const isMultiDay = endParsed.days > 0;
+                                // Multi-day only if end crosses the 06:00 boundary of the next day
+                                const isMultiDay = endParsed.days > 0 && endParsed.time >= "06:00";
                                 const disabled = !canEdit || currentWorker?.availability_locked;
 
                                 if (isMultiDay) {
-                                  // Show two connected buttons sharing the same key
+                                  // Show two connected buttons sharing the same key, split at 06:00
                                   return (
                                     <div key={si} className="flex items-stretch">
-                                      {/* Day 1 part: start → midnight */}
+                                      {/* Day 1 part: start → 06:00 */}
                                       <button
                                         onClick={() => cycleExtraTask(taskKey)}
                                         disabled={disabled}
@@ -706,11 +707,11 @@ END:VEVENT
                                       >
                                         <div className="flex items-center gap-1">
                                           {stateIcon}
-                                          <span>{shift.start_time} - 00:00</span>
+                                          <span>{shift.start_time} - 06:00</span>
                                         </div>
                                         <div className="text-[9px] opacity-70 mt-0.5">יום א׳</div>
                                       </button>
-                                      {/* Day 2 part: midnight → actual end */}
+                                      {/* Day 2 part: 06:00 → actual end */}
                                       <button
                                         onClick={() => cycleExtraTask(taskKey)}
                                         disabled={disabled}
@@ -718,7 +719,7 @@ END:VEVENT
                                       >
                                         <div className="flex items-center gap-1">
                                           {stateIcon}
-                                          <span>00:00 - {endParsed.time}</span>
+                                          <span>06:00 - {endParsed.time}</span>
                                           <span className="text-[9px] font-bold bg-orange-300 text-orange-900 rounded px-0.5">+1</span>
                                         </div>
                                         <div className="text-[9px] opacity-70 mt-0.5">יום ב׳</div>
