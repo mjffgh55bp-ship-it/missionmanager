@@ -97,11 +97,15 @@ export default function Availability() {
     const worker = workersData.find(w => w.email === user.email);
     setCurrentWorker(worker);
     
-    const [settings, eventsData, yearlyEventsData] = await Promise.all([
+    const [settings, eventsData, yearlyEventsData, openRegSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.CompanyEvent.list("-date"),
-      base44.entities.YearlyEvent.list()
+      base44.entities.YearlyEvent.list(),
+      base44.entities.AppSettings.filter({ setting_key: "open_registrations" })
     ]);
+    if (openRegSettings.length > 0) {
+      setOpenRegistrations(JSON.parse(openRegSettings[0].setting_value) || []);
+    }
     
     if (settings.length > 0) {
       const tipsData = JSON.parse(settings[0].setting_value);
