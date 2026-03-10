@@ -658,11 +658,19 @@ END:VEVENT
                   <p className="text-xs text-gray-500 mb-3" dir="rtl">לחץ על משמרת כדי לציין העדפה: רצוי → זמין → לא זמין</p>
                   <div className="space-y-3">
                     {openRegistrations.map((reg) => {
-                      // Support both old format (string) and new format (object with key/name/shifts)
                       const regKey = reg?.key || reg;
                       const regName = reg?.name || reg;
                       const regDate = reg?.date || null;
                       const regShifts = reg?.shifts || [];
+
+                      // Helper: parse "+N HH:MM" or "HH:MM"
+                      const parseTime = (t) => {
+                        if (!t) return { days: 0, time: t };
+                        const m = t.match(/^(\+(\d+))\s+(\d{2}:\d{2})$/);
+                        if (m) return { days: parseInt(m[2]), time: m[3] };
+                        return { days: 0, time: t };
+                      };
+
                       return (
                         <div key={regKey} className="border rounded-lg p-3" dir="rtl">
                           <div className="font-semibold text-sm mb-2">{regName}
@@ -671,31 +679,48 @@ END:VEVENT
                           {regShifts.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                               {regShifts.map((shift, si) => {
-                                const taskKey = `${regKey}__${shift.start_time}-${shift.end_time}`;
+                                // One taskKey per shift — cycling it marks the whole shift
+                                const taskKey = `${regKey}__${si}`;
                                 const state = extraTaskStates[taskKey] || null;
                                 const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white"
                                   : state === "available" ? "bg-cyan-500 border-cyan-600 text-white"
                                   : state === "unavailable" ? "bg-red-500 border-red-600 text-white"
                                   : "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
-                                const stateIcon = state === "wanted" ? <Star className="w-3 h-3 ml-1" />
-                                  : state === "available" ? <Check className="w-3 h-3 ml-1" />
-                                  : state === "unavailable" ? <Ban className="w-3 h-3 ml-1" />
+                                const stateIcon = state === "wanted" ? <Star className="w-3 h-3" />
+                                  : state === "available" ? <Check className="w-3 h-3" />
+                                  : state === "unavailable" ? <Ban className="w-3 h-3" />
                                   : null;
+
+                                const endParsed = parseTime(shift.end_time);
+                                const isMultiDay = endParsed.days > 0;
+
                                 return (
                                   <button
                                     key={si}
                                     onClick={() => cycleExtraTask(taskKey)}
                                     disabled={!canEdit || currentWorker?.availability_locked}
-                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                    className={`flex flex-col items-start px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                                   >
-                                    {stateIcon}
-                                    <span>{shift.start_time} - {shift.end_time}</span>
+                                    <div className="flex items-center gap-1">
+                                      {stateIcon}
+                                      <span>{shift.start_time} - {isMultiDay ? endParsed.time : shift.end_time}</span>
+                                      {isMultiDay && (
+                                        <span className="text-[9px] font-bold bg-orange-200 text-orange-800 rounded px-1 ml-1">
+                                          +{endParsed.days}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {isMultiDay && (
+                                      <div className="text-[9px] opacity-75 mt-0.5" dir="rtl">
+                                        {/* show continuation: day 1 00:00 - end_time */}
+                                        יממה לאחר: 00:00 - {endParsed.time}
+                                      </div>
+                                    )}
                                   </button>
                                 );
                               })}
                             </div>
                           ) : (
-                            // No specific shifts — show a single button for the whole task
                             (() => {
                               const taskKey = regKey;
                               const state = extraTaskStates[taskKey] || null;
