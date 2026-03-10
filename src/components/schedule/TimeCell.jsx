@@ -2,11 +2,21 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-// 00–24 same day, +1 00–24 next day, +2 00–24 two days later
+// Day starts at 06:00 and ends at 06:00 the next day
+// Day 0: 06–23, 00–05 | Day +1: 06–23, 00–05 | Day +2: 06–23, 00–05
 const HOURS = [
-  ...Array.from({ length: 25 }, (_, i) => String(i).padStart(2, "0")),
-  ...Array.from({ length: 25 }, (_, i) => `+1 ${String(i).padStart(2, "0")}`),
-  ...Array.from({ length: 25 }, (_, i) => `+2 ${String(i).padStart(2, "0")}`),
+  // Day 0: 06–23
+  ...Array.from({ length: 18 }, (_, i) => String(i + 6).padStart(2, "0")),
+  // Day 0: 00–05 (still same operational day)
+  ...Array.from({ length: 6 }, (_, i) => String(i).padStart(2, "0")),
+  // Day +1: 06–23
+  ...Array.from({ length: 18 }, (_, i) => `+1 ${String(i + 6).padStart(2, "0")}`),
+  // Day +1: 00–05 (shown but not creating continuations)
+  ...Array.from({ length: 6 }, (_, i) => `+1 ${String(i).padStart(2, "0")}`),
+  // Day +2: 06–23
+  ...Array.from({ length: 18 }, (_, i) => `+2 ${String(i + 6).padStart(2, "0")}`),
+  // Day +2: 00–05
+  ...Array.from({ length: 6 }, (_, i) => `+2 ${String(i).padStart(2, "0")}`),
 ];
 const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
 
