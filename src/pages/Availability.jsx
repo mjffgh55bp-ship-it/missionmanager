@@ -679,7 +679,6 @@ END:VEVENT
                           {regShifts.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                               {regShifts.map((shift, si) => {
-                                // One taskKey per shift — cycling it marks the whole shift
                                 const taskKey = `${regKey}__${si}`;
                                 const state = extraTaskStates[taskKey] || null;
                                 const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white"
@@ -693,29 +692,50 @@ END:VEVENT
 
                                 const endParsed = parseTime(shift.end_time);
                                 const isMultiDay = endParsed.days > 0;
+                                const disabled = !canEdit || currentWorker?.availability_locked;
+
+                                if (isMultiDay) {
+                                  // Show two connected buttons sharing the same key
+                                  return (
+                                    <div key={si} className="flex items-stretch">
+                                      {/* Day 1 part: start → midnight */}
+                                      <button
+                                        onClick={() => cycleExtraTask(taskKey)}
+                                        disabled={disabled}
+                                        className={`flex flex-col items-start px-2 py-1.5 rounded-r-lg border-2 border-l-0 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                      >
+                                        <div className="flex items-center gap-1">
+                                          {stateIcon}
+                                          <span>{shift.start_time} - 00:00</span>
+                                        </div>
+                                        <div className="text-[9px] opacity-70 mt-0.5">יום א׳</div>
+                                      </button>
+                                      {/* Day 2 part: midnight → actual end */}
+                                      <button
+                                        onClick={() => cycleExtraTask(taskKey)}
+                                        disabled={disabled}
+                                        className={`flex flex-col items-start px-2 py-1.5 rounded-l-lg border-2 border-dashed text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                      >
+                                        <div className="flex items-center gap-1">
+                                          {stateIcon}
+                                          <span>00:00 - {endParsed.time}</span>
+                                          <span className="text-[9px] font-bold bg-orange-300 text-orange-900 rounded px-0.5">+1</span>
+                                        </div>
+                                        <div className="text-[9px] opacity-70 mt-0.5">יום ב׳</div>
+                                      </button>
+                                    </div>
+                                  );
+                                }
 
                                 return (
                                   <button
                                     key={si}
                                     onClick={() => cycleExtraTask(taskKey)}
-                                    disabled={!canEdit || currentWorker?.availability_locked}
-                                    className={`flex flex-col items-start px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                                    disabled={disabled}
+                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                                   >
-                                    <div className="flex items-center gap-1">
-                                      {stateIcon}
-                                      <span>{shift.start_time} - {isMultiDay ? endParsed.time : shift.end_time}</span>
-                                      {isMultiDay && (
-                                        <span className="text-[9px] font-bold bg-orange-200 text-orange-800 rounded px-1 ml-1">
-                                          +{endParsed.days}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {isMultiDay && (
-                                      <div className="text-[9px] opacity-75 mt-0.5" dir="rtl">
-                                        {/* show continuation: day 1 00:00 - end_time */}
-                                        יממה לאחר: 00:00 - {endParsed.time}
-                                      </div>
-                                    )}
+                                    {stateIcon}
+                                    <span>{shift.start_time} - {shift.end_time}</span>
                                   </button>
                                 );
                               })}
