@@ -33,6 +33,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
   const [newColumnRole, setNewColumnRole] = useState("");
   const [workerRoles, setWorkerRoles] = useState([]);
   const [columnTypes, setColumnTypes] = useState([]);
+  const [workers, setWorkers] = useState([]);
 
   useEffect(() => {
     if (open) { loadPresets(); loadSettings(); }
