@@ -649,7 +649,10 @@ END:VEVENT
             )}
 
             {/* Extra Tasks Section */}
-            {openRegistrations.length > 0 && (
+            {openRegistrations.filter(reg => {
+              const regShifts = reg?.shifts || [];
+              return regShifts.length > 0;
+            }).length > 0 && (
               <Card className="border-none shadow-lg mb-4">
                 <CardHeader className="border-b bg-white py-3 px-4">
                   <CardTitle className="text-base" dir="rtl">משימות נוספות</CardTitle>
@@ -657,7 +660,10 @@ END:VEVENT
                 <CardContent className="py-3 px-4">
                   <p className="text-xs text-gray-500 mb-3" dir="rtl">לחץ על משמרת כדי לציין העדפה: רצוי → זמין → לא זמין</p>
                   <div className="space-y-3">
-                    {openRegistrations.map((reg) => {
+                    {openRegistrations.filter(reg => {
+                      const regShifts = reg?.shifts || [];
+                      return regShifts.length > 0;
+                    }).map((reg) => {
                       const regKey = reg?.key || reg;
                       const regName = reg?.name || reg;
                       const regDate = reg?.date || null;
