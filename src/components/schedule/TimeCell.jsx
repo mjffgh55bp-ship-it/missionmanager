@@ -89,20 +89,31 @@ export default function TimeCell({ rowId, colName, value, defaultValue, rowValue
           {/* Hours */}
           <div ref={hourRef} className="flex-1 overflow-y-auto scroll-smooth">
             <div className="text-center text-[10px] text-gray-400 mb-1 sticky top-0 bg-white">שעה</div>
-            {HOURS.map(h => (
-              <button
-                key={h}
-                data-selected={h === selectedHour}
-                onClick={() => handleHourClick(h)}
-                className={`w-full text-center py-1 rounded text-sm font-mono transition-colors ${
-                  h === selectedHour
-                    ? "bg-blue-600 text-white font-bold"
-                    : "hover:bg-gray-100 text-gray-800"
-                }`}
-              >
-                {h}
-              </button>
-            ))}
+            {HOURS.map((h, idx) => {
+              // Show day separator before the first entry of each new day
+              const isFirstOfDay = idx > 0 && h.startsWith("+") && !HOURS[idx - 1].startsWith(h.split(" ")[0]);
+              const dayLabel = h.startsWith("+") ? h.split(" ")[0] : null;
+              const hourNum = h.startsWith("+") ? h.split(" ")[1] : h;
+              const isFirstInGroup = isFirstOfDay || (idx === 25 || idx === 50);
+              return (
+                <React.Fragment key={h}>
+                  {isFirstInGroup && (
+                    <div className="text-center text-[9px] font-bold text-orange-500 bg-orange-50 py-0.5 sticky top-5">{dayLabel}</div>
+                  )}
+                  <button
+                    data-selected={h === selectedHour}
+                    onClick={() => handleHourClick(h)}
+                    className={`w-full text-center py-1 rounded text-sm font-mono transition-colors ${
+                      h === selectedHour
+                        ? "bg-blue-600 text-white font-bold"
+                        : dayLabel ? "hover:bg-orange-50 text-orange-700" : "hover:bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {hourNum}
+                  </button>
+                </React.Fragment>
+              );
+            })}
           </div>
 
           <div className="w-px bg-gray-200" />
