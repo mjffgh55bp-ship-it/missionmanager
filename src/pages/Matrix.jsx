@@ -279,6 +279,69 @@ export default function Matrix() {
     return shifts;
   };
 
+  // Get extra task registrations for a worker
+  const getWorkerExtraTaskShifts = (workerId, date = null) => {
+    const [openRegSettings] = React.useMemo(() => {
+      return [availabilities];
+    }, [availabilities]);
+    
+    const targetDate = date || dateString;
+    const shifts = [];
+
+    // Find worker's availability
+    const workerAvail = availabilities.find(a => 
+      a.worker_id === workerId && 
+      a.week_start_date === weekStartDate &&
+      (a.status === "approved" || a.status === "submitted")
+    );
+
+    if (!workerAvail || !workerAvail.extra_tasks) return shifts;
+
+    // Parse extra_tasks object - keys are like "templateId_groupId__shiftIndex" or just "templateId_groupId"
+    Object.entries(workerAvail.extra_tasks).forEach(([taskKey, taskState]) => {
+      if (taskState !== 'wanted' && taskState !== 'available') return; // Only show wanted/available
+      
+      // Find matching template rows by parsing the task key
+      const keyParts = taskKey.split('__');
+      const groupKey = keyParts[0]; // e.g., "template_123_group_456"
+      const shiftIndex = keyParts[1] ? parseInt(keyParts[1]) : null;
+
+      // Find template rows matching this group
+      const [templateId, , groupId] = groupKey.split('_').filter(p => p);
+      
+      const matchingRows = templateRows.filter(r => 
+        r.template_id === templateId && 
+        r.group_id === groupId &&
+        (!date || r.date === targetDate)
+      );
+
+      matchingRows.forEach((row, idx) => {
+        // If shiftIndex is specified, only include that specific shift
+        if (shiftIndex !== null && idx !== shiftIndex) return;
+
+        const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
+        const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
+
+        if (startTime && endTime) {
+          const template = allTemplates.find(t => t.id === row.template_id);
+          shifts.push({
+            id: `extratask_${row.id}_${workerId}`,
+            date: row.date,
+            start_time: startTime,
+            end_time: endTime,
+            food_cart_name: `${template?.name || row.template_name} (משימה נוספת)`,
+            hours: null,
+            status: row.values?.status || null,
+            isTemplateShift: true,
+            isExtraTask: true
+          });
+        }
+      });
+    });
+
+    return shifts;
+  };
+
   const getWorkerAvailabilityForDate = (workerId, date = null) => {
     const targetDate = date || dateString;
     const workerAvail = availabilities.find(a => 
@@ -324,7 +387,8 @@ export default function Matrix() {
   const getWorkerSendStatus = (worker) => {
     const workerAssignments = getWorkerAssignments(worker.id);
     const workerTemplateShifts = getWorkerTemplateShifts(worker.id);
-    const allAssigned = [...workerAssignments, ...workerTemplateShifts];
+    const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
+    const allAssigned = [...workerAssignments, ...workerTemplateShifts, ...workerExtraTaskShifts];
     if (allAssigned.length === 0) return 'none';
     const sent = sentState[worker.id];
     if (!sent) return 'needs_update';
@@ -354,7 +418,8 @@ export default function Matrix() {
         const dStr = format(d, "yyyy-MM-dd");
         const dayAssignments = getWorkerAssignments(selectedWorkerForNotification.id, dStr);
         const dayTemplateShifts = getWorkerTemplateShifts(selectedWorkerForNotification.id, dStr);
-        const allDayShifts = [...dayAssignments, ...dayTemplateShifts];
+        const dayExtraTaskShifts = getWorkerExtraTaskShifts(selectedWorkerForNotification.id, dStr);
+        const allDayShifts = [...dayAssignments, ...dayTemplateShifts, ...dayExtraTaskShifts];
         const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
         emailBody += `${hebrewDays[d.getDay()]}, ${format(d, "d.M")}:\n`;
         if (allDayShifts.length === 0) {
@@ -369,7 +434,8 @@ export default function Matrix() {
     } else {
       const workerAssignments = getWorkerAssignments(selectedWorkerForNotification.id);
       const workerTemplateShifts = getWorkerTemplateShifts(selectedWorkerForNotification.id);
-      const allShifts = [...workerAssignments, ...workerTemplateShifts];
+      const workerExtraTaskShifts = getWorkerExtraTaskShifts(selectedWorkerForNotification.id);
+      const allShifts = [...workerAssignments, ...workerTemplateShifts, ...workerExtraTaskShifts];
       emailBody += `הנה לוח המשמרות שלך ל-${format(currentDate, "d.M.yyyy")}:\n\n`;
       if (allShifts.length === 0) {
         emailBody += "אין משמרות מתוכננות ליום זה.\n\n";
@@ -396,7 +462,7 @@ export default function Matrix() {
     
     // Mark as sent
     const sentWorker = selectedWorkerForNotification;
-    const allAssigned = [...getWorkerAssignments(sentWorker.id), ...getWorkerTemplateShifts(sentWorker.id)];
+    const allAssigned = [...getWorkerAssignments(sentWorker.id), ...getWorkerTemplateShifts(sentWorker.id), ...getWorkerExtraTaskShifts(sentWorker.id)];
     const currentIds = allAssigned.map(a => a.id).sort().join(',');
     setSentState(prev => ({ ...prev, [sentWorker.id]: { assignmentIds: currentIds, date: dateString } }));
 
@@ -1216,6 +1282,7 @@ export default function Matrix() {
                     const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
                     const workerAssignments = getWorkerAssignments(worker.id);
                     const workerTemplateShifts = getWorkerTemplateShifts(worker.id);
+                    const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
                     const summary = viewMode === 'weekly' ? calculateWorkerSummary(worker.id) : null;
                     
@@ -1299,6 +1366,7 @@ export default function Matrix() {
                             {workerUnavailabilities.map(unavail => (<UnavailabilityBar key={unavail.id} unavail={unavail} />))}
                             {workerAssignments.map(ass => <AssignmentBar key={ass.id} assignment={ass} />)}
                             {workerTemplateShifts.map(ts => <AssignmentBar key={ts.id} assignment={ts} />)}
+                            {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
                             <DragPreviewBar preview={dragPreview} workerId={worker.id} />
                           </div>
                         </div>
@@ -1339,28 +1407,36 @@ export default function Matrix() {
                     const d = addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), i);
                     const dStr = format(d, "yyyy-MM-dd");
                     const dayAssignments = getWorkerAssignments(selectedWorkerForNotification.id, dStr);
+                    const dayTemplateShifts = getWorkerTemplateShifts(selectedWorkerForNotification.id, dStr);
+                    const dayExtraTaskShifts = getWorkerExtraTaskShifts(selectedWorkerForNotification.id, dStr);
+                    const allDayShifts = [...dayAssignments, ...dayTemplateShifts, ...dayExtraTaskShifts];
                     return (
-                      <div key={i} className="mb-2">
-                        <p className="text-xs font-semibold">{(() => {
-                          const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-                          return `${hebrewDays[d.getDay()]}, ${format(d, "d.M")}`;
-                        })()}</p>
-                        {dayAssignments.length === 0 ? (
-                          <p className="text-xs text-gray-500 ml-2">אין משמרות</p>
-                        ) : dayAssignments.map((a, idx) => (
-                          <div key={idx} className="text-xs bg-white p-1 rounded border ml-2 mt-1">{a.food_cart_name}: {a.start_time}-{a.end_time}</div>
-                        ))}
-                      </div>
+                     <div key={i} className="mb-2">
+                       <p className="text-xs font-semibold">{(() => {
+                         const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+                         return `${hebrewDays[d.getDay()]}, ${format(d, "d.M")}`;
+                       })()}</p>
+                       {allDayShifts.length === 0 ? (
+                         <p className="text-xs text-gray-500 ml-2">אין משמרות</p>
+                       ) : allDayShifts.map((a, idx) => (
+                         <div key={idx} className="text-xs bg-white p-1 rounded border ml-2 mt-1">{a.food_cart_name}: {a.start_time}-{a.end_time}</div>
+                       ))}
+                     </div>
                     );
                   })
-                ) : selectedWorkerForNotification && getWorkerAssignments(selectedWorkerForNotification.id).length > 0 ? (
-                  getWorkerAssignments(selectedWorkerForNotification.id).map((a, idx) => (
+                ) : selectedWorkerForNotification ? (() => {
+                  const allShifts = [
+                    ...getWorkerAssignments(selectedWorkerForNotification.id),
+                    ...getWorkerTemplateShifts(selectedWorkerForNotification.id),
+                    ...getWorkerExtraTaskShifts(selectedWorkerForNotification.id)
+                  ];
+                  return allShifts.length > 0 ? allShifts.map((a, idx) => (
                     <div key={idx} className="text-xs bg-white p-2 rounded border mb-1">
                       <p className="font-semibold">{a.food_cart_name}</p>
-                      <p>{a.start_time} - {a.end_time} ({a.hours}h)</p>
+                      <p>{a.start_time} - {a.end_time} {a.hours ? `(${a.hours}h)` : ''}</p>
                     </div>
-                  ))
-                ) : (
+                  )) : <p className="text-sm text-gray-600">אין משמרות מתוכננות</p>;
+                })() : (
                   <p className="text-sm text-gray-600">אין משמרות מתוכננות</p>
                 )}
               </div>
