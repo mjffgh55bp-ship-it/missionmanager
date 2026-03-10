@@ -35,11 +35,21 @@ export default function TimeCell({ rowId, colName, value, defaultValue, rowValue
     }, 50);
   }, [open]);
 
-  const selectedHour = localValue ? localValue.split(":")[0] : null;
-  const selectedMin = localValue ? localValue.split(":")[1] : null;
+  // Value format: "HH:MM" or "+N HH:MM"
+  const parseValue = (v) => {
+    if (!v) return { day: "", hour: null, min: null };
+    const plusMatch = v.match(/^(\+\d+)\s+(\d{2}):(\d{2})$/);
+    if (plusMatch) return { day: plusMatch[1], hour: `${plusMatch[1]} ${plusMatch[2]}`, min: plusMatch[3] };
+    const plain = v.match(/^(\d{2}):(\d{2})$/);
+    if (plain) return { day: "", hour: plain[1], min: plain[2] };
+    return { day: "", hour: null, min: null };
+  };
+  const parsed = parseValue(localValue);
+  const selectedHour = parsed.hour;
+  const selectedMin = parsed.min;
 
   const handleSelect = async (hour, min) => {
-    const newVal = `${hour}:${min}`;
+    const newVal = hour.startsWith("+") ? `${hour}:${min}` : `${hour}:${min}`;
     setLocalValue(newVal);
     setOpen(false);
     const newValues = { ...rowValues, [colName]: newVal };
