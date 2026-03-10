@@ -287,7 +287,7 @@ export default function Schedule() {
         template_id: row.template_id,
         template_name: row.template_name,
         date: futureDate,
-        values: continuationValues,
+        values: { ...continuationValues, continuation_source_row_id: row.id },
         group_id: row.group_id,
       });
     }
