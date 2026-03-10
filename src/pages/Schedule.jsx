@@ -668,6 +668,7 @@ export default function Schedule() {
                                           defaultValue={col.default_value || ""}
                                           onSaved={(newValues) => {
                                             setTemplateRows(prev => prev.map(r => r.id === row.id ? { ...r, values: newValues } : r));
+                                            handleTimeSaved(row, newValues);
                                           }}
                                           rowValues={row.values || {}}
                                         />
