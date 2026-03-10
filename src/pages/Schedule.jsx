@@ -109,6 +109,13 @@ export default function Schedule() {
     if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
 
+    const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
+    if (openRegSettings.length > 0) {
+      setOpenRegistrations(JSON.parse(openRegSettings[0].setting_value) || []);
+    } else {
+      setOpenRegistrations([]);
+    }
+
     const columnOrderSettings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
     if (columnOrderSettings.length > 0) {
       setCustomColumnOrders(JSON.parse(columnOrderSettings[0].setting_value) || {});
@@ -430,8 +437,30 @@ export default function Schedule() {
                             <Button size="sm" variant="outline" onClick={() => handleDuplicateMoked(group)} dir="rtl">
                               <Plus className="w-3 h-3 ml-1" />שכפל מוקד
                             </Button>
-                            <Button size="sm" variant="destructive"
+                            <Button
+                              size="sm"
+                              variant={openRegistrations.includes(template.name) ? "default" : "outline"}
+                              className={openRegistrations.includes(template.name) ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
                               onClick={async () => {
+                                let updated;
+                                if (openRegistrations.includes(template.name)) {
+                                  updated = openRegistrations.filter(n => n !== template.name);
+                                } else {
+                                  updated = [...openRegistrations, template.name];
+                                }
+                                setOpenRegistrations(updated);
+                                const settings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
+                                const data = { setting_key: "open_registrations", setting_value: JSON.stringify(updated) };
+                                if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+                                else await base44.entities.AppSettings.create(data);
+                                toast.success(updated.includes(template.name) ? `הרשמה לـ"${template.name}" נפתחה` : `הרשמה לـ"${template.name}" נסגרה`);
+                              }}
+                              dir="rtl"
+                            >
+                              <Plus className="w-3 h-3 ml-1" />{openRegistrations.includes(template.name) ? "בטל הרשמה" : "אפשר הרשמה"}
+                            </Button>
+                            <Button size="sm" variant="destructive"
+                             onClick={async () => {
                                 if (confirm(`האם למחוק את המוקד "${template.name}" מהלוח?`)) {
                                   for (const row of templateRowsForTemplate) {
                                     await base44.entities.TemplateRow.delete(row.id);
