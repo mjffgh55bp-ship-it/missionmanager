@@ -191,6 +191,83 @@ export default function CombinedReport({ isOpen, onClose, chefsData, sousData })
               </div>
             </div>
 
+            {/* כמות משמרות שבועית לאוכלוסייה */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {[
+                { label: "שפים", data: chefsData, color: "orange" },
+                { label: "סו-שפים", data: sousData, color: "blue" }
+              ].map(({ label, data, color }) => {
+                const populations = [
+                  {
+                    name: "סדירים",
+                    count: data.newEmployees,
+                    avgShifts: data.newAvgShifts,
+                    monthlyEvening: data.newMonthlyEveningShifts,
+                    monthlyNight: data.newMonthlyNightShifts
+                  },
+                  {
+                    name: 'הצ״חים',
+                    count: data.veteranEmployees,
+                    avgShifts: data.veteranAvgShifts,
+                    monthlyEvening: data.veteranMonthlyEveningShifts,
+                    monthlyNight: data.veteranMonthlyNightShifts
+                  },
+                  {
+                    name: "מיל",
+                    count: data.seniorEmployees,
+                    avgShifts: data.seniorAvgShifts,
+                    monthlyEvening: data.seniorMonthlyEveningShifts,
+                    monthlyNight: data.seniorMonthlyNightShifts
+                  }
+                ].map(p => {
+                  const wEvening = p.monthlyEvening / 4.3;
+                  const wNight = p.monthlyNight / 4.3;
+                  const wDay = Math.max(0, p.avgShifts - wEvening - wNight);
+                  return {
+                    ...p,
+                    totalDay: (p.count * wDay).toFixed(1),
+                    totalEvening: (p.count * wEvening).toFixed(1),
+                    totalNight: (p.count * wNight).toFixed(1),
+                    totalAll: (p.count * p.avgShifts).toFixed(1)
+                  };
+                });
+                return (
+                  <div key={label}>
+                    <h3 className={`text-sm font-bold text-${color}-600 mb-1 print:text-[10px]`}>{label} - משמרות שבועיות לאוכלוסייה</h3>
+                    <table className="w-full border-collapse text-[9px] print:text-[7px]">
+                      <thead>
+                        <tr className={`bg-${color}-50`}>
+                          <th className="border border-gray-300 px-1 py-0.5 text-center">אוכלוסייה</th>
+                          <th className="border border-gray-300 px-1 py-0.5 text-center">יום</th>
+                          <th className="border border-gray-300 px-1 py-0.5 text-center">ערב</th>
+                          <th className="border border-gray-300 px-1 py-0.5 text-center">לילה</th>
+                          <th className="border border-gray-300 px-1 py-0.5 text-center">סה״כ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {populations.map(p => (
+                          <tr key={p.name}>
+                            <td className="border border-gray-300 px-1 py-0.5 text-center">{p.name}</td>
+                            <td className="border border-gray-300 px-1 py-0.5 text-center">{p.totalDay}</td>
+                            <td className="border border-gray-300 px-1 py-0.5 text-center">{p.totalEvening}</td>
+                            <td className="border border-gray-300 px-1 py-0.5 text-center">{p.totalNight}</td>
+                            <td className="border border-gray-300 px-1 py-0.5 text-center font-semibold">{p.totalAll}</td>
+                          </tr>
+                        ))}
+                        <tr className="bg-gray-100 font-bold">
+                          <td className="border border-gray-300 px-1 py-0.5 text-center">סה״כ</td>
+                          <td className="border border-gray-300 px-1 py-0.5 text-center">{populations.reduce((s, p) => s + parseFloat(p.totalDay), 0).toFixed(1)}</td>
+                          <td className="border border-gray-300 px-1 py-0.5 text-center">{populations.reduce((s, p) => s + parseFloat(p.totalEvening), 0).toFixed(1)}</td>
+                          <td className="border border-gray-300 px-1 py-0.5 text-center">{populations.reduce((s, p) => s + parseFloat(p.totalNight), 0).toFixed(1)}</td>
+                          <td className={`border border-gray-300 px-1 py-0.5 text-center text-${color}-600`}>{populations.reduce((s, p) => s + parseFloat(p.totalAll), 0).toFixed(1)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+
             {/* פערים */}
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div>
