@@ -721,11 +721,10 @@ END:VEVENT
                                       <button
                                   onClick={() => cycleExtraTask(taskKey)}
                                   disabled={disabled}
-                                  className={`flex flex-col items-start px-2 py-1.5 rounded-l-lg border-2 border-dashed text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-
+                                  className={`flex flex-col items-start px-2 py-1.5 rounded-l-lg border-2 border-dashed text-xs font-medium transition-all relative ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                                        <span className="absolute top-0.5 left-0.5 text-[9px] font-bold bg-orange-300 text-orange-900 rounded px-0.5">+1</span>
                                         <div className="flex items-center gap-1">
                                           {stateIcon}
-                                          <span className="text-[9px] font-bold bg-orange-300 text-orange-900 rounded px-0.5">1+</span>
                                           <span>06:00 - {endParsed.time}</span>
                                         </div>
                                         <div className="text-[9px] opacity-70 mt-0.5">יום ב׳</div>
