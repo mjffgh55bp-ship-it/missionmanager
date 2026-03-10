@@ -254,8 +254,37 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                     {(editingPreset.template_config.default_rows || [{}]).map((row, rowIdx) => (
                       <TableRow key={rowIdx}>
                         {editingPreset.template_config.columns.map((col, idx) => (
-                          <TableCell key={idx} className="text-center text-xs text-gray-400 py-2" dir="rtl">
-                            {col.type === "time" ? "00:00" : col.type === "worker" ? "— איש צוות —" : "—"}
+                          <TableCell key={idx} className="text-center py-1 px-1" dir="rtl">
+                            {col.type === "time" ? (
+                              <input
+                                type="time"
+                                value={row[col.name] || ""}
+                                onChange={(e) => updateRowCell(rowIdx, col.name, e.target.value)}
+                                className="w-full text-xs border rounded px-1 py-0.5 text-center"
+                              />
+                            ) : col.type === "worker" ? (
+                              <select
+                                value={row[col.name] || ""}
+                                onChange={(e) => updateRowCell(rowIdx, col.name, e.target.value)}
+                                className="w-full text-xs border rounded px-1 py-0.5"
+                                dir="rtl"
+                              >
+                                <option value="">— בחר —</option>
+                                {workers
+                                  .filter(w => !col.role_filter || w.role === col.role_filter)
+                                  .map(w => (
+                                    <option key={w.id} value={w.id}>{w.nickname}</option>
+                                  ))}
+                              </select>
+                            ) : (
+                              <Input
+                                value={row[col.name] || ""}
+                                onChange={(e) => updateRowCell(rowIdx, col.name, e.target.value)}
+                                className="h-6 text-xs px-1"
+                                dir="rtl"
+                                placeholder="—"
+                              />
+                            )}
                           </TableCell>
                         ))}
                         <TableCell className="text-center py-2" dir="rtl">
