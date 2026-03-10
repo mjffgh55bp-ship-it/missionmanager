@@ -245,6 +245,54 @@ export default function Schedule() {
     toast.success('מוקד חדש נוצר בהצלחה');
   };
 
+  // When a time cell with +N is saved, auto-create continuation rows for the affected days
+  const handleTimeSaved = async (row, newValues) => {
+    const endTime = newValues["סיום"] || newValues["שעת סיום"] || "";
+    if (!endTime.startsWith("+")) return;
+
+    const plusMatch = endTime.match(/^(\+(\d+))\s+(\d{2}):(\d{2})$/);
+    if (!plusMatch) return;
+    const daysAhead = parseInt(plusMatch[2]);
+    const realEndTime = `${plusMatch[3]}:${plusMatch[4]}`;
+
+    // For each future day, ensure a continuation row exists
+    for (let d = 1; d <= daysAhead; d++) {
+      const futureDate = format(addDays(currentDate, d), "yyyy-MM-dd");
+      // Check if a continuation row already exists for this group on that day
+      const existingRows = await base44.entities.TemplateRow.filter({ date: futureDate });
+      const alreadyExists = existingRows.some(r => r.group_id === row.group_id && r.values?.is_continuation === true);
+      if (alreadyExists) continue;
+
+      const template = allTemplates.find(t => t.id === row.template_id);
+      const isLastDay = d === daysAhead;
+      const startTime = d === 1
+        ? (newValues["התחלה"] || newValues["שעת התחלה"] || "00:00")
+        : "00:00";
+
+      const continuationValues = {
+        ...newValues,
+        "התחלה": d === 1 ? "00:00" : "00:00",
+        "שעת התחלה": d === 1 ? "00:00" : "00:00",
+        "סיום": isLastDay ? realEndTime : "24:00",
+        "שעת סיום": isLastDay ? realEndTime : "24:00",
+        is_continuation: true,
+        continuation_from_date: dateString,
+      };
+      // Remove worker assignments from continuation rows — they'll be assigned separately
+      for (const col of (template?.columns || [])) {
+        if (col.type === "worker") delete continuationValues[col.name];
+      }
+
+      await base44.entities.TemplateRow.create({
+        template_id: row.template_id,
+        template_name: row.template_name,
+        date: futureDate,
+        values: continuationValues,
+        group_id: row.group_id,
+      });
+    }
+  };
+
   const handleDeleteTemplateRow = async (rowId) => {
     if (confirm("האם למחוק שורה זו?")) {
       await base44.entities.TemplateRow.delete(rowId);
