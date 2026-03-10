@@ -70,8 +70,17 @@ export default function TimeCell({ rowId, colName, value, defaultValue, rowValue
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className="w-full h-full text-sm text-center py-2 px-1 hover:bg-blue-50 transition-colors">
-          {localValue || <span className="text-gray-400">{defaultValue || "--:--"}</span>}
+        <button className="w-full h-full text-sm text-center py-2 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap">
+          {localValue ? (
+            localValue.startsWith("+") ? (
+              <span>
+                <span className="text-orange-600 font-bold text-[10px]">{localValue.split(" ")[0]} </span>
+                {localValue.split(" ").slice(1).join(" ")}
+              </span>
+            ) : localValue
+          ) : (
+            <span className="text-gray-400">{defaultValue || "--:--"}</span>
+          )}
         </button>
       </PopoverTrigger>
 
