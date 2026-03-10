@@ -56,6 +56,7 @@ export default function Schedule() {
   const [workerRoles, setWorkerRoles] = useState([]);
   const [editMode, setEditMode] = useState(false);
   const [showPresetsDialog, setShowPresetsDialog] = useState(false);
+  const [openRegistrations, setOpenRegistrations] = useState([]);
 
   useEffect(() => { loadData(); }, [currentDate]);
 

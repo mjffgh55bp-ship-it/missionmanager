@@ -80,6 +80,8 @@ export default function Availability() {
     multiDay: false
   });
   const [desiredShiftsCount, setDesiredShiftsCount] = useState("");
+  const [openRegistrations, setOpenRegistrations] = useState([]);
+  const [extraTaskStates, setExtraTaskStates] = useState({});
 
   useEffect(() => {
     loadData();
