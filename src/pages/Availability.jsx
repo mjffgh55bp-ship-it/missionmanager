@@ -678,7 +678,7 @@ END:VEVENT
                   };
 
                   return (
-                    <div key={regKey} className="border rounded-lg p-3" dir="rtl">
+                    <div key={regKey} className="border rounded-lg p-3 relative" dir="rtl">
                           <div className="font-semibold text-sm mb-2">{regName}
                             {regDate && <span className="text-xs text-gray-400 font-normal mr-2">{regDate}</span>}
                           </div>
@@ -704,7 +704,8 @@ END:VEVENT
                           if (isMultiDay) {
                             // Show two connected buttons sharing the same key, split at 06:00
                             return (
-                              <div key={si} className="flex items-stretch">
+                              <div key={si} className="flex items-stretch relative">
+                                      <span className="absolute -top-8 left-0 text-[10px] font-bold bg-orange-300 text-orange-900 rounded px-1 py-0.5">1+</span>
                                       {/* Day 1 part: start → 06:00 */}
                                       <button
                                   onClick={() => cycleExtraTask(taskKey)}
@@ -725,7 +726,6 @@ END:VEVENT
 
                                         <div className="flex items-center gap-1">
                                           {stateIcon}
-                                          <span className="text-[9px] font-bold bg-orange-300 text-orange-900 rounded px-0.5">1+</span>
                                           <span>06:00 - {endParsed.time}</span>
                                         </div>
                                         <div className="text-[9px] opacity-70 mt-0.5">יום ב׳</div>
