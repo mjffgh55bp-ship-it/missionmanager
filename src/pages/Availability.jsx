@@ -248,6 +248,7 @@ export default function Availability() {
       worker_name: currentWorker.nickname,
       week_start_date: weekStartStr,
       shifts: selectedShifts,
+      extra_tasks: extraTaskStates,
       status: "submitted",
       desired_shifts: desiredShiftsCount ? parseInt(desiredShiftsCount) : null
     };
