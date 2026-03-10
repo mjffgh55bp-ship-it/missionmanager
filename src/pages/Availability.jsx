@@ -725,8 +725,8 @@ END:VEVENT
                                       >
                                         <div className="flex items-center gap-1">
                                           {stateIcon}
-                                          <span>06:00 - {endParsed.time}</span>
                                           <span className="text-[9px] font-bold bg-orange-300 text-orange-900 rounded px-0.5">+1</span>
+                                          <span>06:00 - {endParsed.time}</span>
                                         </div>
                                         <div className="text-[9px] opacity-70 mt-0.5">יום ב׳</div>
                                       </button>
