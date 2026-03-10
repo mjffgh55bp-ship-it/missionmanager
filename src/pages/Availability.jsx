@@ -648,6 +648,45 @@ END:VEVENT
               </Card>
             )}
 
+            {/* Extra Tasks Section */}
+            {openRegistrations.length > 0 && (
+              <Card className="border-none shadow-lg mb-4">
+                <CardHeader className="border-b bg-white py-3 px-4">
+                  <CardTitle className="text-base" dir="rtl">משימות נוספות</CardTitle>
+                </CardHeader>
+                <CardContent className="py-3 px-4">
+                  <p className="text-xs text-gray-500 mb-3" dir="rtl">לחץ כדי לציין העדפה: רצוי → זמין → לא זמין</p>
+                  <div className="flex flex-wrap gap-2">
+                    {openRegistrations.map((taskName) => {
+                      const state = extraTaskStates[taskName] || null;
+                      const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white" 
+                        : state === "available" ? "bg-cyan-500 border-cyan-600 text-white"
+                        : state === "unavailable" ? "bg-red-500 border-red-600 text-white"
+                        : "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
+                      const stateIcon = state === "wanted" ? <Star className="w-3 h-3 ml-1" />
+                        : state === "available" ? <Check className="w-3 h-3 ml-1" />
+                        : state === "unavailable" ? <Ban className="w-3 h-3 ml-1" />
+                        : null;
+                      const stateLabel = state === "wanted" ? "רצוי" : state === "available" ? "זמין" : state === "unavailable" ? "לא זמין" : null;
+                      return (
+                        <button
+                          key={taskName}
+                          onClick={() => cycleExtraTask(taskName)}
+                          disabled={!canEdit || currentWorker?.availability_locked}
+                          className={`flex items-center gap-1 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                          dir="rtl"
+                        >
+                          {stateIcon}
+                          <span>{taskName}</span>
+                          {stateLabel && <span className="text-xs opacity-80">({stateLabel})</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Shift Selection Grid */}
             <Card className="border-none shadow-lg mb-4">
               <CardHeader className="border-b bg-white py-3 px-4">
