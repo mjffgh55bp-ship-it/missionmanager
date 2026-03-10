@@ -254,13 +254,7 @@ export default function CombinedReport({ isOpen, onClose, chefsData, sousData })
                             <td className="border border-gray-300 px-1 py-0.5 text-center font-semibold">{p.totalAll}</td>
                           </tr>
                         ))}
-                        <tr className="bg-gray-100 font-bold">
-                          <td className="border border-gray-300 px-1 py-0.5 text-center">סה״כ</td>
-                          <td className="border border-gray-300 px-1 py-0.5 text-center">{populations.reduce((s, p) => s + parseFloat(p.totalDay), 0).toFixed(1)}</td>
-                          <td className="border border-gray-300 px-1 py-0.5 text-center">{populations.reduce((s, p) => s + parseFloat(p.totalEvening), 0).toFixed(1)}</td>
-                          <td className="border border-gray-300 px-1 py-0.5 text-center">{populations.reduce((s, p) => s + parseFloat(p.totalNight), 0).toFixed(1)}</td>
-                          <td className={`border border-gray-300 px-1 py-0.5 text-center text-${color}-600`}>{populations.reduce((s, p) => s + parseFloat(p.totalAll), 0).toFixed(1)}</td>
-                        </tr>
+
                       </tbody>
                     </table>
                   </div>
