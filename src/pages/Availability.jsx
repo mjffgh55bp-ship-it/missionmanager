@@ -138,6 +138,7 @@ export default function Availability() {
         const shifts = availabilities[0].shifts || [];
         setSelectedShifts(shifts);
         setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
+        setExtraTaskStates(availabilities[0].extra_tasks || {});
       } else {
         setExistingAvailability(null);
         setSelectedShifts([]);
