@@ -225,10 +225,10 @@ export default function CombinedReport({ isOpen, onClose, chefsData, sousData })
                   const wDay = Math.max(0, p.avgShifts - wEvening - wNight);
                   return {
                     ...p,
-                    totalDay: (p.count * wDay).toFixed(1),
-                    totalEvening: (p.count * wEvening).toFixed(1),
-                    totalNight: (p.count * wNight).toFixed(1),
-                    totalAll: (p.count * p.avgShifts).toFixed(1)
+                    totalDay: wDay.toFixed(1),
+                    totalEvening: wEvening.toFixed(1),
+                    totalNight: wNight.toFixed(1),
+                    totalAll: p.avgShifts.toFixed(1)
                   };
                 });
                 return (
