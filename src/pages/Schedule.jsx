@@ -450,6 +450,11 @@ export default function Schedule() {
                               </Button>
                             </div>
                           )}
+                          {group.rows.some(r => r.values?.is_continuation) && (
+                            <span className="text-[10px] bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded font-normal" dir="rtl">
+                              המשך מ-{group.rows.find(r => r.values?.continuation_from_date)?.values?.continuation_from_date || "יום קודם"}
+                            </span>
+                          )}
                           {editingMokedName === `${group.key}` ? (
                             <Input
                               value={editingMokedNameValue}
