@@ -260,7 +260,7 @@ export default function Schedule() {
       const futureDate = format(addDays(currentDate, d), "yyyy-MM-dd");
       // Check if a continuation row already exists for this group on that day
       const existingRows = await base44.entities.TemplateRow.filter({ date: futureDate });
-      const alreadyExists = existingRows.some(r => r.group_id === row.group_id && r.values?.is_continuation === true);
+      const alreadyExists = existingRows.some(r => r.values?.continuation_source_row_id === row.id);
       if (alreadyExists) continue;
 
       const template = allTemplates.find(t => t.id === row.template_id);
