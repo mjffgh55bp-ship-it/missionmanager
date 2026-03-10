@@ -47,12 +47,20 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
   };
 
   const loadSettings = async () => {
-    const [rolesSettings, colTypesSettings] = await Promise.all([
+    const [rolesSettings, colTypesSettings, workersData] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
+      base44.entities.Worker.filter({ active: true }),
     ]);
     if (rolesSettings.length > 0) setWorkerRoles(JSON.parse(rolesSettings[0].setting_value) || []);
     if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
+    setWorkers(workersData);
+  };
+
+  const updateRowCell = (rowIdx, colName, value) => {
+    const rows = [...(editingPreset.template_config.default_rows || [])];
+    rows[rowIdx] = { ...rows[rowIdx], [colName]: value };
+    setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, default_rows: rows } });
   };
 
   const handleAddColumnConfirm = () => {
