@@ -208,6 +208,21 @@ export default function Availability() {
     setSelectedShifts(newShifts);
   };
 
+  const cycleExtraTask = (taskName) => {
+    if (existingAvailability?.status === "approved" && !showEditMode) return;
+    if (currentWorker?.availability_locked) return;
+    const current = extraTaskStates[taskName] || null;
+    let next;
+    if (current === null || current === undefined) next = "wanted";
+    else if (current === "wanted") next = "available";
+    else if (current === "available") next = "unavailable";
+    else next = null;
+    const updated = { ...extraTaskStates };
+    if (next === null) delete updated[taskName];
+    else updated[taskName] = next;
+    setExtraTaskStates(updated);
+  };
+
   const handleDragEnd = (result, listType) => {
     if (!result.destination) return;
     
