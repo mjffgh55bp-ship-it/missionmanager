@@ -26,7 +26,7 @@ const formatDateHebrew = (date, formatType = "short") => {
   const monthName = HEBREW_MONTHS[d.getMonth()];
   const day = d.getDate();
   const year = d.getFullYear();
-  
+
   if (formatType === "short") {
     return `${dayNameShort}, ${day} ${monthName}`;
   } else if (formatType === "long") {
@@ -38,13 +38,13 @@ const formatDateHebrew = (date, formatType = "short") => {
 };
 
 const SHIFT_BLOCKS = [
-  { start: "06:00", end: "10:00" },
-  { start: "10:00", end: "14:00" },
-  { start: "14:00", end: "18:00" },
-  { start: "18:00", end: "22:00" },
-  { start: "22:00", end: "02:00" },
-  { start: "02:00", end: "06:00" }
-];
+{ start: "06:00", end: "10:00" },
+{ start: "10:00", end: "14:00" },
+{ start: "14:00", end: "18:00" },
+{ start: "18:00", end: "22:00" },
+{ start: "22:00", end: "02:00" },
+{ start: "02:00", end: "06:00" }];
+
 
 const DAYS_OF_WEEK = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
@@ -90,23 +90,23 @@ export default function Availability() {
   const loadData = async () => {
     const user = await base44.auth.me();
     setCurrentUser(user);
-    
+
     const workersData = await base44.entities.Worker.filter({ active: true });
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
-    
-    const worker = workersData.find(w => w.email === user.email);
+
+    const worker = workersData.find((w) => w.email === user.email);
     setCurrentWorker(worker);
-    
+
     const [settings, eventsData, yearlyEventsData, openRegSettings] = await Promise.all([
-      base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
-      base44.entities.CompanyEvent.list("-date"),
-      base44.entities.YearlyEvent.list(),
-      base44.entities.AppSettings.filter({ setting_key: "open_registrations" })
-    ]);
+    base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
+    base44.entities.CompanyEvent.list("-date"),
+    base44.entities.YearlyEvent.list(),
+    base44.entities.AppSettings.filter({ setting_key: "open_registrations" })]
+    );
     if (openRegSettings.length > 0) {
       setOpenRegistrations(JSON.parse(openRegSettings[0].setting_value) || []);
     }
-    
+
     if (settings.length > 0) {
       const tipsData = JSON.parse(settings[0].setting_value);
       setTipsMessage(tipsData.message || "");
@@ -114,25 +114,25 @@ export default function Availability() {
         setShowTipsPopup(true);
       }
     }
-    
+
     setCompanyEvents(eventsData);
     setYearlyEvents(yearlyEventsData);
-    
+
     if (worker) {
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-      
+
       const [availabilities, unavailabilitiesData, assignmentsData] = await Promise.all([
-        base44.entities.Availability.filter({
-          worker_id: worker.id,
-          week_start_date: weekStartStr
-        }),
-        base44.entities.Unavailability.filter({
-          worker_id: worker.id
-        }),
-        base44.entities.Assignment.list("-date")
-      ]);
-      
+      base44.entities.Availability.filter({
+        worker_id: worker.id,
+        week_start_date: weekStartStr
+      }),
+      base44.entities.Unavailability.filter({
+        worker_id: worker.id
+      }),
+      base44.entities.Assignment.list("-date")]
+      );
+
       if (availabilities.length > 0) {
         setExistingAvailability(availabilities[0]);
         const shifts = availabilities[0].shifts || [];
@@ -144,17 +144,17 @@ export default function Availability() {
         setSelectedShifts([]);
         setOriginalShifts([]);
       }
-      
-      const weekUnavailabilities = unavailabilitiesData.filter(u => {
+
+      const weekUnavailabilities = unavailabilitiesData.filter((u) => {
         const uDate = new Date(u.date);
         return uDate >= new Date(weekStartStr) && uDate <= new Date(weekEndStr);
       });
       setUnavailabilities(weekUnavailabilities);
-      
-      const workerAssignments = assignmentsData.filter(a => 
-        a.chef_id === worker.id || 
-        a.sous_chef_id === worker.id || 
-        a.additional_chef_id === worker.id
+
+      const workerAssignments = assignmentsData.filter((a) =>
+      a.chef_id === worker.id ||
+      a.sous_chef_id === worker.id ||
+      a.additional_chef_id === worker.id
       );
       setAssignments(workerAssignments);
     }
@@ -162,7 +162,7 @@ export default function Availability() {
 
   const getShiftState = (date, shiftBlock) => {
     const shift = selectedShifts.find(
-      s => s.date === date && s.start_time === shiftBlock.start && s.end_time === shiftBlock.end
+      (s) => s.date === date && s.start_time === shiftBlock.start && s.end_time === shiftBlock.end
     );
     return shift?.type || null;
   };
@@ -174,11 +174,11 @@ export default function Availability() {
     const currentState = getShiftState(date, shiftBlock);
 
     let newShifts = selectedShifts.filter(
-      s => !(s.date === date && s.start_time === shiftBlock.start && s.end_time === shiftBlock.end)
+      (s) => !(s.date === date && s.start_time === shiftBlock.start && s.end_time === shiftBlock.end)
     );
 
     if (currentState === null) {
-      const wantedCount = newShifts.filter(s => s.type === "wanted").length;
+      const wantedCount = newShifts.filter((s) => s.type === "wanted").length;
       newShifts.push({
         date,
         start_time: shiftBlock.start,
@@ -187,7 +187,7 @@ export default function Availability() {
         priority: wantedCount + 1
       });
     } else if (currentState === "wanted") {
-      const availableCount = newShifts.filter(s => s.type === "available").length;
+      const availableCount = newShifts.filter((s) => s.type === "available").length;
       newShifts.push({
         date,
         start_time: shiftBlock.start,
@@ -213,29 +213,29 @@ export default function Availability() {
     if (currentWorker?.availability_locked) return;
     const current = extraTaskStates[taskName] || null;
     let next;
-    if (current === null || current === undefined) next = "wanted";
-    else if (current === "wanted") next = "available";
-    else if (current === "available") next = "unavailable";
-    else next = null;
+    if (current === null || current === undefined) next = "wanted";else
+    if (current === "wanted") next = "available";else
+    if (current === "available") next = "unavailable";else
+    next = null;
     const updated = { ...extraTaskStates };
-    if (next === null) delete updated[taskName];
-    else updated[taskName] = next;
+    if (next === null) delete updated[taskName];else
+    updated[taskName] = next;
     setExtraTaskStates(updated);
   };
 
   const handleDragEnd = (result, listType) => {
     if (!result.destination) return;
-    
-    const items = Array.from(selectedShifts.filter(s => s.type === listType));
+
+    const items = Array.from(selectedShifts.filter((s) => s.type === listType));
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
-    
+
     const updatedItems = items.map((item, index) => ({
       ...item,
       priority: index + 1
     }));
-    
-    const otherShifts = selectedShifts.filter(s => s.type !== listType);
+
+    const otherShifts = selectedShifts.filter((s) => s.type !== listType);
     setSelectedShifts([...otherShifts, ...updatedItems]);
   };
 
@@ -261,7 +261,7 @@ export default function Availability() {
       updatedAvailability = await base44.entities.Availability.create(availabilityData);
       setExistingAvailability(updatedAvailability);
     }
-    
+
     setOriginalShifts(JSON.parse(JSON.stringify(selectedShifts)));
     setShowSummary(false);
     setShowEditMode(false);
@@ -284,15 +284,15 @@ export default function Availability() {
   };
 
   const getChanges = () => {
-    const added = selectedShifts.filter(s => 
-      !originalShifts.find(o => 
-        o.date === s.date && o.start_time === s.start_time && o.end_time === s.end_time && o.type === s.type
-      )
+    const added = selectedShifts.filter((s) =>
+    !originalShifts.find((o) =>
+    o.date === s.date && o.start_time === s.start_time && o.end_time === s.end_time && o.type === s.type
+    )
     );
-    const removed = originalShifts.filter(o => 
-      !selectedShifts.find(s => 
-        s.date === o.date && s.start_time === o.start_time && s.end_time === o.end_time && s.type === o.type
-      )
+    const removed = originalShifts.filter((o) =>
+    !selectedShifts.find((s) =>
+    s.date === o.date && s.start_time === o.start_time && s.end_time === o.end_time && s.type === o.type
+    )
     );
     return { added, removed };
   };
@@ -302,7 +302,7 @@ export default function Availability() {
 
     const startDate = new Date(unavailabilityForm.start_date);
     const endDate = unavailabilityForm.multiDay ? new Date(unavailabilityForm.end_date) : startDate;
-    
+
     // Create unavailabilities for each day in range
     const datesToAdd = [];
     let currentD = new Date(startDate);
@@ -327,7 +327,7 @@ export default function Availability() {
     // Update state with new unavailabilities
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-    const weekUnavailabilities = newUnavailabilities.filter(u => {
+    const weekUnavailabilities = newUnavailabilities.filter((u) => {
       const uDate = new Date(u.date);
       return uDate >= new Date(weekStartStr) && uDate <= new Date(weekEndStr);
     });
@@ -337,10 +337,10 @@ export default function Availability() {
     if (unavailabilityForm.multiDay) {
       const newShifts = [...selectedShifts];
       for (const dateStr of datesToAdd) {
-        SHIFT_BLOCKS.forEach(block => {
-          const overlaps = (unavailabilityForm.start_time <= block.end && unavailabilityForm.end_time >= block.start);
+        SHIFT_BLOCKS.forEach((block) => {
+          const overlaps = unavailabilityForm.start_time <= block.end && unavailabilityForm.end_time >= block.start;
           if (overlaps) {
-            const existingIdx = newShifts.findIndex(s => s.date === dateStr && s.start_time === block.start && s.end_time === block.end);
+            const existingIdx = newShifts.findIndex((s) => s.date === dateStr && s.start_time === block.start && s.end_time === block.end);
             if (existingIdx >= 0) {
               newShifts[existingIdx] = { ...newShifts[existingIdx], type: "unavailable", priority: 0 };
             } else {
@@ -365,7 +365,7 @@ export default function Availability() {
 
   const handleDeleteUnavailability = async (id) => {
     await base44.entities.Unavailability.delete(id);
-    setUnavailabilities(unavailabilities.filter(u => u.id !== id));
+    setUnavailabilities(unavailabilities.filter((u) => u.id !== id));
   };
 
   const generateICSFile = () => {
@@ -375,8 +375,8 @@ PRODID:-//Mission Manager//Events//EN
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
 `;
-    
-    companyEvents.forEach(event => {
+
+    companyEvents.forEach((event) => {
       const dateStr = event.date.replace(/-/g, '');
       icsContent += `BEGIN:VEVENT
 DTSTART;VALUE=DATE:${dateStr}
@@ -386,13 +386,13 @@ DESCRIPTION:${event.description || ''}
 END:VEVENT
 `;
     });
-    
+
     // Add yearly events assigned to current worker
     if (currentWorker) {
-      yearlyEvents.filter(e => e.worker_ids?.includes(currentWorker.id)).forEach(event => {
+      yearlyEvents.filter((e) => e.worker_ids?.includes(currentWorker.id)).forEach((event) => {
         const startDateStr = event.start_date.replace(/-/g, '');
         const endDateStr = event.end_date.replace(/-/g, '');
-        
+
         if (event.start_time && event.end_time) {
           const startTimeStr = event.start_time.replace(/:/g, '');
           const endTimeStr = event.end_time.replace(/:/g, '');
@@ -414,9 +414,9 @@ END:VEVENT
         }
       });
     }
-    
+
     icsContent += `END:VCALENDAR`;
-    
+
     const blob = new Blob([icsContent], { type: 'text/calendar' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -451,33 +451,33 @@ END:VEVENT
 
   const getEventForDate = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    return companyEvents.find(e => e.date === dateStr);
+    return companyEvents.find((e) => e.date === dateStr);
   };
 
   const getYearlyEventsForDate = (date) => {
     if (!currentWorker) return [];
     const dateStr = format(date, "yyyy-MM-dd");
-    return yearlyEvents.filter(e => 
-      e.worker_ids?.includes(currentWorker.id) && 
-      dateStr >= e.start_date && dateStr <= e.end_date
+    return yearlyEvents.filter((e) =>
+    e.worker_ids?.includes(currentWorker.id) &&
+    dateStr >= e.start_date && dateStr <= e.end_date
     );
   };
 
   const getYearlyEventsForShift = (date, shiftStart, shiftEnd) => {
     if (!currentWorker) return [];
     const dateStr = format(date, "yyyy-MM-dd");
-    return yearlyEvents.filter(e => {
+    return yearlyEvents.filter((e) => {
       if (e.start_date > dateStr || e.end_date < dateStr) return false;
       if (!e.worker_ids?.includes(currentWorker.id)) return false;
       if (!e.start_time || !e.end_time) return false;
-      
+
       const eventStart = e.start_time;
       const eventEnd = e.end_time;
-      
+
       // Check if event overlaps with shift
-      return (eventStart >= shiftStart && eventStart < shiftEnd) ||
-             (eventEnd > shiftStart && eventEnd <= shiftEnd) ||
-             (eventStart <= shiftStart && eventEnd >= shiftEnd);
+      return eventStart >= shiftStart && eventStart < shiftEnd ||
+      eventEnd > shiftStart && eventEnd <= shiftEnd ||
+      eventStart <= shiftStart && eventEnd >= shiftEnd;
     });
   };
 
@@ -495,14 +495,14 @@ END:VEVENT
     const endMins = Math.min(timeToMinsFrom6(eventEnd), totalMins);
     if (endMins <= startMins) return null;
     return {
-      right: `${(startMins / totalMins) * 100}%`,
-      width: `${((endMins - startMins) / totalMins) * 100}%`
+      right: `${startMins / totalMins * 100}%`,
+      width: `${(endMins - startMins) / totalMins * 100}%`
     };
   };
 
   const getAssignmentForDate = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    return assignments.filter(a => a.date === dateStr);
+    return assignments.filter((a) => a.date === dateStr);
   };
 
   const handleDateClick = (day) => {
@@ -510,15 +510,15 @@ END:VEVENT
     setShowDateDetails(true);
   };
 
-  const wantedShifts = selectedShifts.filter(s => s.type === "wanted").sort((a, b) => (a.priority || 0) - (b.priority || 0));
-  const availableShifts = selectedShifts.filter(s => s.type === "available").sort((a, b) => (a.priority || 0) - (b.priority || 0));
+  const wantedShifts = selectedShifts.filter((s) => s.type === "wanted").sort((a, b) => (a.priority || 0) - (b.priority || 0));
+  const availableShifts = selectedShifts.filter((s) => s.type === "available").sort((a, b) => (a.priority || 0) - (b.priority || 0));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Tips Section */}
-        {tipsMessage && (
-          <Card className="border-none shadow-lg mb-4">
+        {tipsMessage &&
+        <Card className="border-none shadow-lg mb-4">
             <CardContent className="py-4">
               <div className="flex items-start gap-3">
                 <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -529,7 +529,7 @@ END:VEVENT
               </div>
             </CardContent>
           </Card>
-        )}
+        }
 
         {/* Header */}
         <Card className="border-none shadow-lg mb-4">
@@ -560,29 +560,29 @@ END:VEVENT
                 </div>
                 <div className="flex items-center gap-2 ml-auto">
                   <Label className="text-xs text-gray-600" dir="rtl">משמרות רצויות:</Label>
-                  <Input 
-                    type="number" 
-                    className="w-16 h-7 text-xs" 
-                    value={desiredShiftsCount} 
+                  <Input
+                    type="number"
+                    className="w-16 h-7 text-xs"
+                    value={desiredShiftsCount}
                     onChange={(e) => setDesiredShiftsCount(e.target.value)}
-                    placeholder="#"
-                  />
+                    placeholder="#" />
+
                 </div>
               </div>
             </div>
           </CardHeader>
         </Card>
 
-        {!currentWorker ? (
-          <Card className="border-none shadow-lg">
+        {!currentWorker ?
+        <Card className="border-none shadow-lg">
             <CardContent className="py-16 text-center">
               <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2" dir="rtl">לא נמצא פרופיל עובד</h3>
               <p className="text-gray-600" dir="rtl">האימייל שלך לא משויך לחשבון עובד.</p>
             </CardContent>
-          </Card>
-        ) : (
-          <>
+          </Card> :
+
+        <>
             {/* Unavailable Times Section */}
             <Card className="border-none shadow-lg mb-4">
               <CardHeader className="border-b bg-white py-3 px-4">
@@ -594,12 +594,12 @@ END:VEVENT
                 </div>
               </CardHeader>
               <CardContent className="py-3 px-4">
-                {unavailabilities.length === 0 ? (
-                  <p className="text-xs text-gray-500 text-center py-2" dir="rtl">אין זמנים לא זמינים השבוע</p>
-                ) : (
-                  <div className="space-y-2">
-                    {unavailabilities.map((unavail) => (
-                      <div key={unavail.id} className="flex items-center justify-between p-2 bg-red-50 border border-red-200 rounded-lg">
+                {unavailabilities.length === 0 ?
+              <p className="text-xs text-gray-500 text-center py-2" dir="rtl">אין זמנים לא זמינים השבוע</p> :
+
+              <div className="space-y-2">
+                    {unavailabilities.map((unavail) =>
+                <div key={unavail.id} className="flex items-center justify-between p-2 bg-red-50 border border-red-200 rounded-lg">
                         <div className="flex-1">
                           <p className="font-medium text-sm text-gray-900" dir="rtl">{formatDateHebrew(unavail.date, "short")}</p>
                           <p className="text-xs text-gray-600" dir="rtl">{unavail.start_time} - {unavail.end_time} • {unavail.reason === 'overseas' ? 'בחו"ל' : 'תפוס'}</p>
@@ -608,109 +608,109 @@ END:VEVENT
                           <XCircle className="w-4 h-4" />
                         </Button>
                       </div>
-                    ))}
-                  </div>
                 )}
+                  </div>
+              }
               </CardContent>
             </Card>
 
             {/* Status */}
-            {existingAvailability && (
-              <Card className="border-none shadow-lg mb-4">
+            {existingAvailability &&
+          <Card className="border-none shadow-lg mb-4">
                 <CardContent className="py-3 px-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <AlertCircle className="w-4 h-4 text-blue-600" />
                       <span className="text-sm font-medium">
-                        {existingAvailability.status === "approved" ? "אושר" : 
-                         existingAvailability.status === "submitted" ? "נשלח" : 
-                         existingAvailability.status === "pending_change" ? "ממתין לשינוי" : "טיוטה"}
+                        {existingAvailability.status === "approved" ? "אושר" :
+                    existingAvailability.status === "submitted" ? "נשלח" :
+                    existingAvailability.status === "pending_change" ? "ממתין לשינוי" : "טיוטה"}
                       </span>
                     </div>
-                    {isApproved && !showEditMode && (
-                      <Button variant="outline" size="sm" onClick={() => setShowEditMode(true)}>
+                    {isApproved && !showEditMode &&
+                <Button variant="outline" size="sm" onClick={() => setShowEditMode(true)}>
                         <Pencil className="w-3 h-3 mr-1" />ערוך משמרות
                       </Button>
-                    )}
-                    {showEditMode && (
-                      <div className="flex gap-2">
+                }
+                    {showEditMode &&
+                <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={() => {
-                          setShowEditMode(false);
-                          setSelectedShifts(originalShifts);
-                        }} dir="rtl">ביטול</Button>
+                    setShowEditMode(false);
+                    setSelectedShifts(originalShifts);
+                  }} dir="rtl">ביטול</Button>
                         <Button size="sm" onClick={() => setShowChangeRecap(true)} className="bg-blue-900 hover:bg-blue-800">
                           סקור שינויים
                         </Button>
                       </div>
-                    )}
+                }
                   </div>
                 </CardContent>
               </Card>
-            )}
+          }
 
             {/* Extra Tasks Section */}
-            {openRegistrations.filter(reg => {
-              const regShifts = reg?.shifts || [];
-              return regShifts.length > 0;
-            }).length > 0 && (
-              <Card className="border-none shadow-lg mb-4">
+            {openRegistrations.filter((reg) => {
+            const regShifts = reg?.shifts || [];
+            return regShifts.length > 0;
+          }).length > 0 &&
+          <Card className="border-none shadow-lg mb-4">
                 <CardHeader className="border-b bg-white py-3 px-4">
                   <CardTitle className="text-base" dir="rtl">משימות נוספות</CardTitle>
                 </CardHeader>
                 <CardContent className="py-3 px-4">
-                  <p className="text-xs text-gray-500 mb-3" dir="rtl">לחץ על משמרת כדי לציין העדפה: רצוי → זמין → לא זמין</p>
+                  <p className="text-xs text-gray-500 mb-3" dir="rtl">לחיצה בודדת - רצוי, לחיצה כפולה - זמין, שלוש לחיצות - לא זמין</p>
                   <div className="space-y-3">
-                    {openRegistrations.filter(reg => {
-                      const regShifts = reg?.shifts || [];
-                      return regShifts.length > 0;
-                    }).map((reg) => {
-                      const regKey = reg?.key || reg;
-                      const regName = reg?.name || reg;
-                      const regDate = reg?.date || null;
-                      const regShifts = reg?.shifts || [];
+                    {openRegistrations.filter((reg) => {
+                  const regShifts = reg?.shifts || [];
+                  return regShifts.length > 0;
+                }).map((reg) => {
+                  const regKey = reg?.key || reg;
+                  const regName = reg?.name || reg;
+                  const regDate = reg?.date || null;
+                  const regShifts = reg?.shifts || [];
 
-                      // Helper: parse "+N HH:MM" or "HH:MM"
-                      const parseTime = (t) => {
-                        if (!t) return { days: 0, time: t };
-                        const m = t.match(/^(\+(\d+))\s+(\d{2}:\d{2})$/);
-                        if (m) return { days: parseInt(m[2]), time: m[3] };
-                        return { days: 0, time: t };
-                      };
+                  // Helper: parse "+N HH:MM" or "HH:MM"
+                  const parseTime = (t) => {
+                    if (!t) return { days: 0, time: t };
+                    const m = t.match(/^(\+(\d+))\s+(\d{2}:\d{2})$/);
+                    if (m) return { days: parseInt(m[2]), time: m[3] };
+                    return { days: 0, time: t };
+                  };
 
-                      return (
-                        <div key={regKey} className="border rounded-lg p-3" dir="rtl">
+                  return (
+                    <div key={regKey} className="border rounded-lg p-3" dir="rtl">
                           <div className="font-semibold text-sm mb-2">{regName}
                             {regDate && <span className="text-xs text-gray-400 font-normal mr-2">{regDate}</span>}
                           </div>
-                          {regShifts.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
+                          {regShifts.length > 0 ?
+                      <div className="flex flex-wrap gap-2">
                               {regShifts.map((shift, si) => {
-                                const taskKey = `${regKey}__${si}`;
-                                const state = extraTaskStates[taskKey] || null;
-                                const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white"
-                                  : state === "available" ? "bg-cyan-500 border-cyan-600 text-white"
-                                  : state === "unavailable" ? "bg-red-500 border-red-600 text-white"
-                                  : "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
-                                const stateIcon = state === "wanted" ? <Star className="w-3 h-3" />
-                                  : state === "available" ? <Check className="w-3 h-3" />
-                                  : state === "unavailable" ? <Ban className="w-3 h-3" />
-                                  : null;
+                          const taskKey = `${regKey}__${si}`;
+                          const state = extraTaskStates[taskKey] || null;
+                          const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white" :
+                          state === "available" ? "bg-cyan-500 border-cyan-600 text-white" :
+                          state === "unavailable" ? "bg-red-500 border-red-600 text-white" :
+                          "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
+                          const stateIcon = state === "wanted" ? <Star className="w-3 h-3" /> :
+                          state === "available" ? <Check className="w-3 h-3" /> :
+                          state === "unavailable" ? <Ban className="w-3 h-3" /> :
+                          null;
 
-                                const endParsed = parseTime(shift.end_time);
-                                // Multi-day only if end crosses the 06:00 boundary of the next day
-                                const isMultiDay = endParsed.days > 0 && endParsed.time >= "06:00";
-                                const disabled = !canEdit || currentWorker?.availability_locked;
+                          const endParsed = parseTime(shift.end_time);
+                          // Multi-day only if end crosses the 06:00 boundary of the next day
+                          const isMultiDay = endParsed.days > 0 && endParsed.time >= "06:00";
+                          const disabled = !canEdit || currentWorker?.availability_locked;
 
-                                if (isMultiDay) {
-                                  // Show two connected buttons sharing the same key, split at 06:00
-                                  return (
-                                    <div key={si} className="flex items-stretch">
+                          if (isMultiDay) {
+                            // Show two connected buttons sharing the same key, split at 06:00
+                            return (
+                              <div key={si} className="flex items-stretch">
                                       {/* Day 1 part: start → 06:00 */}
                                       <button
-                                        onClick={() => cycleExtraTask(taskKey)}
-                                        disabled={disabled}
-                                        className={`flex flex-col items-start px-2 py-1.5 rounded-r-lg border-2 border-l-0 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                                      >
+                                  onClick={() => cycleExtraTask(taskKey)}
+                                  disabled={disabled}
+                                  className={`flex flex-col items-start px-2 py-1.5 rounded-r-lg border-2 border-l-0 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+
                                         <div className="flex items-center gap-1">
                                           {stateIcon}
                                           <span>{shift.start_time} - 06:00</span>
@@ -719,10 +719,10 @@ END:VEVENT
                                       </button>
                                       {/* Day 2 part: 06:00 → actual end */}
                                       <button
-                                        onClick={() => cycleExtraTask(taskKey)}
-                                        disabled={disabled}
-                                        className={`flex flex-col items-start px-2 py-1.5 rounded-l-lg border-2 border-dashed text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                                      >
+                                  onClick={() => cycleExtraTask(taskKey)}
+                                  disabled={disabled}
+                                  className={`flex flex-col items-start px-2 py-1.5 rounded-l-lg border-2 border-dashed text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+
                                         <div className="flex items-center gap-1">
                                           {stateIcon}
                                           <span className="text-[9px] font-bold bg-orange-300 text-orange-900 rounded px-0.5">+1</span>
@@ -730,148 +730,148 @@ END:VEVENT
                                         </div>
                                         <div className="text-[9px] opacity-70 mt-0.5">יום ב׳</div>
                                       </button>
-                                    </div>
-                                  );
-                                }
+                                    </div>);
 
-                                return (
-                                  <button
-                                    key={si}
-                                    onClick={() => cycleExtraTask(taskKey)}
-                                    disabled={disabled}
-                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                                  >
+                          }
+
+                          return (
+                            <button
+                              key={si}
+                              onClick={() => cycleExtraTask(taskKey)}
+                              disabled={disabled}
+                              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+
                                     {stateIcon}
                                     <span>{shift.start_time} - {shift.end_time}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            (() => {
-                              const taskKey = regKey;
-                              const state = extraTaskStates[taskKey] || null;
-                              const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white"
-                                : state === "available" ? "bg-cyan-500 border-cyan-600 text-white"
-                                : state === "unavailable" ? "bg-red-500 border-red-600 text-white"
-                                : "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
-                              const stateIcon = state === "wanted" ? <Star className="w-3 h-3 ml-1" />
-                                : state === "available" ? <Check className="w-3 h-3 ml-1" />
-                                : state === "unavailable" ? <Ban className="w-3 h-3 ml-1" />
-                                : null;
-                              const stateLabel = state === "wanted" ? "רצוי" : state === "available" ? "זמין" : state === "unavailable" ? "לא זמין" : "לחץ לסימון";
-                              return (
-                                <button
-                                  onClick={() => cycleExtraTask(taskKey)}
-                                  disabled={!canEdit || currentWorker?.availability_locked}
-                                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                                >
+                                  </button>);
+
+                        })}
+                            </div> :
+
+                      (() => {
+                        const taskKey = regKey;
+                        const state = extraTaskStates[taskKey] || null;
+                        const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white" :
+                        state === "available" ? "bg-cyan-500 border-cyan-600 text-white" :
+                        state === "unavailable" ? "bg-red-500 border-red-600 text-white" :
+                        "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
+                        const stateIcon = state === "wanted" ? <Star className="w-3 h-3 ml-1" /> :
+                        state === "available" ? <Check className="w-3 h-3 ml-1" /> :
+                        state === "unavailable" ? <Ban className="w-3 h-3 ml-1" /> :
+                        null;
+                        const stateLabel = state === "wanted" ? "רצוי" : state === "available" ? "זמין" : state === "unavailable" ? "לא זמין" : "לחץ לסימון";
+                        return (
+                          <button
+                            onClick={() => cycleExtraTask(taskKey)}
+                            disabled={!canEdit || currentWorker?.availability_locked}
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+
                                   {stateIcon}
                                   <span>{stateLabel}</span>
-                                </button>
-                              );
-                            })()
-                          )}
-                        </div>
-                      );
-                    })}
+                                </button>);
+
+                      })()
+                      }
+                        </div>);
+
+                })}
                   </div>
                 </CardContent>
               </Card>
-            )}
+          }
 
             {/* Shift Selection Grid */}
             <Card className="border-none shadow-lg mb-4">
               <CardHeader className="border-b bg-white py-3 px-4">
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-base" dir="rtl">בחר משמרות (לחץ כדי להחליף: רצוי → זמין → לא זמין)</CardTitle>
-                  {currentWorker?.availability_locked && (
-                    <Badge className="bg-red-100 text-red-800" dir="rtl">
+                  {currentWorker?.availability_locked &&
+                <Badge className="bg-red-100 text-red-800" dir="rtl">
                       <Lock className="w-3 h-3 mr-1" />
                       זמינות נעולה
                     </Badge>
-                  )}
+                }
                 </div>
               </CardHeader>
               <CardContent className="py-3 px-2">
                 <div className="space-y-3">
                   {DAYS_OF_WEEK.map((day, dayIndex) => {
-                    const date = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
-                    const event = getEventForDate(addDays(weekStart, dayIndex));
-                    
-                    return (
-                      <div key={day} className="border rounded-lg p-2">
+                  const date = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
+                  const event = getEventForDate(addDays(weekStart, dayIndex));
+
+                  return (
+                    <div key={day} className="border rounded-lg p-2">
                         <div className="flex items-center justify-between mb-2">
                           <div>
                             <span className="font-semibold text-sm" dir="rtl">{day}</span>
                             <span className="text-xs text-gray-500 ml-2" dir="rtl">{formatDateHebrew(addDays(weekStart, dayIndex))}</span>
                             <span className="text-xs text-gray-400 ml-1">({formatHebrewDate(addDays(weekStart, dayIndex))})</span>
                           </div>
-                          {event && (
-                            <Badge className="bg-purple-100 text-purple-800 text-xs">
+                          {event &&
+                        <Badge className="bg-purple-100 text-purple-800 text-xs">
                               <PartyPopper className="w-3 h-3 mr-1" />{event.title}
                             </Badge>
-                          )}
+                        }
                         </div>
                         {(() => {
-                            const dayYearlyEvts = yearlyEvents.filter(e =>
-                              e.worker_ids?.includes(currentWorker?.id) &&
-                              e.start_date <= date && e.end_date >= date &&
-                              e.start_time && e.end_time
-                            );
-                            return dayYearlyEvts.length > 0 ? (
-                              <div className="relative h-4 mb-1">
-                                {dayYearlyEvts.map(evt => {
-                                  const pos = getEventBarPositionFull(evt.start_time, evt.end_time);
-                                  if (!pos) return null;
-                                  return (
-                                    <div
-                                      key={evt.id}
-                                      className="absolute h-3.5 bg-purple-500 rounded text-white text-[8px] flex items-center px-1 overflow-hidden whitespace-nowrap"
-                                      style={{ right: pos.right, width: pos.width }}
-                                      title={`${evt.title} (${evt.start_time}-${evt.end_time})`}
-                                    >
+                        const dayYearlyEvts = yearlyEvents.filter((e) =>
+                        e.worker_ids?.includes(currentWorker?.id) &&
+                        e.start_date <= date && e.end_date >= date &&
+                        e.start_time && e.end_time
+                        );
+                        return dayYearlyEvts.length > 0 ?
+                        <div className="relative h-4 mb-1">
+                                {dayYearlyEvts.map((evt) => {
+                            const pos = getEventBarPositionFull(evt.start_time, evt.end_time);
+                            if (!pos) return null;
+                            return (
+                              <div
+                                key={evt.id}
+                                className="absolute h-3.5 bg-purple-500 rounded text-white text-[8px] flex items-center px-1 overflow-hidden whitespace-nowrap"
+                                style={{ right: pos.right, width: pos.width }}
+                                title={`${evt.title} (${evt.start_time}-${evt.end_time})`}>
+
                                       {evt.title}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : null;
-                          })()}
+                                    </div>);
+
+                          })}
+                              </div> :
+                        null;
+                      })()}
                         <div className="grid grid-cols-6 gap-1">
                           {SHIFT_BLOCKS.map((shift) => {
-                            const state = getShiftState(date, shift);
-                            return (
-                              <button
-                                key={shift.start}
-                                onClick={() => cycleShiftState(date, shift)}
-                                disabled={!canEdit || currentWorker?.availability_locked}
-                                className={`p-1.5 rounded border-2 transition-all flex flex-col items-center justify-center ${getShiftStyle(state)} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                              >
+                          const state = getShiftState(date, shift);
+                          return (
+                            <button
+                              key={shift.start}
+                              onClick={() => cycleShiftState(date, shift)}
+                              disabled={!canEdit || currentWorker?.availability_locked}
+                              className={`p-1.5 rounded border-2 transition-all flex flex-col items-center justify-center ${getShiftStyle(state)} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+
                                 {getShiftIcon(state)}
                                 <span className="text-[10px] mt-0.5">{shift.start}</span>
-                              </button>
-                            );
-                          })}
+                              </button>);
+
+                        })}
                         </div>
-                      </div>
-                    );
-                  })}
+                      </div>);
+
+                })}
                 </div>
 
-                {!isApproved && !isPendingChange && (
-                  <div className="flex justify-end gap-2 mt-4">
+                {!isApproved && !isPendingChange &&
+              <div className="flex justify-end gap-2 mt-4">
                     <Button variant="outline" size="sm" onClick={() => setSelectedShifts([])} disabled={currentWorker?.availability_locked} dir="rtl">נקה</Button>
                     <Button
-                      onClick={() => setShowSummary(true)}
-                      disabled={selectedShifts.filter(s => s.type !== "unavailable").length === 0 || currentWorker?.availability_locked}
-                      size="sm"
-                      className="bg-blue-900 hover:bg-blue-800"
-                    >
+                  onClick={() => setShowSummary(true)}
+                  disabled={selectedShifts.filter((s) => s.type !== "unavailable").length === 0 || currentWorker?.availability_locked}
+                  size="sm"
+                  className="bg-blue-900 hover:bg-blue-800">
+
                       סקור ושלח
                     </Button>
                   </div>
-                )}
+              }
               </CardContent>
             </Card>
 
@@ -896,41 +896,41 @@ END:VEVENT
               </CardHeader>
               <CardContent className="py-3 px-4">
                 <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                  {["א", "ב", "ג", "ד", "ה", "ו", "ש"].map((d, i) => (
-                    <div key={i} className="font-semibold text-gray-500 py-1">{d}</div>
-                  ))}
+                  {["א", "ב", "ג", "ד", "ה", "ו", "ש"].map((d, i) =>
+                <div key={i} className="font-semibold text-gray-500 py-1">{d}</div>
+                )}
                   {calendarDays.map((day, idx) => {
-                    const dayAssignments = getAssignmentForDate(day);
-                    const event = getEventForDate(day);
-                    const workerYearlyEvents = getYearlyEventsForDate(day);
-                    const isCurrentMonth = isSameMonth(day, calendarMonth);
-                    const isToday = isSameDay(day, new Date());
-                    
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => handleDateClick(day)}
-                        className={`p-1 min-h-[50px] border rounded text-xs hover:bg-blue-50 transition-colors ${
-                          isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-400"
-                        } ${isToday ? "ring-2 ring-blue-500" : ""}`}
-                      >
+                  const dayAssignments = getAssignmentForDate(day);
+                  const event = getEventForDate(day);
+                  const workerYearlyEvents = getYearlyEventsForDate(day);
+                  const isCurrentMonth = isSameMonth(day, calendarMonth);
+                  const isToday = isSameDay(day, new Date());
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleDateClick(day)}
+                      className={`p-1 min-h-[50px] border rounded text-xs hover:bg-blue-50 transition-colors ${
+                      isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-400"} ${
+                      isToday ? "ring-2 ring-blue-500" : ""}`}>
+
                         <div className="font-medium">{format(day, "d")}</div>
                         {event && <div className="bg-purple-100 text-purple-700 rounded px-1 truncate mt-1">🎉</div>}
-                        {workerYearlyEvents.slice(0, 1).map((e, i) => (
-                          <div key={i} className="bg-green-100 text-green-700 rounded px-1 truncate mt-1" title={e.title}>{e.title}</div>
-                        ))}
-                        {dayAssignments.slice(0, 1).map((a, i) => (
-                          <div key={i} className="bg-blue-100 text-blue-700 rounded px-1 truncate mt-1">{a.start_time.slice(0, 5)}</div>
-                        ))}
-                        {(dayAssignments.length + workerYearlyEvents.length) > 1 && <div className="text-gray-500">+{dayAssignments.length + workerYearlyEvents.length - 1}</div>}
-                      </button>
-                    );
-                  })}
+                        {workerYearlyEvents.slice(0, 1).map((e, i) =>
+                      <div key={i} className="bg-green-100 text-green-700 rounded px-1 truncate mt-1" title={e.title}>{e.title}</div>
+                      )}
+                        {dayAssignments.slice(0, 1).map((a, i) =>
+                      <div key={i} className="bg-blue-100 text-blue-700 rounded px-1 truncate mt-1">{a.start_time.slice(0, 5)}</div>
+                      )}
+                        {dayAssignments.length + workerYearlyEvents.length > 1 && <div className="text-gray-500">+{dayAssignments.length + workerYearlyEvents.length - 1}</div>}
+                      </button>);
+
+                })}
                 </div>
               </CardContent>
             </Card>
           </>
-        )}
+        }
 
         {/* Dialogs */}
         <Dialog open={showUnavailabilityDialog} onOpenChange={setShowUnavailabilityDialog}>
@@ -988,13 +988,13 @@ END:VEVENT
                   </div>
                   <DragDropContext onDragEnd={(r) => handleDragEnd(r, "wanted")}>
                     <Droppable droppableId="wanted-shifts">
-                      {(provided) => (
-                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1 max-h-64 overflow-y-auto">
-                          {wantedShifts.map((shift, index) => (
-                            <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`wanted-${shift.date}-${shift.start_time}`} index={index}>
-                              {(provided, snapshot) => (
-                                <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
-                                  className={`flex items-center gap-1 p-1.5 rounded border ${snapshot.isDragging ? 'bg-green-50 border-green-300 shadow-lg' : 'bg-white border-gray-200'}`}>
+                      {(provided) =>
+                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1 max-h-64 overflow-y-auto">
+                          {wantedShifts.map((shift, index) =>
+                        <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`wanted-${shift.date}-${shift.start_time}`} index={index}>
+                              {(provided, snapshot) =>
+                          <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
+                          className={`flex items-center gap-1 p-1.5 rounded border ${snapshot.isDragging ? 'bg-green-50 border-green-300 shadow-lg' : 'bg-white border-gray-200'}`}>
                                   <GripVertical className="w-3 h-3 text-gray-400" />
                                   <div className="flex items-center justify-center w-5 h-5 bg-green-500 text-white rounded-full font-bold text-[10px]">{index + 1}</div>
                                   <div className="flex-1 min-w-0">
@@ -1002,12 +1002,12 @@ END:VEVENT
                                     <p className="text-[9px] text-gray-600">{shift.start_time}-{shift.end_time}</p>
                                   </div>
                                 </div>
-                              )}
+                          }
                             </Draggable>
-                          ))}
+                        )}
                           {provided.placeholder}
                         </div>
-                      )}
+                      }
                     </Droppable>
                   </DragDropContext>
                 </div>
@@ -1020,13 +1020,13 @@ END:VEVENT
                   </div>
                   <DragDropContext onDragEnd={(r) => handleDragEnd(r, "available")}>
                     <Droppable droppableId="available-shifts">
-                      {(provided) => (
-                        <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1 max-h-64 overflow-y-auto">
-                          {availableShifts.map((shift, index) => (
-                            <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`available-${shift.date}-${shift.start_time}`} index={index}>
-                              {(provided, snapshot) => (
-                                <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
-                                  className={`flex items-center gap-1 p-1.5 rounded border ${snapshot.isDragging ? 'bg-blue-50 border-blue-300 shadow-lg' : 'bg-white border-gray-200'}`}>
+                      {(provided) =>
+                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1 max-h-64 overflow-y-auto">
+                          {availableShifts.map((shift, index) =>
+                        <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`available-${shift.date}-${shift.start_time}`} index={index}>
+                              {(provided, snapshot) =>
+                          <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
+                          className={`flex items-center gap-1 p-1.5 rounded border ${snapshot.isDragging ? 'bg-blue-50 border-blue-300 shadow-lg' : 'bg-white border-gray-200'}`}>
                                   <GripVertical className="w-3 h-3 text-gray-400" />
                                   <div className="flex items-center justify-center w-5 h-5 bg-blue-500 text-white rounded-full font-bold text-[10px]">{index + 1}</div>
                                   <div className="flex-1 min-w-0">
@@ -1034,12 +1034,12 @@ END:VEVENT
                                     <p className="text-[9px] text-gray-600">{shift.start_time}-{shift.end_time}</p>
                                   </div>
                                 </div>
-                              )}
+                          }
                             </Draggable>
-                          ))}
+                        )}
                           {provided.placeholder}
                         </div>
-                      )}
+                      }
                     </Droppable>
                   </DragDropContext>
                 </div>
@@ -1060,31 +1060,31 @@ END:VEVENT
                 const { added, removed } = getChanges();
                 return (
                   <>
-                    {added.length > 0 && (
-                      <div>
+                    {added.length > 0 &&
+                    <div>
                         <p className="font-semibold text-green-700 mb-2" dir="rtl">נוסף:</p>
-                        {added.map((s, i) => (
-                          <div key={i} className="p-2 bg-green-50 rounded mb-1 text-sm" dir="rtl">
+                        {added.map((s, i) =>
+                      <div key={i} className="p-2 bg-green-50 rounded mb-1 text-sm" dir="rtl">
                             {formatDateHebrew(s.date, "short")} {s.start_time}-{s.end_time} ({s.type === 'wanted' ? 'רצוי' : s.type === 'available' ? 'זמין' : 'לא זמין'})
                           </div>
-                        ))}
+                      )}
                       </div>
-                    )}
-                    {removed.length > 0 && (
-                      <div>
+                    }
+                    {removed.length > 0 &&
+                    <div>
                         <p className="font-semibold text-red-700 mb-2" dir="rtl">הוסר:</p>
-                        {removed.map((s, i) => (
-                          <div key={i} className="p-2 bg-red-50 rounded mb-1 text-sm" dir="rtl">
+                        {removed.map((s, i) =>
+                      <div key={i} className="p-2 bg-red-50 rounded mb-1 text-sm" dir="rtl">
                             {formatDateHebrew(s.date, "short")} {s.start_time}-{s.end_time} ({s.type === 'wanted' ? 'רצוי' : s.type === 'available' ? 'זמין' : 'לא זמין'})
                           </div>
-                        ))}
+                      )}
                       </div>
-                    )}
-                    {added.length === 0 && removed.length === 0 && (
-                      <p className="text-gray-500" dir="rtl">לא זוהו שינויים</p>
-                    )}
-                  </>
-                );
+                    }
+                    {added.length === 0 && removed.length === 0 &&
+                    <p className="text-gray-500" dir="rtl">לא זוהו שינויים</p>
+                    }
+                  </>);
+
               })()}
               <div>
                 <Label dir="rtl">הערה למנהל (אופציונלי)</Label>
@@ -1103,51 +1103,51 @@ END:VEVENT
             <DialogHeader>
               <DialogTitle dir="rtl">{selectedDate && formatDateHebrew(selectedDate, "long")}</DialogTitle>
             </DialogHeader>
-            {selectedDate && (
-              <div className="space-y-4 py-4">
-                {getEventForDate(selectedDate) && (
-                  <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+            {selectedDate &&
+            <div className="space-y-4 py-4">
+                {getEventForDate(selectedDate) &&
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
                     <p className="font-semibold text-purple-800 flex items-center gap-2" dir="rtl">
                       <PartyPopper className="w-4 h-4" />{getEventForDate(selectedDate).title}
                     </p>
-                    {getEventForDate(selectedDate).description && (
-                      <p className="text-sm text-gray-600 mt-1" dir="rtl">{getEventForDate(selectedDate).description}</p>
-                    )}
+                    {getEventForDate(selectedDate).description &&
+                <p className="text-sm text-gray-600 mt-1" dir="rtl">{getEventForDate(selectedDate).description}</p>
+                }
                   </div>
-                )}
-                {getYearlyEventsForDate(selectedDate).length > 0 && (
-                  <div>
+              }
+                {getYearlyEventsForDate(selectedDate).length > 0 &&
+              <div>
                     <p className="font-semibold mb-2" dir="rtl">האירועים השנתיים שלך:</p>
-                    {getYearlyEventsForDate(selectedDate).map((e, i) => (
-                      <div key={i} className="p-3 bg-green-50 border border-green-200 rounded-lg mb-2">
+                    {getYearlyEventsForDate(selectedDate).map((e, i) =>
+                <div key={i} className="p-3 bg-green-50 border border-green-200 rounded-lg mb-2">
                         <p className="font-medium text-green-800" dir="rtl">{e.title}</p>
                         <p className="text-sm text-gray-600">{e.start_time} - {e.end_time}</p>
                       </div>
-                    ))}
-                  </div>
                 )}
+                  </div>
+              }
                 <div>
                   <p className="font-semibold mb-2" dir="rtl">המשמרות שלך:</p>
-                  {getAssignmentForDate(selectedDate).length === 0 ? (
-                    <p className="text-sm text-gray-500" dir="rtl">אין משמרות מתוכננות</p>
-                  ) : (
-                    getAssignmentForDate(selectedDate).map((a, i) => (
-                      <div key={i} className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
+                  {getAssignmentForDate(selectedDate).length === 0 ?
+                <p className="text-sm text-gray-500" dir="rtl">אין משמרות מתוכננות</p> :
+
+                getAssignmentForDate(selectedDate).map((a, i) =>
+                <div key={i} className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
                         <p className="font-medium" dir="rtl">{a.food_cart_name}</p>
                         <p className="text-sm text-gray-600">{a.start_time} - {a.end_time} ({a.hours}h)</p>
                         {a.menu && <p className="text-sm text-amber-700" dir="rtl">תפריט: {a.menu}</p>}
                       </div>
-                    ))
-                  )}
+                )
+                }
                 </div>
               </div>
-            )}
+            }
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowDateDetails(false)} dir="rtl">סגור</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
-    </div>
-  );
+    </div>);
+
 }
