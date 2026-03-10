@@ -2,8 +2,12 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-// 00–23 + 24 (= סוף יממה)
-const HOURS = [...Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0")), "24"];
+// 00–24 same day, +1 00–24 next day, +2 00–24 two days later
+const HOURS = [
+  ...Array.from({ length: 25 }, (_, i) => String(i).padStart(2, "0")),
+  ...Array.from({ length: 25 }, (_, i) => `+1 ${String(i).padStart(2, "0")}`),
+  ...Array.from({ length: 25 }, (_, i) => `+2 ${String(i).padStart(2, "0")}`),
+];
 const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
 
 export default function TimeCell({ rowId, colName, value, defaultValue, rowValues, onSaved }) {
