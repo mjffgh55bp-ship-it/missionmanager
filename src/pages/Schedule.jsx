@@ -246,6 +246,7 @@ export default function Schedule() {
   };
 
   // When a time cell with +N is saved, auto-create continuation rows for the affected days
+  // Day boundary is at 06:00 — shifts ending before 06:00 stay in the same day
   const handleTimeSaved = async (row, newValues) => {
     const endTime = newValues["סיום"] || newValues["שעת סיום"] || "";
     if (!endTime.startsWith("+")) return;
@@ -254,6 +255,9 @@ export default function Schedule() {
     if (!plusMatch) return;
     const daysAhead = parseInt(plusMatch[2]);
     const realEndTime = `${plusMatch[3]}:${plusMatch[4]}`;
+    
+    // Only create continuation if end time is >= 06:00 (crosses the day boundary)
+    if (daysAhead === 1 && realEndTime < "06:00") return;
 
     // For each future day, ensure a continuation row exists
     for (let d = 1; d <= daysAhead; d++) {
@@ -265,16 +269,13 @@ export default function Schedule() {
 
       const template = allTemplates.find(t => t.id === row.template_id);
       const isLastDay = d === daysAhead;
-      const startTime = d === 1
-        ? (newValues["התחלה"] || newValues["שעת התחלה"] || "00:00")
-        : "00:00";
 
       const continuationValues = {
         ...newValues,
-        "התחלה": d === 1 ? "00:00" : "00:00",
-        "שעת התחלה": d === 1 ? "00:00" : "00:00",
-        "סיום": isLastDay ? realEndTime : "24:00",
-        "שעת סיום": isLastDay ? realEndTime : "24:00",
+        "התחלה": "06:00",
+        "שעת התחלה": "06:00",
+        "סיום": isLastDay ? realEndTime : "06:00",
+        "שעת סיום": isLastDay ? realEndTime : "06:00",
         is_continuation: true,
         continuation_from_date: dateString,
       };
