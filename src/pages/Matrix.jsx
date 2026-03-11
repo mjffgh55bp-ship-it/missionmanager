@@ -443,13 +443,26 @@ export default function Matrix() {
     
     let emailBody = `שלום ${selectedWorkerForNotification.nickname},\n\n`;
     
-    const formatShiftLine = (a, prefix = '  ') => {
+    const getBriefingTime = (startTime) => {
+      const [hours, minutes] = startTime.split(':').map(Number);
+      const briefingMinutes = hours * 60 + minutes - 15;
+      const briefingHours = Math.floor(briefingMinutes / 60);
+      const briefingMins = briefingMinutes % 60;
+      return `${String(briefingHours).padStart(2, '0')}:${String(briefingMins).padStart(2, '0')}`;
+    };
+    
+    const formatShiftLine = (a, date, prefix = '  ') => {
       const standby = isStandbyStatus(a.status);
-      const label = standby ? `כוננות (${a.status})` : a.food_cart_name;
+      const label = standby ? `כוننות (${a.status})` : a.food_cart_name;
       const duration = standby ? a.status : (a.hours ? `${a.hours}h` : '');
-      return `${prefix}${label}: ${a.start_time} - ${a.end_time}${duration && !standby ? ` (${duration})` : ''}\n`;
+      const briefingTime = getBriefingTime(a.start_time);
+      const statusText = a.status ? ` [${a.status}]` : '';
+      return `${prefix}${label}${statusText}: תדריך ${briefingTime}, משמרת ${a.start_time} - ${a.end_time}${duration && !standby ? ` (${duration})` : ''}\n`;
     };
 
+    // Generate ICS calendar events
+    let icsEvents = [];
+    
     if (viewMode === "weekly") {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
       emailBody += `הנה לוח המשמרות שלך לשבוע של ${format(weekStart, "d.M.yyyy")}:\n\n`;
@@ -467,7 +480,8 @@ export default function Matrix() {
           emailBody += "  אין משמרות\n";
         } else {
           allDayShifts.forEach(a => {
-            emailBody += formatShiftLine(a);
+            emailBody += formatShiftLine(a, dStr);
+            icsEvents.push({ shift: a, date: dStr });
           });
         }
         emailBody += "\n";
@@ -477,16 +491,56 @@ export default function Matrix() {
       const workerTemplateShifts = getWorkerTemplateShifts(selectedWorkerForNotification.id);
       const workerExtraTaskShifts = getWorkerExtraTaskShifts(selectedWorkerForNotification.id);
       const allShifts = [...workerAssignments, ...workerTemplateShifts, ...workerExtraTaskShifts];
+      const dStr = format(currentDate, "yyyy-MM-dd");
       emailBody += `הנה לוח המשמרות שלך ל-${format(currentDate, "d.M.yyyy")}:\n\n`;
       if (allShifts.length === 0) {
         emailBody += "אין משמרות מתוכננות ליום זה.\n\n";
       } else {
         allShifts.forEach((a, i) => {
+          const briefingTime = getBriefingTime(a.start_time);
           const standby = isStandbyStatus(a.status);
-          emailBody += `משמרת ${i + 1}: ${standby ? `כוננות (${a.status})` : a.food_cart_name}\n  זמן: ${a.start_time} - ${a.end_time}${a.hours && !standby ? ` (${a.hours}h)` : ''}\n\n`;
+          const statusText = a.status ? ` [${a.status}]` : '';
+          emailBody += `משמרת ${i + 1}: ${standby ? `כוננות (${a.status})` : a.food_cart_name}${statusText}\n  תדריך: ${briefingTime}\n  משמרת: ${a.start_time} - ${a.end_time}${a.hours && !standby ? ` (${a.hours}h)` : ''}\n\n`;
+          icsEvents.push({ shift: a, date: dStr });
         });
       }
     }
+    
+    // Create ICS file content
+    const createICS = () => {
+      let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Kitchen Shifts//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
+      
+      icsEvents.forEach((evt, idx) => {
+        const { shift, date } = evt;
+        const briefingTime = getBriefingTime(shift.start_time);
+        const startDateTime = `${date.replace(/-/g, '')}T${briefingTime.replace(':', '')}00`;
+        const endDateTime = `${date.replace(/-/g, '')}T${shift.end_time.replace(':', '')}00`;
+        const standby = isStandbyStatus(shift.status);
+        const title = standby ? `כוננות ${shift.status}` : shift.food_cart_name;
+        const statusText = shift.status ? ` - ${shift.status}` : '';
+        
+        icsContent += `BEGIN:VEVENT\n`;
+        icsContent += `UID:shift-${idx}-${Date.now()}@kitchen\n`;
+        icsContent += `DTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\n`;
+        icsContent += `DTSTART:${startDateTime}\n`;
+        icsContent += `DTEND:${endDateTime}\n`;
+        icsContent += `SUMMARY:${title}${statusText}\n`;
+        icsContent += `DESCRIPTION:תדריך: ${briefingTime}\\nמשמרת: ${shift.start_time} - ${shift.end_time}\n`;
+        icsContent += `END:VEVENT\n`;
+      });
+      
+      icsContent += 'END:VCALENDAR';
+      return icsContent;
+    };
+    
+    const icsContent = createICS();
+    const icsBlob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const icsFile = new File([icsBlob], 'shifts.ics', { type: 'text/calendar' });
+    
+    // Upload ICS file
+    const { file_url: icsUrl } = await base44.integrations.Core.UploadFile({ file: icsFile });
+    
+    emailBody += `\n📅 להוספת המשמרות ליומן הדיגיטלי שלך, לחץ על הקישור:\n${icsUrl}\n\n`;
     
     if (notificationNotes.trim()) emailBody += `הערות מההנהלה:\n${notificationNotes}\n\n`;
     emailBody += "בברכה,\nההנהלה";
