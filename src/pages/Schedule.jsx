@@ -336,7 +336,7 @@ export default function Schedule() {
                     dir="rtl">
 
                     <Pencil className="w-4 h-4 ml-2" />
-                    {editMode ? 'יציאה ממצב עריכה' : 'מצב עריכה'}
+                    {editMode ? 'סיים עריכה' : 'עריכה'}
                   </Button>
                   {editMode &&
                   <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowPresetsDialog(true)} dir="rtl">
