@@ -264,11 +264,8 @@ export default function Matrix() {
     const targetDate = date || dateString;
     const shifts = [];
 
-    const rowsToCheck = date
-      ? templateRows.filter(r => r.date === targetDate)
-      : templateRows.filter(r => !date || r.date === targetDate);
-
-    rowsToCheck.forEach(row => {
+    // Don't filter templateRows early - check all rows to find continuation relationships
+    templateRows.forEach(row => {
       if (!row.values) return;
       
       // Check if this is a continuation row
@@ -276,20 +273,24 @@ export default function Matrix() {
       const sourceRowId = row.values.continuation_source_row_id;
       
       let isAssigned = false;
+      let shouldInclude = false;
       
       if (isContinuation && sourceRowId) {
         // For continuation rows, check if worker is assigned in the source row
-        // Source row should now be in templateRows (loaded in loadDynamicData)
         const sourceRow = templateRows.find(r => r.id === sourceRowId);
         if (sourceRow && sourceRow.values) {
           isAssigned = Object.values(sourceRow.values).some(val => val === workerId);
         }
+        // Include if this continuation row is for the target date
+        shouldInclude = row.date === targetDate;
       } else {
         // For regular rows, check if worker is assigned directly
         isAssigned = Object.values(row.values).some(val => val === workerId);
+        // Include if this regular row is for the target date
+        shouldInclude = row.date === targetDate;
       }
       
-      if (!isAssigned) return;
+      if (!isAssigned || !shouldInclude) return;
 
       // Find the template to get worker-type columns
       const template = allTemplates.find(t => t.id === row.template_id);
