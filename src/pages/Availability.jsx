@@ -134,8 +134,8 @@ export default function Availability() {
       }),
       base44.entities.Assignment.list("-date"),
       base44.entities.TemplateRow.list(),
-      base44.entities.Template.filter({ active: true })
-      ]);
+      base44.entities.Template.filter({ active: true })]
+      );
 
       if (availabilities.length > 0) {
         setExistingAvailability(availabilities[0]);
@@ -419,21 +419,21 @@ END:VEVENT
 `;
         }
       });
-      
+
       // Add assigned shifts from assignments and template rows
-      [...assignments, ...templateRows.filter(row => {
+      [...assignments, ...templateRows.filter((row) => {
         if (!row.values) return false;
-        return Object.values(row.values).some(val => val === currentWorker.id);
+        return Object.values(row.values).some((val) => val === currentWorker.id);
       })].forEach((shift) => {
         const dateStr = shift.date.replace(/-/g, '');
         let startTime, endTime, briefingTime, title;
-        
+
         if (shift.isTemplateShift || shift.template_id) {
           // Template shift
           startTime = shift.values?.["התחלה"] || shift.values?.["שעת התחלה"];
           endTime = shift.values?.["סיום"] || shift.values?.["שעת סיום"];
           briefingTime = shift.values?.["תדריך"];
-          const template = allTemplates.find(t => t.id === shift.template_id);
+          const template = allTemplates.find((t) => t.id === shift.template_id);
           title = template?.name || shift.template_name || 'משמרת';
         } else {
           // Regular assignment
@@ -441,14 +441,14 @@ END:VEVENT
           endTime = shift.end_time;
           title = shift.food_cart_name;
         }
-        
+
         if (!startTime || !endTime) return;
-        
+
         // Use briefing time if available, otherwise use shift start time
         const eventStartTime = briefingTime || startTime;
         const startTimeStr = eventStartTime.replace(/:/g, '');
         const endTimeStr = endTime.replace(/:/g, '');
-        
+
         icsContent += `BEGIN:VEVENT
 DTSTART:${dateStr}T${startTimeStr}00
 DTEND:${dateStr}T${endTimeStr}00
@@ -547,22 +547,22 @@ END:VEVENT
   const getAssignmentForDate = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
     const regularAssignments = assignments.filter((a) => a.date === dateStr);
-    
+
     // Get template shifts for this worker on this date
     if (!currentWorker) return regularAssignments;
-    
-    const templateShifts = templateRows.filter(row => {
+
+    const templateShifts = templateRows.filter((row) => {
       if (row.date !== dateStr || !row.values) return false;
-      
+
       // Check if worker is assigned in this row
-      const isAssigned = Object.values(row.values).some(val => val === currentWorker.id);
+      const isAssigned = Object.values(row.values).some((val) => val === currentWorker.id);
       if (!isAssigned) return false;
-      
+
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
       return startTime && endTime;
-    }).map(row => {
-      const template = allTemplates.find(t => t.id === row.template_id);
+    }).map((row) => {
+      const template = allTemplates.find((t) => t.id === row.template_id);
       const briefingTime = row.values?.["תדריך"];
       return {
         id: `template_${row.id}`,
@@ -575,7 +575,7 @@ END:VEVENT
         isTemplateShift: true
       };
     });
-    
+
     return [...regularAssignments, ...templateShifts];
   };
 
@@ -899,8 +899,8 @@ END:VEVENT
                             if (!pos) return null;
                             return (
                               <div
-                                key={evt.id}
-                                className="absolute h-3.5 bg-purple-500 rounded text-white text-[8px] flex items-center px-1 overflow-hidden whitespace-nowrap"
+                                key={evt.id} className="bg-green-300 text-[8px] px-1 rounded absolute h-3.5 flex items-center overflow-hidden whitespace-nowrap"
+
                                 style={{ right: pos.right, width: pos.width }}
                                 title={`${evt.title} (${evt.start_time}-${evt.end_time})`}>
 
@@ -997,8 +997,8 @@ END:VEVENT
                         return (
                           <div key={i} className="bg-blue-100 text-blue-700 rounded px-1 truncate mt-1" title={a.briefing_time ? `תדריך: ${a.briefing_time}` : ''}>
                             {displayTime.slice(0, 5)}
-                          </div>
-                        );
+                          </div>);
+
                       })}
                         {dayAssignments.length + workerYearlyEvents.length > 1 && <div className="text-gray-500">+{dayAssignments.length + workerYearlyEvents.length - 1}</div>}
                       </button>);
