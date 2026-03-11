@@ -293,23 +293,31 @@ export default function Matrix() {
 
     if (!workerAvail || !workerAvail.extra_tasks) return shifts;
 
-    // Parse extra_tasks object - keys are like "templateId_groupId__shiftIndex" or just "templateId_groupId"
+    // Parse extra_tasks object - keys are like "template_123_group_456__shiftIndex" or just "template_123_group_456"
     Object.entries(workerAvail.extra_tasks).forEach(([taskKey, taskState]) => {
       if (taskState !== 'wanted' && taskState !== 'available') return; // Only show wanted/available
       
-      // Find matching template rows by parsing the task key
+      // Parse the task key
       const keyParts = taskKey.split('__');
       const groupKey = keyParts[0]; // e.g., "template_123_group_456"
-      const shiftIndex = keyParts[1] ? parseInt(keyParts[1]) : null;
+      const shiftIndex = keyParts.length > 1 ? parseInt(keyParts[1]) : null;
 
-      // Find template rows matching this group
-      const [templateId, , groupId] = groupKey.split('_').filter(p => p);
+      // Extract template_id and group_id from the key
+      // Key format: "template_id_group_id" or with shift index "template_id_group_id__index"
+      const groupParts = groupKey.split('_');
       
-      const matchingRows = templateRows.filter(r => 
-        r.template_id === templateId && 
-        r.group_id === groupId &&
-        (!date || r.date === targetDate)
-      );
+      // Find where "group" starts in the array
+      const groupIndex = groupParts.indexOf('group');
+      if (groupIndex === -1) return; // Invalid key format
+      
+      const templateId = groupParts.slice(0, groupIndex).join('_');
+      const groupId = groupParts.slice(groupIndex + 1).join('_');
+      
+      const matchingRows = templateRows.filter(r => {
+        const rowKey = `${r.template_id}_${r.group_id || 'default'}`;
+        const matches = rowKey === groupKey && (!date || r.date === targetDate);
+        return matches;
+      });
 
       matchingRows.forEach((row, idx) => {
         // If shiftIndex is specified, only include that specific shift
