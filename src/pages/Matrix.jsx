@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import BriefingBar from "../components/matrix/BriefingBar";
 
 // Timeline: 00:00 → 24:00 (right to left in RTL)
 const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
@@ -449,7 +450,12 @@ export default function Matrix() {
     
     let emailBody = `שלום ${selectedWorkerForNotification.nickname},\n\n`;
     
-    const getBriefingTime = (startTime) => {
+    const getBriefingTime = (shift) => {
+      // Use briefing_time from template if available
+      if (shift && shift.briefing_time) return shift.briefing_time;
+      
+      // Fallback: calculate 15 minutes before start
+      const startTime = shift?.start_time || shift;
       const [hours, minutes] = startTime.split(':').map(Number);
       const briefingMinutes = hours * 60 + minutes - 15;
       const briefingHours = Math.floor(briefingMinutes / 60);
