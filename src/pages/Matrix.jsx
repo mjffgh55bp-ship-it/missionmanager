@@ -251,8 +251,24 @@ export default function Matrix() {
 
     rowsToCheck.forEach(row => {
       if (!row.values) return;
-      // Check if this worker is assigned to any worker column in this row
-      const isAssigned = Object.values(row.values).some(val => val === workerId);
+      
+      // Check if this is a continuation row
+      const isContinuation = row.values.is_continuation;
+      const sourceRowId = row.values.continuation_source_row_id;
+      
+      let isAssigned = false;
+      
+      if (isContinuation && sourceRowId) {
+        // For continuation rows, check if worker is assigned in the source row
+        const sourceRow = templateRows.find(r => r.id === sourceRowId);
+        if (sourceRow && sourceRow.values) {
+          isAssigned = Object.values(sourceRow.values).some(val => val === workerId);
+        }
+      } else {
+        // For regular rows, check if worker is assigned directly
+        isAssigned = Object.values(row.values).some(val => val === workerId);
+      }
+      
       if (!isAssigned) return;
 
       // Find the template to get worker-type columns
