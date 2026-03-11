@@ -281,10 +281,6 @@ export default function Matrix() {
 
   // Get extra task registrations for a worker
   const getWorkerExtraTaskShifts = (workerId, date = null) => {
-    const [openRegSettings] = React.useMemo(() => {
-      return [availabilities];
-    }, [availabilities]);
-    
     const targetDate = date || dateString;
     const shifts = [];
 
