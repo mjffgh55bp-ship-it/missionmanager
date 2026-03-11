@@ -467,7 +467,7 @@ export default function Matrix() {
       const standby = isStandbyStatus(a.status);
       const label = standby ? `כוننות (${a.status})` : a.food_cart_name;
       const duration = standby ? a.status : (a.hours ? `${a.hours}h` : '');
-      const briefingTime = getBriefingTime(a.start_time);
+      const briefingTime = a.briefing_time || getBriefingTime(a);
       const statusText = a.status ? ` [${a.status}]` : '';
       return `${prefix}${label}${statusText}: תדריך ${briefingTime}, משמרת ${a.start_time} - ${a.end_time}${duration && !standby ? ` (${duration})` : ''}\n`;
     };
