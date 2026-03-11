@@ -298,6 +298,7 @@ export default function Matrix() {
 
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
+      const briefingTime = row.values?.["תדריך"];
 
       if (startTime && endTime) {
         shifts.push({
@@ -305,6 +306,7 @@ export default function Matrix() {
           date: row.date,
           start_time: startTime,
           end_time: endTime,
+          briefing_time: briefingTime,
           food_cart_name: template.name || row.template_name,
           hours: null,
           status: row.values?.status || null,
@@ -497,7 +499,7 @@ export default function Matrix() {
         emailBody += "אין משמרות מתוכננות ליום זה.\n\n";
       } else {
         allShifts.forEach((a, i) => {
-          const briefingTime = getBriefingTime(a.start_time);
+          const briefingTime = getBriefingTime(a);
           const standby = isStandbyStatus(a.status);
           const statusText = a.status ? ` [${a.status}]` : '';
           emailBody += `משמרת ${i + 1}: ${standby ? `כוננות (${a.status})` : a.food_cart_name}${statusText}\n  תדריך: ${briefingTime}\n  משמרת: ${a.start_time} - ${a.end_time}${a.hours && !standby ? ` (${a.hours}h)` : ''}\n\n`;
@@ -512,7 +514,7 @@ export default function Matrix() {
       
       icsEvents.forEach((evt, idx) => {
         const { shift, date } = evt;
-        const briefingTime = getBriefingTime(shift.start_time);
+        const briefingTime = getBriefingTime(shift);
         const startDateTime = `${date.replace(/-/g, '')}T${briefingTime.replace(':', '')}00`;
         const endDateTime = `${date.replace(/-/g, '')}T${shift.end_time.replace(':', '')}00`;
         const standby = isStandbyStatus(shift.status);
