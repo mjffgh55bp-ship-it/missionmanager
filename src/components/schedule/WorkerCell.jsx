@@ -72,6 +72,16 @@ export default function WorkerCell({
     if (onSaved) onSaved(null);
   };
 
+  const getWorkerCategory = (workerId) => {
+    if (!rowStartTime || !rowEndTime) return 'no-info';
+    const isUnavail = isWorkerUnavailable(workerId, rowStartTime, rowEndTime);
+    if (isUnavail) return 'unavailable';
+    const availInfo = getWorkerAvailabilityPriority(workerId, rowStartTime, rowEndTime);
+    if (availInfo?.type === 'wanted') return 'wanted';
+    if (availInfo?.type === 'available') return 'available';
+    return 'no-info';
+  };
+
   const filteredWorkers = workers
     .filter(w => w.active)
     .filter(w => {
@@ -83,16 +93,13 @@ export default function WorkerCell({
     })
     .sort((a, b) => {
       if (!rowStartTime || !rowEndTime) return 0;
+      const aCat = getWorkerCategory(a.id);
+      const bCat = getWorkerCategory(b.id);
+      const order = { wanted: 0, available: 1, 'no-info': 2, unavailable: 3 };
+      if (order[aCat] !== order[bCat]) return order[aCat] - order[bCat];
+      // Within same category, sort by priority
       const aAvail = getWorkerAvailabilityPriority(a.id, rowStartTime, rowEndTime);
       const bAvail = getWorkerAvailabilityPriority(b.id, rowStartTime, rowEndTime);
-      const aUnavail = isWorkerUnavailable(a.id, rowStartTime, rowEndTime);
-      const bUnavail = isWorkerUnavailable(b.id, rowStartTime, rowEndTime);
-      if (aUnavail && !bUnavail) return 1;
-      if (!aUnavail && bUnavail) return -1;
-      if (aAvail?.type === 'wanted' && bAvail?.type !== 'wanted') return -1;
-      if (aAvail?.type !== 'wanted' && bAvail?.type === 'wanted') return 1;
-      if (aAvail?.type === 'available' && !bAvail?.type) return -1;
-      if (!aAvail?.type && bAvail?.type === 'available') return 1;
       if (aAvail?.priority && bAvail?.priority) return aAvail.priority - bAvail.priority;
       return 0;
     });
@@ -154,37 +161,37 @@ export default function WorkerCell({
             <div className="text-center text-gray-400 text-xs py-4">לא נמצאו עובדים</div>
           ) : (
             filteredWorkers.map((worker) => {
+              const category = getWorkerCategory(worker.id);
               const availInfo = rowStartTime && rowEndTime
                 ? getWorkerAvailabilityPriority(worker.id, rowStartTime, rowEndTime)
                 : null;
-              const isUnavailable = rowStartTime && rowEndTime
-                ? isWorkerUnavailable(worker.id, rowStartTime, rowEndTime)
-                : false;
               const isSelected = worker.id === currentValue;
+
+              const bgClass = isSelected
+                ? "bg-blue-100 text-blue-800"
+                : category === 'wanted'
+                ? "bg-green-100 hover:bg-green-200 text-green-900"
+                : category === 'available'
+                ? "bg-blue-100 hover:bg-blue-200 text-blue-900"
+                : category === 'no-info'
+                ? "bg-orange-100 hover:bg-orange-200 text-orange-900"
+                : "bg-red-100 hover:bg-red-200 text-red-900";
 
               return (
                 <button
                   key={worker.id}
                   onClick={() => handleWorkerSelect(worker.id)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
-                    isSelected
-                      ? "bg-blue-100 text-blue-800"
-                      : isUnavailable
-                      ? "bg-red-50 hover:bg-red-100"
-                      : availInfo?.type === "wanted"
-                      ? "bg-green-50 hover:bg-green-100"
-                      : "hover:bg-gray-100"
-                  }`}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${bgClass}`}
                   dir="rtl"
                 >
                   {/* Availability indicator */}
                   <span className="flex-shrink-0">
-                    {isUnavailable
-                      ? <AlertTriangle className="w-3 h-3 text-red-500" />
-                      : availInfo?.type === "wanted"
-                      ? <Star className="w-3 h-3 text-green-600 fill-green-600" />
-                      : availInfo?.type === "available"
-                      ? <Check className="w-3 h-3 text-blue-500" />
+                    {category === 'unavailable'
+                      ? <AlertTriangle className="w-3 h-3 text-red-700" />
+                      : category === 'wanted'
+                      ? <Star className="w-3 h-3 text-green-700 fill-green-700" />
+                      : category === 'available'
+                      ? <Check className="w-3 h-3 text-blue-700" />
                       : <span className="w-3 h-3 inline-block" />
                     }
                   </span>
