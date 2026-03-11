@@ -78,7 +78,7 @@ export default function WorkerCell({
       const matchesSearch = !searchQuery ||
         w.nickname?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         w.role?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesRole = !roleFilter || w.role === roleFilter;
+      const matchesRole = !roleFilter || roleFilter === "__all__" || w.role === roleFilter;
       return matchesSearch && matchesRole;
     })
     .sort((a, b) => {
