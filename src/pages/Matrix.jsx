@@ -1513,21 +1513,21 @@ export default function Matrix() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle className="text-right" dir="rtl">{editingShift ? 'עריכת' : 'הוספת'} חלון זמינות - {selectedWorkerForManual?.nickname}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-center block mb-2" dir="rtl">שעת התחלה (HH:MM)</Label>
-                  <Input 
-                    type="time" 
-                    value={manualShiftData.start_time} 
-                    onChange={(e) => setManualShiftData({ ...manualShiftData, start_time: e.target.value })}
-                  />
-                </div>
+              <div className="grid grid-cols-2 gap-4" dir="rtl">
                 <div>
                   <Label className="text-center block mb-2" dir="rtl">שעת סיום (HH:MM)</Label>
                   <Input 
                     type="time" 
                     value={manualShiftData.end_time} 
                     onChange={(e) => setManualShiftData({ ...manualShiftData, end_time: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-center block mb-2" dir="rtl">שעת התחלה (HH:MM)</Label>
+                  <Input 
+                    type="time" 
+                    value={manualShiftData.start_time} 
+                    onChange={(e) => setManualShiftData({ ...manualShiftData, start_time: e.target.value })}
                   />
                 </div>
               </div>
