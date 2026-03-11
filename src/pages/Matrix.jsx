@@ -1061,12 +1061,35 @@ export default function Matrix() {
   };
 
   const WeeklySummary = ({ worker }) => {
-    const summary = getWorkerWeeklySummary(worker.id);
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const days = [];
+    
+    for (let i = 0; i < 7; i++) {
+      const d = format(addDays(weekStart, i), "yyyy-MM-dd");
+      
+      // Check if worker has any assignment or template shift on this calendar day
+      const hasAssignment = assignments.some(a => 
+        (a.chef_id === worker.id || a.sous_chef_id === worker.id || a.additional_chef_id === worker.id) && 
+        a.date === d
+      );
+      
+      const hasTemplateShift = templateRows.some(row => {
+        if (row.date !== d || !row.values) return false;
+        return Object.values(row.values).some(val => val === worker.id);
+      });
+      
+      days.push({ 
+        date: d, 
+        day: DAYS_OF_WEEK[i], 
+        working: hasAssignment || hasTemplateShift 
+      });
+    }
+    
     return (
       <div className="flex gap-1 ml-2">
-        {summary.map((d, i) => (
+        {days.map((d, i) => (
           <div key={i} className={`w-5 h-5 rounded text-[8px] flex items-center justify-center font-medium ${d.working ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`} title={`${d.day}: ${d.working ? 'עובד' : 'חופש'}`}>
-            {d.day.charAt(0)}
+            {d.day}
           </div>
         ))}
       </div>
