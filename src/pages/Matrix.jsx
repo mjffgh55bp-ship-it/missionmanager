@@ -1564,7 +1564,11 @@ export default function Matrix() {
                        {allDayShifts.length === 0 ? (
                          <p className="text-xs text-gray-500 ml-2">אין משמרות</p>
                        ) : allDayShifts.map((a, idx) => (
-                         <div key={idx} className="text-xs bg-white p-1 rounded border ml-2 mt-1">{a.food_cart_name}: {a.start_time}-{a.end_time}</div>
+                         <div key={idx} className="text-xs bg-white p-1 rounded border ml-2 mt-1">
+                           <div className="font-semibold">{a.food_cart_name}</div>
+                           <div className="text-gray-600">{a.start_time} - {a.end_time}</div>
+                           {a.status && <div className="text-blue-600 font-medium">{a.status}</div>}
+                         </div>
                        ))}
                      </div>
                     );
@@ -1578,7 +1582,8 @@ export default function Matrix() {
                   return allShifts.length > 0 ? allShifts.map((a, idx) => (
                     <div key={idx} className="text-xs bg-white p-2 rounded border mb-1">
                       <p className="font-semibold">{a.food_cart_name}</p>
-                      <p>{a.start_time} - {a.end_time} {a.hours ? `(${a.hours}h)` : ''}</p>
+                      <p className="text-gray-600">{a.start_time} - {a.end_time} {a.hours ? `(${a.hours}h)` : ''}</p>
+                      {a.status && <p className="text-blue-600 font-medium">סטטוס: {a.status}</p>}
                     </div>
                   )) : <p className="text-sm text-gray-600">אין משמרות מתוכננות</p>;
                 })() : (
