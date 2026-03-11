@@ -1543,7 +1543,7 @@ export default function Matrix() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle dir="rtl">שלח לוח זמנים {viewMode === "weekly" ? "שבועי" : "יומי"} - {selectedWorkerForNotification?.nickname}</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-h-60 overflow-y-auto">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-h-60 overflow-y-auto" dir="rtl">
                 <p className="text-sm font-semibold mb-2">
                   {viewMode === "weekly" ? `משמרות לשבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "d.M.yyyy")}:` : `משמרות ל-${format(currentDate, "d.M.yyyy")}:`}
                 </p>
@@ -1556,20 +1556,30 @@ export default function Matrix() {
                     const dayExtraTaskShifts = getWorkerExtraTaskShifts(selectedWorkerForNotification.id, dStr);
                     const allDayShifts = [...dayAssignments, ...dayTemplateShifts, ...dayExtraTaskShifts];
                     return (
-                     <div key={i} className="mb-2">
-                       <p className="text-xs font-semibold">{(() => {
-                         const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-                         return `${hebrewDays[d.getDay()]}, ${format(d, "d.M")}`;
-                       })()}</p>
-                       {allDayShifts.length === 0 ? (
-                         <p className="text-xs text-gray-500 ml-2">אין משמרות</p>
-                       ) : allDayShifts.map((a, idx) => (
-                         <div key={idx} className="text-xs bg-white p-1 rounded border ml-2 mt-1">
-                           <div className="font-semibold">{a.food_cart_name}</div>
-                           <div className="text-gray-600">{a.start_time} - {a.end_time}</div>
-                           {a.status && <div className="text-blue-600 font-medium">{a.status}</div>}
-                         </div>
-                       ))}
+                     <div key={i} className="mb-2" dir="rtl">
+                      <p className="text-xs font-semibold">{(() => {
+                        const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+                        return `${hebrewDays[d.getDay()]}, ${format(d, "d.M")}`;
+                      })()}</p>
+                      {allDayShifts.length === 0 ? (
+                        <p className="text-xs text-gray-500 mr-2">אין משמרות</p>
+                       ) : allDayShifts.map((a, idx) => {
+                         const briefingTime = a.briefing_time || (() => {
+                           const [hours, minutes] = a.start_time.split(':').map(Number);
+                           const briefingMinutes = hours * 60 + minutes - 15;
+                           const briefingHours = Math.floor(briefingMinutes / 60);
+                           const briefingMins = briefingMinutes % 60;
+                           return `${String(briefingHours).padStart(2, '0')}:${String(briefingMins).padStart(2, '0')}`;
+                         })();
+                         return (
+                           <div key={idx} className="text-xs bg-white p-1 rounded border ml-2 mt-1" dir="rtl">
+                             <div className="font-semibold">{a.food_cart_name}</div>
+                             <div className="text-amber-600">תדריך: {briefingTime}</div>
+                             <div className="text-gray-600">משמרת: {a.start_time} - {a.end_time}</div>
+                             {a.status && <div className="text-blue-600 font-medium">סטטוס: {a.status}</div>}
+                           </div>
+                         );
+                       })}
                      </div>
                     );
                   })
@@ -1579,13 +1589,23 @@ export default function Matrix() {
                     ...getWorkerTemplateShifts(selectedWorkerForNotification.id),
                     ...getWorkerExtraTaskShifts(selectedWorkerForNotification.id)
                   ];
-                  return allShifts.length > 0 ? allShifts.map((a, idx) => (
-                    <div key={idx} className="text-xs bg-white p-2 rounded border mb-1">
-                      <p className="font-semibold">{a.food_cart_name}</p>
-                      <p className="text-gray-600">{a.start_time} - {a.end_time} {a.hours ? `(${a.hours}h)` : ''}</p>
-                      {a.status && <p className="text-blue-600 font-medium">סטטוס: {a.status}</p>}
-                    </div>
-                  )) : <p className="text-sm text-gray-600">אין משמרות מתוכננות</p>;
+                  return allShifts.length > 0 ? allShifts.map((a, idx) => {
+                    const briefingTime = a.briefing_time || (() => {
+                      const [hours, minutes] = a.start_time.split(':').map(Number);
+                      const briefingMinutes = hours * 60 + minutes - 15;
+                      const briefingHours = Math.floor(briefingMinutes / 60);
+                      const briefingMins = briefingMinutes % 60;
+                      return `${String(briefingHours).padStart(2, '0')}:${String(briefingMins).padStart(2, '0')}`;
+                    })();
+                    return (
+                      <div key={idx} className="text-xs bg-white p-2 rounded border mb-1" dir="rtl">
+                        <p className="font-semibold">{a.food_cart_name}</p>
+                        <p className="text-amber-600">תדריך: {briefingTime}</p>
+                        <p className="text-gray-600">משמרת: {a.start_time} - {a.end_time} {a.hours ? `(${a.hours}h)` : ''}</p>
+                        {a.status && <p className="text-blue-600 font-medium">סטטוס: {a.status}</p>}
+                      </div>
+                    );
+                  }) : <p className="text-sm text-gray-600" dir="rtl">אין משמרות מתוכננות</p>;
                 })() : (
                   <p className="text-sm text-gray-600">אין משמרות מתוכננות</p>
                 )}
