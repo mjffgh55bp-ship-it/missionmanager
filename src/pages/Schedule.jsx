@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { format, addDays, subDays, startOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Save, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Download } from "lucide-react";
 import toast from 'react-hot-toast';
 
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
@@ -48,8 +48,7 @@ export default function Schedule() {
   const [newTemplateColumnName, setNewTemplateColumnName] = useState("");
   const [newTemplateColumnType, setNewTemplateColumnType] = useState("text");
   const [newTemplateColumnRole, setNewTemplateColumnRole] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState(null);
+
   const [customColumnOrders, setCustomColumnOrders] = useState({});
   const [dailyCustomColumns, setDailyCustomColumns] = useState({});
   const [shiftStatuses, setShiftStatuses] = useState([]);
@@ -60,18 +59,7 @@ export default function Schedule() {
 
   useEffect(() => {loadData();}, [currentDate]);
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      await loadData();
-      setLastSaved(new Date());
-      toast.success('הלוח נשמר בהצלחה!');
-    } catch (error) {
-      toast.error('שגיאה בשמירת הלוח');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+
 
   const loadData = async () => {
     setLoading(true);
@@ -297,14 +285,23 @@ export default function Schedule() {
   const handleDeleteTemplateRow = async (rowId) => {
     if (confirm("האם למחוק שורה זו?")) {
       await base44.entities.TemplateRow.delete(rowId);
-      loadData();
+      const updatedRows = templateRows.filter(r => r.id !== rowId);
+      setTemplateRows(updatedRows);
     }
   };
 
   const saveMokedName = async (templateId, name) => {
     if (name.trim()) {
       await base44.entities.Template.update(templateId, { name });
-      loadData();
+      setTemplateRows(prev => prev.map(r => 
+        r.template_id === templateId ? { ...r, template_name: name } : r
+      ));
+      setAllTemplates(prev => prev.map(t => 
+        t.id === templateId ? { ...t, name } : t
+      ));
+      setTemplates(prev => prev.map(t => 
+        t.id === templateId ? { ...t, name } : t
+      ));
     }
     setEditingMokedName(null);
     setEditingMokedNameValue("");
@@ -341,21 +338,6 @@ export default function Schedule() {
                     <Pencil className="w-4 h-4 ml-2" />
                     {editMode ? 'יציאה ממצב עריכה' : 'מצב עריכה'}
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => handleSave()}
-                    disabled={isSaving}
-                    className="gap-2"
-                    dir="rtl">
-
-                    <Save className="w-4 h-4" />
-                    {isSaving ? 'שומר...' : 'שמור לוח'}
-                  </Button>
-                  {lastSaved &&
-                  <span className="text-xs text-gray-500" dir="rtl">
-                      נשמר לאחרונה: {format(lastSaved, 'HH:mm')}
-                    </span>
-                  }
                   {editMode &&
                   <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowPresetsDialog(true)} dir="rtl">
                       <Plus className="w-4 h-4 ml-2" />
