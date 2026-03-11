@@ -204,6 +204,25 @@ export default function Matrix() {
       filteredTemplateRows = templateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
     }
     
+    // For continuation rows in daily mode, also fetch their source rows
+    if (viewMode === "daily") {
+      const continuationRows = filteredTemplateRows.filter(r => r.values?.is_continuation && r.values?.continuation_source_row_id);
+      const sourceRowIds = continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean);
+      const uniqueSourceIds = [...new Set(sourceRowIds)];
+      
+      if (uniqueSourceIds.length > 0) {
+        // Fetch source rows that aren't already in the list
+        const missingSourceIds = uniqueSourceIds.filter(id => !filteredTemplateRows.some(r => r.id === id));
+        if (missingSourceIds.length > 0) {
+          const sourceRows = await Promise.all(
+            missingSourceIds.map(id => base44.entities.TemplateRow.get(id).catch(() => null))
+          );
+          // Add source rows to the list (they won't be displayed but will be available for lookup)
+          filteredTemplateRows = [...filteredTemplateRows, ...sourceRows.filter(Boolean)];
+        }
+      }
+    }
+    
     setAssignments(filteredAssignments);
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
@@ -249,7 +268,7 @@ export default function Matrix() {
       ? templateRows.filter(r => r.date === targetDate)
       : templateRows.filter(r => !date || r.date === targetDate);
 
-    rowsToCheck.forEach(async row => {
+    rowsToCheck.forEach(row => {
       if (!row.values) return;
       
       // Check if this is a continuation row
@@ -259,16 +278,9 @@ export default function Matrix() {
       let isAssigned = false;
       
       if (isContinuation && sourceRowId) {
-        // For continuation rows, need to fetch the source row from DB if not in current templateRows
-        let sourceRow = templateRows.find(r => r.id === sourceRowId);
-        if (!sourceRow) {
-          // Source row is from a different date, fetch it
-          try {
-            sourceRow = await base44.entities.TemplateRow.get(sourceRowId);
-          } catch (e) {
-            console.error('Failed to fetch source row:', e);
-          }
-        }
+        // For continuation rows, check if worker is assigned in the source row
+        // Source row should now be in templateRows (loaded in loadDynamicData)
+        const sourceRow = templateRows.find(r => r.id === sourceRowId);
         if (sourceRow && sourceRow.values) {
           isAssigned = Object.values(sourceRow.values).some(val => val === workerId);
         }
