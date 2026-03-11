@@ -249,7 +249,7 @@ export default function Matrix() {
       ? templateRows.filter(r => r.date === targetDate)
       : templateRows.filter(r => !date || r.date === targetDate);
 
-    rowsToCheck.forEach(row => {
+    rowsToCheck.forEach(async row => {
       if (!row.values) return;
       
       // Check if this is a continuation row
@@ -259,8 +259,16 @@ export default function Matrix() {
       let isAssigned = false;
       
       if (isContinuation && sourceRowId) {
-        // For continuation rows, check if worker is assigned in the source row
-        const sourceRow = templateRows.find(r => r.id === sourceRowId);
+        // For continuation rows, need to fetch the source row from DB if not in current templateRows
+        let sourceRow = templateRows.find(r => r.id === sourceRowId);
+        if (!sourceRow) {
+          // Source row is from a different date, fetch it
+          try {
+            sourceRow = await base44.entities.TemplateRow.get(sourceRowId);
+          } catch (e) {
+            console.error('Failed to fetch source row:', e);
+          }
+        }
         if (sourceRow && sourceRow.values) {
           isAssigned = Object.values(sourceRow.values).some(val => val === workerId);
         }
