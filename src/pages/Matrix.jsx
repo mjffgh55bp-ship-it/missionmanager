@@ -1321,7 +1321,7 @@ export default function Matrix() {
                     .map((worker, index) => {
                     const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
                     const workerAssignments = getWorkerAssignments(worker.id);
-                    const workerTemplateShifts = getWorkerTemplateShifts(worker.id);
+                    const workerTemplateShifts = getWorkerTemplateShifts(worker.id, viewMode === 'daily' ? dateString : null);
                     const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
                     const summary = viewMode === 'weekly' ? calculateWorkerSummary(worker.id) : null;
