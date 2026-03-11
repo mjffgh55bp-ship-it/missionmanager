@@ -82,6 +82,8 @@ export default function Availability() {
   const [desiredShiftsCount, setDesiredShiftsCount] = useState("");
   const [openRegistrations, setOpenRegistrations] = useState([]);
   const [extraTaskStates, setExtraTaskStates] = useState({});
+  const [templateRows, setTemplateRows] = useState([]);
+  const [allTemplates, setAllTemplates] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -122,7 +124,7 @@ export default function Availability() {
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
-      const [availabilities, unavailabilitiesData, assignmentsData] = await Promise.all([
+      const [availabilities, unavailabilitiesData, assignmentsData, templateRowsData, templatesData] = await Promise.all([
       base44.entities.Availability.filter({
         worker_id: worker.id,
         week_start_date: weekStartStr
@@ -130,8 +132,10 @@ export default function Availability() {
       base44.entities.Unavailability.filter({
         worker_id: worker.id
       }),
-      base44.entities.Assignment.list("-date")]
-      );
+      base44.entities.Assignment.list("-date"),
+      base44.entities.TemplateRow.list(),
+      base44.entities.Template.filter({ active: true })
+      ]);
 
       if (availabilities.length > 0) {
         setExistingAvailability(availabilities[0]);
@@ -157,6 +161,8 @@ export default function Availability() {
       a.additional_chef_id === worker.id
       );
       setAssignments(workerAssignments);
+      setTemplateRows(templateRowsData);
+      setAllTemplates(templatesData);
     }
   };
 
@@ -413,6 +419,44 @@ END:VEVENT
 `;
         }
       });
+      
+      // Add assigned shifts from assignments and template rows
+      [...assignments, ...templateRows.filter(row => {
+        if (!row.values) return false;
+        return Object.values(row.values).some(val => val === currentWorker.id);
+      })].forEach((shift) => {
+        const dateStr = shift.date.replace(/-/g, '');
+        let startTime, endTime, briefingTime, title;
+        
+        if (shift.isTemplateShift || shift.template_id) {
+          // Template shift
+          startTime = shift.values?.["התחלה"] || shift.values?.["שעת התחלה"];
+          endTime = shift.values?.["סיום"] || shift.values?.["שעת סיום"];
+          briefingTime = shift.values?.["תדריך"];
+          const template = allTemplates.find(t => t.id === shift.template_id);
+          title = template?.name || shift.template_name || 'משמרת';
+        } else {
+          // Regular assignment
+          startTime = shift.start_time;
+          endTime = shift.end_time;
+          title = shift.food_cart_name;
+        }
+        
+        if (!startTime || !endTime) return;
+        
+        // Use briefing time if available, otherwise use shift start time
+        const eventStartTime = briefingTime || startTime;
+        const startTimeStr = eventStartTime.replace(/:/g, '');
+        const endTimeStr = endTime.replace(/:/g, '');
+        
+        icsContent += `BEGIN:VEVENT
+DTSTART:${dateStr}T${startTimeStr}00
+DTEND:${dateStr}T${endTimeStr}00
+SUMMARY:${title}
+DESCRIPTION:${briefingTime ? `תדריך: ${briefingTime}\\nמשמרת: ${startTime} - ${endTime}` : `משמרת: ${startTime} - ${endTime}`}
+END:VEVENT
+`;
+      });
     }
 
     icsContent += `END:VCALENDAR`;
@@ -502,7 +546,37 @@ END:VEVENT
 
   const getAssignmentForDate = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    return assignments.filter((a) => a.date === dateStr);
+    const regularAssignments = assignments.filter((a) => a.date === dateStr);
+    
+    // Get template shifts for this worker on this date
+    if (!currentWorker) return regularAssignments;
+    
+    const templateShifts = templateRows.filter(row => {
+      if (row.date !== dateStr || !row.values) return false;
+      
+      // Check if worker is assigned in this row
+      const isAssigned = Object.values(row.values).some(val => val === currentWorker.id);
+      if (!isAssigned) return false;
+      
+      const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
+      const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
+      return startTime && endTime;
+    }).map(row => {
+      const template = allTemplates.find(t => t.id === row.template_id);
+      const briefingTime = row.values?.["תדריך"];
+      return {
+        id: `template_${row.id}`,
+        date: row.date,
+        start_time: row.values?.["התחלה"] || row.values?.["שעת התחלה"],
+        end_time: row.values?.["סיום"] || row.values?.["שעת סיום"],
+        briefing_time: briefingTime,
+        food_cart_name: template?.name || row.template_name || 'משמרת',
+        hours: null,
+        isTemplateShift: true
+      };
+    });
+    
+    return [...regularAssignments, ...templateShifts];
   };
 
   const handleDateClick = (day) => {
@@ -918,9 +992,14 @@ END:VEVENT
                         {workerYearlyEvents.slice(0, 1).map((e, i) =>
                       <div key={i} className="bg-green-100 text-green-700 rounded px-1 truncate mt-1" title={e.title}>{e.title}</div>
                       )}
-                        {dayAssignments.slice(0, 1).map((a, i) =>
-                      <div key={i} className="bg-blue-100 text-blue-700 rounded px-1 truncate mt-1">{a.start_time.slice(0, 5)}</div>
-                      )}
+                        {dayAssignments.slice(0, 1).map((a, i) => {
+                        const displayTime = a.briefing_time || a.start_time;
+                        return (
+                          <div key={i} className="bg-blue-100 text-blue-700 rounded px-1 truncate mt-1" title={a.briefing_time ? `תדריך: ${a.briefing_time}` : ''}>
+                            {displayTime.slice(0, 5)}
+                          </div>
+                        );
+                      })}
                         {dayAssignments.length + workerYearlyEvents.length > 1 && <div className="text-gray-500">+{dayAssignments.length + workerYearlyEvents.length - 1}</div>}
                       </button>);
 
@@ -1133,7 +1212,8 @@ END:VEVENT
                 getAssignmentForDate(selectedDate).map((a, i) =>
                 <div key={i} className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-2">
                         <p className="font-medium" dir="rtl">{a.food_cart_name}</p>
-                        <p className="text-sm text-gray-600">{a.start_time} - {a.end_time} ({a.hours}h)</p>
+                        {a.briefing_time && <p className="text-sm text-amber-600" dir="rtl">תדריך: {a.briefing_time}</p>}
+                        <p className="text-sm text-gray-600">{a.start_time} - {a.end_time} {a.hours ? `(${a.hours}h)` : ''}</p>
                         {a.menu && <p className="text-sm text-amber-700" dir="rtl">תפריט: {a.menu}</p>}
                       </div>
                 )
