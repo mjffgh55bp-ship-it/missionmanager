@@ -274,12 +274,17 @@ export default function Matrix() {
       
       let isAssigned = false;
       let shouldInclude = false;
+      let briefingTime = row.values?.["תדריך"];
       
       if (isContinuation && sourceRowId) {
         // For continuation rows, check if worker is assigned in the source row
         const sourceRow = templateRows.find(r => r.id === sourceRowId);
         if (sourceRow && sourceRow.values) {
           isAssigned = Object.values(sourceRow.values).some(val => val === workerId);
+          // Get briefing time from source row if not in continuation
+          if (!briefingTime) {
+            briefingTime = sourceRow.values?.["תדריך"];
+          }
         }
         // Include if this continuation row is for the target date
         shouldInclude = row.date === targetDate;
@@ -298,7 +303,6 @@ export default function Matrix() {
 
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
-      const briefingTime = row.values?.["תדריך"];
 
       if (startTime && endTime) {
         shifts.push({
@@ -1485,7 +1489,22 @@ export default function Matrix() {
                             {availabilityShifts.map((shift, idx) => (<AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />))}
                             {workerUnavailabilities.map(unavail => (<UnavailabilityBar key={unavail.id} unavail={unavail} />))}
                             {workerAssignments.map(ass => <AssignmentBar key={ass.id} assignment={ass} />)}
-                            {workerTemplateShifts.map(ts => <AssignmentBar key={ts.id} assignment={ts} />)}
+                            {workerTemplateShifts.map(ts => (
+                              <React.Fragment key={ts.id}>
+                                <AssignmentBar assignment={ts} />
+                                {ts.briefing_time && (
+                                  <BriefingBar 
+                                    briefingTime={ts.briefing_time}
+                                    shiftStartTime={ts.start_time}
+                                    shiftEndTime={ts.end_time}
+                                    dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.date) : 0}
+                                    viewMode={viewMode}
+                                    zoomRange={zoomRange}
+                                    timeToPercentage={timeToPercentage}
+                                  />
+                                )}
+                              </React.Fragment>
+                            ))}
                             {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
                             <DragPreviewBar preview={dragPreview} workerId={worker.id} />
                           </div>

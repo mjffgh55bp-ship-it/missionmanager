@@ -731,6 +731,7 @@ export default function Schedule() {
                 <Select value={newTemplateColumnName} onValueChange={(val) => {setNewTemplateColumnName(val);setNewTemplateColumnType("");setNewTemplateColumnRole("");}}>
                   <SelectTrigger><SelectValue placeholder="בחר מסוגי העמודות..." /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="briefing">תדריך</SelectItem>
                     <SelectItem value="time">זמן התחלה</SelectItem>
                     <SelectItem value="time_end">זמן סיום</SelectItem>
                     {columnTypes.map((t) =>
@@ -773,7 +774,9 @@ export default function Schedule() {
                 onClick={async () => {
                   if (!newTemplateColumnName || !selectedTemplate) return;
                   let columnToAdd;
-                  if (newTemplateColumnName === "time") {
+                  if (newTemplateColumnName === "briefing") {
+                    columnToAdd = { name: "תדריך", type: "time", width: 100 };
+                  } else if (newTemplateColumnName === "time") {
                     columnToAdd = { name: "התחלה", type: "time", width: 100 };
                   } else if (newTemplateColumnName === "time_end") {
                     columnToAdd = { name: "סיום", type: "time", width: 100 };
