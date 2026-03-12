@@ -52,6 +52,12 @@ export default function WorkerCell({
     return overlapShift ? { priority: overlapShift.priority, type: overlapShift.type } : null;
   };
 
+  const getSeniorityColor = (seniority) => {
+    if (seniority === "newbie") return "text-blue-600";
+    if (seniority === "trainee") return "text-orange-600";
+    return "text-gray-900";
+  };
+
   const handleWorkerSelect = async (workerId) => {
     const updatedValues = { ...(currentRowValues || {}), [columnName]: workerId };
     await base44.entities.TemplateRow.update(rowId, { values: updatedValues });
@@ -191,7 +197,7 @@ export default function WorkerCell({
                   </span>
 
                   {/* Name */}
-                  <span className="flex-1 text-right font-medium text-gray-900">
+                  <span className={`flex-1 text-right font-medium ${getSeniorityColor(worker.seniority)}`}>
                     {worker.nickname}
                   </span>
 
