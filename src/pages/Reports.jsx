@@ -414,41 +414,6 @@ export default function Reports() {
 
         <div className="grid lg:grid-cols-2 gap-6 mb-8">
           <Card className="border-none shadow-lg">
-            <CardHeader className="border-b"><CardTitle className="flex items-center gap-2" dir="rtl"><Calculator className="w-5 h-5 text-blue-900" />מחשבון משרה מלאה (ידני)</CardTitle></CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div><Label dir="rtl">שעות מעובדי משרה מלאה</Label><Input type="number" value={fullTimeHours} onChange={(e) => setFullTimeHours(parseFloat(e.target.value) || 0)} dir="rtl" /></div>
-                <div><Label dir="rtl">משמרות מעובדי משרה מלאה</Label><Input type="number" value={fullTimeShifts} onChange={(e) => setFullTimeShifts(parseInt(e.target.value) || 0)} dir="rtl" /></div>
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-sm font-semibold text-gray-900 mb-2" dir="rtl">נדרש משרה חלקית:</p>
-                  <p className="text-2xl font-bold text-blue-900">{Math.max(0, manualPartTimeHours)}h</p>
-                  <p className="text-sm text-gray-600 mt-1" dir="rtl">{Math.max(0, manualPartTimeShifts)} משמרות</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-none shadow-lg">
-            <CardHeader className="border-b"><CardTitle className="flex items-center gap-2" dir="rtl"><Calculator className="w-5 h-5 text-green-600" />מחשבון משרה מלאה (אוטומטי)</CardTitle></CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-sm font-semibold mb-2" dir="rtl">משרה מלאה ({fullTimeWorkerCount}):</p>
-                  <p className="text-2xl font-bold text-green-600">{fullTimeHoursTotal}h</p>
-                  <p className="text-sm text-gray-600 mt-1" dir="rtl">{fullTimeShiftsTotal} משמרות</p>
-                </div>
-                <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <p className="text-sm font-semibold mb-2" dir="rtl">נדרש משרה חלקית:</p>
-                  <p className="text-2xl font-bold text-amber-600">{Math.max(0, partTimeHoursNeeded)}h</p>
-                  <p className="text-sm text-gray-600 mt-1" dir="rtl">{Math.max(0, partTimeShiftsNeeded)} משמרות</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          <Card className="border-none shadow-lg">
             <CardHeader className="border-b"><CardTitle dir="rtl">שעות לפי עובד</CardTitle></CardHeader>
             <CardContent className="pt-6">
               <ResponsiveContainer width="100%" height={300}>
