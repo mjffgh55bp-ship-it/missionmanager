@@ -446,116 +446,118 @@ export default function Matrix() {
   };
 
   const sendWhatsAppNotification = async (worker) => {
-    let message = `שלום ${worker.nickname}!\n\n`;
-    
-    const getBriefingTime = (shift) => {
-      if (shift && shift.briefing_time) return shift.briefing_time;
-      const startTime = shift?.start_time || shift;
-      const [hours, minutes] = startTime.split(':').map(Number);
-      const briefingMinutes = hours * 60 + minutes - 15;
-      const briefingHours = Math.floor(briefingMinutes / 60);
-      const briefingMins = briefingMinutes % 60;
-      return `${String(briefingHours).padStart(2, '0')}:${String(briefingMins).padStart(2, '0')}`;
-    };
-    
-    // Generate ICS calendar events
-    let icsEvents = [];
-    
-    if (viewMode === "weekly") {
-      const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-      message += `הנה לוח המשמרות שלך לשבוע של ${format(weekStart, "d.M.yyyy")}:\n\n`;
+    try {
+      let message = `שלום ${worker.nickname}!\n\n`;
       
-      for (let i = 0; i < 7; i++) {
-        const d = addDays(weekStart, i);
-        const dStr = format(d, "yyyy-MM-dd");
-        const dayAssignments = getWorkerAssignments(worker.id, dStr);
-        const dayTemplateShifts = getWorkerTemplateShifts(worker.id, dStr);
-        const dayExtraTaskShifts = getWorkerExtraTaskShifts(worker.id, dStr);
-        const allDayShifts = [...dayAssignments, ...dayTemplateShifts, ...dayExtraTaskShifts];
-        const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-        message += `*${hebrewDays[d.getDay()]}, ${format(d, "d.M")}:*\n`;
-        if (allDayShifts.length === 0) {
-          message += "  אין משמרות\n";
+      const getBriefingTime = (shift) => {
+        if (shift && shift.briefing_time) return shift.briefing_time;
+        const startTime = shift?.start_time || shift;
+        const [hours, minutes] = startTime.split(':').map(Number);
+        const briefingMinutes = hours * 60 + minutes - 15;
+        const briefingHours = Math.floor(briefingMinutes / 60);
+        const briefingMins = briefingMinutes % 60;
+        return `${String(briefingHours).padStart(2, '0')}:${String(briefingMins).padStart(2, '0')}`;
+      };
+      
+      // Generate ICS calendar events
+      let icsEvents = [];
+      
+      if (viewMode === "weekly") {
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+        message += `הנה לוח המשמרות שלך לשבוע של ${format(weekStart, "d.M.yyyy")}:\n\n`;
+        
+        for (let i = 0; i < 7; i++) {
+          const d = addDays(weekStart, i);
+          const dStr = format(d, "yyyy-MM-dd");
+          const dayAssignments = getWorkerAssignments(worker.id, dStr);
+          const dayTemplateShifts = getWorkerTemplateShifts(worker.id, dStr);
+          const dayExtraTaskShifts = getWorkerExtraTaskShifts(worker.id, dStr);
+          const allDayShifts = [...dayAssignments, ...dayTemplateShifts, ...dayExtraTaskShifts];
+          const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+          message += `*${hebrewDays[d.getDay()]}, ${format(d, "d.M")}:*\n`;
+          if (allDayShifts.length === 0) {
+            message += "  אין משמרות\n";
+          } else {
+            allDayShifts.forEach(a => {
+              const briefingTime = getBriefingTime(a);
+              const standby = isStandbyStatus(a.status);
+              const label = standby ? `כוננות (${a.status})` : a.food_cart_name;
+              const statusText = a.status ? ` [${a.status}]` : '';
+              message += `  ${label}${statusText}: תדריך ${briefingTime}, משמרת ${a.start_time} - ${a.end_time}\n`;
+              icsEvents.push({ shift: a, date: dStr });
+            });
+          }
+          message += "\n";
+        }
+      } else {
+        const workerAssignments = getWorkerAssignments(worker.id);
+        const workerTemplateShifts = getWorkerTemplateShifts(worker.id);
+        const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
+        const allShifts = [...workerAssignments, ...workerTemplateShifts, ...workerExtraTaskShifts];
+        const dStr = format(currentDate, "yyyy-MM-dd");
+        message += `הנה לוח המשמרות שלך ל-${format(currentDate, "d.M.yyyy")}:\n\n`;
+        if (allShifts.length === 0) {
+          message += "אין משמרות מתוכננות ליום זה.\n\n";
         } else {
-          allDayShifts.forEach(a => {
+          allShifts.forEach((a, i) => {
             const briefingTime = getBriefingTime(a);
             const standby = isStandbyStatus(a.status);
-            const label = standby ? `כוננות (${a.status})` : a.food_cart_name;
             const statusText = a.status ? ` [${a.status}]` : '';
-            message += `  ${label}${statusText}: תדריך ${briefingTime}, משמרת ${a.start_time} - ${a.end_time}\n`;
+            message += `*משמרת ${i + 1}:* ${standby ? `כוננות (${a.status})` : a.food_cart_name}${statusText}\n  תדריך: ${briefingTime}\n  משמרת: ${a.start_time} - ${a.end_time}\n\n`;
             icsEvents.push({ shift: a, date: dStr });
           });
         }
-        message += "\n";
       }
-    } else {
-      const workerAssignments = getWorkerAssignments(worker.id);
-      const workerTemplateShifts = getWorkerTemplateShifts(worker.id);
-      const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
-      const allShifts = [...workerAssignments, ...workerTemplateShifts, ...workerExtraTaskShifts];
-      const dStr = format(currentDate, "yyyy-MM-dd");
-      message += `הנה לוח המשמרות שלך ל-${format(currentDate, "d.M.yyyy")}:\n\n`;
-      if (allShifts.length === 0) {
-        message += "אין משמרות מתוכננות ליום זה.\n\n";
-      } else {
-        allShifts.forEach((a, i) => {
-          const briefingTime = getBriefingTime(a);
-          const standby = isStandbyStatus(a.status);
-          const statusText = a.status ? ` [${a.status}]` : '';
-          message += `*משמרת ${i + 1}:* ${standby ? `כוננות (${a.status})` : a.food_cart_name}${statusText}\n  תדריך: ${briefingTime}\n  משמרת: ${a.start_time} - ${a.end_time}\n\n`;
-          icsEvents.push({ shift: a, date: dStr });
-        });
-      }
-    }
-    
-    // Create ICS file content
-    const createICS = () => {
-      let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Kitchen Shifts//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
       
-      icsEvents.forEach((evt, idx) => {
-        const { shift, date } = evt;
-        const briefingTime = getBriefingTime(shift);
-        const startDateTime = `${date.replace(/-/g, '')}T${briefingTime.replace(':', '')}00`;
-        const endDateTime = `${date.replace(/-/g, '')}T${shift.end_time.replace(':', '')}00`;
-        const standby = isStandbyStatus(shift.status);
-        const title = standby ? `כוננות ${shift.status}` : shift.food_cart_name;
-        const statusText = shift.status ? ` - ${shift.status}` : '';
+      // Create and upload ICS file if there are shifts
+      if (icsEvents.length > 0) {
+        // Create ICS file content
+        let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Kitchen Shifts//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
         
-        icsContent += `BEGIN:VEVENT\n`;
-        icsContent += `UID:shift-${idx}-${Date.now()}@kitchen\n`;
-        icsContent += `DTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\n`;
-        icsContent += `DTSTART:${startDateTime}\n`;
-        icsContent += `DTEND:${endDateTime}\n`;
-        icsContent += `SUMMARY:${title}${statusText}\n`;
-        icsContent += `DESCRIPTION:תדריך: ${briefingTime}\\nמשמרת: ${shift.start_time} - ${shift.end_time}\n`;
-        icsContent += `END:VEVENT\n`;
-      });
+        icsEvents.forEach((evt, idx) => {
+          const { shift, date } = evt;
+          const briefingTime = getBriefingTime(shift);
+          const startDateTime = `${date.replace(/-/g, '')}T${briefingTime.replace(':', '')}00`;
+          const endDateTime = `${date.replace(/-/g, '')}T${shift.end_time.replace(':', '')}00`;
+          const standby = isStandbyStatus(shift.status);
+          const title = standby ? `כוננות ${shift.status}` : shift.food_cart_name;
+          const statusText = shift.status ? ` - ${shift.status}` : '';
+          
+          icsContent += `BEGIN:VEVENT\n`;
+          icsContent += `UID:shift-${idx}-${Date.now()}@kitchen\n`;
+          icsContent += `DTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\n`;
+          icsContent += `DTSTART:${startDateTime}\n`;
+          icsContent += `DTEND:${endDateTime}\n`;
+          icsContent += `SUMMARY:${title}${statusText}\n`;
+          icsContent += `DESCRIPTION:תדריך: ${briefingTime}\\nמשמרת: ${shift.start_time} - ${shift.end_time}\n`;
+          icsContent += `END:VEVENT\n`;
+        });
+        
+        icsContent += 'END:VCALENDAR';
+        
+        // Upload ICS file and wait for URL
+        const icsBlob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const icsFile = new File([icsBlob], 'shifts.ics', { type: 'text/calendar' });
+        const uploadResult = await base44.integrations.Core.UploadFile({ file: icsFile });
+        
+        if (uploadResult && uploadResult.file_url) {
+          message += `\n📅 להוספת המשמרות ליומן הדיגיטלי:\n${uploadResult.file_url}\n\n`;
+        }
+      }
       
-      icsContent += 'END:VCALENDAR';
-      return icsContent;
-    };
-    
-    // Upload ICS file
-    let icsUrl = '';
-    if (icsEvents.length > 0) {
-      const icsContent = createICS();
-      const icsBlob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-      const icsFile = new File([icsBlob], 'shifts.ics', { type: 'text/calendar' });
-      const { file_url } = await base44.integrations.Core.UploadFile({ file: icsFile });
-      icsUrl = file_url;
+      message += "בהצלחה! 👨‍🍳";
       
-      message += `\n📅 להוספת המשמרות ליומן הדיגיטלי, לחץ על:\n${icsUrl}\n\n`;
+      const encodedMessage = encodeURIComponent(message);
+      const phoneNumber = worker.phone?.replace(/[^0-9]/g, '');
+      const whatsappUrl = phoneNumber 
+        ? `https://wa.me/972${phoneNumber.startsWith('0') ? phoneNumber.slice(1) : phoneNumber}?text=${encodedMessage}`
+        : `https://wa.me/?text=${encodedMessage}`;
+      
+      window.open(whatsappUrl, '_blank');
+    } catch (error) {
+      console.error('Error sending WhatsApp notification:', error);
+      alert('שגיאה בשליחת ההודעה. אנא נסה שוב.');
     }
-    
-    message += "בהצלחה! 👨‍🍳";
-    
-    const encodedMessage = encodeURIComponent(message);
-    const phoneNumber = worker.phone?.replace(/[^0-9]/g, '');
-    const whatsappUrl = phoneNumber 
-      ? `https://wa.me/972${phoneNumber.startsWith('0') ? phoneNumber.slice(1) : phoneNumber}?text=${encodedMessage}`
-      : `https://wa.me/?text=${encodedMessage}`;
-    
-    window.open(whatsappUrl, '_blank');
   };
 
   const sendNotification = async () => {
