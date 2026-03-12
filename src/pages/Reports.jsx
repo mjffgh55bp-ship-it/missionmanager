@@ -21,7 +21,7 @@ export default function Reports() {
   const [globalParams, setGlobalParams] = useState([]);
   const [cartParams, setCartParams] = useState({});
   const [loading, setLoading] = useState(true);
-  const [categoryNames, setCategoryNames] = useState({ category_1: "Category 1", category_2: "Category 2", category_3: "Category 3" });
+
   const [sortConfig, setSortConfig] = useState({ key: 'totalHours', direction: 'desc' });
   const [fullTimeHours, setFullTimeHours] = useState(0);
   const [fullTimeShifts, setFullTimeShifts] = useState(0);
@@ -30,7 +30,6 @@ export default function Reports() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [workerFilters, setWorkerFilters] = useState({
-    category: '__all__',
     guide: '__all__',
     role: '__all__',
     status: '__all__'
@@ -42,14 +41,13 @@ export default function Reports() {
   }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings, catSettings, shiftStatusesSettings] = await Promise.all([
+    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings, shiftStatusesSettings] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
       base44.entities.FoodCart.list(),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_category_names" }),
       base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
     ]);
     setWorkers(workersData);
@@ -58,7 +56,6 @@ export default function Reports() {
     if (globalSettings.length > 0) setGlobalParams(JSON.parse(globalSettings[0].setting_value) || []);
     if (cartParamsSettings.length > 0) setCartParams(JSON.parse(cartParamsSettings[0].setting_value) || {});
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
-    if (catSettings.length > 0) setCategoryNames(JSON.parse(catSettings[0].setting_value));
     if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     setLoading(false);
   };
@@ -216,7 +213,6 @@ export default function Reports() {
 
   const filteredWorkersForSubTypes = workers.filter(w => {
     if (!w.active) return false;
-    if (workerFilters.category !== '__all__' && w.category !== workerFilters.category) return false;
     if (workerFilters.guide !== '__all__' && (workerFilters.guide === 'yes' ? !w.is_guide : w.is_guide)) return false;
     if (workerFilters.role !== '__all__' && w.role !== workerFilters.role) return false;
     return true;
@@ -343,16 +339,6 @@ export default function Reports() {
               )}
 
               <div className="flex gap-2 mt-3 flex-wrap">
-                <Select value={workerFilters.category} onValueChange={(v) => setWorkerFilters({...workerFilters, category: v})}>
-                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__" dir="rtl">כל הקטגוריות</SelectItem>
-                    <SelectItem value="category_1" dir="rtl">{categoryNames.category_1}</SelectItem>
-                    <SelectItem value="category_2" dir="rtl">{categoryNames.category_2}</SelectItem>
-                    <SelectItem value="category_3" dir="rtl">{categoryNames.category_3}</SelectItem>
-                  </SelectContent>
-                </Select>
-
                 <Select value={workerFilters.guide} onValueChange={(v) => setWorkerFilters({...workerFilters, guide: v})}>
                   <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
