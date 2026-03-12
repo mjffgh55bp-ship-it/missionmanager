@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
-import { ChevronLeft, ChevronRight, ChefHat, Send, Star, Check, Ban, Calendar, CalendarDays, Plus, Trash2, Lock, LockOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChefHat, Send, Star, Check, Ban, Calendar, CalendarDays, Plus, Trash2, Lock, LockOpen, MessageCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -1438,7 +1438,7 @@ export default function Matrix() {
                                 <LockOpen className="w-5 h-5 text-blue-500" />
                               )}
                             </button>
-                            {/* Send button - between lock and worker name */}
+                            {/* Send buttons - between lock and worker name */}
                             {(() => {
                               const sendStatus = getWorkerSendStatus(worker);
                               const btnClass = sendStatus === 'none'
@@ -1447,13 +1447,22 @@ export default function Matrix() {
                                 ? 'text-green-500 hover:text-green-600'
                                 : 'text-gray-900 hover:text-gray-700';
                               return (
-                                <button
-                                  onClick={() => handleSendNotification(worker)}
-                                  className={`rounded p-1 transition-colors hover:bg-gray-100 ${btnClass}`}
-                                  title="שלח לוח משמרות"
-                                >
-                                  <Send className="w-4 h-4" />
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => sendWhatsAppNotification(worker)}
+                                    className="text-green-600 hover:text-green-700 rounded p-1 transition-colors hover:bg-gray-100"
+                                    title="שלח משמרות בוואטסאפ"
+                                  >
+                                    <MessageCircle className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleSendNotification(worker)}
+                                    className={`rounded p-1 transition-colors hover:bg-gray-100 ${btnClass}`}
+                                    title="שלח לוח משמרות באימייל"
+                                  >
+                                    <Send className="w-4 h-4" />
+                                  </button>
+                                </>
                               );
                             })()}
                             <div className="flex items-center">
