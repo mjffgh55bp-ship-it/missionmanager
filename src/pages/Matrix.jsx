@@ -445,6 +445,74 @@ export default function Matrix() {
     return 'needs_update';
   };
 
+  const sendWhatsAppNotification = (worker) => {
+    let message = `שלום ${worker.nickname}!\n\n`;
+    
+    const getBriefingTime = (shift) => {
+      if (shift && shift.briefing_time) return shift.briefing_time;
+      const startTime = shift?.start_time || shift;
+      const [hours, minutes] = startTime.split(':').map(Number);
+      const briefingMinutes = hours * 60 + minutes - 15;
+      const briefingHours = Math.floor(briefingMinutes / 60);
+      const briefingMins = briefingMinutes % 60;
+      return `${String(briefingHours).padStart(2, '0')}:${String(briefingMins).padStart(2, '0')}`;
+    };
+    
+    if (viewMode === "weekly") {
+      const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+      message += `הנה לוח המשמרות שלך לשבוע של ${format(weekStart, "d.M.yyyy")}:\n\n`;
+      
+      for (let i = 0; i < 7; i++) {
+        const d = addDays(weekStart, i);
+        const dStr = format(d, "yyyy-MM-dd");
+        const dayAssignments = getWorkerAssignments(worker.id, dStr);
+        const dayTemplateShifts = getWorkerTemplateShifts(worker.id, dStr);
+        const dayExtraTaskShifts = getWorkerExtraTaskShifts(worker.id, dStr);
+        const allDayShifts = [...dayAssignments, ...dayTemplateShifts, ...dayExtraTaskShifts];
+        const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+        message += `*${hebrewDays[d.getDay()]}, ${format(d, "d.M")}:*\n`;
+        if (allDayShifts.length === 0) {
+          message += "  אין משמרות\n";
+        } else {
+          allDayShifts.forEach(a => {
+            const briefingTime = getBriefingTime(a);
+            const standby = isStandbyStatus(a.status);
+            const label = standby ? `כוננות (${a.status})` : a.food_cart_name;
+            const statusText = a.status ? ` [${a.status}]` : '';
+            message += `  ${label}${statusText}: תדריך ${briefingTime}, משמרת ${a.start_time} - ${a.end_time}\n`;
+          });
+        }
+        message += "\n";
+      }
+    } else {
+      const workerAssignments = getWorkerAssignments(worker.id);
+      const workerTemplateShifts = getWorkerTemplateShifts(worker.id);
+      const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
+      const allShifts = [...workerAssignments, ...workerTemplateShifts, ...workerExtraTaskShifts];
+      message += `הנה לוח המשמרות שלך ל-${format(currentDate, "d.M.yyyy")}:\n\n`;
+      if (allShifts.length === 0) {
+        message += "אין משמרות מתוכננות ליום זה.\n\n";
+      } else {
+        allShifts.forEach((a, i) => {
+          const briefingTime = getBriefingTime(a);
+          const standby = isStandbyStatus(a.status);
+          const statusText = a.status ? ` [${a.status}]` : '';
+          message += `*משמרת ${i + 1}:* ${standby ? `כוננות (${a.status})` : a.food_cart_name}${statusText}\n  תדריך: ${briefingTime}\n  משמרת: ${a.start_time} - ${a.end_time}\n\n`;
+        });
+      }
+    }
+    
+    message += "בהצלחה! 👨‍🍳";
+    
+    const encodedMessage = encodeURIComponent(message);
+    const phoneNumber = worker.phone?.replace(/[^0-9]/g, '');
+    const whatsappUrl = phoneNumber 
+      ? `https://wa.me/972${phoneNumber.startsWith('0') ? phoneNumber.slice(1) : phoneNumber}?text=${encodedMessage}`
+      : `https://wa.me/?text=${encodedMessage}`;
+    
+    window.open(whatsappUrl, '_blank');
+  };
+
   const sendNotification = async () => {
     if (!selectedWorkerForNotification) return;
     
