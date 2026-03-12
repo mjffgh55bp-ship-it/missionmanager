@@ -122,6 +122,7 @@ export default function Matrix() {
   const [allTemplates, setAllTemplates] = useState([]);
   // sentState: { [workerId]: { sentAssignmentIds: string[], sentDate: string } }
   const [sentState, setSentState] = useState({});
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
 
   useEffect(() => { 
     loadStaticData();
@@ -446,6 +447,7 @@ export default function Matrix() {
   };
 
   const sendWhatsAppNotification = async (worker) => {
+    setSendingWhatsApp(true);
     try {
       let message = `שלום ${worker.nickname}!\n\n`;
       
@@ -557,6 +559,8 @@ export default function Matrix() {
     } catch (error) {
       console.error('Error sending WhatsApp notification:', error);
       alert('שגיאה בשליחת ההודעה. אנא נסה שוב.');
+    } finally {
+      setSendingWhatsApp(false);
     }
   };
 
@@ -1565,10 +1569,15 @@ export default function Matrix() {
                                 <>
                                   <button
                                     onClick={() => sendWhatsAppNotification(worker)}
-                                    className="text-green-600 hover:text-green-700 rounded p-1 transition-colors hover:bg-gray-100"
+                                    className="text-green-600 hover:text-green-700 rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50"
                                     title="שלח משמרות בוואטסאפ"
+                                    disabled={sendingWhatsApp}
                                   >
-                                    <MessageCircle className="w-4 h-4" />
+                                    {sendingWhatsApp ? (
+                                      <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <MessageCircle className="w-4 h-4" />
+                                    )}
                                   </button>
                                   <button
                                     onClick={() => handleSendNotification(worker)}
