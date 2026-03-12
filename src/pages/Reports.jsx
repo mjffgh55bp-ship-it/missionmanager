@@ -32,23 +32,28 @@ export default function Reports() {
   const [workerFilters, setWorkerFilters] = useState({
     guide: '__all__',
     role: '__all__',
-    status: '__all__'
+    status: '__all__',
+    population: '__all__'
   });
   const [shiftStatuses, setShiftStatuses] = useState([]);
+  const [populations, setPopulations] = useState([]);
+  const [workerRoles, setWorkerRoles] = useState([]);
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings, shiftStatusesSettings] = await Promise.all([
+    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings, shiftStatusesSettings, populationsSettings, workerRolesSettings] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
       base44.entities.FoodCart.list(),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
-      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
+      base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -57,6 +62,8 @@ export default function Reports() {
     if (cartParamsSettings.length > 0) setCartParams(JSON.parse(cartParamsSettings[0].setting_value) || {});
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
     if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
+    if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
+    if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
     setLoading(false);
   };
 
@@ -107,10 +114,10 @@ export default function Reports() {
 
   const chartData = workerHours.sort((a, b) => b.totalHours - a.totalHours).slice(0, 10).map(w => ({ name: w.name, hours: w.totalHours }));
 
-  const roleData = [
-    { name: 'טבחים ראשיים', value: workers.filter(w => w.role === 'chef' && w.active).length },
-    { name: 'עוזרי טבח', value: workers.filter(w => w.role === 'sous_chef' && w.active).length }
-  ];
+  const roleData = workerRoles.map(role => ({
+    name: role,
+    value: workers.filter(w => w.role === role && w.active).length
+  })).filter(item => item.value > 0);
 
   const totalHours = assignments.reduce((sum, a) => sum + (a.hours || 0), 0);
   const totalShiftsNeeded = assignments.length;
@@ -215,6 +222,7 @@ export default function Reports() {
     if (!w.active) return false;
     if (workerFilters.guide !== '__all__' && (workerFilters.guide === 'yes' ? !w.is_guide : w.is_guide)) return false;
     if (workerFilters.role !== '__all__' && w.role !== workerFilters.role) return false;
+    if (workerFilters.population !== '__all__' && w.population !== workerFilters.population) return false;
     return true;
   });
 
@@ -339,6 +347,22 @@ export default function Reports() {
               )}
 
               <div className="flex gap-2 mt-3 flex-wrap">
+                <Select value={workerFilters.population} onValueChange={(v) => setWorkerFilters({...workerFilters, population: v})}>
+                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__" dir="rtl">כל האוכלוסיות</SelectItem>
+                    {populations.map(p => <SelectItem key={p} value={p} dir="rtl">{p}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+
+                <Select value={workerFilters.role} onValueChange={(v) => setWorkerFilters({...workerFilters, role: v})}>
+                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__" dir="rtl">כל התפקידים</SelectItem>
+                    {workerRoles.map(r => <SelectItem key={r} value={r} dir="rtl">{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+
                 <Select value={workerFilters.guide} onValueChange={(v) => setWorkerFilters({...workerFilters, guide: v})}>
                   <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -348,20 +372,11 @@ export default function Reports() {
                   </SelectContent>
                 </Select>
 
-                <Select value={workerFilters.role} onValueChange={(v) => setWorkerFilters({...workerFilters, role: v})}>
-                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__" dir="rtl">כל התפקידים</SelectItem>
-                    <SelectItem value="chef" dir="rtl">טבח ראשי</SelectItem>
-                    <SelectItem value="sous_chef" dir="rtl">עוזר טבח</SelectItem>
-                  </SelectContent>
-                </Select>
-
                 <Select value={workerFilters.status} onValueChange={(v) => setWorkerFilters({...workerFilters, status: v})}>
                   <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__" dir="rtl">כל הסטטוסים</SelectItem>
-                    {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    {shiftStatuses.map(s => <SelectItem key={s} value={s} dir="rtl">{s}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -451,7 +466,7 @@ export default function Reports() {
                   {sortedWorkerHours.map((worker) => (
                     <TableRow key={worker.id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">{worker.name}</TableCell>
-                      <TableCell><Badge className={worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'} dir="rtl">{worker.role === 'chef' ? 'טבח ראשי' : 'עוזר טבח'}</Badge></TableCell>
+                      <TableCell><Badge className="bg-blue-100 text-blue-900" dir="rtl">{worker.role || '-'}</Badge></TableCell>
                       <TableCell><Badge className={getSeniorityInfo(worker.seniority).color}>{getSeniorityInfo(worker.seniority).label}</Badge></TableCell>
                       <TableCell><Badge variant={worker.isFullTime ? "default" : "outline"} className={worker.isFullTime ? "bg-green-600" : ""} dir="rtl">{worker.isFullTime ? "משרה מלאה" : "משרה חלקית"}</Badge></TableCell>
                       <TableCell className="font-semibold text-blue-900">{worker.totalHours}h</TableCell>
