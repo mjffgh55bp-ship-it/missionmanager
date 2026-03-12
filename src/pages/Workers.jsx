@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, UserX, UserCheck, ChefHat, TrendingUp, Award, Trash2, Users, Save } from "lucide-react";
+import { Plus, Pencil, UserX, UserCheck, ChefHat, TrendingUp, Award, Trash2, Users, Save, Search } from "lucide-react";
 import { format } from "date-fns";
 import { getSeniorityInfo, calculateProgression } from "../components/utils/SeniorityUtils";
 import { Progress } from "@/components/ui/progress";
@@ -23,6 +23,7 @@ export default function Workers() {
   const [savingRoles, setSavingRoles] = useState(false);
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     nickname: "",
     birthday: "",
@@ -131,7 +132,17 @@ export default function Workers() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-1">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input 
+                value={searchQuery} 
+                onChange={(e) => setSearchQuery(e.target.value)} 
+                placeholder="חפש לפי שם, תפקיד, אוכלוסיה או כשירות..." 
+                className="pr-10"
+                dir="rtl" 
+              />
+            </div>
             <Button onClick={() => setShowDialog(true)} className="bg-blue-900 hover:bg-blue-800 text-white px-6" dir="rtl">
               <Plus className="w-4 h-4 mr-2" />הוסף עובד
             </Button>
@@ -146,7 +157,19 @@ export default function Workers() {
 
           <TabsContent value="workers">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {workers.map((worker) => {
+              {workers.filter(worker => {
+                if (!searchQuery.trim()) return true;
+                const query = searchQuery.toLowerCase();
+                const seniorityInfo = getSeniorityInfo(worker.seniority);
+                return (
+                  worker.nickname?.toLowerCase().includes(query) ||
+                  worker.role?.toLowerCase().includes(query) ||
+                  worker.population?.toLowerCase().includes(query) ||
+                  seniorityInfo.label.toLowerCase().includes(query) ||
+                  worker.training?.toLowerCase().includes(query) ||
+                  worker.email?.toLowerCase().includes(query)
+                );
+              }).map((worker) => {
             const totalHours = getWorkerTotalHours(worker.id);
             const seniorityInfo = getSeniorityInfo(worker.seniority);
             const progression = calculateProgression(totalHours, worker.seniority);
