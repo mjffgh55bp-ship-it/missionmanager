@@ -92,7 +92,7 @@ export default function Reports() {
       name: worker.nickname,
       role: worker.role,
       seniority: worker.seniority,
-      isFullTime: worker.is_full_time,
+      population: worker.population,
       totalHours,
       shifts: totalShifts,
       lastShift: getLastShiftDate(worker.id),
@@ -454,7 +454,7 @@ export default function Reports() {
                     <TableHead><SortButton column="name" label='שם עובד' /></TableHead>
                     <TableHead><SortButton column="role" label='תפקיד' /></TableHead>
                     <TableHead><SortButton column="seniority" label='וותק' /></TableHead>
-                    <TableHead><SortButton column="isFullTime" label='סוג' /></TableHead>
+                    <TableHead><SortButton column="population" label='אוכלוסיה' /></TableHead>
                     <TableHead><SortButton column="totalHours" label='סה"כ שעות' /></TableHead>
                     <TableHead><SortButton column="shifts" label='סה"כ משמרות' /></TableHead>
                     <TableHead><SortButton column="avgHoursPerShift" label='ממוצע שעות/משמרת' /></TableHead>
@@ -468,7 +468,7 @@ export default function Reports() {
                       <TableCell className="font-medium">{worker.name}</TableCell>
                       <TableCell><Badge className="bg-blue-100 text-blue-900" dir="rtl">{worker.role || '-'}</Badge></TableCell>
                       <TableCell><Badge className={getSeniorityInfo(worker.seniority).color}>{getSeniorityInfo(worker.seniority).label}</Badge></TableCell>
-                      <TableCell><Badge variant={worker.isFullTime ? "default" : "outline"} className={worker.isFullTime ? "bg-green-600" : ""} dir="rtl">{worker.isFullTime ? "משרה מלאה" : "משרה חלקית"}</Badge></TableCell>
+                      <TableCell><Badge className="bg-orange-100 text-orange-800" dir="rtl">{worker.population || '-'}</Badge></TableCell>
                       <TableCell className="font-semibold text-blue-900">{worker.totalHours}h</TableCell>
                       <TableCell>{worker.shifts}</TableCell>
                       <TableCell>{worker.avgHoursPerShift.toFixed(1)}h</TableCell>
