@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Calendar as CalendarIcon, Check, X, AlertCircle, Info, GripVertical, Plus, XCircle, Star, Ban, ChevronLeft, ChevronRight, PartyPopper, Pencil, Download, Lock } from "lucide-react";
+import { Calendar as CalendarIcon, Check, X, AlertCircle, Info, GripVertical, Plus, XCircle, Star, Ban, ChevronLeft, ChevronRight, PartyPopper, Pencil, Download, Lock, MessageCircle } from "lucide-react";
 import { format, startOfWeek, addDays, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -372,6 +372,46 @@ export default function Availability() {
   const handleDeleteUnavailability = async (id) => {
     await base44.entities.Unavailability.delete(id);
     setUnavailabilities(unavailabilities.filter((u) => u.id !== id));
+  };
+
+  const sendToWhatsApp = () => {
+    const myAssignments = assignments.filter(a => 
+      a.chef_id === currentWorker?.id || 
+      a.sous_chef_id === currentWorker?.id || 
+      a.additional_chef_id === currentWorker?.id
+    );
+
+    if (myAssignments.length === 0) {
+      alert("אין משמרות לשליחה");
+      return;
+    }
+
+    // Build WhatsApp message
+    let message = `🍳 *משמרות שלי*\n\n`;
+    
+    myAssignments.sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(assignment => {
+      const date = formatDateHebrew(assignment.date, 'long');
+      message += `📅 *${date}*\n`;
+      message += `⏰ ${assignment.start_time} - ${assignment.end_time}\n`;
+      message += `🚚 ${assignment.food_cart_name}\n`;
+      
+      if (assignment.chef_id === currentWorker?.id) {
+        message += `👨‍🍳 תפקיד: טבח ראשי\n`;
+      } else if (assignment.sous_chef_id === currentWorker?.id) {
+        message += `👨‍🍳 תפקיד: עוזר טבח\n`;
+      } else if (assignment.additional_chef_id === currentWorker?.id) {
+        message += `👨‍🍳 תפקיד: ${assignment.additional_chef_role || 'נוסף'}\n`;
+      }
+      
+      if (assignment.menu) {
+        message += `📋 תפריט: ${assignment.menu}\n`;
+      }
+      message += `\n`;
+    });
+
+    // Encode and open WhatsApp
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, '_blank');
   };
 
   const generateICSFile = () => {
@@ -956,6 +996,9 @@ END:VEVENT
                   <div className="flex gap-1 items-center">
                     <Button variant="outline" size="sm" onClick={generateICSFile} title="סנכרן ללוח השנה בטלפון">
                       <Download className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={sendToWhatsApp} className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200" title="שלח משמרות לווצאפ">
+                      <MessageCircle className="w-4 h-4" />
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
                       <ChevronRight className="w-4 h-4" />
