@@ -1500,7 +1500,7 @@ export default function Matrix() {
             <div className="overflow-x-auto pb-16">
               <div className="min-w-[1400px]">
                 <div className="flex sticky top-0 bg-gray-100 z-30 border-b">
-                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-end" dir="rtl">
+                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
                     <MasterControls
                       workers={workers}
                       populationFilter={populationFilter}
