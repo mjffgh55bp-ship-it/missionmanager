@@ -97,12 +97,20 @@ export default function Workers() {
   };
 
   const toggleActive = async (worker) => {
-    await base44.entities.Worker.update(worker.id, { active: !worker.active });
+    await base44.entities.Worker.update(worker.id, { 
+      nickname: worker.nickname,
+      role: worker.role,
+      active: !worker.active 
+    });
     loadData();
   };
 
   const toggleGuide = async (worker) => {
-    await base44.entities.Worker.update(worker.id, { is_guide: !worker.is_guide });
+    await base44.entities.Worker.update(worker.id, { 
+      nickname: worker.nickname,
+      role: worker.role,
+      is_guide: !worker.is_guide 
+    });
     loadData();
   };
 
