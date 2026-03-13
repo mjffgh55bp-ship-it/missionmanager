@@ -5,15 +5,22 @@ import { base44 } from "@/api/base44Client";
 export default function WorkerLockButton({ worker, onUpdate }) {
   const handleToggleLock = async () => {
     if (!worker.nickname || !worker.role) {
-      console.error('Cannot update worker: missing required fields', worker);
+      console.error('Cannot update worker: missing required fields (nickname or role)', worker);
+      alert('לא ניתן לעדכן עובד זה - חסר שם או תפקיד');
       return;
     }
-    await base44.entities.Worker.update(worker.id, {
-      nickname: worker.nickname,
-      role: worker.role,
-      availability_locked: !worker.availability_locked
-    });
-    onUpdate();
+    
+    try {
+      await base44.entities.Worker.update(worker.id, {
+        nickname: worker.nickname,
+        role: worker.role,
+        availability_locked: !worker.availability_locked
+      });
+      onUpdate();
+    } catch (error) {
+      console.error('Failed to toggle worker lock:', error);
+      alert('שגיאה בעדכון סטטוס נעילה');
+    }
   };
 
   return (
