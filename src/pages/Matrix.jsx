@@ -1573,7 +1573,12 @@ export default function Matrix() {
                             {/* Send buttons - between lock and worker name */}
                             {(() => {
                               const sendStatus = getWorkerSendStatus(worker);
-                              const btnClass = sendStatus === 'none'
+                              const whatsappClass = sendStatus === 'none'
+                                ? 'text-gray-400 hover:text-gray-500'
+                                : sendStatus === 'needs_update'
+                                ? 'text-green-500 hover:text-green-600'
+                                : 'text-gray-900 hover:text-gray-700';
+                              const emailClass = sendStatus === 'none'
                                 ? 'text-gray-400 hover:text-gray-500'
                                 : sendStatus === 'needs_update'
                                 ? 'text-green-500 hover:text-green-600'
@@ -1582,7 +1587,7 @@ export default function Matrix() {
                                 <>
                                   <button
                                     onClick={() => sendWhatsAppNotification(worker)}
-                                    className="text-green-600 hover:text-green-700 rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50"
+                                    className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${whatsappClass}`}
                                     title="שלח משמרות בוואטסאפ"
                                     disabled={sendingWhatsApp}
                                   >
@@ -1594,7 +1599,7 @@ export default function Matrix() {
                                   </button>
                                   <button
                                     onClick={() => handleSendNotification(worker)}
-                                    className={`rounded p-1 transition-colors hover:bg-gray-100 ${btnClass}`}
+                                    className={`rounded p-1 transition-colors hover:bg-gray-100 ${emailClass}`}
                                     title="שלח לוח משמרות באימייל"
                                   >
                                     <Send className="w-4 h-4" />
