@@ -1500,8 +1500,7 @@ export default function Matrix() {
             <div className="overflow-x-auto pb-16">
               <div className="min-w-[1400px]">
                 <div className="flex sticky top-0 bg-gray-100 z-30 border-b">
-                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-between" dir="rtl">
-                    <span>עובד</span>
+                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-end" dir="rtl">
                     <MasterControls
                       workers={workers}
                       populationFilter={populationFilter}
@@ -1567,56 +1566,52 @@ export default function Matrix() {
                     return (
                       <React.Fragment key={worker.id}>
                       <div className={`flex border-b h-16 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                        <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-20 h-16">
-                          <div className="flex items-center gap-2">
-                            <WorkerLockButton worker={worker} onUpdate={loadStaticData} />
-                            {/* Send buttons - between lock and worker name */}
-                            {(() => {
-                              const sendStatus = getWorkerSendStatus(worker);
-                              const whatsappClass = sendStatus === 'none'
-                                ? 'text-gray-400 hover:text-gray-500'
-                                : sendStatus === 'needs_update'
-                                ? 'text-green-500 hover:text-green-600'
-                                : 'text-gray-900 hover:text-gray-700';
-                              const emailClass = sendStatus === 'none'
-                                ? 'text-gray-400 hover:text-gray-500'
-                                : sendStatus === 'needs_update'
-                                ? 'text-green-500 hover:text-green-600'
-                                : 'text-gray-900 hover:text-gray-700';
-                              return (
-                                <>
-                                  <button
-                                    onClick={() => sendWhatsAppNotification(worker)}
-                                    className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${whatsappClass}`}
-                                    title="שלח משמרות בוואטסאפ"
-                                    disabled={sendingWhatsApp}
-                                  >
-                                    {sendingWhatsApp ? (
-                                      <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-                                    ) : (
-                                      <MessageCircle className="w-4 h-4" />
-                                    )}
-                                  </button>
-                                  <button
-                                    onClick={() => handleSendNotification(worker)}
-                                    className={`rounded p-1 transition-colors hover:bg-gray-100 ${emailClass}`}
-                                    title="שלח לוח משמרות באימייל"
-                                  >
-                                    <Send className="w-4 h-4" />
-                                  </button>
-                                </>
-                              );
-                            })()}
-                            <div className="flex items-center">
-                              <div>
-                                <span className="truncate block">{worker.nickname}</span>
-                                <WeeklySummary worker={worker} />
-                              </div>
+                        <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-16">
+                          <WorkerLockButton worker={worker} onUpdate={loadStaticData} />
+                          {/* Send buttons - between lock and worker name */}
+                          {(() => {
+                            const sendStatus = getWorkerSendStatus(worker);
+                            const whatsappClass = sendStatus === 'none'
+                              ? 'text-gray-400 hover:text-gray-500'
+                              : sendStatus === 'needs_update'
+                              ? 'text-green-500 hover:text-green-600'
+                              : 'text-gray-900 hover:text-gray-700';
+                            const emailClass = sendStatus === 'none'
+                              ? 'text-gray-400 hover:text-gray-500'
+                              : sendStatus === 'needs_update'
+                              ? 'text-green-500 hover:text-green-600'
+                              : 'text-gray-900 hover:text-gray-700';
+                            return (
+                              <>
+                                <button
+                                  onClick={() => sendWhatsAppNotification(worker)}
+                                  className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${whatsappClass}`}
+                                  title="שלח משמרות בוואטסאפ"
+                                  disabled={sendingWhatsApp}
+                                >
+                                  {sendingWhatsApp ? (
+                                    <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <MessageCircle className="w-4 h-4" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleSendNotification(worker)}
+                                  className={`rounded p-1 transition-colors hover:bg-gray-100 ${emailClass}`}
+                                  title="שלח לוח משמרות באימייל"
+                                >
+                                  <Send className="w-4 h-4" />
+                                </button>
+                              </>
+                            );
+                          })()}
+                          <div className="flex items-center flex-1 min-w-0">
+                            <div>
+                              <span className="truncate block">{worker.nickname}</span>
+                              <WeeklySummary worker={worker} />
                             </div>
                           </div>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
-                          </div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
                         </div>
                         <div 
                           data-worker-id={worker.id}
