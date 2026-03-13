@@ -12,6 +12,8 @@ export default function MasterControls({
   sendingWhatsApp,
   onUpdate
 }) {
+  const [isLocking, setIsLocking] = React.useState(false);
+  
   const getVisibleWorkers = () => {
     return workers.filter(w => {
       if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
@@ -20,24 +22,33 @@ export default function MasterControls({
     });
   };
 
-  const handleMasterLockToggle = async () => {
-    const visibleWorkers = getVisibleWorkers();
-    const allLocked = visibleWorkers.every(w => w.availability_locked);
-    
-    await Promise.all(
-      visibleWorkers.map(worker =>
-        base44.entities.Worker.update(worker.id, {
-          nickname: worker.nickname,
-          role: worker.role,
-          availability_locked: !allLocked
-        })
-      )
-    );
-    onUpdate();
-  };
-
   const visibleWorkers = getVisibleWorkers();
-  const allLocked = visibleWorkers.every(w => w.availability_locked);
+  const allLocked = visibleWorkers.length > 0 && visibleWorkers.every(w => w.availability_locked);
+
+  const handleMasterLockToggle = async () => {
+    if (isLocking || visibleWorkers.length === 0) return;
+    setIsLocking(true);
+    
+    const targetLockState = !allLocked;
+    
+    // Update in batches of 5 for better responsiveness
+    const batchSize = 5;
+    for (let i = 0; i < visibleWorkers.length; i += batchSize) {
+      const batch = visibleWorkers.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(worker =>
+          base44.entities.Worker.update(worker.id, {
+            nickname: worker.nickname,
+            role: worker.role,
+            availability_locked: targetLockState
+          })
+        )
+      );
+    }
+    
+    await onUpdate();
+    setIsLocking(false);
+  };
   
   const statuses = visibleWorkers.map(w => getWorkerSendStatus(w));
   const sendBtnClass = statuses.every(s => s === 'synced') 
@@ -51,13 +62,16 @@ export default function MasterControls({
       {/* Master Lock Button */}
       <button
         onClick={handleMasterLockToggle}
-        className="hover:bg-gray-200 rounded p-1 transition-colors"
-        title={allLocked ? "פתח נעילה לכולם" : "נעל זמינות לכולם"}
+        disabled={isLocking || visibleWorkers.length === 0}
+        className="hover:bg-gray-200 rounded p-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title={isLocking ? "מעדכן..." : allLocked ? "פתח נעילה לכולם" : "נעל זמינות לכולם"}
       >
-        {allLocked ? (
-          <Lock className="w-5 h-5 text-gray-900" />
+        {isLocking ? (
+          <div className="w-5 h-5 border-2 border-gray-600 border-t-transparent rounded-full animate-spin" />
+        ) : allLocked ? (
+          <Lock className="w-5 h-5 text-red-600" />
         ) : (
-          <LockOpen className="w-5 h-5 text-blue-500" />
+          <LockOpen className="w-5 h-5 text-green-500" />
         )}
       </button>
       
