@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import BriefingBar from "../components/matrix/BriefingBar";
+import WorkerLockButton from "../components/matrix/WorkerLockButton";
 
 // Timeline: 00:00 → 24:00 (right to left in RTL)
 const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
@@ -1515,6 +1516,8 @@ export default function Matrix() {
                           await Promise.all(
                             visibleWorkers.map(worker =>
                               base44.entities.Worker.update(worker.id, {
+                                nickname: worker.nickname,
+                                role: worker.role,
                                 availability_locked: !allLocked
                               })
                             )
