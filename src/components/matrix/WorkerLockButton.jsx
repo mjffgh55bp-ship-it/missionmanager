@@ -4,6 +4,10 @@ import { base44 } from "@/api/base44Client";
 
 export default function WorkerLockButton({ worker, onUpdate }) {
   const handleToggleLock = async () => {
+    if (!worker.nickname || !worker.role) {
+      console.error('Cannot update worker: missing required fields', worker);
+      return;
+    }
     await base44.entities.Worker.update(worker.id, {
       nickname: worker.nickname,
       role: worker.role,

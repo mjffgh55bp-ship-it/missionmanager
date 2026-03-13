@@ -31,10 +31,18 @@ export default function MasterControls({
     
     const targetLockState = !allLocked;
     
+    // Filter out workers missing required fields
+    const validWorkers = visibleWorkers.filter(w => w.nickname && w.role);
+    if (validWorkers.length === 0) {
+      console.error('No valid workers to update');
+      setIsLocking(false);
+      return;
+    }
+    
     // Update in batches of 5 for better responsiveness
     const batchSize = 5;
-    for (let i = 0; i < visibleWorkers.length; i += batchSize) {
-      const batch = visibleWorkers.slice(i, i + batchSize);
+    for (let i = 0; i < validWorkers.length; i += batchSize) {
+      const batch = validWorkers.slice(i, i + batchSize);
       await Promise.all(
         batch.map(worker =>
           base44.entities.Worker.update(worker.id, {
