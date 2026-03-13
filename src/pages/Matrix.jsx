@@ -1512,11 +1512,13 @@ export default function Matrix() {
                           
                           const allLocked = visibleWorkers.every(w => w.availability_locked);
                           
-                          for (const worker of visibleWorkers) {
-                            await base44.entities.Worker.update(worker.id, {
-                              availability_locked: !allLocked
-                            });
-                          }
+                          await Promise.all(
+                            visibleWorkers.map(worker =>
+                              base44.entities.Worker.update(worker.id, {
+                                availability_locked: !allLocked
+                              })
+                            )
+                          );
                           loadStaticData();
                         }}
                         className="hover:bg-gray-200 rounded p-1 transition-colors"
