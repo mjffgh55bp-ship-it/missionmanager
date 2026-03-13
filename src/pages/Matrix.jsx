@@ -1238,23 +1238,14 @@ export default function Matrix() {
 
   const WeeklySummary = ({ worker }) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
     const days = [];
     
     for (let i = 0; i < 7; i++) {
       const d = format(addDays(weekStart, i), "yyyy-MM-dd");
       
-      // Check if worker has any template shift on this calendar day across the entire week
-      const hasTemplateShift = allTemplates.length > 0 && templateRows.some(row => {
-        if (!row.date || !row.values) return false;
-        // Check if the row date is within the current week
-        const rowDate = new Date(row.date);
-        if (rowDate < weekStart || rowDate > weekEnd) return false;
-        // Check if this is the specific day we're checking
-        if (row.date !== d) return false;
-        // Check if worker is assigned
-        return Object.values(row.values).some(val => val === worker.id);
-      });
+      // Check template shifts for this specific day by calling the helper function
+      const dayTemplateShifts = getWorkerTemplateShifts(worker.id, d);
+      const hasTemplateShift = dayTemplateShifts.length > 0;
       
       days.push({ 
         date: d, 
