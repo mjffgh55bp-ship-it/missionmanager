@@ -1362,7 +1362,7 @@ export default function Matrix() {
               className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg pointer-events-auto"
               style={{ 
                 direction: 'ltr',
-                zIndex: 9999,
+                zIndex: 40,
                 width: '100%',
                 padding: '8px'
               }}
@@ -1499,8 +1499,8 @@ export default function Matrix() {
             
             <div className="overflow-x-auto pb-16">
               <div className="min-w-[1400px]">
-                <div className="flex sticky top-0 bg-gray-100 z-50 border-b">
-                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50 flex items-center justify-between" dir="rtl">
+                <div className="flex sticky top-0 bg-gray-100 z-30 border-b">
+                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-between" dir="rtl">
                     <span>עובד</span>
                     <MasterControls
                       workers={workers}
@@ -1567,7 +1567,7 @@ export default function Matrix() {
                     return (
                       <React.Fragment key={worker.id}>
                       <div className={`flex border-b h-16 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                        <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-40 h-16">
+                        <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-20 h-16">
                           <div className="flex items-center gap-2">
                             <WorkerLockButton worker={worker} onUpdate={loadStaticData} />
                             {/* Send buttons - between lock and worker name */}
@@ -1666,7 +1666,7 @@ export default function Matrix() {
                       </div>
                       {viewMode === 'weekly' && summary && (
                        <div className="flex border-b bg-gray-100 text-xs h-8">
-                         <div className="w-[300px] min-w-[300px] px-3 py-1 border-r sticky left-0 bg-gray-100 z-40 font-semibold text-gray-700" dir="rtl">
+                         <div className="w-[300px] min-w-[300px] px-3 py-1 border-r sticky left-0 bg-gray-100 z-20 font-semibold text-gray-700" dir="rtl">
                            סיכום שבועי
                          </div>
                          <div className="flex-1 px-3 py-1 flex gap-4 items-center flex-wrap text-gray-700" dir="rtl">
