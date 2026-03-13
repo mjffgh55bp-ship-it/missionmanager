@@ -1498,7 +1498,123 @@ export default function Matrix() {
             <div className="overflow-x-auto pb-16">
               <div className="min-w-[1400px]">
                 <div className="flex sticky top-0 bg-gray-100 z-50 border-b">
-                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50" dir="rtl">עובד</div>
+                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-50 flex items-center justify-between" dir="rtl">
+                    <span>עובד</span>
+                    <div className="flex gap-1">
+                      {/* Master Lock Button */}
+                      <button
+                        onClick={async () => {
+                          const visibleWorkers = workers.filter(w => {
+                            if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                            if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                            return true;
+                          });
+                          
+                          const allLocked = visibleWorkers.every(w => w.availability_locked);
+                          
+                          for (const worker of visibleWorkers) {
+                            await base44.entities.Worker.update(worker.id, {
+                              ...worker,
+                              availability_locked: !allLocked
+                            });
+                          }
+                          loadStaticData();
+                        }}
+                        className="hover:bg-gray-200 rounded p-1 transition-colors"
+                        title={workers.filter(w => {
+                          if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                          if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                          return true;
+                        }).every(w => w.availability_locked) ? "פתח נעילה לכולם" : "נעל זמינות לכולם"}
+                      >
+                        {workers.filter(w => {
+                          if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                          if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                          return true;
+                        }).every(w => w.availability_locked) ? (
+                          <Lock className="w-5 h-5 text-gray-900" />
+                        ) : (
+                          <LockOpen className="w-5 h-5 text-blue-500" />
+                        )}
+                      </button>
+                      
+                      {/* Master WhatsApp Button */}
+                      <button
+                        onClick={async () => {
+                          const visibleWorkers = workers.filter(w => {
+                            if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                            if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                            return true;
+                          });
+                          
+                          for (const worker of visibleWorkers) {
+                            await sendWhatsAppNotification(worker);
+                            // Small delay between messages
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                          }
+                        }}
+                        className={`rounded p-1 transition-colors hover:bg-gray-200 ${
+                          (() => {
+                            const visibleWorkers = workers.filter(w => {
+                              if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                              if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                              return true;
+                            });
+                            const statuses = visibleWorkers.map(w => getWorkerSendStatus(w));
+                            if (statuses.every(s => s === 'synced')) return 'text-gray-900';
+                            if (statuses.every(s => s === 'none')) return 'text-gray-600';
+                            return 'text-green-500';
+                          })()
+                        }`}
+                        title="שלח משמרות בוואטסאפ לכולם"
+                        disabled={sendingWhatsApp}
+                      >
+                        {sendingWhatsApp ? (
+                          <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <MessageCircle className="w-4 h-4" />
+                        )}
+                      </button>
+                      
+                      {/* Master Email Button */}
+                      <button
+                        onClick={async () => {
+                          const visibleWorkers = workers.filter(w => {
+                            if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                            if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                            return true;
+                          });
+                          
+                          for (const worker of visibleWorkers) {
+                            await new Promise(resolve => {
+                              setSelectedWorkerForNotification(worker);
+                              setNotificationNotes("");
+                              setShowNotificationDialog(true);
+                              resolve();
+                            });
+                            // Wait for dialog to be handled
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                          }
+                        }}
+                        className={`rounded p-1 transition-colors hover:bg-gray-200 ${
+                          (() => {
+                            const visibleWorkers = workers.filter(w => {
+                              if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                              if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                              return true;
+                            });
+                            const statuses = visibleWorkers.map(w => getWorkerSendStatus(w));
+                            if (statuses.every(s => s === 'synced')) return 'text-gray-900';
+                            if (statuses.every(s => s === 'none')) return 'text-gray-600';
+                            return 'text-green-500';
+                          })()
+                        }`}
+                        title="שלח משמרות במייל לכולם"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                   <div className="flex-1 relative flex" dir="rtl">
                     {viewMode === 'daily' ? (
                      getDailyTimeSlots(zoomRange).map((hour) => (
