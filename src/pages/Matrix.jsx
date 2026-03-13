@@ -1608,9 +1608,6 @@ export default function Matrix() {
                               );
                             })()}
                             <div className="flex items-center">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${worker.role === 'chef' ? 'bg-blue-100 text-blue-900' : 'bg-amber-100 text-amber-700'}`}>
-                                <ChefHat className="w-4 h-4" />
-                              </div>
                               <div>
                                 <span className="truncate block">{worker.nickname}</span>
                                 <WeeklySummary worker={worker} />
