@@ -1663,22 +1663,7 @@ export default function Matrix() {
                       <div className={`flex border-b h-16 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                         <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center justify-between sticky left-0 bg-inherit z-40 h-16">
                           <div className="flex items-center gap-2">
-                            <button
-                              onClick={async () => {
-                                await base44.entities.Worker.update(worker.id, {
-                                  availability_locked: !worker.availability_locked
-                                });
-                                loadStaticData();
-                              }}
-                              className="hover:bg-gray-100 rounded p-1 transition-colors"
-                              title={worker.availability_locked ? "נעול - לחץ לפתיחה" : "פתוח - לחץ לנעילה"}
-                            >
-                              {worker.availability_locked ? (
-                                <Lock className="w-5 h-5 text-gray-900" />
-                              ) : (
-                                <LockOpen className="w-5 h-5 text-blue-500" />
-                              )}
-                            </button>
+                            <WorkerLockButton worker={worker} onUpdate={loadStaticData} />
                             {/* Send buttons - between lock and worker name */}
                             {(() => {
                               const sendStatus = getWorkerSendStatus(worker);

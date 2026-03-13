@@ -1,15 +1,16 @@
 import React from "react";
 import { Lock, LockOpen, MessageCircle, Send } from "lucide-react";
+import { base44 } from "@/api/base44Client";
 
 export default function MasterControls({ 
   workers, 
   populationFilter, 
   roleFilter, 
   getWorkerSendStatus, 
-  onLockToggle,
   onSendWhatsApp,
   onSendEmail,
-  sendingWhatsApp 
+  sendingWhatsApp,
+  onUpdate
 }) {
   const getVisibleWorkers = () => {
     return workers.filter(w => {
@@ -17,6 +18,22 @@ export default function MasterControls({
       if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
       return true;
     });
+  };
+
+  const handleMasterLockToggle = async () => {
+    const visibleWorkers = getVisibleWorkers();
+    const allLocked = visibleWorkers.every(w => w.availability_locked);
+    
+    await Promise.all(
+      visibleWorkers.map(worker =>
+        base44.entities.Worker.update(worker.id, {
+          nickname: worker.nickname,
+          role: worker.role,
+          availability_locked: !allLocked
+        })
+      )
+    );
+    onUpdate();
   };
 
   const visibleWorkers = getVisibleWorkers();
@@ -33,7 +50,7 @@ export default function MasterControls({
     <div className="flex gap-1">
       {/* Master Lock Button */}
       <button
-        onClick={() => onLockToggle(visibleWorkers, allLocked)}
+        onClick={handleMasterLockToggle}
         className="hover:bg-gray-200 rounded p-1 transition-colors"
         title={allLocked ? "פתח נעילה לכולם" : "נעל זמינות לכולם"}
       >
