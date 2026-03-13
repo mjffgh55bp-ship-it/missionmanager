@@ -543,7 +543,7 @@ export default function Matrix() {
         const uploadResult = await base44.integrations.Core.UploadFile({ file: icsFile });
         
         if (uploadResult && uploadResult.file_url) {
-          message += `\n📅 להוספת המשמרות ליומן הדיגיטלי:\n${uploadResult.file_url}\n\n`;
+          message += `\n📅 *להוספת המשמרות ליומן הדיגיטלי שלך:*\nלחץ על הקישור הבא להורדת קובץ ICS:\n${uploadResult.file_url}\n\nלאחר ההורדה, פתח את הקובץ והמשמרות יתווספו ליומן שלך אוטומטית.\n\n`;
         }
       }
       
