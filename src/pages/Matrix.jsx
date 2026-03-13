@@ -1514,7 +1514,6 @@ export default function Matrix() {
                           
                           for (const worker of visibleWorkers) {
                             await base44.entities.Worker.update(worker.id, {
-                              ...worker,
                               availability_locked: !allLocked
                             });
                           }
@@ -1665,7 +1664,6 @@ export default function Matrix() {
                             <button
                               onClick={async () => {
                                 await base44.entities.Worker.update(worker.id, {
-                                  ...worker,
                                   availability_locked: !worker.availability_locked
                                 });
                                 loadStaticData();
