@@ -1521,21 +1521,27 @@ export default function Matrix() {
                           loadStaticData();
                         }}
                         className="hover:bg-gray-200 rounded p-1 transition-colors"
-                        title={workers.filter(w => {
-                          if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
-                          if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
-                          return true;
-                        }).every(w => w.availability_locked) ? "פתח נעילה לכולם" : "נעל זמינות לכולם"}
+                        title={(() => {
+                          const visibleWorkers = workers.filter(w => {
+                            if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                            if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                            return true;
+                          });
+                          return visibleWorkers.every(w => w.availability_locked) ? "פתח נעילה לכולם" : "נעל זמינות לכולם";
+                        })()}
                       >
-                        {workers.filter(w => {
-                          if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
-                          if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
-                          return true;
-                        }).every(w => w.availability_locked) ? (
-                          <Lock className="w-5 h-5 text-gray-900" />
-                        ) : (
-                          <LockOpen className="w-5 h-5 text-blue-500" />
-                        )}
+                        {(() => {
+                          const visibleWorkers = workers.filter(w => {
+                            if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                            if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                            return true;
+                          });
+                          return visibleWorkers.every(w => w.availability_locked) ? (
+                            <Lock className="w-5 h-5 text-gray-900" />
+                          ) : (
+                            <LockOpen className="w-5 h-5 text-blue-500" />
+                          );
+                        })()}
                       </button>
                       
                       {/* Master WhatsApp Button */}
