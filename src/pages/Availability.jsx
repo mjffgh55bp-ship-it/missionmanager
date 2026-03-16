@@ -1023,7 +1023,7 @@ END:VEVENT
         {/* Dialogs */}
         <Dialog open={showUnavailabilityDialog} onOpenChange={setShowUnavailabilityDialog}>
           <DialogContent className="sm:max-w-sm">
-            <DialogHeader><DialogTitle className="text-right" dir="rtl">הוסף זמן לא זמין</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle className="text-right" dir="rtl">הוסף אילוץ</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="flex items-center gap-2" dir="rtl">
                 <Label htmlFor="multiDay">מספר ימים</Label>
