@@ -679,7 +679,7 @@ END:VEVENT
               </CardHeader>
               <CardContent className="py-3 px-4">
                 {unavailabilities.length === 0 ?
-              <p className="text-xs text-gray-500 text-center py-2" dir="rtl">אין זמנים לא זמינים השבוע</p> :
+              <p className="text-xs text-gray-500 text-center py-2" dir="rtl">אין אילוצים השבוע</p> :
 
               <div className="space-y-2">
                     {unavailabilities.map((unavail) =>
