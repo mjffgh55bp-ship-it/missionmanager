@@ -671,7 +671,7 @@ END:VEVENT
             <Card className="border-none shadow-lg mb-4">
               <CardHeader className="border-b bg-white py-3 px-4">
                 <div className="flex justify-between items-center">
-                  <CardTitle className="text-base" dir="rtl">זמנים לא זמינים</CardTitle>
+                  <CardTitle className="text-base" dir="rtl">אילוצים</CardTitle>
                   <Button onClick={() => setShowUnavailabilityDialog(true)} size="sm" className="bg-red-600 hover:bg-red-700">
                     <Plus className="w-4 h-4" />
                   </Button>
