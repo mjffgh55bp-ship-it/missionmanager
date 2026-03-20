@@ -1586,11 +1586,11 @@ export default function Matrix() {
                             );
                           })()}
                           <div className="flex items-center flex-1 min-w-0">
-                            <div className="min-w-0">
-                              <span className="truncate block">{worker.nickname}</span>
-                              <div className="flex items-center gap-1">
+                            <div className="min-w-0 flex-1">
+                              <span className="truncate block text-sm">{worker.nickname}</span>
+                              <div className="flex items-center gap-1 mt-0.5">
                                 <WeeklySummary worker={worker} />
-                                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
+                                <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
                               </div>
                             </div>
                           </div>
