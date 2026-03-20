@@ -1545,8 +1545,8 @@ export default function Matrix() {
                     
                     return (
                       <React.Fragment key={worker.id}>
-                      <div className={`flex border-b h-10 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                        <div className="w-[360px] min-w-[360px] px-2 py-1 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-10">
+                      <div className={`flex border-b h-14 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                        <div className="w-[360px] min-w-[360px] px-2 py-1 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-14">
                           <WorkerLockButton worker={worker} onUpdate={loadStaticData} />
                           {/* Send buttons - between lock and worker name */}
                           {(() => {
@@ -1585,13 +1585,11 @@ export default function Matrix() {
                               </>
                             );
                           })()}
-                          <div className="flex items-center flex-1 min-w-0">
-                            <div className="min-w-0 flex-1">
-                              <span className="truncate block text-sm">{worker.nickname}</span>
-                              <div className="flex items-center gap-1 mt-0.5">
-                                <WeeklySummary worker={worker} />
-                                <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
-                              </div>
+                          <div className="flex flex-col justify-center flex-1 min-w-0 h-full">
+                            <span className="truncate text-sm font-medium">{worker.nickname}</span>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <WeeklySummary worker={worker} />
+                              <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
                             </div>
                           </div>
                         </div>
@@ -1603,17 +1601,17 @@ export default function Matrix() {
                               console.log(`Assigned ref for ${worker.nickname} (${worker.id}):`, el);
                             }
                           }}
-                          className="flex-1 relative border-r cursor-crosshair h-10"
+                          className="flex-1 relative border-r cursor-crosshair h-14"
                           dir="rtl"
                           onMouseDown={(e) => {
                             handleMouseDown(e, worker, null, 'create');
                           }}
                         >
-                          <div className="absolute inset-0 flex h-10" dir="rtl">
+                          <div className="absolute inset-0 flex h-14" dir="rtl">
                             {viewMode === 'daily' ? (
-                              getDailyTimeSlots(zoomRange).map(hour => (<div key={hour} className="flex-1 border-l time-slot h-10"></div>))
+                              getDailyTimeSlots(zoomRange).map(hour => (<div key={hour} className="flex-1 border-l time-slot h-14"></div>))
                             ) : (
-                              getWeeklyTimeSlots(zoomRange).map((slot, idx) => (<div key={idx} className="flex-1 border-l time-slot h-10"></div>))
+                              getWeeklyTimeSlots(zoomRange).map((slot, idx) => (<div key={idx} className="flex-1 border-l time-slot h-14"></div>))
                             )}
                           </div>
                           <div className="absolute inset-0">
