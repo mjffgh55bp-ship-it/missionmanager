@@ -51,6 +51,7 @@ export default function Schedule() {
 
   const [customColumnOrders, setCustomColumnOrders] = useState({});
   const [dailyCustomColumns, setDailyCustomColumns] = useState({});
+  const [mokedOrder, setMokedOrder] = useState([]);
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
   const [editMode, setEditMode] = useState(false);
@@ -102,6 +103,13 @@ export default function Schedule() {
       setOpenRegistrations(JSON.parse(openRegSettings[0].setting_value) || []);
     } else {
       setOpenRegistrations([]);
+    }
+
+    const mokedOrderSettings = await base44.entities.AppSettings.filter({ setting_key: `moked_order_${dateString}` });
+    if (mokedOrderSettings.length > 0) {
+      setMokedOrder(JSON.parse(mokedOrderSettings[0].setting_value) || []);
+    } else {
+      setMokedOrder([]);
     }
 
     const columnOrderSettings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
@@ -391,6 +399,18 @@ export default function Schedule() {
               rows: rows.sort((a, b) => new Date(a.created_date) - new Date(b.created_date))
             }));
 
+            // Sort groups by mokedOrder if available
+            if (mokedOrder.length > 0) {
+              groups.sort((a, b) => {
+                const ai = mokedOrder.indexOf(a.key);
+                const bi = mokedOrder.indexOf(b.key);
+                if (ai === -1 && bi === -1) return 0;
+                if (ai === -1) return 1;
+                if (bi === -1) return -1;
+                return ai - bi;
+              });
+            }
+
             return groups.map((group, groupIndex) => {
               const template = allTemplates.find((t) => t.id === group.template_id);
               if (!template) return null;
@@ -414,20 +434,24 @@ export default function Schedule() {
                               <Button size="icon" variant="ghost" className="h-6 w-6 text-black hover:bg-black/10"
                           disabled={groupIndex === 0}
                           onClick={async () => {
-                            const prevGroup = groups[groupIndex - 1];
-                            await base44.entities.TemplateRow.update(group.rows[0].id, { created_date: prevGroup.rows[0].created_date });
-                            await base44.entities.TemplateRow.update(prevGroup.rows[0].id, { created_date: group.rows[0].created_date });
-                            loadData();
+                            const newOrder = groups.map(g => g.key);
+                            [newOrder[groupIndex - 1], newOrder[groupIndex]] = [newOrder[groupIndex], newOrder[groupIndex - 1]];
+                            setMokedOrder(newOrder);
+                            const settings = await base44.entities.AppSettings.filter({ setting_key: `moked_order_${dateString}` });
+                            const data = { setting_key: `moked_order_${dateString}`, setting_value: JSON.stringify(newOrder) };
+                            if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data); else await base44.entities.AppSettings.create(data);
                           }}>
                                 <ChevronUp className="w-4 h-4" />
                               </Button>
                               <Button size="icon" variant="ghost" className="h-6 w-6 text-black hover:bg-black/10"
                           disabled={groupIndex === groups.length - 1}
                           onClick={async () => {
-                            const nextGroup = groups[groupIndex + 1];
-                            await base44.entities.TemplateRow.update(group.rows[0].id, { created_date: nextGroup.rows[0].created_date });
-                            await base44.entities.TemplateRow.update(nextGroup.rows[0].id, { created_date: group.rows[0].created_date });
-                            loadData();
+                            const newOrder = groups.map(g => g.key);
+                            [newOrder[groupIndex], newOrder[groupIndex + 1]] = [newOrder[groupIndex + 1], newOrder[groupIndex]];
+                            setMokedOrder(newOrder);
+                            const settings = await base44.entities.AppSettings.filter({ setting_key: `moked_order_${dateString}` });
+                            const data = { setting_key: `moked_order_${dateString}`, setting_value: JSON.stringify(newOrder) };
+                            if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data); else await base44.entities.AppSettings.create(data);
                           }}>
                                 <ChevronDown className="w-4 h-4" />
                               </Button>
