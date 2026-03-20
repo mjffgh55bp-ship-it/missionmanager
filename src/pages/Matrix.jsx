@@ -1545,8 +1545,8 @@ export default function Matrix() {
                     
                     return (
                       <React.Fragment key={worker.id}>
-                      <div className={`flex border-b h-16 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                        <div className="w-[300px] min-w-[300px] p-3 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-16">
+                      <div className={`flex border-b h-10 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                        <div className="w-[300px] min-w-[300px] px-2 py-1 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-10">
                           <WorkerLockButton worker={worker} onUpdate={loadStaticData} />
                           {/* Send buttons - between lock and worker name */}
                           {(() => {
