@@ -1257,7 +1257,7 @@ export default function Matrix() {
     return (
       <div className="flex gap-1 ml-2">
         {days.map((d, i) => (
-          <div key={i} className={`w-5 h-5 rounded text-[8px] flex items-center justify-center font-medium ${d.working ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`} title={`${d.day}: ${d.working ? 'עובד' : 'חופש'}`}>
+          <div key={i} className={`text-[10px] font-medium ${d.working ? 'text-green-600' : 'text-gray-300'}`} title={`${d.day}: ${d.working ? 'עובד' : 'חופש'}`}>
             {d.day}
           </div>
         ))}
