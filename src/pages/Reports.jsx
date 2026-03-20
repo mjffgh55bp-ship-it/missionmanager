@@ -38,13 +38,18 @@ export default function Reports() {
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
+  const [allTemplateRows, setAllTemplateRows] = useState([]);
+  const [allTemplatesForReport, setAllTemplatesForReport] = useState([]);
+  const [visibleColumns, setVisibleColumns] = useState(null); // null = all visible
+  const [manualWorkerIds, setManualWorkerIds] = useState(null); // null = show all
+  const [showWorkerPicker, setShowWorkerPicker] = useState(false);
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings, shiftStatusesSettings, populationsSettings, workerRolesSettings] = await Promise.all([
+    const [workersData, assignmentsData, cartsData, globalSettings, cartParamsSettings, colSubTypesSettings, shiftStatusesSettings, populationsSettings, workerRolesSettings, templateRowsData, templatesData] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
       base44.entities.FoodCart.list(),
@@ -53,11 +58,15 @@ export default function Reports() {
       base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
       base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
+      base44.entities.TemplateRow.list(),
+      base44.entities.Template.filter({ active: true })
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
     setCarts(cartsData);
+    setAllTemplateRows(templateRowsData);
+    setAllTemplatesForReport(templatesData);
     if (globalSettings.length > 0) setGlobalParams(JSON.parse(globalSettings[0].setting_value) || []);
     if (cartParamsSettings.length > 0) setCartParams(JSON.parse(cartParamsSettings[0].setting_value) || {});
     if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
@@ -154,14 +163,55 @@ export default function Reports() {
 
   const allParams = getAllParams();
 
-  // Get all unique subtypes across all column types
-  const getAllSubTypes = () => {
-    const allSubs = new Set();
-    Object.values(columnSubTypes).forEach(subs => subs.forEach(s => allSubs.add(s)));
-    return Array.from(allSubs);
+  // Helper: parse hours from start/end time strings
+  const calcHoursFromTimes = (start, end) => {
+    if (!start || !end) return 0;
+    const endMatch = end.match(/^\+(\d+)\s+(\d{2}):(\d{2})$/);
+    const [startH, startM] = start.split(':').map(Number);
+    if (endMatch) {
+      const extraDays = parseInt(endMatch[1]);
+      const endH = parseInt(endMatch[2]);
+      const endMin = parseInt(endMatch[3]);
+      return extraDays * 24 + endH + endMin / 60 - startH - startM / 60;
+    }
+    const [endH, endM] = end.split(':').map(Number);
+    let diff = (endH + endM / 60) - (startH + startM / 60);
+    if (diff < 0) diff += 24;
+    return Math.round(diff * 10) / 10;
   };
 
-  const allSubTypes = getAllSubTypes();
+  // All unique worker column names across templates
+  const allWorkerColumnNames = [...new Set(
+    allTemplatesForReport.flatMap(t =>
+      (t.columns || []).filter(c => c.type === 'worker').map(c => c.name)
+    )
+  )];
+
+  const effectiveVisibleColumns = visibleColumns || allWorkerColumnNames;
+
+  // Compute hours per worker per column from TemplateRows
+  const getWorkerColumnHoursMap = () => {
+    const dateRange = getDateRange();
+    const result = {};
+    allTemplateRows.forEach(row => {
+      if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+      const template = allTemplatesForReport.find(t => t.id === row.template_id);
+      if (!template) return;
+      const startTime = row.values?.['התחלה'] || row.values?.['שעת התחלה'] || '';
+      const endTime = row.values?.['סיום'] || row.values?.['שעת סיום'] || '';
+      const hours = calcHoursFromTimes(startTime, endTime);
+      (template.columns || []).forEach(col => {
+        if (col.type !== 'worker') return;
+        const workerId = row.values?.[col.name];
+        if (!workerId) return;
+        if (!result[workerId]) result[workerId] = {};
+        result[workerId][col.name] = (result[workerId][col.name] || 0) + hours;
+      });
+    });
+    return result;
+  };
+
+  const workerColumnHoursMap = getWorkerColumnHoursMap();
 
   const getDateRange = () => {
     const today = new Date();
@@ -218,8 +268,9 @@ export default function Reports() {
     return totalHours;
   };
 
-  const filteredWorkersForSubTypes = workers.filter(w => {
+  const filteredWorkersForTable = workers.filter(w => {
     if (!w.active) return false;
+    if (manualWorkerIds !== null && !manualWorkerIds.includes(w.id)) return false;
     if (workerFilters.guide !== '__all__' && (workerFilters.guide === 'yes' ? !w.is_guide : w.is_guide)) return false;
     if (workerFilters.role !== '__all__' && w.role !== workerFilters.role) return false;
     if (workerFilters.population !== '__all__' && w.population !== workerFilters.population) return false;
@@ -280,62 +331,18 @@ export default function Reports() {
 
 
 
-        {/* Hours by SubType per Worker */}
-        {allSubTypes.length > 0 && (
+        {/* Hours by Worker Column */}
+        {allWorkerColumnNames.length > 0 && (
           <Card className="border-none shadow-lg mb-8">
             <CardHeader className="border-b">
               <div className="flex justify-between items-start flex-wrap gap-4">
-                <CardTitle className="flex items-center gap-2" dir="rtl"><Clock className="w-5 h-5 text-green-600" />שעות לפי תת-סוג</CardTitle>
-
+                <CardTitle className="flex items-center gap-2" dir="rtl"><Clock className="w-5 h-5 text-green-600" />שעות לפי תפקיד במשמרת</CardTitle>
                 <div className="flex flex-wrap gap-2">
-                  <Button 
-                    variant={dateFilterMode === 'all' ? 'default' : 'outline'} 
-                    size="sm"
-                    onClick={() => setDateFilterMode('all')}
-                    dir="rtl"
-                  >
-                    כל הזמן
-                  </Button>
-                  <Button 
-                    variant={dateFilterMode === 'daily' ? 'default' : 'outline'} 
-                    size="sm"
-                    onClick={() => setDateFilterMode('daily')}
-                    dir="rtl"
-                  >
-                    היום
-                  </Button>
-                  <Button 
-                    variant={dateFilterMode === 'week' ? 'default' : 'outline'} 
-                    size="sm"
-                    onClick={() => setDateFilterMode('week')}
-                    dir="rtl"
-                  >
-                    השבוע
-                  </Button>
-                  <Button 
-                    variant={dateFilterMode === 'month' ? 'default' : 'outline'} 
-                    size="sm"
-                    onClick={() => setDateFilterMode('month')}
-                    dir="rtl"
-                  >
-                    החודש
-                  </Button>
-                  <Button 
-                    variant={dateFilterMode === 'half_year' ? 'default' : 'outline'} 
-                    size="sm"
-                    onClick={() => setDateFilterMode('half_year')}
-                    dir="rtl"
-                  >
-                    חצי שנה
-                  </Button>
-                  <Button 
-                    variant={dateFilterMode === 'custom' ? 'default' : 'outline'} 
-                    size="sm"
-                    onClick={() => setDateFilterMode('custom')}
-                    dir="rtl"
-                  >
-                    מותאם אישית
-                  </Button>
+                  {['all','daily','week','month','half_year','custom'].map(mode => (
+                    <Button key={mode} variant={dateFilterMode === mode ? 'default' : 'outline'} size="sm" onClick={() => setDateFilterMode(mode)} dir="rtl">
+                      {mode === 'all' ? 'כל הזמן' : mode === 'daily' ? 'היום' : mode === 'week' ? 'השבוע' : mode === 'month' ? 'החודש' : mode === 'half_year' ? 'חצי שנה' : 'מותאם אישית'}
+                    </Button>
+                  ))}
                 </div>
               </div>
 
@@ -346,39 +353,84 @@ export default function Reports() {
                 </div>
               )}
 
-              <div className="flex gap-2 mt-3 flex-wrap">
+              {/* Filters row */}
+              <div className="flex gap-2 mt-3 flex-wrap items-center">
                 <Select value={workerFilters.population} onValueChange={(v) => setWorkerFilters({...workerFilters, population: v})}>
-                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-36 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__" dir="rtl">כל האוכלוסיות</SelectItem>
                     {populations.map(p => <SelectItem key={p} value={p} dir="rtl">{p}</SelectItem>)}
                   </SelectContent>
                 </Select>
-
                 <Select value={workerFilters.role} onValueChange={(v) => setWorkerFilters({...workerFilters, role: v})}>
-                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-36 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__" dir="rtl">כל התפקידים</SelectItem>
                     {workerRoles.map(r => <SelectItem key={r} value={r} dir="rtl">{r}</SelectItem>)}
                   </SelectContent>
                 </Select>
-
                 <Select value={workerFilters.guide} onValueChange={(v) => setWorkerFilters({...workerFilters, guide: v})}>
-                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-36 h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__" dir="rtl">כל המדריכים</SelectItem>
                     <SelectItem value="yes" dir="rtl">מדריכים בלבד</SelectItem>
                     <SelectItem value="no" dir="rtl">לא מדריכים</SelectItem>
                   </SelectContent>
                 </Select>
+                <Button variant={manualWorkerIds !== null ? 'default' : 'outline'} size="sm" onClick={() => setShowWorkerPicker(!showWorkerPicker)} dir="rtl">
+                  {manualWorkerIds !== null ? `${manualWorkerIds.length} עובדים נבחרו` : 'בחר עובדים ידנית'}
+                </Button>
+                {manualWorkerIds !== null && (
+                  <Button variant="ghost" size="sm" onClick={() => setManualWorkerIds(null)} dir="rtl">נקה בחירה</Button>
+                )}
+              </div>
 
-                <Select value={workerFilters.status} onValueChange={(v) => setWorkerFilters({...workerFilters, status: v})}>
-                  <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__" dir="rtl">כל הסטטוסים</SelectItem>
-                    {shiftStatuses.map(s => <SelectItem key={s} value={s} dir="rtl">{s}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              {/* Manual worker picker */}
+              {showWorkerPicker && (
+                <div className="mt-3 p-3 border rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
+                  <div className="flex flex-wrap gap-2">
+                    {workers.filter(w => w.active).map(w => {
+                      const selected = manualWorkerIds === null || manualWorkerIds.includes(w.id);
+                      return (
+                        <button key={w.id}
+                          onClick={() => {
+                            const current = manualWorkerIds || workers.filter(x => x.active).map(x => x.id);
+                            if (current.includes(w.id)) {
+                              setManualWorkerIds(current.filter(id => id !== w.id));
+                            } else {
+                              setManualWorkerIds([...current, w.id]);
+                            }
+                          }}
+                          className={`px-2 py-1 rounded text-xs border transition-colors ${selected ? 'bg-blue-900 text-white border-blue-900' : 'bg-white text-gray-600 border-gray-300'}`}
+                        >{w.nickname}</button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Column toggle */}
+              <div className="mt-3">
+                <p className="text-xs text-gray-500 mb-1" dir="rtl">הצג/הסתר עמודות:</p>
+                <div className="flex flex-wrap gap-2">
+                  {allWorkerColumnNames.map(col => {
+                    const visible = effectiveVisibleColumns.includes(col);
+                    return (
+                      <button key={col}
+                        onClick={() => {
+                          const current = effectiveVisibleColumns;
+                          if (visible) {
+                            setVisibleColumns(current.filter(c => c !== col));
+                          } else {
+                            setVisibleColumns([...current, col]);
+                          }
+                        }}
+                        className={`px-2 py-1 rounded text-xs border transition-colors ${visible ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-400 border-gray-200'}`}
+                      >{col}</button>
+                    );
+                  })}
+                  <button onClick={() => setVisibleColumns(null)} className="px-2 py-1 rounded text-xs border bg-gray-100 text-gray-600 border-gray-300">הצג הכל</button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-6">
@@ -387,24 +439,32 @@ export default function Reports() {
                   <TableHeader>
                     <TableRow>
                       <TableHead dir="rtl">עובד</TableHead>
-                      {allSubTypes.map(st => <TableHead key={st} dir="rtl">{st}</TableHead>)}
+                      {effectiveVisibleColumns.map(col => <TableHead key={col} dir="rtl">{col}</TableHead>)}
+                      <TableHead dir="rtl">סה"כ</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredWorkersForSubTypes.map(worker => (
-                      <TableRow key={worker.id}>
-                        <TableCell className="font-medium">{worker.nickname}</TableCell>
-                        {allSubTypes.map(st => (
-                          <TableCell key={st}>{getWorkerHoursBySubType(worker.id, st)}h</TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
+                    {filteredWorkersForTable.map(worker => {
+                      const colData = workerColumnHoursMap[worker.id] || {};
+                      const total = effectiveVisibleColumns.reduce((sum, col) => sum + (colData[col] || 0), 0);
+                      if (total === 0 && Object.keys(colData).length === 0) return null;
+                      return (
+                        <TableRow key={worker.id}>
+                          <TableCell className="font-medium">{worker.nickname}</TableCell>
+                          {effectiveVisibleColumns.map(col => (
+                            <TableCell key={col}>{colData[col] ? `${colData[col]}h` : '-'}</TableCell>
+                          ))}
+                          <TableCell className="font-semibold text-blue-900">{total > 0 ? `${Math.round(total * 10) / 10}h` : '-'}</TableCell>
+                        </TableRow>
+                      );
+                    }).filter(Boolean)}
                     <TableRow className="bg-gray-100 font-semibold">
                       <TableCell dir="rtl">סה"כ</TableCell>
-                      {allSubTypes.map(st => {
-                        const total = filteredWorkersForSubTypes.reduce((sum, w) => sum + getWorkerHoursBySubType(w.id, st), 0);
-                        return <TableCell key={st}>{total}h</TableCell>;
+                      {effectiveVisibleColumns.map(col => {
+                        const total = filteredWorkersForTable.reduce((sum, w) => sum + (workerColumnHoursMap[w.id]?.[col] || 0), 0);
+                        return <TableCell key={col}>{total > 0 ? `${Math.round(total * 10) / 10}h` : '-'}</TableCell>;
                       })}
+                      <TableCell>{Math.round(filteredWorkersForTable.reduce((sum, w) => sum + effectiveVisibleColumns.reduce((s2, col) => s2 + (workerColumnHoursMap[w.id]?.[col] || 0), 0), 0) * 10) / 10}h</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
