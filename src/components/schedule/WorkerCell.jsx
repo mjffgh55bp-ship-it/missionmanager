@@ -124,7 +124,7 @@ export default function WorkerCell({
               {isCurrentUnavailable && <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />}
             </div> :
 
-          <span className="text-xs text-gray-400">+ בחר עובד</span>
+          <span className="text-gray-300 text-xs">+ בחר עובד</span>
           }
         </button>
       </PopoverTrigger>
