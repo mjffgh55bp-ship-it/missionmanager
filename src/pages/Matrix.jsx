@@ -1603,17 +1603,17 @@ export default function Matrix() {
                               console.log(`Assigned ref for ${worker.nickname} (${worker.id}):`, el);
                             }
                           }}
-                          className="flex-1 relative border-r cursor-crosshair h-16"
+                          className="flex-1 relative border-r cursor-crosshair h-10"
                           dir="rtl"
                           onMouseDown={(e) => {
                             handleMouseDown(e, worker, null, 'create');
                           }}
                         >
-                          <div className="absolute inset-0 flex h-16" dir="rtl">
+                          <div className="absolute inset-0 flex h-10" dir="rtl">
                             {viewMode === 'daily' ? (
-                              getDailyTimeSlots(zoomRange).map(hour => (<div key={hour} className="flex-1 border-l time-slot h-16"></div>))
+                              getDailyTimeSlots(zoomRange).map(hour => (<div key={hour} className="flex-1 border-l time-slot h-10"></div>))
                             ) : (
-                              getWeeklyTimeSlots(zoomRange).map((slot, idx) => (<div key={idx} className="flex-1 border-l time-slot h-16"></div>))
+                              getWeeklyTimeSlots(zoomRange).map((slot, idx) => (<div key={idx} className="flex-1 border-l time-slot h-10"></div>))
                             )}
                           </div>
                           <div className="absolute inset-0">
