@@ -1481,7 +1481,7 @@ export default function Matrix() {
             <div className="overflow-x-auto pb-16">
               <div className="min-w-[1400px]">
                 <div className="flex sticky top-0 bg-gray-100 z-30 border-b">
-                  <div className="w-[300px] min-w-[300px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
+                  <div className="w-[360px] min-w-[360px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
                     <MasterControls
                       workers={workers}
                       populationFilter={populationFilter}
@@ -1546,7 +1546,7 @@ export default function Matrix() {
                     return (
                       <React.Fragment key={worker.id}>
                       <div className={`flex border-b h-10 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                        <div className="w-[300px] min-w-[300px] px-2 py-1 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-10">
+                        <div className="w-[360px] min-w-[360px] px-2 py-1 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-10">
                           <WorkerLockButton worker={worker} onUpdate={loadStaticData} />
                           {/* Send buttons - between lock and worker name */}
                           {(() => {
