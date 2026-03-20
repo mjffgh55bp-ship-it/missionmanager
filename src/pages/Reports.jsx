@@ -189,6 +189,25 @@ export default function Reports() {
 
   const effectiveVisibleColumns = visibleColumns || allWorkerColumnNames;
 
+  const getDateRange = () => {
+    const today = new Date();
+    if (dateFilterMode === 'daily') {
+      const d = format(today, 'yyyy-MM-dd');
+      return { start: d, end: d };
+    } else if (dateFilterMode === 'week') {
+      return { start: format(startOfWeek(today, { weekStartsOn: 0 }), 'yyyy-MM-dd'), end: format(endOfWeek(today, { weekStartsOn: 0 }), 'yyyy-MM-dd') };
+    } else if (dateFilterMode === 'month') {
+      return { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: format(endOfMonth(today), 'yyyy-MM-dd') };
+    } else if (dateFilterMode === 'half_year') {
+      const sixMonthsAgo = new Date(today); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      return { start: format(sixMonthsAgo, 'yyyy-MM-dd'), end: format(today, 'yyyy-MM-dd') };
+    } else if (dateFilterMode === 'custom') {
+      if (!startDate || !endDate) return null;
+      return { start: startDate, end: endDate };
+    }
+    return null;
+  };
+
   // Compute hours per worker per column from TemplateRows
   const getWorkerColumnHoursMap = () => {
     const dateRange = getDateRange();
@@ -212,38 +231,6 @@ export default function Reports() {
   };
 
   const workerColumnHoursMap = getWorkerColumnHoursMap();
-
-  const getDateRange = () => {
-    const today = new Date();
-    let start, end;
-    
-    if (dateFilterMode === 'daily') {
-      start = end = format(today, 'yyyy-MM-dd');
-    } else if (dateFilterMode === 'week') {
-      const wStart = startOfWeek(today, { weekStartsOn: 0 });
-      const wEnd = endOfWeek(today, { weekStartsOn: 0 });
-      start = format(wStart, 'yyyy-MM-dd');
-      end = format(wEnd, 'yyyy-MM-dd');
-    } else if (dateFilterMode === 'month') {
-      const mStart = startOfMonth(today);
-      const mEnd = endOfMonth(today);
-      start = format(mStart, 'yyyy-MM-dd');
-      end = format(mEnd, 'yyyy-MM-dd');
-    } else if (dateFilterMode === 'half_year') {
-      const halfStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 6) * 6, 1);
-      const halfEnd = new Date(today.getFullYear(), Math.floor(today.getMonth() / 6) * 6 + 6, 0);
-      start = format(halfStart, 'yyyy-MM-dd');
-      end = format(halfEnd, 'yyyy-MM-dd');
-    } else if (dateFilterMode === 'custom') {
-      if (!startDate || !endDate) return null;
-      start = startDate;
-      end = endDate;
-    } else {
-      return null;
-    }
-    
-    return { start, end };
-  };
 
   // Calculate hours per subtype per worker
   const getWorkerHoursBySubType = (workerId, subType) => {
