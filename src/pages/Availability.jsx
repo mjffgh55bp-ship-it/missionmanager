@@ -735,7 +735,11 @@ END:VEVENT
             {/* Extra Tasks Section */}
             {openRegistrations.filter((reg) => {
             const regShifts = reg?.shifts || [];
-            return regShifts.length > 0;
+            if (regShifts.length === 0) return false;
+            if (!reg?.date) return true;
+            const weekStartStr = format(weekStart, "yyyy-MM-dd");
+            const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
+            return reg.date >= weekStartStr && reg.date <= weekEndStr;
           }).length > 0 &&
           <Card className="border-none shadow-lg mb-4">
                 <CardHeader className="border-b bg-white py-3 px-4">
@@ -746,7 +750,11 @@ END:VEVENT
                   <div className="space-y-3">
                     {openRegistrations.filter((reg) => {
                   const regShifts = reg?.shifts || [];
-                  return regShifts.length > 0;
+                  if (regShifts.length === 0) return false;
+                  if (!reg?.date) return true;
+                  const weekStartStr = format(weekStart, "yyyy-MM-dd");
+                  const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
+                  return reg.date >= weekStartStr && reg.date <= weekEndStr;
                 }).map((reg) => {
                   const regKey = reg?.key || reg;
                   const regName = reg?.name || reg;
