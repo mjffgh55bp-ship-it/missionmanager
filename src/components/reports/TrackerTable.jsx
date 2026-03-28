@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pencil, Trash2, Check, X, Plus, Save, ChevronDown, ChevronUp } from "lucide-react";
+import { Trash2, Check, X, Plus, Save, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
@@ -13,8 +13,8 @@ const COLUMN_TYPES = [
   { value: "hours_assignments", label: "שעות (משימות)" },
   { value: "hours_templates", label: "שעות (תבניות)" },
   { value: "shifts_count", label: "מספר משמרות" },
-  { value: "schedule_col_sum", label: "סיכום עמודת לוח (מספר)" },
-  { value: "schedule_col_count", label: "ספירת ערך בעמודת לוח" },
+  { value: "schedule_col_sum", label: "סיכום עמודת לוח" },
+  { value: "schedule_col_count", label: "ספירת ערך בלוח" },
   { value: "number", label: "מספר (ידני)" },
   { value: "text", label: "טקסט (ידני)" },
   { value: "checkbox", label: "סימון (ידני)" },
@@ -70,7 +70,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [guide, setGuide] = useState("__all__");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Inline editor state
+  // Inline edit
   const [editMode, setEditMode] = useState(false);
   const [editName, setEditName] = useState(tracker.name);
   const [editColumns, setEditColumns] = useState(tracker.columns || []);
@@ -87,8 +87,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     setEntries(data);
   };
 
-  // ── Inline editor helpers ──
-  const addColumn = () => setEditColumns([...editColumns, { id: Date.now().toString(), name: "", type: "hours_assignments", template_column: "" }]);
+  const addColumn = () => setEditColumns([...editColumns, { id: Date.now().toString(), name: "", type: "hours_assignments", template_column: "", schedule_col_name: "", schedule_col_value: "" }]);
   const updateColumn = (idx, field, value) => { const c = [...editColumns]; c[idx] = { ...c[idx], [field]: value }; setEditColumns(c); };
   const removeColumn = (idx) => setEditColumns(editColumns.filter((_, i) => i !== idx));
 
@@ -106,7 +105,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     setEditMode(false);
   };
 
-  // ── Cell helpers ──
   const getEntry = (workerId, colId) => entries.find(e => e.worker_id === workerId && e.column_id === colId);
 
   const startCellEdit = (workerId, colId) => {
@@ -141,7 +139,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     }
   };
 
-  // ── Auto-compute ──
   const computeAutoValue = (col, workerId) => {
     const dateRange = getDateRange(dateFilterMode, startDate, endDate);
     const filtered = assignments.filter(a => {
@@ -151,6 +148,21 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     });
     if (col.type === "hours_assignments") return filtered.reduce((s, a) => s + (a.hours || 0), 0);
     if (col.type === "shifts_count") return filtered.length;
+    if (col.type === "hours_templates") {
+      let total = 0;
+      templateRows.forEach(row => {
+        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+        const tmpl = allTemplates.find(t => t.id === row.template_id);
+        if (!tmpl) return;
+        const h = calcHours(row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "", row.values?.["סיום"] || row.values?.["שעת סיום"] || "");
+        (tmpl.columns || []).forEach(tc => {
+          if (tc.type !== "worker") return;
+          if (col.template_column && col.template_column !== "__all__" && tc.name !== col.template_column) return;
+          if (row.values?.[tc.name] === workerId) total += h;
+        });
+      });
+      return Math.round(total * 10) / 10;
+    }
     if (col.type === "schedule_col_sum") {
       return filtered.reduce((sum, a) => {
         const colData = a.column_values?.[col.schedule_col_name];
@@ -166,21 +178,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         if (col.schedule_col_value) return String(val) === String(col.schedule_col_value);
         return val !== undefined && val !== null && val !== "";
       }).length;
-    }
-    if (col.type === "hours_templates") {
-      let total = 0;
-      templateRows.forEach(row => {
-        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
-        const tmpl = allTemplates.find(t => t.id === row.template_id);
-        if (!tmpl) return;
-        const h = calcHours(row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "", row.values?.["סיום"] || row.values?.["שעת סיום"] || "");
-        (tmpl.columns || []).forEach(tc => {
-          if (tc.type !== "worker") return;
-          if (col.template_column && col.template_column !== "__all__" && tc.name !== col.template_column) return;
-          if (row.values?.[tc.name] === workerId) total += h;
-        });
-      });
-      return Math.round(total * 10) / 10;
     }
     return null;
   };
@@ -199,87 +196,40 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   return (
     <Card className="border-none shadow-lg mb-6" dir="rtl">
-      {/* ── Header ── */}
+      {/* Header */}
       <CardHeader className="border-b py-3 px-4">
-        {editMode ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-8 font-semibold text-base flex-1" dir="rtl" placeholder="שם הטבלה" />
-              <Button size="sm" onClick={saveTracker} disabled={saving || !editName.trim()} className="bg-green-600 hover:bg-green-700">
-                <Save className="w-4 h-4 ml-1" />{saving ? "שומר..." : "שמור"}
-              </Button>
-              <Button size="sm" variant="outline" onClick={cancelEdit}>
-                <X className="w-4 h-4 ml-1" />ביטול
-              </Button>
-            </div>
-            {/* Column editor */}
-            <div className="space-y-2 pt-1">
-              {editColumns.map((col, idx) => (
-                <div key={col.id} className="flex gap-2 items-center bg-gray-50 rounded-lg p-2 border">
-                  <Input value={col.name} onChange={e => updateColumn(idx, "name", e.target.value)} placeholder="שם עמודה" className="h-7 text-sm flex-1" dir="rtl" />
-                  <Select value={col.type} onValueChange={v => updateColumn(idx, "type", v)}>
-                    <SelectTrigger className="h-7 w-44 text-sm" dir="rtl"><SelectValue /></SelectTrigger>
-                    <SelectContent dir="rtl">
-                      {COLUMN_TYPES.map(ct => <SelectItem key={ct.value} value={ct.value}>{ct.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  {col.type === "hours_templates" && allWorkerColumnNames.length > 0 && (
-                    <Select value={col.template_column || ""} onValueChange={v => updateColumn(idx, "template_column", v)}>
-                      <SelectTrigger className="h-7 w-36 text-sm" dir="rtl"><SelectValue placeholder="עמודה..." /></SelectTrigger>
-                      <SelectContent dir="rtl">
-                        <SelectItem value="__all__">כל העמודות</SelectItem>
-                        {allWorkerColumnNames.map(cn => <SelectItem key={cn} value={cn}>{cn}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {(col.type === "schedule_col_sum" || col.type === "schedule_col_count") && (
-                    <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
-                      <SelectTrigger className="h-7 w-36 text-sm" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
-                      <SelectContent dir="rtl">
-                        {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {col.type === "schedule_col_count" && col.schedule_col_name && (() => {
-                    const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                    const opts = sc?.options || [];
-                    return opts.length > 0 ? (
-                      <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
-                        <SelectTrigger className="h-7 w-32 text-sm" dir="rtl"><SelectValue placeholder="ערך לסנן..." /></SelectTrigger>
-                        <SelectContent dir="rtl">
-                          <SelectItem value={null}>כל ערך</SelectItem>
-                          {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : null;
-                  })()}
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 flex-shrink-0" onClick={() => removeColumn(idx)}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              ))}
-              <Button size="sm" variant="outline" onClick={addColumn} className="w-full">
-                <Plus className="w-4 h-4 ml-1" />הוסף עמודה
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
+          {editMode ? (
+            <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-8 font-semibold text-base w-56" dir="rtl" placeholder="שם הטבלה" />
+          ) : (
             <CardTitle className="text-base">{tracker.name}</CardTitle>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setShowFilters(!showFilters)}>
-                {showFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-                סינון
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setEditMode(true)}>
-                <Pencil className="w-4 h-4 ml-1" />ערוך
-              </Button>
-              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={onDelete}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
+          )}
+          <div className="flex gap-2">
+            {editMode ? (
+              <>
+                <Button size="sm" onClick={saveTracker} disabled={saving || !editName.trim()} className="bg-green-600 hover:bg-green-700">
+                  <Save className="w-4 h-4 ml-1" />{saving ? "שומר..." : "שמור"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={cancelEdit}>
+                  <X className="w-4 h-4 ml-1" />ביטול
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setShowFilters(!showFilters)}>
+                  {showFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+                  סינון
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setEditName(tracker.name); setEditColumns(tracker.columns || []); setEditMode(true); }}>
+                  <Pencil className="w-4 h-4 ml-1" />ערוך
+                </Button>
+                <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={onDelete}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Filters panel */}
         {!editMode && showFilters && (
@@ -289,7 +239,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               <div className="flex flex-wrap gap-1">
                 {DATE_MODES.map(m => (
                   <Button key={m.value} variant={dateFilterMode === m.value ? "default" : "outline"} size="sm"
-                    className={dateFilterMode === m.value ? "bg-blue-900 text-white h-7 px-2 text-xs" : "h-7 px-2 text-xs"}
+                    className={`h-7 px-2 text-xs ${dateFilterMode === m.value ? "bg-blue-900 text-white" : ""}`}
                     onClick={() => setDateFilterMode(m.value)}>{m.label}</Button>
                 ))}
               </div>
@@ -335,28 +285,92 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         )}
       </CardHeader>
 
-      {/* ── Table ── */}
-      <CardContent className="pt-4 px-2 overflow-x-auto">
+      {/* Table */}
+      <CardContent className="pt-0 px-0 overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50">
-              <TableHead dir="rtl" className="font-bold">עובד</TableHead>
-              {displayColumns.map(col => (
-                <TableHead key={col.id} dir="rtl">
-                  <div className="flex flex-col gap-0.5">
-                    <span>{col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}</span>
-                    <span className="text-[10px] text-gray-400 font-normal">
-                      {COLUMN_TYPES.find(ct => ct.value === col.type)?.label || ""}
-                    </span>
-                  </div>
+              <TableHead dir="rtl" className="font-bold px-4 min-w-[100px]">עובד</TableHead>
+              {displayColumns.map((col, idx) => (
+                <TableHead key={col.id} dir="rtl" className="px-2 min-w-[160px]">
+                  {editMode ? (
+                    <div className="flex flex-col gap-1 py-1">
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => removeColumn(idx)} className="text-red-400 hover:text-red-600 flex-shrink-0">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        <Input
+                          value={col.name}
+                          onChange={e => updateColumn(idx, "name", e.target.value)}
+                          placeholder="שם עמודה"
+                          className="h-7 text-xs flex-1 min-w-0"
+                          dir="rtl"
+                        />
+                      </div>
+                      <Select value={col.type} onValueChange={v => updateColumn(idx, "type", v)}>
+                        <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue /></SelectTrigger>
+                        <SelectContent dir="rtl">
+                          {COLUMN_TYPES.map(ct => <SelectItem key={ct.value} value={ct.value} className="text-xs">{ct.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {col.type === "hours_templates" && allWorkerColumnNames.length > 0 && (
+                        <Select value={col.template_column || ""} onValueChange={v => updateColumn(idx, "template_column", v)}>
+                          <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת עובד..." /></SelectTrigger>
+                          <SelectContent dir="rtl">
+                            <SelectItem value="__all__">כל העמודות</SelectItem>
+                            {allWorkerColumnNames.map(cn => <SelectItem key={cn} value={cn} className="text-xs">{cn}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {(col.type === "schedule_col_sum" || col.type === "schedule_col_count") && (
+                        <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
+                          <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
+                          <SelectContent dir="rtl">
+                            {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {col.type === "schedule_col_count" && col.schedule_col_name && (() => {
+                        const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+                        const opts = sc?.options || [];
+                        return opts.length > 0 ? (
+                          <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
+                            <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="ערך לסנן..." /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              <SelectItem value={null}>כל ערך</SelectItem>
+                              {opts.map(o => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        ) : null;
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-0.5 py-1">
+                      <span className="font-medium">{col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}</span>
+                      <span className="text-[10px] text-gray-400 font-normal">
+                        {COLUMN_TYPES.find(ct => ct.value === col.type)?.label || ""}
+                      </span>
+                    </div>
+                  )}
                 </TableHead>
               ))}
+              {/* Add column button in header */}
+              {editMode && (
+                <TableHead className="px-2">
+                  <button
+                    onClick={addColumn}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 border border-dashed border-blue-300 hover:border-blue-500 rounded px-2 py-1 whitespace-nowrap transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />הוסף עמודה
+                  </button>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredWorkers.map(worker => (
               <TableRow key={worker.id} className="hover:bg-gray-50">
-                <TableCell className="font-medium whitespace-nowrap">{worker.nickname}</TableCell>
+                <TableCell className="font-medium whitespace-nowrap px-4">{worker.nickname}</TableCell>
                 {displayColumns.map(col => {
                   const auto = isAuto(col.type);
                   const entryValue = getEntry(worker.id, col.id)?.value || "";
@@ -365,14 +379,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
                   if (auto) {
                     return (
-                      <TableCell key={col.id} className="text-center font-semibold text-blue-900">
-                        {value > 0 ? (col.type === "shifts_count" ? value : `${value}h`) : <span className="text-gray-300">-</span>}
+                      <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2">
+                        {value > 0 ? (col.type === "shifts_count" || col.type === "schedule_col_count" ? value : `${value}h`) : <span className="text-gray-300">-</span>}
                       </TableCell>
                     );
                   }
                   if (col.type === "checkbox") {
                     return (
-                      <TableCell key={col.id} className="text-center">
+                      <TableCell key={col.id} className="text-center px-2">
                         <button
                           onClick={() => toggleCheckbox(worker.id, col.id, entryValue)}
                           className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors mx-auto ${entryValue === "true" ? "bg-green-500 border-green-600 text-white" : "border-gray-300 hover:border-blue-400"}`}
@@ -383,7 +397,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     );
                   }
                   return (
-                    <TableCell key={col.id}>
+                    <TableCell key={col.id} className="px-2">
                       {isEditing ? (
                         <div className="flex items-center gap-1">
                           <Input autoFocus value={cellDraft} onChange={e => setCellDraft(e.target.value)}
@@ -401,6 +415,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     </TableCell>
                   );
                 })}
+                {editMode && <TableCell />}
               </TableRow>
             ))}
           </TableBody>
