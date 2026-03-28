@@ -62,8 +62,7 @@ const COLUMN_TYPES = [
   { value: "hours_assignments", label: "שעות (משימות)" },
   { value: "hours_templates", label: "שעות (תבניות)" },
   { value: "shifts_count", label: "מספר משמרות" },
-  { value: "schedule_col_sum", label: "סיכום עמודת לוח" },
-  { value: "schedule_col_count", label: "ספירת ערך בלוח" },
+  { value: "schedule_col", label: "עמודת לוח" },
   { value: "number", label: "מספר (ידני)" },
   { value: "text", label: "טקסט (ידני)" },
   { value: "checkbox", label: "סימון (ידני)" },
@@ -212,21 +211,26 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       });
       return Math.round(total * 10) / 10;
     }
-    if (col.type === "schedule_col_sum") {
-      return filtered.reduce((sum, a) => {
-        const colData = a.column_values?.[col.schedule_col_name];
-        const val = colData?.value ?? colData;
-        const num = parseFloat(val);
-        return sum + (isNaN(num) ? 0 : num);
-      }, 0);
-    }
-    if (col.type === "schedule_col_count") {
-      return filtered.filter(a => {
-        const colData = a.column_values?.[col.schedule_col_name];
-        const val = colData?.value ?? colData;
-        if (col.schedule_col_value) return String(val) === String(col.schedule_col_value);
-        return val !== undefined && val !== null && val !== "";
-      }).length;
+    if (col.type === "schedule_col") {
+      const schCol = scheduleColumns.find(c => c.name === col.schedule_col_name);
+      const reportType = schCol?.report_type || "sum_numbers";
+      if (reportType === "sum_hours") {
+        // Sum hours of assignments where column value matches filter
+        return filtered.filter(a => {
+          const colData = a.column_values?.[col.schedule_col_name];
+          const val = colData?.value ?? colData;
+          if (col.schedule_col_value) return String(val) === String(col.schedule_col_value);
+          return val !== undefined && val !== null && val !== "";
+        }).reduce((sum, a) => sum + (a.hours || 0), 0);
+      } else {
+        // Sum numeric values
+        return filtered.reduce((sum, a) => {
+          const colData = a.column_values?.[col.schedule_col_name];
+          const val = colData?.value ?? colData;
+          const num = parseFloat(val);
+          return sum + (isNaN(num) ? 0 : num);
+        }, 0);
+      }
     }
     return null;
   };
@@ -240,7 +244,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return true;
   });
 
-  const isAuto = (type) => ["hours_assignments", "hours_templates", "shifts_count", "schedule_col_sum", "schedule_col_count"].includes(type);
+  const isAuto = (type) => ["hours_assignments", "hours_templates", "shifts_count", "schedule_col"].includes(type);
   const displayColumns = editMode ? editColumns : (tracker.columns || []);
 
   return (
@@ -369,20 +373,24 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           </SelectContent>
                         </Select>
                       )}
-                      {(col.type === "schedule_col_sum" || col.type === "schedule_col_count") && (
+                      {col.type === "schedule_col" && (
                         <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
                           <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
                           <SelectContent dir="rtl">
-                            {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
+                            {scheduleColumns.map(sc => (
+                              <SelectItem key={sc.name} value={sc.name} className="text-xs">
+                                {sc.name} ({sc.report_type === "sum_hours" ? "שעות" : "מספרים"})
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       )}
-                      {col.type === "schedule_col_count" && col.schedule_col_name && (() => {
+                      {col.type === "schedule_col" && col.schedule_col_name && (() => {
                         const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
                         const opts = sc?.options || [];
                         return opts.length > 0 ? (
                           <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
-                            <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="ערך לסנן..." /></SelectTrigger>
+                            <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="סנן לפי ערך..." /></SelectTrigger>
                             <SelectContent dir="rtl">
                               <SelectItem value={null}>כל ערך</SelectItem>
                               {opts.map(o => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
@@ -425,9 +433,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   const isEditing = editingCell?.workerId === worker.id && editingCell?.colId === col.id;
 
                   if (auto) {
+                    const schCol = col.type === "schedule_col" ? scheduleColumns.find(c => c.name === col.schedule_col_name) : null;
+                    const showAsNumber = col.type === "shifts_count" || (col.type === "schedule_col" && schCol?.report_type === "sum_numbers");
                     return (
                       <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2">
-                        {value > 0 ? (col.type === "shifts_count" || col.type === "schedule_col_count" ? value : `${value}h`) : <span className="text-gray-300">-</span>}
+                        {value > 0 ? (showAsNumber ? value : `${value}h`) : <span className="text-gray-300">-</span>}
                       </TableCell>
                     );
                   }

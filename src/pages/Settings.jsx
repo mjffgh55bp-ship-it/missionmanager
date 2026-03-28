@@ -6,30 +6,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Info, Users, X, Plus, Trash2, Clock, Hash, Columns, Settings as SettingsIcon } from "lucide-react";
+import { Save, Info, Users, X, Plus, Trash2, Columns, Settings as SettingsIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { format } from "date-fns";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 export default function Settings() {
   const [tipsMessage, setTipsMessage] = useState("");
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
   const [userRoles, setUserRoles] = useState({});
   const [workers, setWorkers] = useState([]);
-  const [timeParamTypes, setTimeParamTypes] = useState([]);
-  const [countParamTypes, setCountParamTypes] = useState([]);
-  const [newTimeType, setNewTimeType] = useState("");
-  const [newCountType, setNewCountType] = useState("");
-  const [paramSubTypes, setParamSubTypes] = useState({});
-  const [selectedTypeForSubType, setSelectedTypeForSubType] = useState("");
-  const [newSubType, setNewSubType] = useState("");
-  // Schedule column types
-  const [columnTypes, setColumnTypes] = useState([]);
-  const [columnSubTypes, setColumnSubTypes] = useState({});
-  const [newColumnType, setNewColumnType] = useState("");
-  const [selectedColTypeForSubType, setSelectedColTypeForSubType] = useState("");
-  const [newColSubType, setNewColSubType] = useState("");
+  // Unified schedule columns
+  const [scheduleColumns, setScheduleColumns] = useState([]);
+  const [newColName, setNewColName] = useState("");
+  const [newColReportType, setNewColReportType] = useState("sum_numbers");
+  const [newColOption, setNewColOption] = useState("");
+  const [expandedCol, setExpandedCol] = useState(null);
   const [populations, setPopulations] = useState([]);
   const [newPopulation, setNewPopulation] = useState("");
   const [workerRoles, setWorkerRoles] = useState([]);
@@ -42,15 +34,11 @@ export default function Settings() {
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, timeTypesSettings, countTypesSettings, subTypesSettings, colTypesSettings, colSubTypesSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
+    const [tipsSettings, rolesSettings, workersData, scheduleColsSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
-      base44.entities.AppSettings.filter({ setting_key: "time_param_types" }),
-      base44.entities.AppSettings.filter({ setting_key: "count_param_types" }),
-      base44.entities.AppSettings.filter({ setting_key: "param_sub_types" }),
-      base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
-      base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
+      base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
@@ -62,11 +50,7 @@ export default function Settings() {
       setShowTipsAsPopup(tipsData.showAsPopup || false);
     }
     if (rolesSettings.length > 0) setUserRoles(JSON.parse(rolesSettings[0].setting_value));
-    if (timeTypesSettings.length > 0) setTimeParamTypes(JSON.parse(timeTypesSettings[0].setting_value) || []);
-    if (countTypesSettings.length > 0) setCountParamTypes(JSON.parse(countTypesSettings[0].setting_value) || []);
-    if (subTypesSettings.length > 0) setParamSubTypes(JSON.parse(subTypesSettings[0].setting_value) || {});
-    if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
-    if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
+    if (scheduleColsSettings.length > 0) setScheduleColumns(JSON.parse(scheduleColsSettings[0].setting_value) || []);
     if (populationsSettings.length > 0) {
       setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     } else {
@@ -109,96 +93,35 @@ export default function Settings() {
     setUserRoles({ ...userRoles, [email]: role });
   };
 
-  // Time/Count param types handlers
-  const handleAddTimeType = async () => {
-    if (!newTimeType.trim()) return;
-    const updated = [...timeParamTypes, newTimeType.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "time_param_types" });
-    const data = { setting_key: "time_param_types", setting_value: JSON.stringify(updated) };
+  const saveScheduleColumns = async (updated) => {
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
+    const data = { setting_key: "custom_schedule_params", setting_value: JSON.stringify(updated) };
     if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
     else await base44.entities.AppSettings.create(data);
-    setTimeParamTypes(updated);
-    setNewTimeType("");
+    setScheduleColumns(updated);
   };
 
-  const handleRemoveTimeType = async (type) => {
-    const updated = timeParamTypes.filter(t => t !== type);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "time_param_types" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    setTimeParamTypes(updated);
+  const handleAddScheduleColumn = async () => {
+    if (!newColName.trim()) return;
+    const updated = [...scheduleColumns, { name: newColName.trim(), report_type: newColReportType, options: [] }];
+    await saveScheduleColumns(updated);
+    setNewColName("");
   };
 
-  const handleAddCountType = async () => {
-    if (!newCountType.trim()) return;
-    const updated = [...countParamTypes, newCountType.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "count_param_types" });
-    const data = { setting_key: "count_param_types", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setCountParamTypes(updated);
-    setNewCountType("");
+  const handleRemoveScheduleColumn = async (idx) => {
+    await saveScheduleColumns(scheduleColumns.filter((_, i) => i !== idx));
   };
 
-  const handleRemoveCountType = async (type) => {
-    const updated = countParamTypes.filter(t => t !== type);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "count_param_types" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    setCountParamTypes(updated);
+  const handleAddOption = async (colIdx) => {
+    if (!newColOption.trim()) return;
+    const updated = scheduleColumns.map((c, i) => i === colIdx ? { ...c, options: [...(c.options || []), newColOption.trim()] } : c);
+    await saveScheduleColumns(updated);
+    setNewColOption("");
   };
 
-  const handleAddSubType = async () => {
-    if (!selectedTypeForSubType || !newSubType.trim()) return;
-    const updated = { ...paramSubTypes, [selectedTypeForSubType]: [...(paramSubTypes[selectedTypeForSubType] || []), newSubType.trim()] };
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "param_sub_types" });
-    const data = { setting_key: "param_sub_types", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setParamSubTypes(updated);
-    setNewSubType("");
-  };
-
-  const handleRemoveSubType = async (type, subType) => {
-    const updated = { ...paramSubTypes, [type]: (paramSubTypes[type] || []).filter(st => st !== subType) };
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "param_sub_types" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    setParamSubTypes(updated);
-  };
-
-  // Schedule column types handlers
-  const handleAddColumnType = async () => {
-    if (!newColumnType.trim()) return;
-    const updated = [...columnTypes, newColumnType.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" });
-    const data = { setting_key: "schedule_column_types", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setColumnTypes(updated);
-    setNewColumnType("");
-  };
-
-  const handleRemoveColumnType = async (type) => {
-    const updated = columnTypes.filter(t => t !== type);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    setColumnTypes(updated);
-  };
-
-  const handleAddColSubType = async () => {
-    if (!selectedColTypeForSubType || !newColSubType.trim()) return;
-    const updated = { ...columnSubTypes, [selectedColTypeForSubType]: [...(columnSubTypes[selectedColTypeForSubType] || []), newColSubType.trim()] };
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" });
-    const data = { setting_key: "schedule_column_subtypes", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setColumnSubTypes(updated);
-    setNewColSubType("");
-  };
-
-  const handleRemoveColSubType = async (type, subType) => {
-    const updated = { ...columnSubTypes, [type]: (columnSubTypes[type] || []).filter(st => st !== subType) };
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
-    setColumnSubTypes(updated);
+  const handleRemoveOption = async (colIdx, opt) => {
+    const updated = scheduleColumns.map((c, i) => i === colIdx ? { ...c, options: (c.options || []).filter(o => o !== opt) } : c);
+    await saveScheduleColumns(updated);
   };
 
   const handleAddPopulation = async () => {
@@ -263,126 +186,76 @@ export default function Settings() {
           <p className="text-gray-600" dir="rtl">הגדר הגדרות כלל מערכת</p>
         </div>
 
-        {/* Schedule Column Types */}
+        {/* Unified Schedule Columns */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Columns className="w-5 h-5 text-green-600" />סוגי עמודות בלוח התורים</CardTitle>
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Columns className="w-5 h-5 text-green-600" />עמודות לוח ודוחות</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סוגי עמודות שניתן להוסיף לעגלות בעמוד לוח התורים</p>
-            <div className="flex gap-2 mb-4">
-              <Input value={newColumnType} onChange={(e) => setNewColumnType(e.target.value)} placeholder="שם סוג עמודה חדש..." dir="rtl" />
-              <Button onClick={handleAddColumnType}><Plus className="w-4 h-4" /></Button>
+            <p className="text-sm text-gray-600 mb-4" dir="rtl">
+              הגדר עמודות שיופיעו בלוח ובדוחות. לכל עמודה קבע כיצד לסכם את הנתונים בדוחות.
+            </p>
+            {/* Add new column */}
+            <div className="flex gap-2 mb-4" dir="rtl">
+              <Input value={newColName} onChange={e => setNewColName(e.target.value)} placeholder="שם עמודה חדשה..." dir="rtl" className="flex-1" />
+              <Select value={newColReportType} onValueChange={setNewColReportType}>
+                <SelectTrigger className="w-48" dir="rtl"><SelectValue /></SelectTrigger>
+                <SelectContent dir="rtl">
+                  <SelectItem value="sum_numbers">סיכום מספרים</SelectItem>
+                  <SelectItem value="sum_hours">סיכום שעות לפי טקסט</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button onClick={handleAddScheduleColumn}><Plus className="w-4 h-4" /></Button>
             </div>
-            <div className="flex flex-wrap gap-2 mb-6">
-              {columnTypes.map(type => (
-                <Badge key={type} className="bg-green-100 text-green-800 pr-1">
-                  {type}
-                  <button onClick={() => handleRemoveColumnType(type)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
-                </Badge>
-              ))}
-              {columnTypes.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סוגי עמודות</p>}
-            </div>
-            
-            <div className="pt-4 border-t">
-              <p className="text-sm font-semibold mb-3" dir="rtl">תתי-סוגי עמודות (לכל סוג עמודה)</p>
-              <div className="flex gap-2 mb-4">
-                <Select value={selectedColTypeForSubType} onValueChange={setSelectedColTypeForSubType}>
-                  <SelectTrigger className="w-40"><SelectValue placeholder="בחר סוג..." /></SelectTrigger>
-                  <SelectContent>
-                    {columnTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Input value={newColSubType} onChange={(e) => setNewColSubType(e.target.value)} placeholder="תת-סוג חדש..." className="flex-1" dir="rtl" />
-                <Button onClick={handleAddColSubType} disabled={!selectedColTypeForSubType}><Plus className="w-4 h-4" /></Button>
-              </div>
-              {Object.entries(columnSubTypes).filter(([_, subs]) => subs.length > 0).map(([type, subs]) => (
-                <div key={type} className="mb-2">
-                  <p className="text-xs font-medium text-gray-700 mb-1">{type}:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {subs.map(sub => (
-                      <Badge key={sub} variant="outline" className="text-xs pr-1">
-                        {sub}
-                        <button onClick={() => handleRemoveColSubType(type, sub)} className="ml-1 hover:text-red-600"><X className="w-2 h-2" /></button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Parameter Types */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Clock className="w-5 h-5 text-purple-600" />סוגי פרמטרים (דוחות)</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <Tabs defaultValue="time" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="time" dir="rtl"><Clock className="w-3 h-3 mr-1" />סוגי זמן</TabsTrigger>
-                <TabsTrigger value="count" dir="rtl"><Hash className="w-3 h-3 mr-1" />סוגי ספירה</TabsTrigger>
-              </TabsList>
-              <TabsContent value="time" className="mt-4">
-                <p className="text-sm text-gray-600 mb-3" dir="rtl">פרמטרי זמן מסכמים שעות עבודה תחת כל סוג</p>
-                <div className="flex gap-2 mb-4">
-                  <Input value={newTimeType} onChange={(e) => setNewTimeType(e.target.value)} placeholder="שם סוג זמן חדש..." dir="rtl" />
-                  <Button onClick={handleAddTimeType}><Plus className="w-4 h-4" /></Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {timeParamTypes.map(type => (
-                    <Badge key={type} className="bg-purple-100 text-purple-800 pr-1">
-                      {type}
-                      <button onClick={() => handleRemoveTimeType(type)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
-                    </Badge>
-                  ))}
-                  {timeParamTypes.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סוגי זמן</p>}
-                </div>
-              </TabsContent>
-              <TabsContent value="count" className="mt-4">
-                <p className="text-sm text-gray-600 mb-3" dir="rtl">פרמטרי ספירה מסכמים ערכים מספריים תחת כל סוג</p>
-                <div className="flex gap-2 mb-4">
-                  <Input value={newCountType} onChange={(e) => setNewCountType(e.target.value)} placeholder="שם סוג ספירה חדש..." dir="rtl" />
-                  <Button onClick={handleAddCountType}><Plus className="w-4 h-4" /></Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {countParamTypes.map(type => (
-                    <Badge key={type} className="bg-blue-100 text-blue-800 pr-1">
-                      {type}
-                      <button onClick={() => handleRemoveCountType(type)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
-                    </Badge>
-                  ))}
-                  {countParamTypes.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סוגי ספירה</p>}
-                </div>
-              </TabsContent>
-              <div className="mt-6 pt-6 border-t">
-                <p className="text-sm font-semibold mb-3" dir="rtl">תתי-סוגים (לכל סוג פרמטר)</p>
-                <div className="flex gap-2 mb-4">
-                  <Select value={selectedTypeForSubType} onValueChange={setSelectedTypeForSubType}>
-                    <SelectTrigger className="w-40"><SelectValue placeholder="בחר סוג..." /></SelectTrigger>
-                    <SelectContent>
-                      {[...timeParamTypes, ...countParamTypes].map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Input value={newSubType} onChange={(e) => setNewSubType(e.target.value)} placeholder="תת-סוג חדש..." className="flex-1" dir="rtl" />
-                  <Button onClick={handleAddSubType} disabled={!selectedTypeForSubType}><Plus className="w-4 h-4" /></Button>
-                </div>
-                {Object.entries(paramSubTypes).filter(([_, subs]) => subs.length > 0).map(([type, subs]) => (
-                  <div key={type} className="mb-2">
-                    <p className="text-xs font-medium text-gray-700 mb-1">{type}:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {subs.map(sub => (
-                        <Badge key={sub} variant="outline" className="text-xs pr-1">
-                          {sub}
-                          <button onClick={() => handleRemoveSubType(type, sub)} className="ml-1 hover:text-red-600"><X className="w-2 h-2" /></button>
-                        </Badge>
-                      ))}
+            {/* Column list */}
+            <div className="space-y-2">
+              {scheduleColumns.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו עמודות</p>}
+              {scheduleColumns.map((col, idx) => (
+                <div key={idx} className="border rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50" dir="rtl">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{col.name}</span>
+                      <Badge variant="outline" className={`text-xs ${
+                        col.report_type === "sum_hours" ? "border-purple-300 text-purple-700" : "border-blue-300 text-blue-700"
+                      }`}>
+                        {col.report_type === "sum_hours" ? "סיכום שעות לפי טקסט" : "סיכום מספרים"}
+                      </Badge>
+                      {(col.options || []).length > 0 && (
+                        <span className="text-xs text-gray-500">{col.options.length} אפשרויות</span>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => setExpandedCol(expandedCol === idx ? null : idx)} className="text-gray-400 hover:text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-200">
+                        {expandedCol === idx ? "סגור" : "אפשרויות"}
+                      </button>
+                      <button onClick={() => handleRemoveScheduleColumn(idx)} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
                     </div>
                   </div>
-                ))}
-              </div>
-            </Tabs>
+                  {expandedCol === idx && (
+                    <div className="p-3 border-t" dir="rtl">
+                      <p className="text-xs text-gray-500 mb-2">
+                        {col.report_type === "sum_hours"
+                          ? "הגדר ערכי טקסט לסינון (ניתן לשייך בלוח ולסנן לפיהם בדוחות)"
+                          : "הגדר ערכים מספריים מוצעים"}
+                      </p>
+                      <div className="flex gap-2 mb-2">
+                        <Input value={newColOption} onChange={e => setNewColOption(e.target.value)} placeholder="ערך חדש..." className="h-7 text-sm" dir="rtl" />
+                        <Button size="sm" className="h-7" onClick={() => handleAddOption(idx)}><Plus className="w-3 h-3" /></Button>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {(col.options || []).map(opt => (
+                          <Badge key={opt} variant="outline" className="text-xs pr-1">
+                            {opt}
+                            <button onClick={() => handleRemoveOption(idx, opt)} className="ml-1 hover:text-red-600"><X className="w-2 h-2" /></button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
