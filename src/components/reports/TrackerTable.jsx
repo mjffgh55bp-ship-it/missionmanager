@@ -135,7 +135,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     setEntries(data);
   };
 
-  const addColumn = () => setEditColumns([...editColumns, { id: Date.now().toString(), name: "", type: "hours_assignments", template_column: "", schedule_col_name: "", schedule_col_value: "" }]);
+  const [newOptionDraft, setNewOptionDraft] = useState({});
+
+  const addColumn = () => setEditColumns([...editColumns, { id: Date.now().toString(), name: "", type: "hours_assignments", template_column: "", schedule_col_name: "", schedule_col_value: "", options: [] }]);
   const updateColumn = (idx, field, value) => { const c = [...editColumns]; c[idx] = { ...c[idx], [field]: value }; setEditColumns(c); };
   const removeColumn = (idx) => setEditColumns(editColumns.filter((_, i) => i !== idx));
 
@@ -398,6 +400,42 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           </Select>
                         ) : null;
                       })()}
+                      {col.type === "text" && (
+                        <div className="mt-1">
+                          <div className="flex flex-wrap gap-1 mb-1">
+                            {(col.options || []).map(opt => (
+                              <span key={opt} className="inline-flex items-center gap-0.5 bg-gray-100 text-gray-700 text-xs px-1.5 py-0.5 rounded">
+                                {opt}
+                                <button type="button" onClick={() => updateColumn(idx, "options", (col.options || []).filter(o => o !== opt))} className="hover:text-red-500"><X className="w-2.5 h-2.5" /></button>
+                              </span>
+                            ))}
+                          </div>
+                          <div className="flex gap-1">
+                            <Input
+                              value={newOptionDraft[idx] || ""}
+                              onChange={e => setNewOptionDraft(d => ({ ...d, [idx]: e.target.value }))}
+                              onKeyDown={e => {
+                                if (e.key === "Enter" && newOptionDraft[idx]?.trim()) {
+                                  updateColumn(idx, "options", [...(col.options || []), newOptionDraft[idx].trim()]);
+                                  setNewOptionDraft(d => ({ ...d, [idx]: "" }));
+                                }
+                              }}
+                              placeholder="אפשרות..."
+                              className="h-6 text-xs flex-1"
+                              dir="rtl"
+                            />
+                            <button type="button"
+                              onClick={() => {
+                                if (!newOptionDraft[idx]?.trim()) return;
+                                updateColumn(idx, "options", [...(col.options || []), newOptionDraft[idx].trim()]);
+                                setNewOptionDraft(d => ({ ...d, [idx]: "" }));
+                              }}
+                              className="text-blue-600 hover:text-blue-800">
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex flex-col gap-0.5 py-1">
@@ -453,23 +491,40 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       </TableCell>
                     );
                   }
+                  const textOptions = col.type === "text" ? (col.options || []) : [];
                   return (
-                    <TableCell key={col.id} className="px-2">
-                      {isEditing ? (
-                        <div className="flex items-center gap-1">
-                          <Input autoFocus value={cellDraft} onChange={e => setCellDraft(e.target.value)}
-                            onKeyDown={e => { if (e.key === "Enter") saveCell(); if (e.key === "Escape") setEditingCell(null); }}
-                            className="h-7 text-sm w-24" type={col.type === "number" ? "number" : "text"} dir="rtl" />
-                          <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={saveCell}><Check className="w-3 h-3" /></Button>
-                          <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-400" onClick={() => setEditingCell(null)}><X className="w-3 h-3" /></Button>
-                        </div>
-                      ) : (
-                        <div onClick={() => startCellEdit(worker.id, col.id)}
-                          className="min-w-[60px] min-h-[24px] px-1 rounded cursor-pointer hover:bg-blue-50 text-sm" dir="rtl">
-                          {entryValue || <span className="text-gray-300 text-xs">לחץ לעריכה</span>}
-                        </div>
-                      )}
-                    </TableCell>
+                   <TableCell key={col.id} className="px-2">
+                     {isEditing ? (
+                       <div className="flex items-center gap-1">
+                         {textOptions.length > 0 ? (
+                           <>
+                             <Select value={cellDraft} onValueChange={v => { setCellDraft(v); }}>
+                               <SelectTrigger className="h-7 text-sm w-28" dir="rtl"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                               <SelectContent dir="rtl">
+                                 <SelectItem value={null}>ריק</SelectItem>
+                                 {textOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                               </SelectContent>
+                             </Select>
+                             <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={saveCell}><Check className="w-3 h-3" /></Button>
+                             <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-400" onClick={() => setEditingCell(null)}><X className="w-3 h-3" /></Button>
+                           </>
+                         ) : (
+                           <>
+                             <Input autoFocus value={cellDraft} onChange={e => setCellDraft(e.target.value)}
+                               onKeyDown={e => { if (e.key === "Enter") saveCell(); if (e.key === "Escape") setEditingCell(null); }}
+                               className="h-7 text-sm w-24" type={col.type === "number" ? "number" : "text"} dir="rtl" />
+                             <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={saveCell}><Check className="w-3 h-3" /></Button>
+                             <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-400" onClick={() => setEditingCell(null)}><X className="w-3 h-3" /></Button>
+                           </>
+                         )}
+                       </div>
+                     ) : (
+                       <div onClick={() => startCellEdit(worker.id, col.id)}
+                         className="min-w-[60px] min-h-[24px] px-1 rounded cursor-pointer hover:bg-blue-50 text-sm" dir="rtl">
+                         {entryValue || <span className="text-gray-300 text-xs">לחץ לעריכה</span>}
+                       </div>
+                     )}
+                   </TableCell>
                   );
                 })}
                 {editMode && <TableCell />}
