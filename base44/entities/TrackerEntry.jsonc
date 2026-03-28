@@ -1,0 +1,27 @@
+{
+  "name": "TrackerEntry",
+  "type": "object",
+  "properties": {
+    "tracker_id": {
+      "type": "string",
+      "description": "ID of the tracker"
+    },
+    "worker_id": {
+      "type": "string",
+      "description": "ID of the worker"
+    },
+    "column_id": {
+      "type": "string",
+      "description": "ID of the column"
+    },
+    "value": {
+      "type": "string",
+      "description": "Cell value (stored as string)"
+    }
+  },
+  "required": [
+    "tracker_id",
+    "worker_id",
+    "column_id"
+  ]
+}

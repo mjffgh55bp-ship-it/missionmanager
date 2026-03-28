@@ -1,0 +1,48 @@
+{
+  "name": "Tracker",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the tracker table"
+    },
+    "order": {
+      "type": "number",
+      "default": 0,
+      "description": "Display order"
+    },
+    "columns": {
+      "type": "array",
+      "description": "Column definitions",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "hours_assignments",
+              "hours_templates",
+              "shifts_count",
+              "number",
+              "text",
+              "checkbox"
+            ]
+          },
+          "template_column": {
+            "type": "string",
+            "description": "For hours_templates: which worker column name to sum"
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "name"
+  ]
+}
