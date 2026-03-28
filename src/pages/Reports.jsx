@@ -12,6 +12,7 @@ export default function Reports() {
   const [trackers, setTrackers] = useState([]);
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
+  const [scheduleColumns, setScheduleColumns] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { loadData(); }, []);
@@ -19,7 +20,7 @@ export default function Reports() {
   const loadData = async () => {
     const [
       workersData, assignmentsData, templateRowsData, templatesData, trackersData,
-      populationsSettings, workerRolesSettings
+      populationsSettings, workerRolesSettings, globalColSettings, cartColSettings
     ] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
@@ -28,6 +29,8 @@ export default function Reports() {
       base44.entities.Tracker.list("order"),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
+      base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
+      base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -36,6 +39,13 @@ export default function Reports() {
     setTrackers(trackersData);
     if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
+
+    // Collect all unique schedule columns from global + cart params
+    const globalCols = globalColSettings.length > 0 ? (JSON.parse(globalColSettings[0].setting_value) || []) : [];
+    const cartCols = cartColSettings.length > 0 ? Object.values(JSON.parse(cartColSettings[0].setting_value) || {}).flat() : [];
+    const allCols = [...globalCols, ...cartCols];
+    const uniqueCols = allCols.filter((col, idx, arr) => arr.findIndex(c => c.name === col.name) === idx);
+    setScheduleColumns(uniqueCols);
     setLoading(false);
   };
 
@@ -91,6 +101,7 @@ export default function Reports() {
               allTemplates={allTemplates}
               populations={populations}
               workerRoles={workerRoles}
+              scheduleColumns={scheduleColumns}
               onDelete={() => handleDeleteTracker(tracker.id)}
             />
           ))

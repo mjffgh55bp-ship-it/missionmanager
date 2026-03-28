@@ -13,6 +13,8 @@ const COLUMN_TYPES = [
   { value: "hours_assignments", label: "שעות (משימות)" },
   { value: "hours_templates", label: "שעות (תבניות)" },
   { value: "shifts_count", label: "מספר משמרות" },
+  { value: "schedule_col_sum", label: "סיכום עמודת לוח (מספר)" },
+  { value: "schedule_col_count", label: "ספירת ערך בעמודת לוח" },
   { value: "number", label: "מספר (ידני)" },
   { value: "text", label: "טקסט (ידני)" },
   { value: "checkbox", label: "סימון (ידני)" },
@@ -53,7 +55,7 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, onDelete }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], onDelete }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -149,6 +151,22 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     });
     if (col.type === "hours_assignments") return filtered.reduce((s, a) => s + (a.hours || 0), 0);
     if (col.type === "shifts_count") return filtered.length;
+    if (col.type === "schedule_col_sum") {
+      return filtered.reduce((sum, a) => {
+        const colData = a.column_values?.[col.schedule_col_name];
+        const val = colData?.value ?? colData;
+        const num = parseFloat(val);
+        return sum + (isNaN(num) ? 0 : num);
+      }, 0);
+    }
+    if (col.type === "schedule_col_count") {
+      return filtered.filter(a => {
+        const colData = a.column_values?.[col.schedule_col_name];
+        const val = colData?.value ?? colData;
+        if (col.schedule_col_value) return String(val) === String(col.schedule_col_value);
+        return val !== undefined && val !== null && val !== "";
+      }).length;
+    }
     if (col.type === "hours_templates") {
       let total = 0;
       templateRows.forEach(row => {
@@ -176,7 +194,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return true;
   });
 
-  const isAuto = (type) => ["hours_assignments", "hours_templates", "shifts_count"].includes(type);
+  const isAuto = (type) => ["hours_assignments", "hours_templates", "shifts_count", "schedule_col_sum", "schedule_col_count"].includes(type);
   const displayColumns = editMode ? editColumns : (tracker.columns || []);
 
   return (
@@ -214,6 +232,27 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       </SelectContent>
                     </Select>
                   )}
+                  {(col.type === "schedule_col_sum" || col.type === "schedule_col_count") && (
+                    <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
+                      <SelectTrigger className="h-7 w-36 text-sm" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
+                      <SelectContent dir="rtl">
+                        {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {col.type === "schedule_col_count" && col.schedule_col_name && (() => {
+                    const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+                    const opts = sc?.options || [];
+                    return opts.length > 0 ? (
+                      <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
+                        <SelectTrigger className="h-7 w-32 text-sm" dir="rtl"><SelectValue placeholder="ערך לסנן..." /></SelectTrigger>
+                        <SelectContent dir="rtl">
+                          <SelectItem value={null}>כל ערך</SelectItem>
+                          {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : null;
+                  })()}
                   <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 flex-shrink-0" onClick={() => removeColumn(idx)}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
