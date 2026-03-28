@@ -9,6 +9,55 @@ import { Trash2, Check, X, Plus, Save, ChevronDown, ChevronUp, Pencil } from "lu
 import { base44 } from "@/api/base44Client";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
+function MultiSelect({ options, selected, onChange, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const toggle = (val) => onChange(selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val]);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="h-8 min-w-[140px] max-w-[200px] border border-input rounded-md px-2 text-sm text-right flex items-center justify-between gap-2 bg-white hover:bg-gray-50"
+        dir="rtl"
+      >
+        <span className="truncate text-right">
+          {selected.length === 0 ? placeholder : selected.join(", ")}
+        </span>
+        <ChevronDown className="w-3 h-3 flex-shrink-0 text-gray-400" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-9 z-50 bg-white border border-gray-200 rounded-md shadow-lg min-w-[160px] py-1" dir="rtl">
+            {options.map(opt => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => toggle(opt)}
+                className={`w-full text-right px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-gray-50 ${
+                  selected.includes(opt) ? "font-semibold text-blue-700" : ""
+                }`}
+              >
+                <span className={`w-4 h-4 border-2 rounded flex-shrink-0 flex items-center justify-center ${
+                  selected.includes(opt) ? "bg-blue-600 border-blue-600" : "border-gray-300"
+                }`}>
+                  {selected.includes(opt) && <Check className="w-2.5 h-2.5 text-white" />}
+                </span>
+                {opt}
+              </button>
+            ))}
+            {selected.length > 0 && (
+              <button onClick={() => onChange([])} className="w-full text-right px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50 border-t mt-1">
+                נקה בחירה
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const COLUMN_TYPES = [
   { value: "hours_assignments", label: "שעות (משימות)" },
   { value: "hours_templates", label: "שעות (תבניות)" },
@@ -65,8 +114,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [dateFilterMode, setDateFilterMode] = useState("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [population, setPopulation] = useState("__all__");
-  const [role, setRole] = useState("__all__");
+  const [selectedPopulations, setSelectedPopulations] = useState([]);
+  const [selectedRoles, setSelectedRoles] = useState([]);
   const [guide, setGuide] = useState("__all__");
   const [showFilters, setShowFilters] = useState(false);
 
@@ -184,8 +233,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const filteredWorkers = workers.filter(w => {
     if (!w.active) return false;
-    if (population !== "__all__" && w.population !== population) return false;
-    if (role !== "__all__" && w.role !== role) return false;
+    if (selectedPopulations.length > 0 && !selectedPopulations.includes(w.population)) return false;
+    if (selectedRoles.length > 0 && !selectedRoles.includes(w.role)) return false;
     if (guide === "yes" && !w.is_guide) return false;
     if (guide === "no" && w.is_guide) return false;
     return true;
@@ -252,23 +301,21 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             )}
             <div>
               <Label className="text-xs block mb-1">אוכלוסייה</Label>
-              <Select value={population} onValueChange={setPopulation}>
-                <SelectTrigger className="h-8 w-32 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value="__all__">כולם</SelectItem>
-                  {populations.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MultiSelect
+                options={populations}
+                selected={selectedPopulations}
+                onChange={setSelectedPopulations}
+                placeholder="כל האוכלוסיות"
+              />
             </div>
             <div>
               <Label className="text-xs block mb-1">תפקיד</Label>
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger className="h-8 w-32 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value="__all__">כולם</SelectItem>
-                  {workerRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MultiSelect
+                options={workerRoles}
+                selected={selectedRoles}
+                onChange={setSelectedRoles}
+                placeholder="כל התפקידים"
+              />
             </div>
             <div>
               <Label className="text-xs block mb-1">מדריך</Label>
