@@ -21,6 +21,9 @@ export default function Settings() {
   const [newColName, setNewColName] = useState("");
   const [newColReportType, setNewColReportType] = useState("sum_numbers");
   const [newColOption, setNewColOption] = useState("");
+  const [newSubOptionName, setNewSubOptionName] = useState("");
+  const [newSubOptionCriterion, setNewSubOptionCriterion] = useState("");
+  const [expandedSubOptions, setExpandedSubOptions] = useState(null);
   const [expandedCol, setExpandedCol] = useState(null);
   const [populations, setPopulations] = useState([]);
   const [newPopulation, setNewPopulation] = useState("");
@@ -121,6 +124,23 @@ export default function Settings() {
 
   const handleRemoveOption = async (colIdx, opt) => {
     const updated = scheduleColumns.map((c, i) => i === colIdx ? { ...c, options: (c.options || []).filter(o => o !== opt) } : c);
+    await saveScheduleColumns(updated);
+  };
+
+  const handleAddSubOption = async (colIdx) => {
+    if (!newSubOptionName.trim() || !newSubOptionCriterion.trim()) return;
+    const updated = scheduleColumns.map((c, i) =>
+      i === colIdx ? { ...c, sub_options: [...(c.sub_options || []), { name: newSubOptionName.trim(), criterion: newSubOptionCriterion.trim() }] } : c
+    );
+    await saveScheduleColumns(updated);
+    setNewSubOptionName("");
+    setNewSubOptionCriterion("");
+  };
+
+  const handleRemoveSubOption = async (colIdx, subIdx) => {
+    const updated = scheduleColumns.map((c, i) =>
+      i === colIdx ? { ...c, sub_options: (c.sub_options || []).filter((_, si) => si !== subIdx) } : c
+    );
     await saveScheduleColumns(updated);
   };
 
@@ -233,23 +253,62 @@ export default function Settings() {
                     </div>
                   </div>
                   {expandedCol === idx && (
-                    <div className="p-3 border-t" dir="rtl">
-                      <p className="text-xs text-gray-500 mb-2">
-                        {col.report_type === "sum_hours"
-                          ? "הגדר ערכי טקסט לסינון (ניתן לשייך בלוח ולסנן לפיהם בדוחות)"
-                          : "הגדר ערכים מספריים מוצעים"}
-                      </p>
-                      <div className="flex gap-2 mb-2">
-                        <Input value={newColOption} onChange={e => setNewColOption(e.target.value)} placeholder="ערך חדש..." className="h-7 text-sm" dir="rtl" />
-                        <Button size="sm" className="h-7" onClick={() => handleAddOption(idx)}><Plus className="w-3 h-3" /></Button>
+                    <div className="p-3 border-t space-y-4" dir="rtl">
+                      {/* Options */}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 mb-2">
+                          {col.report_type === "sum_hours" ? "ערכי טקסט לסינון" : "ערכים מספריים מוצעים"}
+                        </p>
+                        <div className="flex gap-2 mb-2">
+                          <Input value={newColOption} onChange={e => setNewColOption(e.target.value)} placeholder="ערך חדש..." className="h-7 text-sm" dir="rtl" />
+                          <Button size="sm" className="h-7" onClick={() => handleAddOption(idx)}><Plus className="w-3 h-3" /></Button>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {(col.options || []).map(opt => (
+                            <Badge key={opt} variant="outline" className="text-xs pr-1">
+                              {opt}
+                              <button onClick={() => handleRemoveOption(idx, opt)} className="ml-1 hover:text-red-600"><X className="w-2 h-2" /></button>
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {(col.options || []).map(opt => (
-                          <Badge key={opt} variant="outline" className="text-xs pr-1">
-                            {opt}
-                            <button onClick={() => handleRemoveOption(idx, opt)} className="ml-1 hover:text-red-600"><X className="w-2 h-2" /></button>
-                          </Badge>
-                        ))}
+
+                      {/* Sub-options (presets with criterion) */}
+                      <div className="border-t pt-3">
+                        <p className="text-xs font-semibold text-gray-600 mb-1">תת-אפשרויות מוכנות מראש</p>
+                        <p className="text-xs text-gray-400 mb-2">כל תת-אפשרות מגדירה קריטריון ספירה/סיכום לעובד בדוחות ומטריציה</p>
+                        <div className="flex gap-2 mb-2">
+                          <Input
+                            value={newSubOptionName}
+                            onChange={e => setNewSubOptionName(e.target.value)}
+                            placeholder="שם התת-אפשרות..."
+                            className="h-7 text-sm flex-1"
+                            dir="rtl"
+                          />
+                          <Select value={newSubOptionCriterion} onValueChange={setNewSubOptionCriterion}>
+                            <SelectTrigger className="h-7 text-sm w-36" dir="rtl">
+                              <SelectValue placeholder="קריטריון..." />
+                            </SelectTrigger>
+                            <SelectContent dir="rtl">
+                              {(col.options || []).map(opt => (
+                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button size="sm" className="h-7" onClick={() => handleAddSubOption(idx)}><Plus className="w-3 h-3" /></Button>
+                        </div>
+                        <div className="space-y-1">
+                          {(col.sub_options || []).map((so, si) => (
+                            <div key={si} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-xs">
+                              <span className="font-medium">{so.name}</span>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">{so.criterion}</Badge>
+                                <button onClick={() => handleRemoveSubOption(idx, si)} className="text-red-400 hover:text-red-600"><X className="w-3 h-3" /></button>
+                              </div>
+                            </div>
+                          ))}
+                          {(col.sub_options || []).length === 0 && <p className="text-xs text-gray-400">לא הוגדרו תת-אפשרויות</p>}
+                        </div>
                       </div>
                     </div>
                   )}
