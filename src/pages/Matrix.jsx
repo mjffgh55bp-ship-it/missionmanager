@@ -1091,7 +1091,11 @@ export default function Matrix() {
   const AssignmentBar = ({ assignment }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(assignment.date) : 0;
     const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
-    const endPercent = timeToPercentage(assignment.end_time, dayIndex, viewMode, zoomRange);
+    // Handle overnight shifts: if end hour < start hour, treat end as next day (+24h)
+    const [startH] = assignment.start_time.split(':').map(Number);
+    const [endH] = assignment.end_time.split(':').map(Number);
+    const adjustedEndTime = endH < startH ? `${String(endH + 24).padStart(2, '0')}:${assignment.end_time.split(':')[1]}` : assignment.end_time;
+    const endPercent = timeToPercentage(adjustedEndTime, dayIndex, viewMode, zoomRange);
     const width = endPercent >= startPercent ? endPercent - startPercent : 0;
     
     if (startPercent < 0 || startPercent > 100) return null;
@@ -1166,7 +1170,10 @@ export default function Matrix() {
   const AvailabilityBar = ({ shift, worker }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
     const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode, zoomRange);
-    const endPercent = timeToPercentage(shift.end_time, dayIndex, viewMode, zoomRange);
+    const [startH] = shift.start_time.split(':').map(Number);
+    const [endH] = shift.end_time.split(':').map(Number);
+    const adjustedEndTime = endH < startH ? `${String(endH + 24).padStart(2, '0')}:${shift.end_time.split(':')[1]}` : shift.end_time;
+    const endPercent = timeToPercentage(adjustedEndTime, dayIndex, viewMode, zoomRange);
     const width = endPercent >= startPercent ? endPercent - startPercent : 0;
     
     if (startPercent < 0 || startPercent > 100) return null;
