@@ -122,9 +122,12 @@ export default function Matrix() {
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
-  // sentState: { [workerId]: { sentAssignmentIds: string[], sentDate: string } }
   const [sentState, setSentState] = useState({});
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [summaryColumns, setSummaryColumns] = useState([]);
+  const [showSummaryColumnsDialog, setShowSummaryColumnsDialog] = useState(false);
+  const [editingSummaryColumn, setEditingSummaryColumn] = useState(null);
+  const [newColumnForm, setNewColumnForm] = useState({ name: '', criteria_type: 'total_shifts', criteria_value: '' });
 
   useEffect(() => { 
     loadStaticData();
@@ -150,11 +153,12 @@ export default function Matrix() {
 
   const loadStaticData = async () => {
     // Load workers and settings only once
-    const [workersData, populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
+    const [workersData, populationsSettings, workerRolesSettings, shiftStatusesSettings, summaryColsSettings] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
+      base44.entities.AppSettings.filter({ setting_key: "matrix_summary_columns" })
     ]);
     
     if (populationsSettings.length > 0) {
@@ -169,6 +173,9 @@ export default function Matrix() {
     }
     if (shiftStatusesSettings.length > 0) {
       setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
+    }
+    if (summaryColsSettings.length > 0) {
+      setSummaryColumns(JSON.parse(summaryColsSettings[0].setting_value) || []);
     }
     
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
@@ -1028,6 +1035,59 @@ export default function Matrix() {
 
   const isStandbyStatus = (status) => /^\d+[׳']/.test(status || '');
 
+  const saveSummaryColumns = async (cols) => {
+    const existing = await base44.entities.AppSettings.filter({ setting_key: 'matrix_summary_columns' });
+    if (existing.length > 0) {
+      await base44.entities.AppSettings.update(existing[0].id, { setting_value: JSON.stringify(cols) });
+    } else {
+      await base44.entities.AppSettings.create({ setting_key: 'matrix_summary_columns', setting_value: JSON.stringify(cols) });
+    }
+    setSummaryColumns(cols);
+  };
+
+  const getWorkerColumnCount = (workerId, column) => {
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+    const weekEndStr = format(weekEnd, 'yyyy-MM-dd');
+
+    // Get all template row shifts for this worker in this week
+    const weeklyShifts = [];
+    templateRows.forEach(row => {
+      if (!row.values || row.date < weekStartStr || row.date > weekEndStr) return;
+      const isAssigned = Object.values(row.values).some(val => val === workerId);
+      if (!isAssigned) return;
+      const st = row.values?.['התחלה'] || row.values?.['שעת התחלה'];
+      const et = row.values?.['סיום'] || row.values?.['שעת סיום'];
+      if (st && et) {
+        weeklyShifts.push({
+          date: row.date,
+          start_time: st,
+          end_time: et,
+          status: row.values?.status || null,
+          food_cart_name: allTemplates.find(t => t.id === row.template_id)?.name || row.template_name || ''
+        });
+      }
+    });
+
+    if (column.criteria_type === 'total_shifts') return weeklyShifts.length;
+    if (column.criteria_type === 'status') return weeklyShifts.filter(s => s.status === column.criteria_value).length;
+    if (column.criteria_type === 'food_cart') return weeklyShifts.filter(s => s.food_cart_name === column.criteria_value).length;
+    if (column.criteria_type === 'time_range') {
+      const [from, to] = (column.criteria_value || '').split('-');
+      if (!from || !to) return 0;
+      const toMins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+      const fromMins = toMins(from);
+      const toMinsVal = toMins(to);
+      return weeklyShifts.filter(s => {
+        const shiftStart = toMins(s.start_time);
+        const shiftEnd = toMins(s.end_time);
+        return shiftStart < toMinsVal && shiftEnd > fromMins;
+      }).length;
+    }
+    return 0;
+  };
+
   const AssignmentBar = ({ assignment }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(assignment.date) : 0;
     const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
@@ -1370,6 +1430,19 @@ export default function Matrix() {
                       onUpdate={loadStaticData}
                     />
                   </div>
+                  {/* Summary columns headers - only in weekly mode */}
+                  {viewMode === 'weekly' && summaryColumns.map(col => (
+                    <div key={col.id} className="w-[50px] min-w-[50px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1" title={col.name}>
+                      <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
+                    </div>
+                  ))}
+                  {viewMode === 'weekly' && (
+                    <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center">
+                      <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום">
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex-1 relative flex" dir="rtl">
                     {viewMode === 'daily' ? (
                      getDailyTimeSlots(zoomRange).map((hour) => {
@@ -1408,60 +1481,42 @@ export default function Matrix() {
                     const workerTemplateShifts = getWorkerTemplateShifts(worker.id, viewMode === 'daily' ? dateString : null);
                     const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
-                    const summary = viewMode === 'weekly' ? calculateWorkerSummary(worker.id) : null;
-                    
+
                     return (
                       <React.Fragment key={worker.id}>
                       <div className={`flex border-b h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                         <div className="w-[360px] min-w-[360px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-8">
                           <WorkerLockButton worker={worker} onUpdate={loadStaticData} />
-                          {/* Send buttons - between lock and worker name */}
                           {(() => {
                             const sendStatus = getWorkerSendStatus(worker);
-                            const whatsappClass = sendStatus === 'none'
-                              ? 'text-gray-400 hover:text-gray-500'
-                              : sendStatus === 'needs_update'
-                              ? 'text-green-500 hover:text-green-600'
-                              : 'text-gray-900 hover:text-gray-700';
-                            const emailClass = sendStatus === 'none'
-                              ? 'text-gray-400 hover:text-gray-500'
-                              : sendStatus === 'needs_update'
-                              ? 'text-green-500 hover:text-green-600'
-                              : 'text-gray-900 hover:text-gray-700';
+                            const whatsappClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
+                            const emailClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
                             return (
                               <>
-                                <button
-                                  onClick={() => sendWhatsAppNotification(worker)}
-                                  className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${whatsappClass}`}
-                                  title="שלח משמרות בוואטסאפ"
-                                  disabled={sendingWhatsApp}
-                                >
-                                  {sendingWhatsApp ? (
-                                    <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-                                  ) : (
-                                    <MessageCircle className="w-4 h-4" />
-                                  )}
+                                <button onClick={() => sendWhatsAppNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${whatsappClass}`} title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}>
+                                  {sendingWhatsApp ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /> : <MessageCircle className="w-4 h-4" />}
                                 </button>
-                                <button
-                                  onClick={() => handleSendNotification(worker)}
-                                  className={`rounded p-1 transition-colors hover:bg-gray-100 ${emailClass}`}
-                                  title="שלח לוח משמרות באימייל"
-                                >
+                                <button onClick={() => handleSendNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 ${emailClass}`} title="שלח לוח משמרות באימייל">
                                   <Send className="w-4 h-4" />
                                 </button>
                               </>
                             );
                           })()}
                           <div className="flex items-center flex-1 min-w-0">
+                            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 ml-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
                             <div className="min-w-0 flex-1">
                               <span className="truncate block text-sm leading-tight">{worker.nickname}</span>
-                              <div className="flex items-center gap-0">
-                                <WeeklySummary worker={worker} />
-                                <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
-                              </div>
+                              <WeeklySummary worker={worker} />
                             </div>
                           </div>
                         </div>
+                        {/* Summary columns cells - weekly mode only */}
+                        {viewMode === 'weekly' && summaryColumns.map(col => (
+                          <div key={col.id} className={`w-[50px] min-w-[50px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                            <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
+                          </div>
+                        ))}
+                        {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
                         <div 
                           data-worker-id={worker.id}
                           ref={el => {
@@ -1507,19 +1562,6 @@ export default function Matrix() {
                           </div>
                         </div>
                       </div>
-                      {viewMode === 'weekly' && summary && (
-                       <div className="flex border-b bg-gray-100 text-xs h-8">
-                         <div className="w-[300px] min-w-[300px] px-3 py-1 border-r sticky left-0 bg-gray-100 z-20 font-semibold text-gray-700" dir="rtl">
-                           סיכום שבועי
-                         </div>
-                         <div className="flex-1 px-3 py-1 flex gap-4 items-center flex-wrap text-gray-700" dir="rtl">
-                           <span><strong>סה"כ:</strong> {summary.total}</span>
-                           <span><strong>משמרת:</strong> {summary.regularShift}</span>
-                           <span><strong>ליבה:</strong> {summary.core}</span>
-                           <span><strong>קיצון:</strong> {summary.extreme}</span>
-                         </div>
-                       </div>
-                      )}
                       </React.Fragment>
                     );
                   })
@@ -1528,6 +1570,91 @@ export default function Matrix() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Summary Columns Management Dialog */}
+        <Dialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog}>
+          <DialogContent className="sm:max-w-lg" dir="rtl">
+            <DialogHeader><DialogTitle dir="rtl">ניהול עמודות סיכום שבועי</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-2" dir="rtl">
+              {summaryColumns.length === 0 && <p className="text-sm text-gray-500 text-center">אין עמודות. הוסף עמודה חדשה למטה.</p>}
+              {summaryColumns.map(col => (
+                <div key={col.id} className="flex items-center gap-2 bg-gray-50 rounded p-2">
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{col.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {col.criteria_type === 'total_shifts' && 'סה"כ משמרות'}
+                      {col.criteria_type === 'status' && `סטטוס: ${col.criteria_value}`}
+                      {col.criteria_type === 'food_cart' && `עגלה: ${col.criteria_value}`}
+                      {col.criteria_type === 'time_range' && `טווח שעות: ${col.criteria_value}`}
+                    </div>
+                  </div>
+                  <button onClick={() => { setEditingSummaryColumn(col); setNewColumnForm({ name: col.name, criteria_type: col.criteria_type, criteria_value: col.criteria_value || '' }); }} className="text-blue-500 hover:text-blue-700 text-xs">ערוך</button>
+                  <button onClick={() => { const updated = summaryColumns.filter(c => c.id !== col.id); saveSummaryColumns(updated); }} className="text-red-500 hover:text-red-700 text-xs">מחק</button>
+                </div>
+              ))}
+              <div className="border-t pt-3">
+                <div className="font-semibold text-sm mb-2">{editingSummaryColumn ? 'עריכת עמודה' : 'הוספת עמודה חדשה'}</div>
+                <div className="space-y-2">
+                  <div>
+                    <Label className="text-xs" dir="rtl">שם העמודה</Label>
+                    <Input value={newColumnForm.name} onChange={e => setNewColumnForm(p => ({ ...p, name: e.target.value }))} placeholder="שם" dir="rtl" className="h-8 text-sm" />
+                  </div>
+                  <div>
+                    <Label className="text-xs" dir="rtl">סוג קריטריון</Label>
+                    <Select value={newColumnForm.criteria_type} onValueChange={v => setNewColumnForm(p => ({ ...p, criteria_type: v, criteria_value: '' }))}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="total_shifts">סה"כ משמרות</SelectItem>
+                        <SelectItem value="status">לפי סטטוס</SelectItem>
+                        <SelectItem value="food_cart">לפי עגלה/תבנית</SelectItem>
+                        <SelectItem value="time_range">לפי טווח שעות (HH:MM-HH:MM)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(newColumnForm.criteria_type === 'status' || newColumnForm.criteria_type === 'food_cart' || newColumnForm.criteria_type === 'time_range') && (
+                    <div>
+                      <Label className="text-xs" dir="rtl">
+                        {newColumnForm.criteria_type === 'status' && 'ערך סטטוס'}
+                        {newColumnForm.criteria_type === 'food_cart' && 'שם עגלה/תבנית'}
+                        {newColumnForm.criteria_type === 'time_range' && 'טווח שעות (לדוגמה: 06:00-18:00)'}
+                      </Label>
+                      {newColumnForm.criteria_type === 'status' ? (
+                        <Select value={newColumnForm.criteria_value} onValueChange={v => setNewColumnForm(p => ({ ...p, criteria_value: v }))}>
+                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="בחר סטטוס" /></SelectTrigger>
+                          <SelectContent>
+                            {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input value={newColumnForm.criteria_value} onChange={e => setNewColumnForm(p => ({ ...p, criteria_value: e.target.value }))} dir="rtl" className="h-8 text-sm" />
+                      )}
+                    </div>
+                  )}
+                  <div className="flex gap-2 justify-end pt-1">
+                    {editingSummaryColumn && (
+                      <Button variant="outline" size="sm" onClick={() => { setEditingSummaryColumn(null); setNewColumnForm({ name: '', criteria_type: 'total_shifts', criteria_value: '' }); }}>ביטול עריכה</Button>
+                    )}
+                    <Button size="sm" className="bg-blue-900 hover:bg-blue-800" onClick={() => {
+                      if (!newColumnForm.name) return;
+                      let updated;
+                      if (editingSummaryColumn) {
+                        updated = summaryColumns.map(c => c.id === editingSummaryColumn.id ? { ...c, ...newColumnForm } : c);
+                        setEditingSummaryColumn(null);
+                      } else {
+                        updated = [...summaryColumns, { id: Date.now().toString(), ...newColumnForm }];
+                      }
+                      saveSummaryColumns(updated);
+                      setNewColumnForm({ name: '', criteria_type: 'total_shifts', criteria_value: '' });
+                    }} dir="rtl">{editingSummaryColumn ? 'עדכן' : 'הוסף'}</Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowSummaryColumnsDialog(false)} dir="rtl">סגור</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Notification Dialog */}
         <Dialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog}>
