@@ -140,10 +140,10 @@ export default function Matrix() {
   // Real-time subscriptions - refresh when assignments or template rows change
   useEffect(() => {
     const unsubAssignment = base44.entities.Assignment.subscribe(() => {
-      debouncedLoadData();
+      debouncedLoadData(true);
     });
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
-      debouncedLoadData();
+      debouncedLoadData(true);
     });
     return () => {
       unsubAssignment();
@@ -181,10 +181,10 @@ export default function Matrix() {
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
   };
 
-  const loadDynamicData = async () => {
+  const loadDynamicData = async (silent = false) => {
     if (isLoadingData) return;
     setIsLoadingData(true);
-    setLoading(true);
+    if (!silent) setLoading(true);
     
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
@@ -243,12 +243,12 @@ export default function Matrix() {
     setIsLoadingData(false);
   };
 
-  const debouncedLoadData = () => {
+  const debouncedLoadData = (silent = false) => {
     if (loadingTimeoutRef.current) {
       clearTimeout(loadingTimeoutRef.current);
     }
     loadingTimeoutRef.current = setTimeout(() => {
-      loadDynamicData();
+      loadDynamicData(silent);
     }, 300);
   };
 
