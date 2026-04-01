@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Palette, Eye, EyeOff, GripVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Palette, Eye, EyeOff, GripVertical, Menu } from "lucide-react";
 import { format, addDays, getDay, differenceInDays, parseISO } from "date-fns";
 import { getHebrewDate } from "../components/utils/HebrewDate";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -342,6 +342,12 @@ export default function Yearly() {
       <div className="fixed top-0 left-0 right-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 pb-2 border-b border-gray-200">
         <div className="max-w-full mx-auto flex flex-wrap justify-between items-center gap-4">
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('open-sidebar'))}
+              className="hover:bg-gray-100 p-2 rounded-lg transition-colors duration-200"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-1">תצוגה תקופתית</h1>
               <p className="text-gray-600 text-sm">{viewOnly ? "מצב צפייה בלבד" : "לחץ פעמיים על אירוע לעריכה"}</p>

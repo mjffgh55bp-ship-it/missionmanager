@@ -30,6 +30,12 @@ export default function Layout({ children }) {
     checkUserRole();
   }, []);
 
+  useEffect(() => {
+    const handler = () => setSidebarOpen(true);
+    window.addEventListener('open-sidebar', handler);
+    return () => window.removeEventListener('open-sidebar', handler);
+  }, []);
+
 
 
   const checkUserRole = async () => {
