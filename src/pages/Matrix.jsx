@@ -60,9 +60,7 @@ const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { st
     basePercent = (totalMinutes / (7 * 24 * 60)) * 100;
   } else {
     // 00:00 = 0%, 06:00 next day = 100% (30 hours total)
-    // Hours < 6 are treated as next day (add 24h)
-    const adjustedHours = hours < 6 ? hours + 24 : hours;
-    const totalMinutes = adjustedHours * 60 + minutes;
+    const totalMinutes = hours * 60 + minutes;
     basePercent = (totalMinutes / (30 * 60)) * 100;
   }
   
@@ -77,7 +75,7 @@ const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { st
 const percentageToTime = (percentage, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
   const zoomWidth = zoomRange.end - zoomRange.start;
   const basePercent = (percentage / 100) * zoomWidth + zoomRange.start;
-  const totalMinutes = (basePercent / 100) * (viewMode === 'weekly' ? 7 * 24 * 60 : 24 * 60);
+  const totalMinutes = (basePercent / 100) * (viewMode === 'weekly' ? 7 * 24 * 60 : 30 * 60);
   
   if (viewMode === 'weekly') {
     const day = Math.floor(totalMinutes / (24 * 60));
@@ -1514,10 +1512,9 @@ export default function Matrix() {
                     {viewMode === 'daily' ? (
                      getDailyTimeSlots(zoomRange).map((hour) => {
                        const displayHour = hour >= 24 ? hour - 24 : hour;
-                       const isNextDay = hour >= 24;
                        return (
-                         <div key={hour} className={`flex-1 text-xs py-3 border-l text-center font-medium ${isNextDay ? 'text-orange-500' : 'text-gray-600'}`}>
-                           {String(displayHour).padStart(2, '0')}:00{isNextDay && <span className="text-[8px] align-super">+1</span>}
+                         <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium">
+                           {String(displayHour).padStart(2, '0')}:00
                          </div>
                        );
                      })
