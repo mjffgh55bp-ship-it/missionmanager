@@ -74,27 +74,27 @@ export default function Schedule() {
     base44.entities.Unavailability.filter({ date: dateString })]
     );
 
-    const [colTypesSettings, colSubTypesSettings, allTemplatesData, templateRowsData, shiftStatusesSettings, workerRolesSettings] = await Promise.all([
-    base44.entities.AppSettings.filter({ setting_key: "schedule_column_types" }),
-    base44.entities.AppSettings.filter({ setting_key: "schedule_column_subtypes" }),
+    const [colTypesSettings, allTemplatesData, templateRowsData, shiftStatusesSettings, workerRolesSettings] = await Promise.all([
+    base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
     base44.entities.Template.filter({ active: true }),
     base44.entities.TemplateRow.filter({ date: dateString }),
     base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
     base44.entities.AppSettings.filter({ setting_key: "worker_roles" })]
     );
 
-    setWorkers(workersData);
-    setAvailabilities(availabilitiesData);
-    setUnavailabilities(unavailabilitiesData);
-    setTemplateRows(templateRowsData);
-    setAllTemplates(allTemplatesData);
-
-    const uniqueTemplateIds = [...new Set(templateRowsData.map((row) => row.template_id))];
-    const templatesInUse = allTemplatesData.filter((t) => uniqueTemplateIds.includes(t.id));
-    setTemplates(templatesInUse);
-
-    if (colTypesSettings.length > 0) setColumnTypes(JSON.parse(colTypesSettings[0].setting_value) || []);
-    if (colSubTypesSettings.length > 0) setColumnSubTypes(JSON.parse(colSubTypesSettings[0].setting_value) || {});
+    if (colTypesSettings.length > 0) {
+      const customParams = JSON.parse(colTypesSettings[0].setting_value) || [];
+      setColumnTypes(customParams.map(c => c.name));
+      // Build subtypes map from options and sub_options
+      const subTypesMap = {};
+      customParams.forEach(c => {
+        const allOpts = [];
+        if (c.options && c.options.length > 0) allOpts.push(...c.options);
+        if (c.sub_options && c.sub_options.length > 0) allOpts.push(...c.sub_options.map(so => so.name));
+        if (allOpts.length > 0) subTypesMap[c.name] = allOpts;
+      });
+      setColumnSubTypes(subTypesMap);
+    }
     if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
 
