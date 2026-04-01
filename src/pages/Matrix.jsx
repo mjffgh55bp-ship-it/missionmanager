@@ -18,7 +18,7 @@ import MasterControls from "../components/matrix/MasterControls";
 
 // Timeline: 00:00 → 24:00 (right to left in RTL)
 const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
-  const allSlots = Array.from({ length: 24 }, (_, i) => i); // 0..23
+  const allSlots = Array.from({ length: 30 }, (_, i) => i); // 0..29 (0-23 = today, 24-29 = next day 00-05)
   const startIdx = Math.floor((zoomRange.start / 100) * allSlots.length);
   const endIdx = Math.ceil((zoomRange.end / 100) * allSlots.length);
   return allSlots.slice(startIdx, endIdx);
@@ -59,9 +59,11 @@ const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { st
     const totalMinutes = (day * 24 + hours) * 60 + minutes;
     basePercent = (totalMinutes / (7 * 24 * 60)) * 100;
   } else {
-    // 00:00 = 0%, 24:00 = 100%
-    const totalMinutes = hours * 60 + minutes;
-    basePercent = (totalMinutes / (24 * 60)) * 100;
+    // 00:00 = 0%, 06:00 next day = 100% (30 hours total)
+    // Hours < 6 are treated as next day (add 24h)
+    const adjustedHours = hours < 6 ? hours + 24 : hours;
+    const totalMinutes = adjustedHours * 60 + minutes;
+    basePercent = (totalMinutes / (30 * 60)) * 100;
   }
   
   if (basePercent < zoomRange.start || basePercent > zoomRange.end) {
@@ -1510,9 +1512,15 @@ export default function Matrix() {
                   </div>
                   <div className="flex-1 relative flex" dir="rtl">
                     {viewMode === 'daily' ? (
-                     getDailyTimeSlots(zoomRange).map((hour) => (
-                       <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium">{String(hour).padStart(2, '0')}:00</div>
-                     ))
+                     getDailyTimeSlots(zoomRange).map((hour) => {
+                       const displayHour = hour >= 24 ? hour - 24 : hour;
+                       const isNextDay = hour >= 24;
+                       return (
+                         <div key={hour} className={`flex-1 text-xs py-3 border-l text-center font-medium ${isNextDay ? 'text-orange-500' : 'text-gray-600'}`}>
+                           {String(displayHour).padStart(2, '0')}:00{isNextDay && <span className="text-[8px] align-super">+1</span>}
+                         </div>
+                       );
+                     })
                     ) : (
                      getWeeklyTimeSlots(zoomRange, startOfWeek(currentDate, { weekStartsOn: 0 })).map((slot, idx) => (
                        <div key={idx} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium">
