@@ -93,59 +93,54 @@ export default function Availability() {
     const user = await base44.auth.me();
     setCurrentUser(user);
 
-    const workersData = await base44.entities.Worker.filter({ active: true });
+    // Batch 1: workers + settings (no worker dependency needed yet)
+    const [workersData, settings, eventsData, yearlyEventsData, openRegSettings] = await Promise.all([
+      base44.entities.Worker.filter({ active: true }),
+      base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
+      base44.entities.CompanyEvent.list("-date"),
+      base44.entities.YearlyEvent.list(),
+      base44.entities.AppSettings.filter({ setting_key: "open_registrations" })
+    ]);
+
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
+    setCompanyEvents(eventsData);
+    setYearlyEvents(yearlyEventsData);
 
-    const worker = workersData.find((w) => w.email === user.email);
-    setCurrentWorker(worker);
-
-    const [settings, eventsData, yearlyEventsData, openRegSettings] = await Promise.all([
-    base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
-    base44.entities.CompanyEvent.list("-date"),
-    base44.entities.YearlyEvent.list(),
-    base44.entities.AppSettings.filter({ setting_key: "open_registrations" })]
-    );
     if (openRegSettings.length > 0) {
       setOpenRegistrations(JSON.parse(openRegSettings[0].setting_value) || []);
     }
+
+    const worker = workersData.find((w) => w.email === user.email);
+    setCurrentWorker(worker);
 
     if (settings.length > 0) {
       const tipsData = JSON.parse(settings[0].setting_value);
       setTipsMessage(tipsData.message || "");
       if (tipsData.message && tipsData.message.trim() && tipsData.showAsPopup) {
-        // Check if user already acknowledged this version
         const acknowledgedSettings = await base44.entities.AppSettings.filter({ 
           setting_key: `tips_acknowledged_${user.email}` 
         });
         const acknowledgedVersion = acknowledgedSettings.length > 0 
           ? acknowledgedSettings[0].setting_value 
           : null;
-        
         if (acknowledgedVersion !== tipsData.message) {
           setShowTipsPopup(true);
         }
       }
     }
 
-    setCompanyEvents(eventsData);
-    setYearlyEvents(yearlyEventsData);
-
     if (worker) {
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
+      // Batch 2: all worker-specific data
       const [availabilities, unavailabilitiesData, assignmentsData, templateRowsData, templatesData] = await Promise.all([
-      base44.entities.Availability.filter({
-        worker_id: worker.id,
-        week_start_date: weekStartStr
-      }),
-      base44.entities.Unavailability.filter({
-        worker_id: worker.id
-      }),
-      base44.entities.Assignment.list("-date"),
-      base44.entities.TemplateRow.list(),
-      base44.entities.Template.filter({ active: true })]
-      );
+        base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
+        base44.entities.Unavailability.filter({ worker_id: worker.id }),
+        base44.entities.Assignment.list("-date", 500),
+        base44.entities.TemplateRow.list("-date", 500),
+        base44.entities.Template.filter({ active: true })
+      ]);
 
       if (availabilities.length > 0) {
         setExistingAvailability(availabilities[0]);
@@ -166,9 +161,9 @@ export default function Availability() {
       setUnavailabilities(weekUnavailabilities);
 
       const workerAssignments = assignmentsData.filter((a) =>
-      a.chef_id === worker.id ||
-      a.sous_chef_id === worker.id ||
-      a.additional_chef_id === worker.id
+        a.chef_id === worker.id ||
+        a.sous_chef_id === worker.id ||
+        a.additional_chef_id === worker.id
       );
       setAssignments(workerAssignments);
       setTemplateRows(templateRowsData);
