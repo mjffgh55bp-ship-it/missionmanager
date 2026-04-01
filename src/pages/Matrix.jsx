@@ -1266,6 +1266,7 @@ export default function Matrix() {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} dir="rtl">
       <div className="max-w-screen-2xl mx-auto">
         <Card className="border-none shadow-lg mb-6">
@@ -1338,145 +1339,6 @@ export default function Matrix() {
 
         <Card className="border-none shadow-lg">
           <CardContent className="p-0">
-            {/* Fixed Zoom Control at Bottom */}
-            <div 
-              className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg pointer-events-auto"
-              style={{ 
-                direction: 'ltr',
-                zIndex: 40,
-                width: '100%',
-                padding: '8px'
-              }}
-            >
-              <div className="flex items-center gap-4 max-w-screen-2xl mx-auto">
-                <div className="flex-1 relative bg-gray-200 rounded-full pointer-events-auto" style={{ height: '16px', minHeight: '16px' }}>
-                  {/* Main drag bar */}
-                  <div 
-                    className="absolute top-0 h-full bg-blue-400 rounded-full cursor-move hover:bg-blue-500 transition-colors"
-                    style={{ 
-                      left: `${zoomRange.start}%`, 
-                      width: `${zoomRange.end - zoomRange.start}%`,
-                      pointerEvents: 'auto'
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const startX = e.clientX;
-                      const startRangeStart = zoomRange.start;
-                      const startRangeEnd = zoomRange.end;
-                      const width = startRangeEnd - startRangeStart;
-                      const rect = e.currentTarget.parentElement.getBoundingClientRect();
-                      const handleMove = (moveE) => {
-                        moveE.preventDefault();
-                        moveE.stopPropagation();
-                        const delta = ((moveE.clientX - startX) / rect.width) * 100;
-                        let newStart = startRangeStart + delta;
-                        let newEnd = startRangeEnd + delta;
-                        
-                        if (newStart < 0) {
-                          newStart = 0;
-                          newEnd = width;
-                        } else if (newEnd > 100) {
-                          newEnd = 100;
-                          newStart = 100 - width;
-                        }
-                        
-                        setZoomRange({ start: newStart, end: newEnd });
-                      };
-                      const handleUp = (upE) => {
-                        upE.preventDefault();
-                        upE.stopPropagation();
-                        document.removeEventListener('mousemove', handleMove);
-                        document.removeEventListener('mouseup', handleUp);
-                      };
-                      document.addEventListener('mousemove', handleMove);
-                      document.addEventListener('mouseup', handleUp);
-                    }}
-                  />
-                  {/* Left handle */}
-                  <div 
-                    className="absolute bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors"
-                    style={{ 
-                      left: `${zoomRange.start}%`,
-                      top: '-2px',
-                      width: '16px',
-                      height: '20px',
-                      zIndex: 10,
-                      pointerEvents: 'auto'
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const startX = e.clientX;
-                      const startValue = zoomRange.start;
-                      const rect = e.currentTarget.parentElement.getBoundingClientRect();
-                      const handleMove = (moveE) => {
-                        moveE.preventDefault();
-                        moveE.stopPropagation();
-                        const deltaPixels = moveE.clientX - startX;
-                        const deltaPercent = (deltaPixels / rect.width) * 100;
-                        const newStart = Math.max(0, Math.min(zoomRange.end - 5, startValue + deltaPercent));
-                        setZoomRange({ start: newStart, end: zoomRange.end });
-                      };
-                      const handleUp = (upE) => {
-                        upE.preventDefault();
-                        upE.stopPropagation();
-                        document.removeEventListener('mousemove', handleMove);
-                        document.removeEventListener('mouseup', handleUp);
-                      };
-                      document.addEventListener('mousemove', handleMove);
-                      document.addEventListener('mouseup', handleUp);
-                    }}
-                  />
-                  {/* Right handle */}
-                  <div 
-                    className="absolute bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors"
-                    style={{ 
-                      left: `${zoomRange.end}%`,
-                      top: '-2px',
-                      width: '16px',
-                      height: '20px',
-                      transform: 'translateX(-100%)',
-                      zIndex: 10,
-                      pointerEvents: 'auto'
-                    }}
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const startX = e.clientX;
-                      const startValue = zoomRange.end;
-                      const rect = e.currentTarget.parentElement.getBoundingClientRect();
-                      const handleMove = (moveE) => {
-                        moveE.preventDefault();
-                        moveE.stopPropagation();
-                        const deltaPixels = moveE.clientX - startX;
-                        const deltaPercent = (deltaPixels / rect.width) * 100;
-                        const newEnd = Math.max(zoomRange.start + 5, Math.min(100, startValue + deltaPercent));
-                        setZoomRange({ start: zoomRange.start, end: newEnd });
-                      };
-                      const handleUp = (upE) => {
-                        upE.preventDefault();
-                        upE.stopPropagation();
-                        document.removeEventListener('mousemove', handleMove);
-                        document.removeEventListener('mouseup', handleUp);
-                      };
-                      document.addEventListener('mousemove', handleMove);
-                      document.addEventListener('mouseup', handleUp);
-                    }}
-                  />
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setZoomRange({ start: 0, end: 100 })}
-                  disabled={zoomRange.start === 0 && zoomRange.end === 100}
-                  className="shrink-0"
-                  style={{ pointerEvents: 'auto' }}
-                >
-                  איפוס
-                </Button>
-              </div>
-            </div>
             
             <div className="overflow-x-auto pb-16">
               <div className="min-w-[1400px]">
@@ -1868,5 +1730,101 @@ export default function Matrix() {
 
       </div>
     </div>
+    {/* Fixed Zoom Control at Bottom */}
+    <div 
+      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg"
+      style={{ direction: 'ltr', zIndex: 50, width: '100%', padding: '8px' }}
+    >
+      <div className="flex items-center gap-4 max-w-screen-2xl mx-auto">
+        <div className="flex-1 relative bg-gray-200 rounded-full" style={{ height: '16px', minHeight: '16px' }}>
+          {/* Main drag bar */}
+          <div 
+            className="absolute top-0 h-full bg-blue-400 rounded-full cursor-move hover:bg-blue-500 transition-colors"
+            style={{ left: `${zoomRange.start}%`, width: `${zoomRange.end - zoomRange.start}%` }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const startX = e.clientX;
+              const startRangeStart = zoomRange.start;
+              const startRangeEnd = zoomRange.end;
+              const rangeWidth = startRangeEnd - startRangeStart;
+              const rect = e.currentTarget.parentElement.getBoundingClientRect();
+              const handleMove = (moveE) => {
+                const delta = ((moveE.clientX - startX) / rect.width) * 100;
+                let newStart = startRangeStart + delta;
+                let newEnd = startRangeEnd + delta;
+                if (newStart < 0) { newStart = 0; newEnd = rangeWidth; }
+                else if (newEnd > 100) { newEnd = 100; newStart = 100 - rangeWidth; }
+                setZoomRange({ start: newStart, end: newEnd });
+              };
+              const handleUp = () => {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              };
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+            }}
+          />
+          {/* Left handle */}
+          <div 
+            className="absolute bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors"
+            style={{ left: `${zoomRange.start}%`, top: '-2px', width: '16px', height: '20px', zIndex: 10 }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const startX = e.clientX;
+              const capturedEnd = zoomRange.end;
+              const startValue = zoomRange.start;
+              const rect = e.currentTarget.parentElement.getBoundingClientRect();
+              const handleMove = (moveE) => {
+                const deltaPercent = ((moveE.clientX - startX) / rect.width) * 100;
+                const newStart = Math.max(0, Math.min(capturedEnd - 5, startValue + deltaPercent));
+                setZoomRange(prev => ({ start: newStart, end: prev.end }));
+              };
+              const handleUp = () => {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              };
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+            }}
+          />
+          {/* Right handle */}
+          <div 
+            className="absolute bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors"
+            style={{ left: `${zoomRange.end}%`, top: '-2px', width: '16px', height: '20px', transform: 'translateX(-100%)', zIndex: 10 }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const startX = e.clientX;
+              const capturedStart = zoomRange.start;
+              const startValue = zoomRange.end;
+              const rect = e.currentTarget.parentElement.getBoundingClientRect();
+              const handleMove = (moveE) => {
+                const deltaPercent = ((moveE.clientX - startX) / rect.width) * 100;
+                const newEnd = Math.max(capturedStart + 5, Math.min(100, startValue + deltaPercent));
+                setZoomRange(prev => ({ start: prev.start, end: newEnd }));
+              };
+              const handleUp = () => {
+                document.removeEventListener('mousemove', handleMove);
+                document.removeEventListener('mouseup', handleUp);
+              };
+              document.addEventListener('mousemove', handleMove);
+              document.addEventListener('mouseup', handleUp);
+            }}
+          />
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => setZoomRange({ start: 0, end: 100 })}
+          disabled={zoomRange.start === 0 && zoomRange.end === 100}
+          className="shrink-0"
+        >
+          איפוס
+        </Button>
+      </div>
+    </div>
+    </>
   );
 }
