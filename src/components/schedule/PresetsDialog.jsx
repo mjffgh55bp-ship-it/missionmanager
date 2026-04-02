@@ -273,11 +273,9 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                                 dir="rtl"
                               >
                                 <option value="">— בחר —</option>
-                                {workers
-                                  .filter(w => !col.role_filter || w.role === col.role_filter)
-                                  .map(w => (
-                                    <option key={w.id} value={w.id}>{w.nickname}</option>
-                                  ))}
+                                {workers.map(w => (
+                                  <option key={w.id} value={w.id}>{w.nickname}</option>
+                                ))}
                               </select>
                             ) : (
                               <Input
