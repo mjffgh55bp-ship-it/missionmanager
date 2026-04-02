@@ -185,17 +185,23 @@ export default function Schedule() {
     const rowsToCreate = config.default_rows && config.default_rows.length > 0 ?
     config.default_rows :
     [{}];
+    const createdRows = [];
     for (const rowValues of rowsToCreate) {
-      await base44.entities.TemplateRow.create({
+      const newRow = await base44.entities.TemplateRow.create({
         template_id: newTemplate.id,
         template_name: newTemplate.name,
         date: dateString,
         values: rowValues,
         group_id: newGroupId
       });
+      createdRows.push(newRow);
     }
-    await loadData();
+    // Immediately update state so moked appears without waiting for DB consistency
+    setAllTemplates(prev => [...prev, newTemplate]);
+    setTemplates(prev => [...prev, newTemplate]);
+    setTemplateRows(prev => [...prev, ...createdRows]);
     toast.success(`מוקד "${preset.name}" נוסף ללוח`);
+    await loadData();
   };
 
   const handleDuplicateMoked = async (group) => {
