@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import BriefingBar from "../components/matrix/BriefingBar";
 import WorkerLockButton from "../components/matrix/WorkerLockButton";
 import MasterControls from "../components/matrix/MasterControls";
+import SummaryColumnsDialog from "../components/matrix/SummaryColumnsDialog";
 
 // Timeline: 00:00 → 24:00 (right to left in RTL)
 const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
@@ -126,8 +127,9 @@ export default function Matrix() {
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
   const [summaryColumns, setSummaryColumns] = useState([]);
   const [showSummaryColumnsDialog, setShowSummaryColumnsDialog] = useState(false);
-  const [editingSummaryColumn, setEditingSummaryColumn] = useState(null);
-  const [newColumnForm, setNewColumnForm] = useState({ name: '', criteria_type: 'total_shifts', criteria_value: '' });
+  const [scheduleParams, setScheduleParams] = useState([]);
+  const [trackers, setTrackers] = useState([]);
+  const [trackerEntries, setTrackerEntries] = useState([]);
 
   useEffect(() => { 
     loadStaticData();
@@ -152,32 +154,23 @@ export default function Matrix() {
   }, [currentDate, viewMode]);
 
   const loadStaticData = async () => {
-    // Load workers and settings only once
-    const [workersData, populationsSettings, workerRolesSettings, shiftStatusesSettings, summaryColsSettings] = await Promise.all([
+    const [workersData, populationsSettings, workerRolesSettings, shiftStatusesSettings, summaryColsSettings, scheduleParamsSettings, trackersData] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
-      base44.entities.AppSettings.filter({ setting_key: "matrix_summary_columns" })
+      base44.entities.AppSettings.filter({ setting_key: "matrix_summary_columns" }),
+      base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
+      base44.entities.Tracker.list()
     ]);
-    
-    if (populationsSettings.length > 0) {
-      setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
-    } else {
-      setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
-    }
-    if (workerRolesSettings.length > 0) {
-      setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
-    } else {
-      setWorkerRoles(["שף", "סו-שף"]);
-    }
-    if (shiftStatusesSettings.length > 0) {
-      setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
-    }
-    if (summaryColsSettings.length > 0) {
-      setSummaryColumns(JSON.parse(summaryColsSettings[0].setting_value) || []);
-    }
-    
+    if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
+    else setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
+    if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
+    else setWorkerRoles(["שף", "סו-שף"]);
+    if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
+    if (summaryColsSettings.length > 0) setSummaryColumns(JSON.parse(summaryColsSettings[0].setting_value) || []);
+    if (scheduleParamsSettings.length > 0) setScheduleParams(JSON.parse(scheduleParamsSettings[0].setting_value) || []);
+    setTrackers(trackersData);
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
   };
 
@@ -234,11 +227,13 @@ export default function Matrix() {
       }
     }
     
+    const trackerEntriesData = await base44.entities.TrackerEntry.list();
     setAssignments(filteredAssignments);
     setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
     setTemplateRows(filteredTemplateRows);
     setAllTemplates(allTemplatesData);
+    setTrackerEntries(trackerEntriesData);
     setLoading(false);
     setIsLoadingData(false);
   };
@@ -1085,6 +1080,28 @@ export default function Matrix() {
         return shiftStart < toMinsVal && shiftEnd > fromMins;
       }).length;
     }
+    if (column.criteria_type === 'schedule_col') {
+      const [colName, criterion] = (column.criteria_value || '').split('|||');
+      if (!colName) return 0;
+      let count = 0;
+      templateRows.forEach(row => {
+        if (!row.values || row.date < weekStartStr || row.date > weekEndStr) return;
+        if (!Object.values(row.values).some(val => val === workerId)) return;
+        const cellVal = row.values[colName];
+        if (!criterion) { if (cellVal) count++; }
+        else {
+          const valStr = Array.isArray(cellVal) ? cellVal.join(',') : (cellVal || '');
+          if (valStr.includes(criterion)) count++;
+        }
+      });
+      return count;
+    }
+    if (column.criteria_type === 'tracker_col') {
+      const [trackerId, columnId] = (column.criteria_value || '').split('|||');
+      if (!trackerId || !columnId) return 0;
+      const entry = trackerEntries.find(e => e.tracker_id === trackerId && e.worker_id === workerId && e.column_id === columnId);
+      return entry ? (parseFloat(entry.value) || entry.value || 0) : 0;
+    }
     return 0;
   };
 
@@ -1588,90 +1605,15 @@ export default function Matrix() {
           </CardContent>
         </Card>
 
-        {/* Summary Columns Management Dialog */}
-        <Dialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog}>
-          <DialogContent className="sm:max-w-lg" dir="rtl">
-            <DialogHeader><DialogTitle dir="rtl">ניהול עמודות סיכום שבועי</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-2" dir="rtl">
-              {summaryColumns.length === 0 && <p className="text-sm text-gray-500 text-center">אין עמודות. הוסף עמודה חדשה למטה.</p>}
-              {summaryColumns.map(col => (
-                <div key={col.id} className="flex items-center gap-2 bg-gray-50 rounded p-2">
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">{col.name}</div>
-                    <div className="text-xs text-gray-500">
-                      {col.criteria_type === 'total_shifts' && 'סה"כ משמרות'}
-                      {col.criteria_type === 'status' && `סטטוס: ${col.criteria_value}`}
-                      {col.criteria_type === 'food_cart' && `עגלה: ${col.criteria_value}`}
-                      {col.criteria_type === 'time_range' && `טווח שעות: ${col.criteria_value}`}
-                    </div>
-                  </div>
-                  <button onClick={() => { setEditingSummaryColumn(col); setNewColumnForm({ name: col.name, criteria_type: col.criteria_type, criteria_value: col.criteria_value || '' }); }} className="text-blue-500 hover:text-blue-700 text-xs">ערוך</button>
-                  <button onClick={() => { const updated = summaryColumns.filter(c => c.id !== col.id); saveSummaryColumns(updated); }} className="text-red-500 hover:text-red-700 text-xs">מחק</button>
-                </div>
-              ))}
-              <div className="border-t pt-3">
-                <div className="font-semibold text-sm mb-2">{editingSummaryColumn ? 'עריכת עמודה' : 'הוספת עמודה חדשה'}</div>
-                <div className="space-y-2">
-                  <div>
-                    <Label className="text-xs" dir="rtl">שם העמודה</Label>
-                    <Input value={newColumnForm.name} onChange={e => setNewColumnForm(p => ({ ...p, name: e.target.value }))} placeholder="שם" dir="rtl" className="h-8 text-sm" />
-                  </div>
-                  <div>
-                    <Label className="text-xs" dir="rtl">סוג קריטריון</Label>
-                    <Select value={newColumnForm.criteria_type} onValueChange={v => setNewColumnForm(p => ({ ...p, criteria_type: v, criteria_value: '' }))}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="total_shifts">סה"כ משמרות</SelectItem>
-                        <SelectItem value="status">לפי סטטוס</SelectItem>
-                        <SelectItem value="food_cart">לפי עגלה/תבנית</SelectItem>
-                        <SelectItem value="time_range">לפי טווח שעות (HH:MM-HH:MM)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {(newColumnForm.criteria_type === 'status' || newColumnForm.criteria_type === 'food_cart' || newColumnForm.criteria_type === 'time_range') && (
-                    <div>
-                      <Label className="text-xs" dir="rtl">
-                        {newColumnForm.criteria_type === 'status' && 'ערך סטטוס'}
-                        {newColumnForm.criteria_type === 'food_cart' && 'שם עגלה/תבנית'}
-                        {newColumnForm.criteria_type === 'time_range' && 'טווח שעות (לדוגמה: 06:00-18:00)'}
-                      </Label>
-                      {newColumnForm.criteria_type === 'status' ? (
-                        <Select value={newColumnForm.criteria_value} onValueChange={v => setNewColumnForm(p => ({ ...p, criteria_value: v }))}>
-                          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="בחר סטטוס" /></SelectTrigger>
-                          <SelectContent>
-                            {shiftStatuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input value={newColumnForm.criteria_value} onChange={e => setNewColumnForm(p => ({ ...p, criteria_value: e.target.value }))} dir="rtl" className="h-8 text-sm" />
-                      )}
-                    </div>
-                  )}
-                  <div className="flex gap-2 justify-end pt-1">
-                    {editingSummaryColumn && (
-                      <Button variant="outline" size="sm" onClick={() => { setEditingSummaryColumn(null); setNewColumnForm({ name: '', criteria_type: 'total_shifts', criteria_value: '' }); }}>ביטול עריכה</Button>
-                    )}
-                    <Button size="sm" className="bg-blue-900 hover:bg-blue-800" onClick={() => {
-                      if (!newColumnForm.name) return;
-                      let updated;
-                      if (editingSummaryColumn) {
-                        updated = summaryColumns.map(c => c.id === editingSummaryColumn.id ? { ...c, ...newColumnForm } : c);
-                        setEditingSummaryColumn(null);
-                      } else {
-                        updated = [...summaryColumns, { id: Date.now().toString(), ...newColumnForm }];
-                      }
-                      saveSummaryColumns(updated);
-                      setNewColumnForm({ name: '', criteria_type: 'total_shifts', criteria_value: '' });
-                    }} dir="rtl">{editingSummaryColumn ? 'עדכן' : 'הוסף'}</Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowSummaryColumnsDialog(false)} dir="rtl">סגור</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <SummaryColumnsDialog
+          open={showSummaryColumnsDialog}
+          onOpenChange={setShowSummaryColumnsDialog}
+          summaryColumns={summaryColumns}
+          saveSummaryColumns={saveSummaryColumns}
+          shiftStatuses={shiftStatuses}
+          scheduleParams={scheduleParams}
+          trackers={trackers}
+        />
 
         {/* Notification Dialog */}
         <Dialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog}>
