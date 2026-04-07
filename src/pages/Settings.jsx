@@ -233,6 +233,12 @@ export default function Settings() {
                       <div className="text-xs text-gray-500">סופר שעות עבודה של עובדים לפי ערך טקסטואלי מוגדר (למשל "נוכח")</div>
                     </div>
                   </SelectItem>
+                  <SelectItem value="count_by_text">
+                    <div dir="rtl">
+                      <div className="font-medium">סיכום פעמים לפי טקסט</div>
+                      <div className="text-xs text-gray-500">סופר כמה פעמים עובד עשה משמרת עם טקסט מוגדר בעמודה (למשל ספירת מספר משמרות עם "ויש")</div>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <Button onClick={handleAddScheduleColumn}><Plus className="w-4 h-4" /></Button>
@@ -247,9 +253,11 @@ export default function Settings() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">{col.name}</span>
                       <Badge variant="outline" className={`text-xs ${
-                        col.report_type === "sum_hours" ? "border-purple-300 text-purple-700" : "border-blue-300 text-blue-700"
+                        col.report_type === "sum_hours" ? "border-purple-300 text-purple-700" :
+                        col.report_type === "count_by_text" ? "border-green-300 text-green-700" :
+                        "border-blue-300 text-blue-700"
                       }`}>
-                        {col.report_type === "sum_hours" ? "סיכום שעות לפי טקסט" : "סיכום מספרים"}
+                        {col.report_type === "sum_hours" ? "סיכום שעות לפי טקסט" : col.report_type === "count_by_text" ? "סיכום פעמים לפי טקסט" : "סיכום מספרים"}
                       </Badge>
                       {(col.options || []).length > 0 && (
                         <span className="text-xs text-gray-500">{col.options.length} אפשרויות</span>
