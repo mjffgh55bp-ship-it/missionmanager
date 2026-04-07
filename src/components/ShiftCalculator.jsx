@@ -317,55 +317,63 @@ export default function ShiftCalculator({ title, icon: TitleIcon, accentColor = 
         {/* משמרות נדרשות */}
         <div>
           <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">משמרות נדרשות</h3>
-          <div className="space-y-1">
-            <NumberControl 
-              label="משמרות יום בימי A (06:00-22:00)"
-              value={config.dayAShifts}
-              onChange={(v) => updateConfig('dayAShifts', v)}
-              max={20}
-            />
-            <NumberControl 
-              label="כמות ימי A בשבוע"
-              value={config.daysTypeA}
-              onChange={(v) => updateConfig('daysTypeA', v)}
-              max={7}
-            />
-            <NumberControl 
-              label="משמרות יום בימי B (06:00-22:00)"
-              value={config.dayBShifts}
-              onChange={(v) => updateConfig('dayBShifts', v)}
-              max={20}
-            />
-            <NumberControl 
-              label="כמות ימי B בשבוע"
-              value={config.daysTypeB}
-              onChange={(v) => updateConfig('daysTypeB', v)}
-              max={7}
-            />
-            <NumberControl 
-              label="משמרות ערב ביום A (22:00-02:00)"
-              value={config.dayAEveningShifts}
-              onChange={(v) => updateConfig('dayAEveningShifts', v)}
-              max={5}
-            />
-            <NumberControl 
-              label="משמרות ערב ביום B (22:00-02:00)"
-              value={config.dayBEveningShifts}
-              onChange={(v) => updateConfig('dayBEveningShifts', v)}
-              max={5}
-            />
-            <NumberControl 
-              label="משמרות לילה ביום A (02:00-06:00)"
-              value={config.dayANightShifts}
-              onChange={(v) => updateConfig('dayANightShifts', v)}
-              max={5}
-            />
-            <NumberControl 
-              label="משמרות לילה ביום B (02:00-06:00)"
-              value={config.dayBNightShifts}
-              onChange={(v) => updateConfig('dayBNightShifts', v)}
-              max={5}
-            />
+          <div className="space-y-4">
+            {/* ימי A */}
+            <div className="p-3 bg-gray-50 rounded-xl">
+              <div className="text-xs font-semibold text-gray-500 uppercase mb-2">ימי A</div>
+              <NumberControl 
+                label="כמות ימי A בשבוע"
+                value={config.daysTypeA}
+                onChange={(v) => updateConfig('daysTypeA', v)}
+                max={7}
+              />
+              <NumberControl 
+                label="משמרות יום בימי A (06:00-22:00)"
+                value={config.dayAShifts}
+                onChange={(v) => updateConfig('dayAShifts', v)}
+                max={20}
+              />
+              <NumberControl 
+                label="משמרות ערב ביום A (22:00-02:00)"
+                value={config.dayAEveningShifts}
+                onChange={(v) => updateConfig('dayAEveningShifts', v)}
+                max={5}
+              />
+              <NumberControl 
+                label="משמרות לילה ביום A (02:00-06:00)"
+                value={config.dayANightShifts}
+                onChange={(v) => updateConfig('dayANightShifts', v)}
+                max={5}
+              />
+            </div>
+            {/* ימי B */}
+            <div className="p-3 bg-gray-50 rounded-xl">
+              <div className="text-xs font-semibold text-gray-500 uppercase mb-2">ימי B</div>
+              <NumberControl 
+                label="כמות ימי B בשבוע"
+                value={config.daysTypeB}
+                onChange={(v) => updateConfig('daysTypeB', v)}
+                max={7}
+              />
+              <NumberControl 
+                label="משמרות יום בימי B (06:00-22:00)"
+                value={config.dayBShifts}
+                onChange={(v) => updateConfig('dayBShifts', v)}
+                max={20}
+              />
+              <NumberControl 
+                label="משמרות ערב ביום B (22:00-02:00)"
+                value={config.dayBEveningShifts}
+                onChange={(v) => updateConfig('dayBEveningShifts', v)}
+                max={5}
+              />
+              <NumberControl 
+                label="משמרות לילה ביום B (02:00-06:00)"
+                value={config.dayBNightShifts}
+                onChange={(v) => updateConfig('dayBNightShifts', v)}
+                max={5}
+              />
+            </div>
           </div>
         </div>
 
