@@ -144,14 +144,20 @@ export default function Schedule() {
           });
         }
       }
-      if (defaultTemplates.length > 0) {
-        const updatedTemplateRows = await base44.entities.TemplateRow.filter({ date: dateString });
-        setTemplateRows(updatedTemplateRows);
-        const updatedUniqueIds = [...new Set(updatedTemplateRows.map((row) => row.template_id))];
-        setTemplates(allTemplatesData.filter((t) => updatedUniqueIds.includes(t.id)));
-      }
+      const updatedTemplateRows = await base44.entities.TemplateRow.filter({ date: dateString });
+      setTemplateRows(updatedTemplateRows);
+      const updatedUniqueIds = [...new Set(updatedTemplateRows.map((row) => row.template_id))];
+      setTemplates(allTemplatesData.filter((t) => updatedUniqueIds.includes(t.id)));
+    } else {
+      setTemplateRows(templateRowsData);
+      const uniqueTemplateIds = [...new Set(templateRowsData.map((row) => row.template_id))];
+      setTemplates(allTemplatesData.filter((t) => uniqueTemplateIds.includes(t.id)));
     }
 
+    setAllTemplates(allTemplatesData);
+    setWorkers(workersData);
+    setAvailabilities(availabilitiesData);
+    setUnavailabilities(unavailabilitiesData);
     setLoading(false);
   };
 
