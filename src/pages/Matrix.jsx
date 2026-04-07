@@ -1546,6 +1546,16 @@ export default function Matrix() {
                             )}
                           </div>
                           <div className="absolute inset-0">
+                            {/* Day boundary line at 06:00 */}
+                            {viewMode === 'daily' ? (() => {
+                              const pos = timeToPercentage("06:00", 0, 'daily', zoomRange);
+                              if (pos < 0 || pos > 100) return null;
+                              return <div key="day-boundary" className="absolute top-0 h-full pointer-events-none" style={{ right: `${pos}%`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
+                            })() : [0,1,2,3,4,5,6].map(day => {
+                              const pos = timeToPercentage("06:00", day, 'weekly', zoomRange);
+                              if (pos < 0 || pos > 100) return null;
+                              return <div key={`day-boundary-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${pos}%`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
+                            })}
                             {availabilityShifts.map((shift, idx) => (<AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />))}
                             {workerUnavailabilities.map(unavail => (<UnavailabilityBar key={unavail.id} unavail={unavail} />))}
                             {workerTemplateShifts.map(ts => (
