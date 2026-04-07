@@ -1527,12 +1527,12 @@ export default function Matrix() {
                             );
                           })()}
                           <div className="flex items-center flex-1 min-w-0">
-                            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 ml-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
-                            <div className="min-w-0 flex-1">
-                              <span className="truncate block text-sm leading-tight">{worker.nickname}</span>
-                              <WeeklySummary worker={worker} />
-                            </div>
-                          </div>
+                             <div className="min-w-0 flex-1">
+                               <span className="truncate block text-sm leading-tight">{worker.nickname}</span>
+                               <WeeklySummary worker={worker} />
+                             </div>
+                             <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
+                           </div>
                         </div>
                         {/* Summary columns cells - weekly mode only */}
                         {viewMode === 'weekly' && summaryColumns.map(col => (
