@@ -219,10 +219,20 @@ export default function Settings() {
             <div className="flex gap-2 mb-4" dir="rtl">
               <Input value={newColName} onChange={e => setNewColName(e.target.value)} placeholder="שם עמודה חדשה..." dir="rtl" className="flex-1" />
               <Select value={newColReportType} onValueChange={setNewColReportType}>
-                <SelectTrigger className="w-48" dir="rtl"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-56" dir="rtl"><SelectValue /></SelectTrigger>
                 <SelectContent dir="rtl">
-                  <SelectItem value="sum_numbers">סיכום מספרים</SelectItem>
-                  <SelectItem value="sum_hours">סיכום שעות לפי טקסט</SelectItem>
+                  <SelectItem value="sum_numbers">
+                    <div dir="rtl">
+                      <div className="font-medium">סיכום מספרים</div>
+                      <div className="text-xs text-gray-500">מסכם ערכים מספריים שהוזנו בתאים (כמויות, כמו מנות)</div>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="sum_hours">
+                    <div dir="rtl">
+                      <div className="font-medium">סיכום שעות לפי טקסט</div>
+                      <div className="text-xs text-gray-500">סופר שעות עבודה של עובדים לפי ערך טקסטואלי מוגדר (למשל "נוכח")</div>
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <Button onClick={handleAddScheduleColumn}><Plus className="w-4 h-4" /></Button>
