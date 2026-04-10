@@ -423,7 +423,12 @@ export default function Schedule() {
               });
             }
 
-            return groups.map((group, groupIndex) => {
+            return groups.filter((group) => {
+              const template = allTemplates.find((t) => t.id === group.template_id);
+              if (!template) return false;
+              // Hide old-style role tables (templates with a 'תפקיד' column)
+              return !(template.columns || []).some(c => c.name === 'תפקיד');
+            }).map((group, groupIndex) => {
               const template = allTemplates.find((t) => t.id === group.template_id);
               if (!template) return null;
               const templateRowsForTemplate = group.rows;
@@ -697,7 +702,7 @@ export default function Schedule() {
                                 rowValues={row.values || {}} /> :
 
 
-                              {(columnSubTypes[col.name] || []).length > 0 ? (
+(columnSubTypes[col.name] || []).length > 0 ?
                                 <ColumnCell
                                   assignmentId={row.id}
                                   colType={col.name}
@@ -708,10 +713,8 @@ export default function Schedule() {
                                     const newValues = { ...row.values, ...updatedColumnValues };
                                     base44.entities.TemplateRow.update(row.id, { values: newValues });
                                     setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
-                                  }} />
-                              ) : (
+                                  }} /> :
                                 <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
-                              )}
 
                               }
                                     </TableCell>
