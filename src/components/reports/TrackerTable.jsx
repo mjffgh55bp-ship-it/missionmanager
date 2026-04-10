@@ -104,7 +104,7 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], onDelete }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], onDelete, onUpdated }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -146,6 +146,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     setSaving(true);
     const updated = await base44.entities.Tracker.update(tracker.id, { name: editName, columns: editColumns });
     setTracker(updated);
+    if (onUpdated) onUpdated(updated);
     setSaving(false);
     setEditMode(false);
   };

@@ -54,6 +54,10 @@ export default function Reports() {
     setTrackers(prev => [...prev, created]);
   };
 
+  const handleTrackerUpdated = (updated) => {
+    setTrackers(prev => prev.map(t => t.id === updated.id ? updated : t));
+  };
+
   const handleDeleteTracker = async (trackerId) => {
     if (!window.confirm("האם למחוק את טבלת המעקב?")) return;
     await base44.entities.Tracker.delete(trackerId);
@@ -103,6 +107,7 @@ export default function Reports() {
               workerRoles={workerRoles}
               scheduleColumns={scheduleColumns}
               onDelete={() => handleDeleteTracker(tracker.id)}
+              onUpdated={handleTrackerUpdated}
             />
           ))
         )}
