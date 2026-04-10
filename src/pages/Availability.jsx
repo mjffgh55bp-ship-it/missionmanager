@@ -84,6 +84,10 @@ export default function Availability() {
   const [extraTaskStates, setExtraTaskStates] = useState({});
   const [templateRows, setTemplateRows] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
+  const [isManager, setIsManager] = useState(false);
+  const [editingTips, setEditingTips] = useState(false);
+  const [tipsEditValue, setTipsEditValue] = useState("");
+  const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -94,12 +98,15 @@ export default function Availability() {
     setCurrentUser(user);
 
     // Batch 1: workers + settings (no worker dependency needed yet)
-    const [workersData, settings, eventsData, yearlyEventsData, openRegSettings] = await Promise.all([
+    const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
+    const [workersData, settings, weekTipsSettings, eventsData, yearlyEventsData, openRegSettings, userRolesSettings] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
+      base44.entities.AppSettings.filter({ setting_key: `availability_tips_${weekStartStr2}` }),
       base44.entities.CompanyEvent.list("-date"),
       base44.entities.YearlyEvent.list(),
-      base44.entities.AppSettings.filter({ setting_key: "open_registrations" })
+      base44.entities.AppSettings.filter({ setting_key: "open_registrations" }),
+      base44.entities.AppSettings.filter({ setting_key: "user_roles" })
     ]);
 
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
@@ -113,9 +120,24 @@ export default function Availability() {
     const worker = workersData.find((w) => w.email === user.email);
     setCurrentWorker(worker);
 
-    if (settings.length > 0) {
-      const tipsData = JSON.parse(settings[0].setting_value);
+    // Check if manager
+    if (userRolesSettings.length > 0) {
+      const rolesData = JSON.parse(userRolesSettings[0].setting_value);
+      const role = rolesData[user.email];
+      setIsManager(user.role === 'admin' || role === 'manager');
+    } else {
+      setIsManager(user.role === 'admin');
+    }
+
+    // Load week-specific tips, fallback to global
+    const activeWeekTips = weekTipsSettings.length > 0 ? weekTipsSettings[0] : null;
+    const activeGlobalTips = settings.length > 0 ? settings[0] : null;
+    const tipsSource = activeWeekTips || activeGlobalTips;
+    if (tipsSource) {
+      const tipsData = JSON.parse(tipsSource.setting_value);
       setTipsMessage(tipsData.message || "");
+      setTipsEditValue(tipsData.message || "");
+      setShowTipsAsPopup(tipsData.showAsPopup || false);
       if (tipsData.message && tipsData.message.trim() && tipsData.showAsPopup) {
         const acknowledgedSettings = await base44.entities.AppSettings.filter({ 
           setting_key: `tips_acknowledged_${user.email}` 
@@ -127,6 +149,9 @@ export default function Availability() {
           setShowTipsPopup(true);
         }
       }
+    } else {
+      setTipsMessage("");
+      setTipsEditValue("");
     }
 
     if (worker) {
@@ -596,14 +621,49 @@ END:VEVENT
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 md:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Tips Section */}
-        {tipsMessage &&
+        {(tipsMessage || isManager) &&
         <Card className="border-none shadow-lg mb-4">
             <CardContent className="py-4">
               <div className="flex items-start gap-3">
                 <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-semibold text-gray-900 mb-1">נהלי הרשמה ועדכונים</p>
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{tipsMessage}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="font-semibold text-gray-900">נהלי הרשמה ועדכונים</p>
+                    {isManager && !editingTips && (
+                      <Button size="sm" variant="outline" onClick={() => { setTipsEditValue(tipsMessage); setEditingTips(true); }} dir="rtl">
+                        <Pencil className="w-3 h-3 mr-1" />ערוך
+                      </Button>
+                    )}
+                  </div>
+                  {editingTips ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={tipsEditValue}
+                        onChange={e => setTipsEditValue(e.target.value)}
+                        rows={6}
+                        dir="rtl"
+                        className="text-sm"
+                        placeholder="הכנס הודעה לעובדים..."
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <Button size="sm" variant="outline" onClick={() => setEditingTips(false)} dir="rtl">ביטול</Button>
+                        <Button size="sm" className="bg-blue-900 hover:bg-blue-800" dir="rtl" onClick={async () => {
+                          const weekStartStr3 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
+                          const key = `availability_tips_${weekStartStr3}`;
+                          const existing = await base44.entities.AppSettings.filter({ setting_key: key });
+                          const data = { setting_key: key, setting_value: JSON.stringify({ message: tipsEditValue, showAsPopup: showTipsAsPopup }) };
+                          if (existing.length > 0) await base44.entities.AppSettings.update(existing[0].id, data);
+                          else await base44.entities.AppSettings.create(data);
+                          setTipsMessage(tipsEditValue);
+                          setEditingTips(false);
+                        }}>שמור</Button>
+                      </div>
+                    </div>
+                  ) : tipsMessage ? (
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap">{tipsMessage}</p>
+                  ) : (
+                    <p className="text-sm text-gray-400" dir="rtl">לא הוגדרה הודעה לשבוע זה</p>
+                  )}
                 </div>
               </div>
             </CardContent>

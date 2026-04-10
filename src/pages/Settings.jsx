@@ -2,18 +2,16 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Info, Users, X, Plus, Trash2, Columns, Settings as SettingsIcon, ClipboardList } from "lucide-react";
+import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 
 
 export default function Settings() {
-  const [tipsMessage, setTipsMessage] = useState("");
-  const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
+
   const [userRoles, setUserRoles] = useState({});
   const [workers, setWorkers] = useState([]);
   // Unified schedule columns
@@ -41,8 +39,7 @@ export default function Settings() {
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, scheduleColsSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings, tasksSettings, taskQualSettings] = await Promise.all([
-      base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
+    const [rolesSettings, workersData, scheduleColsSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings, tasksSettings, taskQualSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
@@ -53,11 +50,7 @@ export default function Settings() {
       base44.entities.AppSettings.filter({ setting_key: "task_qualifications" })
     ]);
     
-    if (tipsSettings.length > 0) {
-      const tipsData = JSON.parse(tipsSettings[0].setting_value);
-      setTipsMessage(tipsData.message || "");
-      setShowTipsAsPopup(tipsData.showAsPopup || false);
-    }
+
     if (rolesSettings.length > 0) setUserRoles(JSON.parse(rolesSettings[0].setting_value));
     if (scheduleColsSettings.length > 0) setScheduleColumns(JSON.parse(scheduleColsSettings[0].setting_value) || []);
     if (populationsSettings.length > 0) {
@@ -81,14 +74,7 @@ export default function Settings() {
     setLoading(false);
   };
 
-  const handleSaveTips = async () => {
-    setSaving(true);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "availability_tips" });
-    const data = { setting_key: "availability_tips", setting_value: JSON.stringify({ message: tipsMessage, showAsPopup: showTipsAsPopup }) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setSaving(false);
-  };
+
 
   const handleSaveRoles = async () => {
     setSaving(true);
@@ -546,22 +532,7 @@ export default function Settings() {
 
         {/* Activity Types Management - Removed as requested */}
 
-        {/* Tips & Policy */}
-        <Card className="border-none shadow-lg">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Info className="w-5 h-5 text-blue-600" />טיפים ומדיניות זמינות</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div><Label dir="rtl">הצג כחלון קופץ לאישור</Label><p className="text-xs text-gray-600" dir="rtl">הצג טיפים בחלון קופץ</p></div>
-                <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
-              </div>
-              <div><Label htmlFor="tips" dir="rtl">הודעה לעובדים</Label><Textarea id="tips" value={tipsMessage} onChange={(e) => setTipsMessage(e.target.value)} placeholder="הזן טיפים..." rows={10} className="font-mono text-sm mt-2" dir="rtl" /></div>
-              <Button onClick={handleSaveTips} disabled={saving} className="bg-blue-900 hover:bg-blue-800" dir="rtl"><Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור טיפים"}</Button>
-            </div>
-          </CardContent>
-        </Card>
+
       </div>
     </div>
   );
