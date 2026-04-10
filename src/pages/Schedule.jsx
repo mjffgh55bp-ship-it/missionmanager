@@ -630,6 +630,17 @@ export default function Schedule() {
                             )}
                               <TableHead className="w-[100px] text-center" dir="rtl">סטטוס</TableHead>
                               {editMode && <TableHead className="w-[60px] text-center" dir="rtl"></TableHead>}
+                              {editMode && (
+                                <TableHead className="w-[40px] p-0 text-center">
+                                  <button
+                                    onClick={() => {setSelectedTemplate(template);setShowAddTemplateColumnDialog(true);}}
+                                    className="flex items-center justify-center w-full h-full px-2 py-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors rounded"
+                                    title="הוסף עמודה"
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                  </button>
+                                </TableHead>
+                              )}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -759,18 +770,9 @@ export default function Schedule() {
                            <Plus className="w-3 h-3" />
                            שורה חדשה
                           </button>
-                          <div className="w-px h-4 bg-gray-300" />
-                          <button
-                           onClick={() => {setSelectedTemplate(template);setShowAddTemplateColumnDialog(true);}}
-                           className="flex items-center gap-1 px-3 py-1 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors"
-                           dir="rtl"
-                          >
-                           <Plus className="w-3 h-3" />
-                           עמודה חדשה
-                          </button>
                           </div>
                           )}
-                          </CardContent>
+                           </CardContent>
                   </Card>);
 
             });
