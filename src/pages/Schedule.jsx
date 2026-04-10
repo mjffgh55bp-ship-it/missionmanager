@@ -105,8 +105,14 @@ export default function Schedule() {
     }
     if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
-    if (tasksSettings.length > 0) setTasksList(JSON.parse(tasksSettings[0].setting_value) || []);
-    if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
+    const parsedTaskQual = taskQualSettings.length > 0 ? (JSON.parse(taskQualSettings[0].setting_value) || {}) : {};
+    if (taskQualSettings.length > 0) setTaskQualifications(parsedTaskQual);
+    if (tasksSettings.length > 0) {
+      setTasksList(JSON.parse(tasksSettings[0].setting_value) || []);
+    } else {
+      // Fall back to keys from task_qualifications
+      setTasksList(Object.keys(parsedTaskQual));
+    }
 
     const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
     if (openRegSettings.length > 0) {
