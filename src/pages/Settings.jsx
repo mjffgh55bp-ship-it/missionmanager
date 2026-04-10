@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Info, Users, X, Plus, Trash2, Columns, Settings as SettingsIcon } from "lucide-react";
+import { Save, Info, Users, X, Plus, Trash2, Columns, Settings as SettingsIcon, ClipboardList } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 
@@ -31,20 +31,26 @@ export default function Settings() {
   const [newWorkerRole, setNewWorkerRole] = useState("");
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [newShiftStatus, setNewShiftStatus] = useState("");
+  const [tasks, setTasks] = useState([]);
+  const [newTaskName, setNewTaskName] = useState("");
+  const [taskQualifications, setTaskQualifications] = useState({}); // { taskName: [workerId, ...] }
+  const [expandedTask, setExpandedTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [tipsSettings, rolesSettings, workersData, scheduleColsSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
+    const [tipsSettings, rolesSettings, workersData, scheduleColsSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings, tasksSettings, taskQualSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" })
+      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
+      base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
+      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" })
     ]);
     
     if (tipsSettings.length > 0) {
@@ -69,6 +75,8 @@ export default function Settings() {
     } else {
       setShiftStatuses(["מתוכנן", "מאושר", "בוצע", "בוטל"]);
     }
+    if (tasksSettings.length > 0) setTasks(JSON.parse(tasksSettings[0].setting_value) || []);
+    if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
     setWorkers(workersData);
     setLoading(false);
   };
@@ -195,6 +203,43 @@ export default function Settings() {
     const settings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
     await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
     setShiftStatuses(updated);
+  };
+
+  const saveTaskQualifications = async (updated) => {
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "task_qualifications" });
+    const data = { setting_key: "task_qualifications", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setTaskQualifications(updated);
+  };
+
+  const handleAddTask = async () => {
+    if (!newTaskName.trim() || tasks.includes(newTaskName.trim())) return;
+    const updated = [...tasks, newTaskName.trim()];
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "tasks_list" });
+    const data = { setting_key: "tasks_list", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setTasks(updated);
+    setNewTaskName("");
+  };
+
+  const handleRemoveTask = async (task) => {
+    const updated = tasks.filter(t => t !== task);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "tasks_list" });
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+    const updatedQuals = { ...taskQualifications };
+    delete updatedQuals[task];
+    await saveTaskQualifications(updatedQuals);
+    setTasks(updated);
+  };
+
+  const handleToggleWorkerQualification = async (taskName, workerId) => {
+    const current = taskQualifications[taskName] || [];
+    const updated = current.includes(workerId)
+      ? { ...taskQualifications, [taskName]: current.filter(id => id !== workerId) }
+      : { ...taskQualifications, [taskName]: [...current, workerId] };
+    await saveTaskQualifications(updated);
   };
 
   return (
@@ -422,6 +467,66 @@ export default function Settings() {
               <Button onClick={handleSaveRoles} disabled={saving} className="bg-blue-900 hover:bg-blue-800" dir="rtl">
                 <Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור תפקידי משתמש"}
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tasks & Qualifications */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><ClipboardList className="w-5 h-5 text-violet-600" />משימות וכשירויות</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600 mb-4" dir="rtl">
+              הגדר משימות וקבע אילו עובדים כשירים לכל משימה. בעמודת הלוח, עובדים לא כשירים יצובעו בכתום ויוצגו אחרונים.
+            </p>
+            <div className="flex gap-2 mb-4" dir="rtl">
+              <Input value={newTaskName} onChange={e => setNewTaskName(e.target.value)} placeholder="שם משימה חדשה..." dir="rtl" className="flex-1" onKeyDown={e => e.key === 'Enter' && handleAddTask()} />
+              <Button onClick={handleAddTask}><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="space-y-2">
+              {tasks.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו משימות</p>}
+              {tasks.map(task => (
+                <div key={task} className="border rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50" dir="rtl">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{task}</span>
+                      <Badge variant="outline" className="text-xs border-violet-300 text-violet-700">
+                        {(taskQualifications[task] || []).length} כשירים
+                      </Badge>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => setExpandedTask(expandedTask === task ? null : task)} className="text-gray-400 hover:text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-200">
+                        {expandedTask === task ? "סגור" : "נהל כשירויות"}
+                      </button>
+                      <button onClick={() => handleRemoveTask(task)} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                  {expandedTask === task && (
+                    <div className="p-3 border-t" dir="rtl">
+                      <p className="text-xs text-gray-500 mb-2">סמן את העובדים הכשירים למשימה זו:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {workers.filter(w => w.active !== false).map(worker => {
+                          const qualified = (taskQualifications[task] || []).includes(worker.id);
+                          return (
+                            <button
+                              key={worker.id}
+                              onClick={() => handleToggleWorkerQualification(task, worker.id)}
+                              className={`px-2 py-1 rounded text-xs border transition-colors ${
+                                qualified
+                                  ? 'bg-violet-100 border-violet-400 text-violet-800 font-semibold'
+                                  : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-400'
+                              }`}
+                            >
+                              {worker.nickname}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

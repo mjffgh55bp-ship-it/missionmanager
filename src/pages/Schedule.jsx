@@ -58,6 +58,8 @@ export default function Schedule() {
   const [editMode, setEditMode] = useState(false);
   const [showPresetsDialog, setShowPresetsDialog] = useState(false);
   const [openRegistrations, setOpenRegistrations] = useState([]);
+  const [tasksList, setTasksList] = useState([]);
+  const [taskQualifications, setTaskQualifications] = useState({});
 
   useEffect(() => {loadData();}, [currentDate]);
 
@@ -75,12 +77,14 @@ export default function Schedule() {
     base44.entities.Unavailability.filter({ date: dateString })]
     );
 
-    const [colTypesSettings, allTemplatesData, templateRowsData, shiftStatusesSettings, workerRolesSettings] = await Promise.all([
+    const [colTypesSettings, allTemplatesData, templateRowsData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings] = await Promise.all([
     base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
     base44.entities.Template.filter({ active: true }),
     base44.entities.TemplateRow.filter({ date: dateString }),
     base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
-    base44.entities.AppSettings.filter({ setting_key: "worker_roles" })]
+    base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
+    base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
+    base44.entities.AppSettings.filter({ setting_key: "task_qualifications" })]
     );
 
     if (colTypesSettings.length > 0) {
@@ -101,6 +105,8 @@ export default function Schedule() {
     }
     if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
+    if (tasksSettings.length > 0) setTasksList(JSON.parse(tasksSettings[0].setting_value) || []);
+    if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
 
     const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
     if (openRegSettings.length > 0) {
@@ -693,6 +699,7 @@ export default function Schedule() {
                                 dateString={dateString}
                                 rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
                                 rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
+                                taskQualifiedWorkerIds={col.task_name ? (taskQualifications[col.task_name] || []) : undefined}
                                 onSaved={(workerId) => {
                                   const newValues = { ...row.values, [col.name]: workerId };
                                   setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
@@ -803,6 +810,7 @@ export default function Schedule() {
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                     )}
                     <SelectItem value="worker_member">חבר צוות</SelectItem>
+                    {tasksList.map(t => <SelectItem key={`task_${t}`} value={`task_${t}`}>משימה: {t}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -848,6 +856,9 @@ export default function Schedule() {
                   } else if (newTemplateColumnName === "worker_member") {
                     const colName = newTemplateColumnType.trim() || newTemplateColumnRole;
                     columnToAdd = { name: colName, type: "worker", width: 150, role_filter: newTemplateColumnRole };
+                  } else if (newTemplateColumnName.startsWith("task_")) {
+                    const taskName = newTemplateColumnName.replace("task_", "");
+                    columnToAdd = { name: taskName, type: "worker", width: 150, task_name: taskName };
                   } else {
                     columnToAdd = { name: newTemplateColumnName, type: "text", width: 120 };
                   }

@@ -18,6 +18,7 @@ export default function WorkerCell({
   dateString,
   rowStartTime,
   rowEndTime,
+  taskQualifiedWorkerIds,
   onSaved
 }) {
   const [open, setOpen] = useState(false);
@@ -72,6 +73,11 @@ export default function WorkerCell({
     if (onSaved) onSaved(null);
   };
 
+  const isWorkerQualified = (workerId) => {
+    if (!taskQualifiedWorkerIds) return true; // no task filter = all qualified
+    return taskQualifiedWorkerIds.includes(workerId);
+  };
+
   const getWorkerCategory = (workerId) => {
     if (!rowStartTime || !rowEndTime) return 'no-info';
     const isUnavail = isWorkerUnavailable(workerId, rowStartTime, rowEndTime);
@@ -92,12 +98,21 @@ export default function WorkerCell({
     return matchesSearch && matchesRole;
   }).
   sort((a, b) => {
-    if (!rowStartTime || !rowEndTime) return 0;
+    const aQual = isWorkerQualified(a.id);
+    const bQual = isWorkerQualified(b.id);
+    if (!rowStartTime || !rowEndTime) {
+      // Sort qualified first when no time info
+      if (aQual !== bQual) return aQual ? -1 : 1;
+      return 0;
+    }
     const aCat = getWorkerCategory(a.id);
     const bCat = getWorkerCategory(b.id);
-    const order = { wanted: 0, available: 1, 'no-info': 2, unavailable: 3 };
-    if (order[aCat] !== order[bCat]) return order[aCat] - order[bCat];
-    // Within same category, sort by priority
+    // Combined score: qualified+wanted=0, qualified+available=1, qualified+no-info=2,
+    // unqualified+wanted=3, unqualified+available=4, unqualified+no-info=5, unavailable=6
+    const catOrder = { wanted: 0, available: 1, 'no-info': 2, unavailable: 6 };
+    const aScore = aCat === 'unavailable' ? 6 : (aQual ? catOrder[aCat] : catOrder[aCat] + 3);
+    const bScore = bCat === 'unavailable' ? 6 : (bQual ? catOrder[bCat] : catOrder[bCat] + 3);
+    if (aScore !== bScore) return aScore - bScore;
     const aAvail = getWorkerAvailabilityPriority(a.id, rowStartTime, rowEndTime);
     const bAvail = getWorkerAvailabilityPriority(b.id, rowStartTime, rowEndTime);
     if (aAvail?.priority && bAvail?.priority) return aAvail.priority - bAvail.priority;
@@ -106,6 +121,8 @@ export default function WorkerCell({
 
   const isCurrentUnavailable = selectedWorker && rowStartTime && rowEndTime &&
   isWorkerUnavailable(selectedWorker.id, rowStartTime, rowEndTime);
+  const isCurrentUnqualified = selectedWorker && taskQualifiedWorkerIds &&
+  !taskQualifiedWorkerIds.includes(selectedWorker.id);
 
   return (
     <Popover open={open} onOpenChange={(v) => {setOpen(v);if (v) setSearchQuery("");}}>
@@ -118,10 +135,11 @@ export default function WorkerCell({
 
           {selectedWorker ?
           <div className="flex items-center gap-1 justify-center">
-              <span className="text-gray-950 text-xs font-medium truncate">
+              <span className={`text-xs font-medium truncate ${isCurrentUnqualified ? 'text-orange-600' : 'text-gray-950'}`}>
                 {selectedWorker.nickname}
               </span>
               {isCurrentUnavailable && <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />}
+              {isCurrentUnqualified && <span className="text-[10px] text-orange-500 flex-shrink-0">⚠</span>}
             </div> :
 
           <span className="text-gray-300 text-xs">+ בחר עובד</span>
@@ -177,6 +195,7 @@ export default function WorkerCell({
             "bg-orange-100 hover:bg-orange-200 text-orange-900" :
             "bg-red-100 hover:bg-red-200 text-red-900";
 
+            const qualified = isWorkerQualified(worker.id);
             return (
               <button
                 key={worker.id}
@@ -197,8 +216,8 @@ export default function WorkerCell({
                   </span>
 
                   {/* Name */}
-                  <span className={`flex-1 text-right font-medium ${getSeniorityColor(worker.seniority)}`}>
-                    {worker.nickname}
+                  <span className={`flex-1 text-right font-medium ${!qualified ? 'text-orange-600' : getSeniorityColor(worker.seniority)}`}>
+                    {worker.nickname}{!qualified ? ' ⚠' : ''}
                   </span>
 
                   {/* Role badge */}
