@@ -272,47 +272,25 @@ export default function Settings() {
                   </div>
                   {expandedCol === idx && (
                     <div className="p-3 border-t space-y-4" dir="rtl">
-                      {/* Options */}
+                      {/* Preset options */}
                       <div>
-                        <p className="text-xs font-semibold text-gray-600 mb-2">
-                          {col.report_type === "sum_hours" ? "ערכי טקסט לסינון" : "ערכים מספריים מוצעים"}
-                        </p>
-                        <div className="flex gap-2 mb-2">
-                          <Input value={newColOption} onChange={e => setNewColOption(e.target.value)} placeholder="ערך חדש..." className="h-7 text-sm" dir="rtl" />
-                          <Button size="sm" className="h-7" onClick={() => handleAddOption(idx)}><Plus className="w-3 h-3" /></Button>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {(col.options || []).map(opt => (
-                            <Badge key={opt} variant="outline" className="text-xs pr-1">
-                              {opt}
-                              <button onClick={() => handleRemoveOption(idx, opt)} className="ml-1 hover:text-red-600"><X className="w-2 h-2" /></button>
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Sub-options (presets with criterion) */}
-                      <div className="border-t pt-3">
-                        <p className="text-xs font-semibold text-gray-600 mb-1">תת-אפשרויות מוכנות מראש</p>
-                        <p className="text-xs text-gray-400 mb-2">כל תת-אפשרות מגדירה קריטריון ספירה/סיכום לעובד בדוחות ומטריציה</p>
+                        <p className="text-xs font-semibold text-gray-600 mb-1">אפשרויות מוכנות מראש לבחירה בלוח</p>
+                        <p className="text-xs text-gray-400 mb-2">כל אפשרות מגדירה ערך לבחירה בתא ואת הקריטריון לספירת שעות בדוחות</p>
                         <div className="flex gap-2 mb-2">
                           <Input
                             value={newSubOptionName}
                             onChange={e => setNewSubOptionName(e.target.value)}
-                            placeholder="שם התת-אפשרות..."
+                            placeholder="שם האפשרות (יופיע בלוח)..."
                             className="h-7 text-sm flex-1"
                             dir="rtl"
                           />
-                          <Select value={newSubOptionCriterion} onValueChange={setNewSubOptionCriterion}>
-                            <SelectTrigger className="h-7 text-sm w-36" dir="rtl">
-                              <SelectValue placeholder="קריטריון..." />
-                            </SelectTrigger>
-                            <SelectContent dir="rtl">
-                              {(col.options || []).map(opt => (
-                                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Input
+                            value={newSubOptionCriterion}
+                            onChange={e => setNewSubOptionCriterion(e.target.value)}
+                            placeholder="ערך לסינון שעות..."
+                            className="h-7 text-sm w-40"
+                            dir="rtl"
+                          />
                           <Button size="sm" className="h-7" onClick={() => handleAddSubOption(idx)}><Plus className="w-3 h-3" /></Button>
                         </div>
                         <div className="space-y-1">
