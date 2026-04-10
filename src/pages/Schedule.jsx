@@ -378,7 +378,8 @@ export default function Schedule() {
                 const templateRowsForTemplate = group.rows;
 
                 const dailyColumns = dailyCustomColumns[template.id] || [];
-                const allColumns = [...(template.columns || []), ...dailyColumns];
+                const taskColumn = { name: 'משימה', type: 'task', width: 120 };
+                const allColumns = [...(template.columns || []), ...dailyColumns, taskColumn];
                 const customOrder = customColumnOrders[template.id];
                 const orderedColumns = customOrder
                   ? customOrder.map((name) => allColumns.find((col) => col.name === name)).filter(Boolean)
@@ -686,48 +687,47 @@ export default function Schedule() {
                                               base44.entities.TemplateRow.update(row.id, { values: newValues });
                                               setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                             }} />
+                                            ) : col.type === 'task' ? (
+                                              <Select
+                                                value={row.values?.task || ""}
+                                                onValueChange={async (value) => {
+                                                  const newValues = { ...row.values, task: value };
+                                                  await base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                                  setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                                }}>
+                                                <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
+                                                  <SelectValue placeholder="-" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  <SelectItem value={null}>ללא</SelectItem>
+                                                  {tasksList.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                                </SelectContent>
+                                              </Select>
                                             ) : (
-                                            <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
+                                              <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
                                             )}
                                             </TableCell>
                                             );
                                             })}
                                             <TableCell className="p-0 text-center">
                                             <Select
-                                            value={row.values?.task || ""}
-                                            onValueChange={async (value) => {
-                                            const newValues = { ...row.values, task: value };
-                                            await base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                            setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                              value={row.values?.status || ""}
+                                              onValueChange={async (value) => {
+                                              const newValues = { ...row.values, status: value };
+                                              await base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                              setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                             }}>
                                             <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
-                                            <SelectValue placeholder="-" />
+                                              <SelectValue placeholder="-" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                            <SelectItem value={null}>ללא</SelectItem>
-                                            {tasksList.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                              <SelectItem value={null}>ללא</SelectItem>
+                                              {shiftStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                             </SelectContent>
                                             </Select>
                                             </TableCell>
-                                            <TableCell className="p-0 text-center">
-                                            <Select
-                                            value={row.values?.status || ""}
-                                            onValueChange={async (value) => {
-                                            const newValues = { ...row.values, status: value };
-                                        await base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                        setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
-                                      }}>
-                                      <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
-                                        <SelectValue placeholder="-" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value={null}>ללא</SelectItem>
-                                        {shiftStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                      </SelectContent>
-                                      </Select>
-                                      </TableCell>
-                                      {editMode && (
-                                      <TableCell className="p-0">
+                                            {editMode && (
+                                            <TableCell className="p-0">
                                       <Button variant="ghost" size="icon" className="h-5 w-5 text-red-500 hover:text-red-700" onClick={() => handleDeleteTemplateRow(row.id)}>
                                         <Trash2 className="w-3 h-3" />
                                       </Button>
