@@ -23,6 +23,8 @@ export default function Workers() {
   const [savingRoles, setSavingRoles] = useState(false);
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [taskQualifications, setTaskQualifications] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     nickname: "",
@@ -40,12 +42,14 @@ export default function Workers() {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, rolesSettings, populationsSettings, workerRolesSettings] = await Promise.all([
+    const [workersData, assignmentsData, rolesSettings, populationsSettings, workerRolesSettings, tasksSettings, taskQualSettings] = await Promise.all([
       base44.entities.Worker.list("-created_date"),
       base44.entities.Assignment.list(),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" })
+      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
+      base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
+      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" })
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -62,6 +66,22 @@ export default function Workers() {
     } else {
       setWorkerRoles(["שף", "סו-שף"]);
     }
+    if (tasksSettings.length > 0) setTasks(JSON.parse(tasksSettings[0].setting_value) || []);
+    if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
+  };
+
+  const handleToggleTaskQualification = async (taskName, role, workerId) => {
+    const taskRoles = taskQualifications[taskName] || {};
+    const current = taskRoles[role] || [];
+    const updatedRole = current.includes(workerId)
+      ? current.filter(id => id !== workerId)
+      : [...current, workerId];
+    const updated = { ...taskQualifications, [taskName]: { ...taskRoles, [role]: updatedRole } };
+    setTaskQualifications(updated);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "task_qualifications" });
+    const data = { setting_key: "task_qualifications", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
   };
 
   const getWorkerTotalHours = (workerId) => {
@@ -392,6 +412,39 @@ export default function Workers() {
 
                 </div>
               </div>
+
+              {/* כשירויות למשימות */}
+              {editingWorker && tasks.length > 0 && (
+                <div className="p-3 bg-violet-50 rounded-lg border border-violet-200">
+                  <h4 className="text-sm font-semibold text-violet-900 mb-3" dir="rtl">כשירות למשימות</h4>
+                  <div className="space-y-3">
+                    {tasks.map(task => {
+                      const workerRoleList = Array.isArray(editingWorker.role) ? editingWorker.role : (editingWorker.role ? [editingWorker.role] : []);
+                      if (workerRoleList.length === 0) return null;
+                      return (
+                        <div key={task}>
+                          <p className="text-xs font-medium text-gray-700 mb-1">{task}</p>
+                          <div className="flex flex-wrap gap-2" dir="rtl">
+                            {workerRoleList.map(role => {
+                              const qualified = ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id);
+                              return (
+                                <button
+                                  key={role}
+                                  type="button"
+                                  onClick={() => handleToggleTaskQualification(task, role, editingWorker.id)}
+                                  className={`px-3 py-1 rounded text-xs border transition-colors ${qualified ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400'}`}
+                                >
+                                  {role}: {qualified ? 'כשיר' : 'לא כשיר'}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* פרטי קשר */}
               <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">

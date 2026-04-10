@@ -234,11 +234,13 @@ export default function Settings() {
     setTasks(updated);
   };
 
-  const handleToggleWorkerQualification = async (taskName, workerId) => {
-    const current = taskQualifications[taskName] || [];
-    const updated = current.includes(workerId)
-      ? { ...taskQualifications, [taskName]: current.filter(id => id !== workerId) }
-      : { ...taskQualifications, [taskName]: [...current, workerId] };
+  const handleToggleWorkerQualification = async (taskName, role, workerId) => {
+    const taskRoles = taskQualifications[taskName] || {};
+    const current = taskRoles[role] || [];
+    const updatedRole = current.includes(workerId)
+      ? current.filter(id => id !== workerId)
+      : [...current, workerId];
+    const updated = { ...taskQualifications, [taskName]: { ...taskRoles, [role]: updatedRole } };
     await saveTaskQualifications(updated);
   };
 
@@ -492,7 +494,7 @@ export default function Settings() {
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">{task}</span>
                       <Badge variant="outline" className="text-xs border-violet-300 text-violet-700">
-                        {(taskQualifications[task] || []).length} כשירים
+                        {Object.values(taskQualifications[task] || {}).flat().length} כשירים
                       </Badge>
                     </div>
                     <div className="flex gap-1">
@@ -503,26 +505,37 @@ export default function Settings() {
                     </div>
                   </div>
                   {expandedTask === task && (
-                    <div className="p-3 border-t" dir="rtl">
-                      <p className="text-xs text-gray-500 mb-2">סמן את העובדים הכשירים למשימה זו:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {workers.filter(w => w.active !== false).map(worker => {
-                          const qualified = (taskQualifications[task] || []).includes(worker.id);
-                          return (
-                            <button
-                              key={worker.id}
-                              onClick={() => handleToggleWorkerQualification(task, worker.id)}
-                              className={`px-2 py-1 rounded text-xs border transition-colors ${
-                                qualified
-                                  ? 'bg-violet-100 border-violet-400 text-violet-800 font-semibold'
-                                  : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-400'
-                              }`}
-                            >
-                              {worker.nickname}
-                            </button>
-                          );
-                        })}
-                      </div>
+                    <div className="p-3 border-t space-y-3" dir="rtl">
+                      <p className="text-xs text-gray-500">סמן עובדים כשירים למשימה לפי תפקיד:</p>
+                      {workerRoles.map(role => {
+                        const roleWorkers = workers.filter(w => w.active !== false && (Array.isArray(w.role) ? w.role.includes(role) : w.role === role));
+                        if (roleWorkers.length === 0) return null;
+                        const taskRoleQuals = (taskQualifications[task] || {})[role] || [];
+                        return (
+                          <div key={role}>
+                            <p className="text-xs font-semibold text-gray-700 mb-1">{role}</p>
+                            <div className="flex flex-wrap gap-2">
+                              {roleWorkers.map(worker => {
+                                const qualified = taskRoleQuals.includes(worker.id);
+                                return (
+                                  <button
+                                    key={worker.id}
+                                    onClick={() => handleToggleWorkerQualification(task, role, worker.id)}
+                                    className={`px-2 py-1 rounded text-xs border transition-colors ${
+                                      qualified
+                                        ? 'bg-violet-100 border-violet-400 text-violet-800 font-semibold'
+                                        : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-400'
+                                    }`}
+                                  >
+                                    {worker.nickname}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {workerRoles.length === 0 && <p className="text-xs text-gray-400">הגדר תפקידי עובדים תחילה</p>}
                     </div>
                   )}
                 </div>

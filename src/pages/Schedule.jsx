@@ -731,7 +731,7 @@ export default function Schedule() {
                                 dateString={dateString}
                                 rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
                                 rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
-                                taskQualifiedWorkerIds={col.task_name ? (taskQualifications[col.task_name] || []) : undefined}
+                                taskQualifiedWorkerIds={col.task_name ? Object.values(taskQualifications[col.task_name] || {}).flat() : undefined}
                                 onSaved={(workerId) => {
                                   const newValues = { ...row.values, [col.name]: workerId };
                                   setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
