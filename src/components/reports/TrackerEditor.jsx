@@ -4,29 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, GripVertical } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const COLUMN_TYPES = [
-  { value: "hours_assignments", label: "שעות (משימות)" },
-  { value: "hours_templates", label: "שעות (תבניות)" },
   { value: "shifts_count", label: "מספר משמרות" },
-  { value: "template_schedule_col", label: "שעות לפי שדה לוח" },
-  { value: "number", label: "מספר (ידני)" },
-  { value: "text", label: "טקסט (ידני)" },
-  { value: "checkbox", label: "סימון (ידני)" },
+  { value: "schedule_col", label: "עמודת לוח" },
 ];
 
 export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, allTemplates, scheduleColumns = [] }) {
   const [name, setName] = useState("");
   const [columns, setColumns] = useState([]);
   const [saving, setSaving] = useState(false);
-
-  const allWorkerColumnNames = [...new Set(
-    (allTemplates || []).flatMap(t =>
-      (t.columns || []).filter(c => c.type === "worker").map(c => c.name)
-    )
-  )];
 
   useEffect(() => {
     if (tracker) {
@@ -39,7 +28,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
   }, [tracker, open]);
 
   const addColumn = () => {
-    setColumns([...columns, { id: Date.now().toString(), name: "", type: "hours_assignments", template_column: "" }]);
+    setColumns([...columns, { id: Date.now().toString(), name: "", type: "shifts_count", schedule_col_name: "", schedule_col_value: "" }]);
   };
 
   const updateColumn = (idx, field, value) => {
@@ -113,23 +102,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                         </SelectContent>
                       </Select>
                     </div>
-                    {col.type === "hours_templates" && allWorkerColumnNames.length > 0 && (
-                      <div className="col-span-2">
-                        <Label className="text-xs" dir="rtl">עמודת עובד בתבנית</Label>
-                        <Select value={col.template_column || ""} onValueChange={v => updateColumn(idx, "template_column", v)}>
-                          <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl">
-                            <SelectValue placeholder="בחר עמודה..." />
-                          </SelectTrigger>
-                          <SelectContent dir="rtl">
-                            <SelectItem value="__all__">כל העמודות</SelectItem>
-                            {allWorkerColumnNames.map(cn => (
-                              <SelectItem key={cn} value={cn}>{cn}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    {col.type === "template_schedule_col" && (
+                    {col.type === "schedule_col" && (
                       <div className="col-span-2 space-y-2">
                         <div>
                           <Label className="text-xs" dir="rtl">שדה לוח (עמודה)</Label>

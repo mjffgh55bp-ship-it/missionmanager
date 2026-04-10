@@ -59,14 +59,8 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
 }
 
 const COLUMN_TYPES = [
-  { value: "hours_assignments", label: "שעות (משימות)" },
-  { value: "hours_templates", label: "שעות (תבניות)" },
   { value: "shifts_count", label: "מספר משמרות" },
   { value: "schedule_col", label: "עמודת לוח" },
-  { value: "template_schedule_col", label: "שעות לפי שדה לוח" },
-  { value: "number", label: "מספר (ידני)" },
-  { value: "text", label: "טקסט (ידני)" },
-  { value: "checkbox", label: "סימון (ידני)" },
 ];
 
 const calcHours = (start, end) => {
@@ -138,7 +132,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const [newOptionDraft, setNewOptionDraft] = useState({});
 
-  const addColumn = () => setEditColumns([...editColumns, { id: Date.now().toString(), name: "", type: "hours_assignments", template_column: "", schedule_col_name: "", schedule_col_value: "", options: [] }]);
+  const addColumn = () => setEditColumns([...editColumns, { id: Date.now().toString(), name: "", type: "shifts_count", template_column: "", schedule_col_name: "", schedule_col_value: "", options: [] }]);
   const updateColumn = (idx, field, value) => { const c = [...editColumns]; c[idx] = { ...c[idx], [field]: value }; setEditColumns(c); };
   const removeColumn = (idx) => setEditColumns(editColumns.filter((_, i) => i !== idx));
 
@@ -198,53 +192,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       if (dateRange && (a.date < dateRange.start || a.date > dateRange.end)) return false;
       return true;
     });
-    if (col.type === "hours_assignments") return filtered.reduce((s, a) => s + (a.hours || 0), 0);
     if (col.type === "shifts_count") return filtered.length;
-    if (col.type === "hours_templates") {
-      let total = 0;
-      templateRows.forEach(row => {
-        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
-        const tmpl = allTemplates.find(t => t.id === row.template_id);
-        if (!tmpl) return;
-        const h = calcHours(row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "", row.values?.["סיום"] || row.values?.["שעת סיום"] || "");
-        (tmpl.columns || []).forEach(tc => {
-          if (tc.type !== "worker") return;
-          if (col.template_column && col.template_column !== "__all__" && tc.name !== col.template_column) return;
-          if (row.values?.[tc.name] === workerId) total += h;
-        });
-      });
-      return Math.round(total * 10) / 10;
-    }
     if (col.type === "schedule_col") {
-      const schCol = scheduleColumns.find(c => c.name === col.schedule_col_name);
-      const reportType = schCol?.report_type || "sum_numbers";
-      if (reportType === "sum_hours") {
-        return filtered.filter(a => {
-          const colData = a.column_values?.[col.schedule_col_name];
-          const val = colData?.value ?? colData;
-          if (col.schedule_col_value) return String(val) === String(col.schedule_col_value);
-          return val !== undefined && val !== null && val !== "";
-        }).reduce((sum, a) => sum + (a.hours || 0), 0);
-      } else {
-        return filtered.reduce((sum, a) => {
-          const colData = a.column_values?.[col.schedule_col_name];
-          const val = colData?.value ?? colData;
-          const num = parseFloat(val);
-          return sum + (isNaN(num) ? 0 : num);
-        }, 0);
-      }
-    }
-    if (col.type === "template_schedule_col") {
+      // Also count from template rows
       let total = 0;
-      const dateRange = getDateRange(dateFilterMode, startDate, endDate);
       templateRows.forEach(row => {
         if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
-        // Check if this worker is assigned in any worker column of this row
         const workerIsInRow = (tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId);
         if (!workerIsInRow) return;
-        // Check if the schedule col field has the required value
         const fieldVal = row.values?.[col.schedule_col_name];
         const subTypes = row.values?.[`${col.schedule_col_name}_subTypes`] || [];
         const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
@@ -254,8 +211,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           if (allVals.length === 0) return;
         }
         const h = calcHours(
-          row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
-          row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
+          row.values?.["\u05d4\u05ea\u05d7\u05dc\u05d4"] || row.values?.["\u05e9\u05e2\u05ea \u05d4\u05ea\u05d7\u05dc\u05d4"] || "",
+          row.values?.["\u05e1\u05d9\u05d5\u05dd"] || row.values?.["\u05e9\u05e2\u05ea \u05e1\u05d9\u05d5\u05dd"] || ""
         );
         total += h;
       });
@@ -273,7 +230,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return true;
   });
 
-  const isAuto = (type) => ["hours_assignments", "hours_templates", "shifts_count", "schedule_col", "template_schedule_col"].includes(type);
+  const isAuto = (type) => ["shifts_count", "schedule_col"].includes(type);
   const displayColumns = editMode ? editColumns : (tracker.columns || []);
 
   return (
@@ -393,16 +350,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           {COLUMN_TYPES.map(ct => <SelectItem key={ct.value} value={ct.value} className="text-xs">{ct.label}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      {col.type === "hours_templates" && allWorkerColumnNames.length > 0 && (
-                        <Select value={col.template_column || ""} onValueChange={v => updateColumn(idx, "template_column", v)}>
-                          <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת עובד..." /></SelectTrigger>
-                          <SelectContent dir="rtl">
-                            <SelectItem value="__all__">כל העמודות</SelectItem>
-                            {allWorkerColumnNames.map(cn => <SelectItem key={cn} value={cn} className="text-xs">{cn}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      {(col.type === "schedule_col" || col.type === "template_schedule_col") && (
+                      {col.type === "schedule_col" && (
                         <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
                           <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
                           <SelectContent dir="rtl">
@@ -414,7 +362,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           </SelectContent>
                         </Select>
                       )}
-                      {(col.type === "schedule_col" || col.type === "template_schedule_col") && col.schedule_col_name && (() => {
+                      {col.type === "schedule_col" && col.schedule_col_name && (() => {
                         const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
                         const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
                         return opts.length > 0 ? (
@@ -423,48 +371,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                             <SelectContent dir="rtl">
                               <SelectItem value={null}>כל ערך</SelectItem>
                               {opts.map(o => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        ) : null;
-                      })()}
-                      {col.type === "text" && (
-                        <div className="mt-1">
-                          <div className="flex flex-wrap gap-1 mb-1">
-                            {(col.options || []).map(opt => (
-                              <span key={opt} className="inline-flex items-center gap-0.5 bg-gray-100 text-gray-700 text-xs px-1.5 py-0.5 rounded">
-                                {opt}
-                                <button type="button" onClick={() => updateColumn(idx, "options", (col.options || []).filter(o => o !== opt))} className="hover:text-red-500"><X className="w-2.5 h-2.5" /></button>
-                              </span>
-                            ))}
-                          </div>
-                          <div className="flex gap-1">
-                            <Input
-                              value={newOptionDraft[idx] || ""}
-                              onChange={e => setNewOptionDraft(d => ({ ...d, [idx]: e.target.value }))}
-                              onKeyDown={e => {
-                                if (e.key === "Enter" && newOptionDraft[idx]?.trim()) {
-                                  updateColumn(idx, "options", [...(col.options || []), newOptionDraft[idx].trim()]);
-                                  setNewOptionDraft(d => ({ ...d, [idx]: "" }));
-                                }
-                              }}
-                              placeholder="אפשרות..."
-                              className="h-6 text-xs flex-1"
-                              dir="rtl"
-                            />
-                            <button type="button"
-                              onClick={() => {
-                                if (!newOptionDraft[idx]?.trim()) return;
-                                updateColumn(idx, "options", [...(col.options || []), newOptionDraft[idx].trim()]);
-                                setNewOptionDraft(d => ({ ...d, [idx]: "" }));
-                              }}
-                              className="text-blue-600 hover:text-blue-800">
-                              <Plus className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
+                              </SelectContent>
+                              </Select>
+                              ) : null;
+                              })()}
+                              </div>
+                              ) : (
                     <div className="flex flex-col gap-0.5 py-1">
                       <span className="font-medium">{col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}</span>
                       <span className="text-[10px] text-gray-400 font-normal">
@@ -498,27 +410,13 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   const isEditing = editingCell?.workerId === worker.id && editingCell?.colId === col.id;
 
                   if (auto) {
-                    const schCol = col.type === "schedule_col" ? scheduleColumns.find(c => c.name === col.schedule_col_name) : null;
-                    const showAsNumber = col.type === "shifts_count" || (col.type === "schedule_col" && schCol?.report_type === "sum_numbers");
+                    const showAsNumber = col.type === "shifts_count";
                     return (
                       <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2">
                         {value > 0 ? (showAsNumber ? value : `${value}h`) : <span className="text-gray-300">-</span>}
                       </TableCell>
                     );
                   }
-                  if (col.type === "checkbox") {
-                    return (
-                      <TableCell key={col.id} className="text-center px-2">
-                        <button
-                          onClick={() => toggleCheckbox(worker.id, col.id, entryValue)}
-                          className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors mx-auto ${entryValue === "true" ? "bg-green-500 border-green-600 text-white" : "border-gray-300 hover:border-blue-400"}`}
-                        >
-                          {entryValue === "true" && <Check className="w-3 h-3" />}
-                        </button>
-                      </TableCell>
-                    );
-                  }
-                  const textOptions = col.type === "text" ? (col.options || []) : [];
                   return (
                    <TableCell key={col.id} className="px-2">
                      {isEditing ? (
