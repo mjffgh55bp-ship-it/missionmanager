@@ -643,7 +643,7 @@ export default function Schedule() {
                               </TableRow> :
 
                           templateRowsForTemplate.map((row, rowIndex) =>
-                          <TableRow key={row.id} className={row.values?.is_continuation ? "bg-orange-50" : ""}>
+                          <TableRow key={row.id} className={`h-8 ${row.values?.is_continuation ? "bg-orange-50" : ""}`}>
                                   {editMode &&
                             <TableCell className="w-[60px]">
                                       <div className="flex flex-col gap-1 items-center">
