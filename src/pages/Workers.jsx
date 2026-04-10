@@ -27,15 +27,14 @@ export default function Workers() {
   const [formData, setFormData] = useState({
     nickname: "",
     birthday: "",
-    role: "",
+    role: [],
     phone: "",
     email: "",
     hire_date: format(new Date(), "yyyy-MM-dd"),
     is_guide: false,
     active: true,
     population: "",
-    training: "",
-    additional_training: ""
+    training: ""
   });
 
   useEffect(() => { loadData(); }, []);
@@ -74,7 +73,7 @@ export default function Workers() {
     else await base44.entities.Worker.create(formData);
     setShowDialog(false);
     setEditingWorker(null);
-    setFormData({ nickname: "", birthday: "", role: "", phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "", additional_training: "" });
+    setFormData({ nickname: "", birthday: "", role: [], phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "" });
     loadData();
   };
 
@@ -83,15 +82,14 @@ export default function Workers() {
     setFormData({
       nickname: worker.nickname || "",
       birthday: worker.birthday || "",
-      role: worker.role,
+      role: Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : []),
       phone: worker.phone || "",
       email: worker.email || "",
       hire_date: worker.hire_date || format(new Date(), "yyyy-MM-dd"),
       is_guide: worker.is_guide || false,
       active: worker.active,
       population: worker.population || "",
-      training: worker.training || "",
-      additional_training: worker.additional_training || ""
+      training: worker.training || ""
     });
     setShowDialog(true);
   };
@@ -193,9 +191,10 @@ export default function Workers() {
                       <div>
                         <CardTitle className="text-lg text-right" dir="rtl">{worker.nickname}</CardTitle>
                         <div className="flex gap-2 mt-1 flex-wrap">
-                          <Badge className="bg-blue-100 text-blue-900" dir="rtl">
-                          {worker.role || 'לא הוגדר'}
-                          </Badge>
+                          {(Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).map(r => (
+                            <Badge key={r} className="bg-blue-100 text-blue-900" dir="rtl">{r}</Badge>
+                          ))}
+                          {!(Array.isArray(worker.role) ? worker.role.length : worker.role) && <Badge className="bg-blue-100 text-blue-900" dir="rtl">לא הוגדר</Badge>}
                           <Badge className={seniorityInfo.color}>{seniorityInfo.label}</Badge>
                           {worker.is_guide && <Badge className="bg-yellow-100 text-yellow-800" dir="rtl"><Award className="w-3 h-3 mr-1" />מדריך</Badge>}
                         </div>
@@ -239,7 +238,7 @@ export default function Workers() {
                       <h4 className="text-sm font-semibold text-green-900 mb-2" dir="rtl">כשירות</h4>
                       <div className="space-y-1">
                         {worker.population && <p className="text-sm text-gray-700" dir="rtl">👥 אוכלוסיה: {worker.population}</p>}
-                        <p className="text-sm text-gray-700" dir="rtl">🍳 תפקיד: {worker.role || 'לא הוגדר'}</p>
+                        <p className="text-sm text-gray-700" dir="rtl">🍳 תפקיד: {(Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).join(', ') || 'לא הוגדר'}</p>
                         <p className="text-sm text-gray-700" dir="rtl">⭐ כשירות: {seniorityInfo.label}</p>
                         <p className="text-sm text-gray-700" dir="rtl">🏆 מדריך: {worker.is_guide ? 'כן' : 'לא'}</p>
                       </div>
@@ -325,11 +324,11 @@ export default function Workers() {
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <h4 className="text-sm font-semibold text-blue-900 mb-3" dir="rtl">פרטים אישיים</h4>
                 <div className="space-y-3">
-                  <div><Label htmlFor="nickname" dir="rtl">כינוי *</Label><Input id="nickname" value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="כינוי" dir="rtl" /></div>
-                  <div><Label htmlFor="birthday" dir="rtl">תאריך יום הולדת</Label><Input id="birthday" type="date" value={formData.birthday} onChange={(e) => setFormData({ ...formData, birthday: e.target.value })} /></div>
-                  <div><Label htmlFor="hire_date" dir="rtl">תאריך גיוס</Label><Input id="hire_date" type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
+                  <div><Label htmlFor="nickname" className="block text-right" dir="rtl">כינוי *</Label><Input id="nickname" value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="כינוי" dir="rtl" /></div>
+                  <div><Label htmlFor="birthday" className="block text-right" dir="rtl">תאריך יום הולדת</Label><Input id="birthday" type="date" value={formData.birthday} onChange={(e) => setFormData({ ...formData, birthday: e.target.value })} /></div>
+                  <div><Label htmlFor="hire_date" className="block text-right" dir="rtl">תאריך גיוס</Label><Input id="hire_date" type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
                   <div>
-                    <Label dir="rtl">קורס/הכשרה</Label>
+                    <Label className="block text-right" dir="rtl">קורס</Label>
                     <Select value={formData.training} onValueChange={(value) => setFormData({ ...formData, training: value })}>
                       <SelectTrigger><SelectValue placeholder="בחר קורס..." /></SelectTrigger>
                       <SelectContent>
@@ -349,7 +348,7 @@ export default function Workers() {
                 <h4 className="text-sm font-semibold text-green-900 mb-3" dir="rtl">כשירות</h4>
                 <div className="space-y-3">
                   <div>
-                    <Label dir="rtl">אוכלוסייה</Label>
+                    <Label className="block text-right" dir="rtl">אוכלוסייה</Label>
                     <Select value={formData.population} onValueChange={(value) => setFormData({ ...formData, population: value })}>
                       <SelectTrigger><SelectValue placeholder="בחר אוכלוסייה..." /></SelectTrigger>
                       <SelectContent>
@@ -361,16 +360,28 @@ export default function Workers() {
                     </Select>
                   </div>
 
-                  <div><Label htmlFor="role" dir="rtl">תפקיד *</Label>
-                    <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                      <SelectTrigger><SelectValue placeholder="בחר תפקיד..." /></SelectTrigger>
-                      <SelectContent>
-                        {workerRoles.map(role => (
-                          <SelectItem key={role} value={role}>{role}</SelectItem>
-                        ))}
-                        {workerRoles.length === 0 && <SelectItem value={null} disabled>לא הוגדרו תפקידים</SelectItem>}
-                      </SelectContent>
-                    </Select>
+                  <div>
+                    <Label className="block text-right" dir="rtl">תפקיד *</Label>
+                    <div className="flex flex-wrap gap-2 mt-1" dir="rtl">
+                      {workerRoles.map(role => {
+                        const selected = formData.role.includes(role);
+                        return (
+                          <Badge
+                            key={role}
+                            onClick={() => {
+                              const newRoles = selected
+                                ? formData.role.filter(r => r !== role)
+                                : [...formData.role, role];
+                              setFormData({ ...formData, role: newRoles });
+                            }}
+                            className={`cursor-pointer select-none px-3 py-1 text-sm ${selected ? 'bg-blue-700 text-white hover:bg-blue-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          >
+                            {role}
+                          </Badge>
+                        );
+                      })}
+                      {workerRoles.length === 0 && <span className="text-sm text-gray-500">לא הוגדרו תפקידים</span>}
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
@@ -378,18 +389,7 @@ export default function Workers() {
                     <Switch id="is_guide" checked={formData.is_guide} onCheckedChange={(checked) => setFormData({ ...formData, is_guide: checked })} />
                   </div>
 
-                  <div>
-                    <Label dir="rtl">הכשרה נוספת</Label>
-                    <Select value={formData.additional_training} onValueChange={(value) => setFormData({ ...formData, additional_training: value })}>
-                      <SelectTrigger><SelectValue placeholder="בחר הכשרה נוספת..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={null}>ללא</SelectItem>
-                        <SelectItem value="מדריך">מדריך</SelectItem>
-                        <SelectItem value="בוחן">בוחן</SelectItem>
-                        <SelectItem value="מתלמד">מתלמד</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+
                 </div>
               </div>
 
@@ -397,8 +397,8 @@ export default function Workers() {
               <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <h4 className="text-sm font-semibold text-gray-900 mb-3" dir="rtl">פרטי קשר</h4>
                 <div className="space-y-3">
-                  <div><Label htmlFor="email" dir="rtl">אימייל</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@mail.com" dir="rtl" /></div>
-                  <div><Label htmlFor="phone" dir="rtl">טלפון</Label><Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="05x-xxxxxxx" dir="rtl" /></div>
+                  <div><Label htmlFor="email" className="block text-right" dir="rtl">אימייל</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@mail.com" dir="rtl" /></div>
+                  <div><Label htmlFor="phone" className="block text-right" dir="rtl">טלפון</Label><Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="05x-xxxxxxx" dir="rtl" /></div>
                 </div>
               </div>
             </div>
@@ -414,7 +414,7 @@ export default function Workers() {
                 </>
               )}
               <Button variant="outline" onClick={() => { setShowDialog(false); setEditingWorker(null); }} dir="rtl">ביטול</Button>
-              <Button onClick={handleSubmit} disabled={!formData.nickname} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
+              <Button onClick={handleSubmit} disabled={!formData.nickname || formData.role.length === 0} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
