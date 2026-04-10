@@ -562,6 +562,7 @@ export default function Schedule() {
                                   </div>
                                 </TableHead>
                               ))}
+                              <TableHead className="w-[120px] text-center" dir="rtl">משימה</TableHead>
                               <TableHead className="w-[100px] text-center" dir="rtl">סטטוס</TableHead>
                               {editMode && <TableHead className="w-[60px] text-center" dir="rtl"></TableHead>}
                               {editMode && (
@@ -656,13 +657,13 @@ export default function Schedule() {
                                             dateString={dateString}
                                             rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
                                             rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
-                                            taskQualifiedWorkerIds={col.task_name ? Object.values(taskQualifications[col.task_name] || {}).flat() : undefined}
+                                            taskQualifiedWorkerIds={col.task_name ? Object.values(taskQualifications[col.task_name] || {}).flat() : (row.values?.task ? Object.values(taskQualifications[row.values.task] || {}).flat() : undefined)}
                                             onSaved={(workerId) => {
                                               const newValues = { ...row.values, [col.name]: workerId };
                                               setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                             }} />
-                                        ) : col.type === "time" ? (
-                                          <TimeCell
+                                            ) : col.type === "time" ? (
+                                            <TimeCell
                                             rowId={row.id}
                                             colName={col.name}
                                             value={row.values?.[col.name] || ""}
@@ -672,8 +673,8 @@ export default function Schedule() {
                                               handleTimeSaved(row, newValues);
                                             }}
                                             rowValues={row.values || {}} />
-                                        ) : ((columnSubTypes[col.name] || []).length > 0 || columnFreeText[col.name]) ? (
-                                          <ColumnCell
+                                            ) : ((columnSubTypes[col.name] || []).length > 0 || columnFreeText[col.name]) ? (
+                                            <ColumnCell
                                             assignmentId={row.id}
                                             colType={col.name}
                                             columnValues={row.values || {}}
@@ -685,17 +686,34 @@ export default function Schedule() {
                                               base44.entities.TemplateRow.update(row.id, { values: newValues });
                                               setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                             }} />
-                                        ) : (
-                                          <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
-                                        )}
-                                      </TableCell>
-                                    );
-                                  })}
-                                  <TableCell className="p-0 text-center">
-                                    <Select
-                                      value={row.values?.status || ""}
-                                      onValueChange={async (value) => {
-                                        const newValues = { ...row.values, status: value };
+                                            ) : (
+                                            <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
+                                            )}
+                                            </TableCell>
+                                            );
+                                            })}
+                                            <TableCell className="p-0 text-center">
+                                            <Select
+                                            value={row.values?.task || ""}
+                                            onValueChange={async (value) => {
+                                            const newValues = { ...row.values, task: value };
+                                            await base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                            setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                            }}>
+                                            <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
+                                            <SelectValue placeholder="-" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                            <SelectItem value={null}>ללא</SelectItem>
+                                            {tasksList.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                            </SelectContent>
+                                            </Select>
+                                            </TableCell>
+                                            <TableCell className="p-0 text-center">
+                                            <Select
+                                            value={row.values?.status || ""}
+                                            onValueChange={async (value) => {
+                                            const newValues = { ...row.values, status: value };
                                         await base44.entities.TemplateRow.update(row.id, { values: newValues });
                                         setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                       }}>
@@ -706,10 +724,10 @@ export default function Schedule() {
                                         <SelectItem value={null}>ללא</SelectItem>
                                         {shiftStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                                       </SelectContent>
-                                    </Select>
-                                  </TableCell>
-                                  {editMode && (
-                                    <TableCell className="p-0">
+                                      </Select>
+                                      </TableCell>
+                                      {editMode && (
+                                      <TableCell className="p-0">
                                       <Button variant="ghost" size="icon" className="h-5 w-5 text-red-500 hover:text-red-700" onClick={() => handleDeleteTemplateRow(row.id)}>
                                         <Trash2 className="w-3 h-3" />
                                       </Button>
