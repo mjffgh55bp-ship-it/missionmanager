@@ -509,12 +509,6 @@ export default function Schedule() {
                         </div>
                         {editMode &&
                       <div className="flex gap-2">
-                            <Button size="sm" variant="secondary" onClick={() => handleAddTemplateRowForTemplate(template.id, group.group_id)} dir="rtl">
-                              <Plus className="w-3 h-3 ml-1" />הוסף שורה
-                            </Button>
-                            <Button size="sm" variant="secondary" onClick={() => {setSelectedTemplate(template);setShowAddTemplateColumnDialog(true);}} dir="rtl">
-                              <Plus className="w-3 h-3 ml-1" />הוסף עמודה
-                            </Button>
                             <Button size="sm" variant="outline" onClick={() => handleDuplicateMoked(group)} dir="rtl">
                               <Plus className="w-3 h-3 ml-1" />שכפל מוקד
                             </Button>
