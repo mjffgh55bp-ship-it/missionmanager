@@ -747,9 +747,30 @@ export default function Schedule() {
                           )
                           }
                           </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
+                          </Table>
+                          </div>
+                          {editMode && (
+                          <div className="flex items-center gap-1 px-3 py-1 border-t border-gray-100 bg-gray-50/50">
+                          <button
+                           onClick={() => handleAddTemplateRowForTemplate(template.id, group.group_id)}
+                           className="flex items-center gap-1 px-3 py-1 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors"
+                           dir="rtl"
+                          >
+                           <Plus className="w-3 h-3" />
+                           שורה חדשה
+                          </button>
+                          <div className="w-px h-4 bg-gray-300" />
+                          <button
+                           onClick={() => {setSelectedTemplate(template);setShowAddTemplateColumnDialog(true);}}
+                           className="flex items-center gap-1 px-3 py-1 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-md transition-colors"
+                           dir="rtl"
+                          >
+                           <Plus className="w-3 h-3" />
+                           עמודה חדשה
+                          </button>
+                          </div>
+                          )}
+                          </CardContent>
                   </Card>);
 
             });
