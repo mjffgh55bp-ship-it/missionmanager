@@ -128,13 +128,12 @@ export default function Settings() {
   };
 
   const handleAddSubOption = async (colIdx) => {
-    if (!newSubOptionName.trim() || !newSubOptionCriterion.trim()) return;
+    if (!newSubOptionName.trim()) return;
     const updated = scheduleColumns.map((c, i) =>
-      i === colIdx ? { ...c, sub_options: [...(c.sub_options || []), { name: newSubOptionName.trim(), criterion: newSubOptionCriterion.trim() }] } : c
+      i === colIdx ? { ...c, sub_options: [...(c.sub_options || []), { name: newSubOptionName.trim(), criterion: newSubOptionName.trim() }] } : c
     );
     await saveScheduleColumns(updated);
     setNewSubOptionName("");
-    setNewSubOptionCriterion("");
   };
 
   const handleRemoveSubOption = async (colIdx, subIdx) => {
@@ -280,15 +279,8 @@ export default function Settings() {
                           <Input
                             value={newSubOptionName}
                             onChange={e => setNewSubOptionName(e.target.value)}
-                            placeholder="שם האפשרות (יופיע בלוח)..."
+                            placeholder="שם אפשרות..."
                             className="h-7 text-sm flex-1"
-                            dir="rtl"
-                          />
-                          <Input
-                            value={newSubOptionCriterion}
-                            onChange={e => setNewSubOptionCriterion(e.target.value)}
-                            placeholder="ערך לסינון שעות..."
-                            className="h-7 text-sm w-40"
                             dir="rtl"
                           />
                           <Button size="sm" className="h-7" onClick={() => handleAddSubOption(idx)}><Plus className="w-3 h-3" /></Button>
