@@ -421,27 +421,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                    <TableCell key={col.id} className="px-2">
                      {isEditing ? (
                        <div className="flex items-center gap-1">
-                         {textOptions.length > 0 ? (
-                           <>
-                             <Select value={cellDraft} onValueChange={v => { setCellDraft(v); }}>
-                               <SelectTrigger className="h-7 text-sm w-28" dir="rtl"><SelectValue placeholder="בחר..." /></SelectTrigger>
-                               <SelectContent dir="rtl">
-                                 <SelectItem value={null}>ריק</SelectItem>
-                                 {textOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                               </SelectContent>
-                             </Select>
-                             <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={saveCell}><Check className="w-3 h-3" /></Button>
-                             <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-400" onClick={() => setEditingCell(null)}><X className="w-3 h-3" /></Button>
-                           </>
-                         ) : (
-                           <>
-                             <Input autoFocus value={cellDraft} onChange={e => setCellDraft(e.target.value)}
-                               onKeyDown={e => { if (e.key === "Enter") saveCell(); if (e.key === "Escape") setEditingCell(null); }}
-                               className="h-7 text-sm w-24" type={col.type === "number" ? "number" : "text"} dir="rtl" />
-                             <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={saveCell}><Check className="w-3 h-3" /></Button>
-                             <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-400" onClick={() => setEditingCell(null)}><X className="w-3 h-3" /></Button>
-                           </>
-                         )}
+                         <Input autoFocus value={cellDraft} onChange={e => setCellDraft(e.target.value)}
+                           onKeyDown={e => { if (e.key === "Enter") saveCell(); if (e.key === "Escape") setEditingCell(null); }}
+                           className="h-7 text-sm w-24" dir="rtl" />
+                         <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={saveCell}><Check className="w-3 h-3" /></Button>
+                         <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-400" onClick={() => setEditingCell(null)}><X className="w-3 h-3" /></Button>
                        </div>
                      ) : (
                        <div onClick={() => startCellEdit(worker.id, col.id)}
@@ -451,7 +435,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                      )}
                    </TableCell>
                   );
-                })}
+                  })}
                 {editMode && <TableCell />}
               </TableRow>
             ))}
