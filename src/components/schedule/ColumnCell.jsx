@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-export default function ColumnCell({ assignmentId, colType, columnValues, availableSubTypes, onSaved, isTemplateRow = false }) {
+export default function ColumnCell({ assignmentId, colType, columnValues, availableSubTypes, freeText = false, onSaved, isTemplateRow = false }) {
   const [open, setOpen] = useState(false);
   
   // Handle both template rows and assignments
@@ -79,12 +79,13 @@ export default function ColumnCell({ assignmentId, colType, columnValues, availa
       <PopoverContent className="w-56 p-2" onOpenAutoFocus={(e) => e.preventDefault()}>
         <div className="space-y-2">
           <div>
-            <Label className="text-xs">Value</Label>
             <Input 
               className="h-7 text-xs" 
-              type="number" 
+              type="text" 
               value={localValue} 
-              onChange={(e) => setLocalValue(e.target.value)} 
+              onChange={(e) => setLocalValue(e.target.value)}
+              placeholder="הזן ערך..."
+              dir="rtl"
             />
           </div>
           {availableSubTypes && availableSubTypes.length > 0 && (

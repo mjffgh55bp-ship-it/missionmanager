@@ -37,6 +37,7 @@ export default function Schedule() {
   const [loading, setLoading] = useState(true);
   const [columnTypes, setColumnTypes] = useState([]);
   const [columnSubTypes, setColumnSubTypes] = useState({});
+  const [columnFreeText, setColumnFreeText] = useState({});
   const [templates, setTemplates] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
@@ -87,13 +88,16 @@ export default function Schedule() {
       setColumnTypes(customParams.map(c => c.name));
       // Build subtypes map from options and sub_options
       const subTypesMap = {};
+      const freeTextMap = {};
       customParams.forEach(c => {
         const allOpts = [];
         if (c.options && c.options.length > 0) allOpts.push(...c.options);
         if (c.sub_options && c.sub_options.length > 0) allOpts.push(...c.sub_options.map(so => so.name));
         if (allOpts.length > 0) subTypesMap[c.name] = allOpts;
+        if (c.free_text) freeTextMap[c.name] = true;
       });
       setColumnSubTypes(subTypesMap);
+      setColumnFreeText(freeTextMap);
     }
     if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
@@ -702,19 +706,20 @@ export default function Schedule() {
                                 rowValues={row.values || {}} /> :
 
 
-(columnSubTypes[col.name] || []).length > 0 ?
-                                <ColumnCell
-                                  assignmentId={row.id}
-                                  colType={col.name}
-                                  columnValues={row.values || {}}
-                                  availableSubTypes={columnSubTypes[col.name] || []}
-                                  isTemplateRow={true}
-                                  onSaved={(updatedColumnValues) => {
-                                    const newValues = { ...row.values, ...updatedColumnValues };
-                                    base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                    setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
-                                  }} /> :
-                                <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
+((columnSubTypes[col.name] || []).length > 0 || columnFreeText[col.name]) ?
+                                 <ColumnCell
+                                   assignmentId={row.id}
+                                   colType={col.name}
+                                   columnValues={row.values || {}}
+                                   availableSubTypes={columnSubTypes[col.name] || []}
+                                   freeText={!!columnFreeText[col.name]}
+                                   isTemplateRow={true}
+                                   onSaved={(updatedColumnValues) => {
+                                     const newValues = { ...row.values, ...updatedColumnValues };
+                                     base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                     setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                   }} /> :
+                                 <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
 
                               }
                                     </TableCell>
