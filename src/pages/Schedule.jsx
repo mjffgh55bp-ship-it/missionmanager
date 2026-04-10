@@ -697,17 +697,21 @@ export default function Schedule() {
                                 rowValues={row.values || {}} /> :
 
 
-                              <ColumnCell
-                                assignmentId={row.id}
-                                colType={col.name}
-                                columnValues={row.values || {}}
-                                availableSubTypes={columnSubTypes[col.name] || []}
-                                isTemplateRow={true}
-                                onSaved={(updatedColumnValues) => {
-                                  const newValues = { ...row.values, ...updatedColumnValues };
-                                  base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                  setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
-                                }} />
+                              {(columnSubTypes[col.name] || []).length > 0 ? (
+                                <ColumnCell
+                                  assignmentId={row.id}
+                                  colType={col.name}
+                                  columnValues={row.values || {}}
+                                  availableSubTypes={columnSubTypes[col.name] || []}
+                                  isTemplateRow={true}
+                                  onSaved={(updatedColumnValues) => {
+                                    const newValues = { ...row.values, ...updatedColumnValues };
+                                    base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                    setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                  }} />
+                              ) : (
+                                <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
+                              )}
 
                               }
                                     </TableCell>
