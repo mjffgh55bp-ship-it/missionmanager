@@ -27,7 +27,8 @@
             "type": "string",
             "enum": [
               "shifts_count",
-              "schedule_col"
+              "schedule_col",
+              "combined_data"
             ]
           },
           "schedule_col_name": {
@@ -37,6 +38,32 @@
           "schedule_col_value": {
             "type": "string",
             "description": "For schedule_col: optional value filter"
+          },
+          "combined_filters": {
+            "type": "object",
+            "description": "For combined_data: filters for computation",
+            "properties": {
+              "schedule_col_name": {
+                "type": "string"
+              },
+              "schedule_col_value": {
+                "type": "string"
+              },
+              "task": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              }
+            }
+          },
+          "combined_operation": {
+            "type": "string",
+            "enum": [
+              "sum_hours",
+              "count_shifts"
+            ],
+            "description": "For combined_data: aggregation operation"
           }
         }
       }

@@ -10,6 +10,12 @@ import { base44 } from "@/api/base44Client";
 const COLUMN_TYPES = [
   { value: "shifts_count", label: "מספר משמרות" },
   { value: "schedule_col", label: "עמודת לוח" },
+  { value: "combined_data", label: "נתונים משולבים" },
+];
+
+const COMBINED_OPS = [
+  { value: "sum_hours", label: "סהכו שעות" },
+  { value: "count_shifts", label: "מספר משמרות" },
 ];
 
 export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, allTemplates, scheduleColumns = [] }) {
@@ -28,7 +34,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
   }, [tracker, open]);
 
   const addColumn = () => {
-    setColumns([...columns, { id: Date.now().toString(), name: "", type: "shifts_count", schedule_col_name: "", schedule_col_value: "" }]);
+    setColumns([...columns, { id: Date.now().toString(), name: "", type: "shifts_count", schedule_col_name: "", schedule_col_value: "", combined_filters: {}, combined_operation: "sum_hours" }]);
   };
 
   const updateColumn = (idx, field, value) => {
@@ -120,7 +126,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                           const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
                           return opts.length > 0 ? (
                             <div>
-                              <Label className="text-xs" dir="rtl">סנן לפי ערך (אופציונלי)</Label>
+                              <Label className="text-xs" dir="rtl">סנן לפי ערך (אופציונאלי)</Label>
                               <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
                                 <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="כל ערך" /></SelectTrigger>
                                 <SelectContent dir="rtl">
@@ -133,7 +139,65 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                         })()}
                       </div>
                     )}
-                  </div>
+                    {col.type === "combined_data" && (
+                      <div className="col-span-2 space-y-2">
+                        <div>
+                          <Label className="text-xs" dir="rtl">שדה לוח</Label>
+                          <Select value={col.combined_filters?.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, schedule_col_name: v })}>
+                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר..." /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              {scheduleColumns.map(sc => (
+                                <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {col.combined_filters?.schedule_col_name && (() => {
+                          const sc = scheduleColumns.find(c => c.name === col.combined_filters.schedule_col_name);
+                          const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
+                          return opts.length > 0 ? (
+                            <div>
+                              <Label className="text-xs" dir="rtl">ערך בעמודה</Label>
+                              <Select value={col.combined_filters?.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, schedule_col_value: v })}>
+                                <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר" /></SelectTrigger>
+                                <SelectContent dir="rtl">
+                                  {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : null;
+                        })()}
+                        <div>
+                          <Label className="text-xs" dir="rtl">תפקיד (אופציונאלי)</Label>
+                          <Select value={col.combined_filters?.role || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, role: v })}>
+                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר" /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              <SelectItem value={null}>בחירה חטיבה</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs" dir="rtl">משימה (אופציונאלי)</Label>
+                          <Select value={col.combined_filters?.task || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, task: v })}>
+                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר" /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              <SelectItem value={null}>בחירה חטיבה</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs" dir="rtl">חישוב</Label>
+                          <Select value={col.combined_operation || "sum_hours"} onValueChange={v => updateColumn(idx, "combined_operation", v)}>
+                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              <SelectItem value="sum_hours">סהכו שעות</SelectItem>
+                              <SelectItem value="count_shifts">מספר משמרות</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
+                    </div>
                   <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500 mt-5" onClick={() => removeColumn(idx)}>
                     <Trash2 className="w-4 h-4" />
                   </Button>
