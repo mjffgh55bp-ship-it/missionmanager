@@ -349,7 +349,7 @@ export default function Yearly() {
               <Menu className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-1">תצוגה תקופתית</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-1">תקופתית</h1>
               <p className="text-gray-600 text-sm">{viewOnly ? "מצב צפייה בלבד" : "לחץ פעמיים על אירוע לעריכה"}</p>
             </div>
           </div>
@@ -363,7 +363,15 @@ export default function Yearly() {
             <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[100px] text-center">{currentYear}</div>
             <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronRight className="w-4 h-4" /></Button>
             <Button variant="outline" onClick={() => setCurrentYear(new Date().getFullYear())}>השנה</Button>
-            <Button variant="outline" onClick={scrollToToday}>היום</Button>
+            <Button variant="outline" onClick={() => {
+              const todayYear = new Date().getFullYear();
+              localStorage.removeItem(`yearly_scroll_${todayYear}`);
+              if (currentYear === todayYear) {
+                scrollToToday();
+              } else {
+                setCurrentYear(todayYear);
+              }
+            }}>היום</Button>
             </div>
         </div>
       </div>
