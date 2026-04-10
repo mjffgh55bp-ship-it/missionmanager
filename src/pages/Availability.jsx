@@ -650,10 +650,6 @@ END:VEVENT
                         <Label className="text-xs text-gray-600">הצג כפופ-אפ שדורש אישור</Label>
                         <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
                       </div>
-                      <div className="flex items-center gap-2 justify-end" dir="rtl">
-                        <Label className="text-xs text-gray-600">הצג כפופ-אפ הדורש אישור</Label>
-                        <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
-                      </div>
                       <div className="flex gap-2 justify-end">
                         <Button size="sm" variant="outline" onClick={() => setEditingTips(false)} dir="rtl">ביטול</Button>
                         <Button size="sm" className="bg-blue-900 hover:bg-blue-800" dir="rtl" onClick={async () => {
