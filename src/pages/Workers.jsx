@@ -404,10 +404,7 @@ export default function Workers() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <Label htmlFor="is_guide" className="cursor-pointer flex items-center gap-2"><Award className="w-4 h-4 text-yellow-600" /><span dir="rtl">מדריך מוסמך</span></Label>
-                    <Switch id="is_guide" checked={formData.is_guide} onCheckedChange={(checked) => setFormData({ ...formData, is_guide: checked })} />
-                  </div>
+
 
 
                 </div>
