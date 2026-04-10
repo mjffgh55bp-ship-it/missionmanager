@@ -657,7 +657,29 @@ export default function Schedule() {
                                 </TableCell>
                               </TableRow> :
 
-                          templateRowsForTemplate.map((row, rowIndex) =>
+                          (() => {
+                            // Compute rowspans per column (only when not in edit mode)
+                            const spanMap = {};
+                            orderedColumns.forEach((col, colIdx) => {
+                              let i = 0;
+                              while (i < templateRowsForTemplate.length) {
+                                const val = templateRowsForTemplate[i].values?.[col.name];
+                                if (val && !editMode) {
+                                  let span = 1;
+                                  while (
+                                    i + span < templateRowsForTemplate.length &&
+                                    templateRowsForTemplate[i + span].values?.[col.name] === val
+                                  ) { span++; }
+                                  spanMap[`${i}_${colIdx}`] = span;
+                                  for (let k = 1; k < span; k++) spanMap[`${i+k}_${colIdx}`] = 0;
+                                  i += span;
+                                } else {
+                                  spanMap[`${i}_${colIdx}`] = 1;
+                                  i++;
+                                }
+                              }
+                            });
+                            return templateRowsForTemplate.map((row, rowIndex) =>
                           <TableRow key={row.id} className={`h-8 ${row.values?.is_continuation ? "bg-orange-50" : ""}`}>
                                   {editMode &&
                             <TableCell className="w-[60px] p-0">
@@ -683,8 +705,12 @@ export default function Schedule() {
                                       </div>
                                     </TableCell>
                             }
-                                  {orderedColumns.map((col, idx) =>
-                            <TableCell key={idx} dir="rtl" className="p-0 text-center">
+                                  {orderedColumns.map((col, idx) => {
+                                    const spanKey = `${rowIndex}_${idx}`;
+                                    const span = spanMap[spanKey] ?? 1;
+                                    if (span === 0) return null;
+                                    return (
+                            <TableCell key={idx} dir="rtl" className="p-0 text-center" rowSpan={span > 1 ? span : undefined}>
                                       {col.type === "worker" ?
                               <WorkerCell
                                 rowId={row.id}
@@ -735,7 +761,8 @@ export default function Schedule() {
 
                               }
                                     </TableCell>
-                            )}
+                                    );
+                            })}
                                   <TableCell className="p-0 text-center">
                                     <Select
                                 value={row.values?.status || ""}
@@ -762,7 +789,8 @@ export default function Schedule() {
                                     </TableCell>
                             }
                                 </TableRow>
-                          )
+                          );
+                          })()
                           }
                           </TableBody>
                           </Table>
