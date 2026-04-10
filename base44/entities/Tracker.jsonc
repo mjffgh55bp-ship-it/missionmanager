@@ -26,17 +26,17 @@
           "type": {
             "type": "string",
             "enum": [
-              "hours_assignments",
-              "hours_templates",
               "shifts_count",
-              "number",
-              "text",
-              "checkbox"
+              "schedule_col"
             ]
           },
-          "template_column": {
+          "schedule_col_name": {
             "type": "string",
-            "description": "For hours_templates: which worker column name to sum"
+            "description": "For schedule_col: which schedule column name to use"
+          },
+          "schedule_col_value": {
+            "type": "string",
+            "description": "For schedule_col: optional value filter"
           }
         }
       }
