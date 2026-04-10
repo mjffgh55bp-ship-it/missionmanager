@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { formatHebrewDate } from "../components/utils/HebrewDate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const HEBREW_DAYS_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -645,6 +646,14 @@ END:VEVENT
                         className="text-sm"
                         placeholder="הכנס הודעה לעובדים..."
                       />
+                      <div className="flex items-center gap-2 justify-end" dir="rtl">
+                        <Label className="text-xs text-gray-600">הצג כפופ-אפ שדורש אישור</Label>
+                        <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
+                      </div>
+                      <div className="flex items-center gap-2 justify-end" dir="rtl">
+                        <Label className="text-xs text-gray-600">הצג כפופ-אפ הדורש אישור</Label>
+                        <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
+                      </div>
                       <div className="flex gap-2 justify-end">
                         <Button size="sm" variant="outline" onClick={() => setEditingTips(false)} dir="rtl">ביטול</Button>
                         <Button size="sm" className="bg-blue-900 hover:bg-blue-800" dir="rtl" onClick={async () => {
