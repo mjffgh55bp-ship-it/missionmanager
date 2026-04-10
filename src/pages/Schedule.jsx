@@ -645,9 +645,9 @@ export default function Schedule() {
                           templateRowsForTemplate.map((row, rowIndex) =>
                           <TableRow key={row.id} className={`h-8 ${row.values?.is_continuation ? "bg-orange-50" : ""}`}>
                                   {editMode &&
-                            <TableCell className="w-[60px]">
-                                      <div className="flex flex-col gap-1 items-center">
-                                        <Button size="icon" variant="ghost" className="h-6 w-6" disabled={rowIndex === 0}
+                            <TableCell className="w-[60px] p-0">
+                                      <div className="flex flex-col gap-0 items-center">
+                                        <Button size="icon" variant="ghost" className="h-4 w-4" disabled={rowIndex === 0}
                                 onClick={async () => {
                                   const prevRow = templateRowsForTemplate[rowIndex - 1];
                                   await base44.entities.TemplateRow.update(row.id, { created_date: prevRow.created_date });
@@ -656,7 +656,7 @@ export default function Schedule() {
                                 }}>
                                           <ChevronUp className="w-3 h-3" />
                                         </Button>
-                                        <Button size="icon" variant="ghost" className="h-6 w-6" disabled={rowIndex === templateRowsForTemplate.length - 1}
+                                        <Button size="icon" variant="ghost" className="h-4 w-4" disabled={rowIndex === templateRowsForTemplate.length - 1}
                                 onClick={async () => {
                                   const nextRow = templateRowsForTemplate[rowIndex + 1];
                                   await base44.entities.TemplateRow.update(row.id, { created_date: nextRow.created_date });
@@ -738,8 +738,8 @@ export default function Schedule() {
                                     </Select>
                                   </TableCell>
                                   {editMode &&
-                            <TableCell className="p-1">
-                                      <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => handleDeleteTemplateRow(row.id)}>
+                                  <TableCell className="p-0">
+                                      <Button variant="ghost" size="icon" className="h-5 w-5 text-red-500 hover:text-red-700" onClick={() => handleDeleteTemplateRow(row.id)}>
                                         <Trash2 className="w-3 h-3" />
                                       </Button>
                                     </TableCell>
