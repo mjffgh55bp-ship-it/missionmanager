@@ -388,7 +388,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                               })()}
                               </div>
                               ) : (
-                    <div className="flex flex-col gap-0.5 py-1">
+                    <div className="flex flex-col gap-0.5 py-1 items-center text-center">
                       <span className="font-medium">{col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}</span>
                       <span className="text-[10px] text-gray-400 font-normal">
                         {COLUMN_TYPES.find(ct => ct.value === col.type)?.label || ""}
