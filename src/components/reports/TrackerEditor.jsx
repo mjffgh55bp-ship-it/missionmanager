@@ -11,12 +11,13 @@ const COLUMN_TYPES = [
   { value: "hours_assignments", label: "שעות (משימות)" },
   { value: "hours_templates", label: "שעות (תבניות)" },
   { value: "shifts_count", label: "מספר משמרות" },
+  { value: "template_schedule_col", label: "שעות לפי שדה לוח" },
   { value: "number", label: "מספר (ידני)" },
   { value: "text", label: "טקסט (ידני)" },
   { value: "checkbox", label: "סימון (ידני)" },
 ];
 
-export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, allTemplates }) {
+export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, allTemplates, scheduleColumns = [] }) {
   const [name, setName] = useState("");
   const [columns, setColumns] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -126,6 +127,37 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                             ))}
                           </SelectContent>
                         </Select>
+                      </div>
+                    )}
+                    {col.type === "template_schedule_col" && (
+                      <div className="col-span-2 space-y-2">
+                        <div>
+                          <Label className="text-xs" dir="rtl">שדה לוח (עמודה)</Label>
+                          <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
+                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              {scheduleColumns.map(sc => (
+                                <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {col.schedule_col_name && (() => {
+                          const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+                          const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
+                          return opts.length > 0 ? (
+                            <div>
+                              <Label className="text-xs" dir="rtl">סנן לפי ערך (אופציונלי)</Label>
+                              <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
+                                <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="כל ערך" /></SelectTrigger>
+                                <SelectContent dir="rtl">
+                                  <SelectItem value={null}>כל ערך</SelectItem>
+                                  {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : null;
+                        })()}
                       </div>
                     )}
                   </div>

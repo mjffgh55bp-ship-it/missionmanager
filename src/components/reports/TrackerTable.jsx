@@ -63,6 +63,7 @@ const COLUMN_TYPES = [
   { value: "hours_templates", label: "שעות (תבניות)" },
   { value: "shifts_count", label: "מספר משמרות" },
   { value: "schedule_col", label: "עמודת לוח" },
+  { value: "template_schedule_col", label: "שעות לפי שדה לוח" },
   { value: "number", label: "מספר (ידני)" },
   { value: "text", label: "טקסט (ידני)" },
   { value: "checkbox", label: "סימון (ידני)" },
@@ -217,7 +218,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       const schCol = scheduleColumns.find(c => c.name === col.schedule_col_name);
       const reportType = schCol?.report_type || "sum_numbers";
       if (reportType === "sum_hours") {
-        // Sum hours of assignments where column value matches filter
         return filtered.filter(a => {
           const colData = a.column_values?.[col.schedule_col_name];
           const val = colData?.value ?? colData;
@@ -225,7 +225,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           return val !== undefined && val !== null && val !== "";
         }).reduce((sum, a) => sum + (a.hours || 0), 0);
       } else {
-        // Sum numeric values
         return filtered.reduce((sum, a) => {
           const colData = a.column_values?.[col.schedule_col_name];
           const val = colData?.value ?? colData;
@@ -233,6 +232,33 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           return sum + (isNaN(num) ? 0 : num);
         }, 0);
       }
+    }
+    if (col.type === "template_schedule_col") {
+      let total = 0;
+      const dateRange = getDateRange(dateFilterMode, startDate, endDate);
+      templateRows.forEach(row => {
+        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+        const tmpl = allTemplates.find(t => t.id === row.template_id);
+        if (!tmpl) return;
+        // Check if this worker is assigned in any worker column of this row
+        const workerIsInRow = (tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId);
+        if (!workerIsInRow) return;
+        // Check if the schedule col field has the required value
+        const fieldVal = row.values?.[col.schedule_col_name];
+        const subTypes = row.values?.[`${col.schedule_col_name}_subTypes`] || [];
+        const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
+        if (col.schedule_col_value) {
+          if (!allVals.includes(String(col.schedule_col_value))) return;
+        } else {
+          if (allVals.length === 0) return;
+        }
+        const h = calcHours(
+          row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
+          row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
+        );
+        total += h;
+      });
+      return Math.round(total * 10) / 10;
     }
     return null;
   };
@@ -246,7 +272,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return true;
   });
 
-  const isAuto = (type) => ["hours_assignments", "hours_templates", "shifts_count", "schedule_col"].includes(type);
+  const isAuto = (type) => ["hours_assignments", "hours_templates", "shifts_count", "schedule_col", "template_schedule_col"].includes(type);
   const displayColumns = editMode ? editColumns : (tracker.columns || []);
 
   return (
@@ -375,21 +401,21 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           </SelectContent>
                         </Select>
                       )}
-                      {col.type === "schedule_col" && (
+                      {(col.type === "schedule_col" || col.type === "template_schedule_col") && (
                         <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
                           <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
                           <SelectContent dir="rtl">
                             {scheduleColumns.map(sc => (
                               <SelectItem key={sc.name} value={sc.name} className="text-xs">
-                                {sc.name} ({sc.report_type === "sum_hours" ? "שעות" : "מספרים"})
+                                {sc.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       )}
-                      {col.type === "schedule_col" && col.schedule_col_name && (() => {
+                      {(col.type === "schedule_col" || col.type === "template_schedule_col") && col.schedule_col_name && (() => {
                         const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                        const opts = sc?.options || [];
+                        const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
                         return opts.length > 0 ? (
                           <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
                             <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="סנן לפי ערך..." /></SelectTrigger>
