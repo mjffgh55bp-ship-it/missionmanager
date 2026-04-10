@@ -194,8 +194,18 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     });
     if (col.type === "shifts_count") return filtered.length;
     if (col.type === "schedule_col") {
-      // Also count from template rows
       let total = 0;
+
+      // Count from assignments (column_values)
+      filtered.forEach(a => {
+        const vals = a.column_values || {};
+        const fieldVal = vals[col.schedule_col_name];
+        if (!fieldVal) return;
+        if (col.schedule_col_value && String(fieldVal) !== String(col.schedule_col_value)) return;
+        total += a.hours || 0;
+      });
+
+      // Count from template rows
       templateRows.forEach(row => {
         if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
         const tmpl = allTemplates.find(t => t.id === row.template_id);
@@ -216,6 +226,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         );
         total += h;
       });
+
       return Math.round(total * 10) / 10;
     }
     return null;
