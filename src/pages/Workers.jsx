@@ -414,37 +414,37 @@ export default function Workers() {
               </div>
 
               {/* כשירויות למשימות */}
-              {editingWorker && tasks.length > 0 && (
-                <div className="p-3 bg-violet-50 rounded-lg border border-violet-200">
-                  <h4 className="text-sm font-semibold text-violet-900 mb-3" dir="rtl">כשירות למשימות</h4>
-                  <div className="space-y-3">
-                    {tasks.map(task => {
-                      const workerRoleList = Array.isArray(editingWorker.role) ? editingWorker.role : (editingWorker.role ? [editingWorker.role] : []);
-                      if (workerRoleList.length === 0) return null;
-                      return (
-                        <div key={task}>
-                          <p className="text-xs font-medium text-gray-700 mb-1">{task}</p>
+              {editingWorker && tasks.length > 0 && (() => {
+                const workerRoleList = Array.isArray(editingWorker.role) ? editingWorker.role : (editingWorker.role ? [editingWorker.role] : []);
+                if (workerRoleList.length === 0) return null;
+                return (
+                  <div className="p-3 bg-violet-50 rounded-lg border border-violet-200">
+                    <h4 className="text-sm font-semibold text-violet-900 mb-3" dir="rtl">כשירות למשימות</h4>
+                    <div className="space-y-3">
+                      {workerRoleList.map(role => (
+                        <div key={role}>
+                          <p className="text-xs font-semibold text-gray-700 mb-1" dir="rtl">{role}</p>
                           <div className="flex flex-wrap gap-2" dir="rtl">
-                            {workerRoleList.map(role => {
+                            {tasks.map(task => {
                               const qualified = ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id);
                               return (
                                 <button
-                                  key={role}
+                                  key={task}
                                   type="button"
                                   onClick={() => handleToggleTaskQualification(task, role, editingWorker.id)}
                                   className={`px-3 py-1 rounded text-xs border transition-colors ${qualified ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400'}`}
                                 >
-                                  {role}: {qualified ? 'כשיר' : 'לא כשיר'}
+                                  {task}
                                 </button>
                               );
                             })}
                           </div>
                         </div>
-                      );
-                    })}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* פרטי קשר */}
               <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
