@@ -1,0 +1,82 @@
+{
+  "name": "Worker",
+  "type": "object",
+  "properties": {
+    "nickname": {
+      "type": "string",
+      "description": "Nickname or preferred name"
+    },
+    "birthday": {
+      "type": "string",
+      "format": "date",
+      "description": "Worker's birthday"
+    },
+    "hire_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when the worker was hired"
+    },
+    "training": {
+      "type": "string",
+      "description": "Primary training/course"
+    },
+    "population": {
+      "type": "string",
+      "description": "Population group"
+    },
+    "role": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Worker's role(s) in the kitchen"
+    },
+    "is_guide": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the worker is qualified as a guide to train trainees"
+    },
+    "seniority": {
+      "type": "string",
+      "enum": [
+        "trainee",
+        "newbie",
+        "experienced_chef"
+      ],
+      "default": "trainee",
+      "description": "Worker's seniority level"
+    },
+    "additional_training": {
+      "type": "string",
+      "description": "Additional training"
+    },
+    "is_full_time": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the worker is a full-time employee"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Contact phone number"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email address"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the worker is currently active"
+    },
+    "availability_locked": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the worker's availability is locked and cannot be edited"
+    }
+  },
+  "required": [
+    "nickname",
+    "role"
+  ]
+}
