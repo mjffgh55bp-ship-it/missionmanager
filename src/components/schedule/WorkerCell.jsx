@@ -149,6 +149,14 @@ export default function WorkerCell({
           ref={inputRef}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && filteredWorkers.length > 0) {
+              handleWorkerSelect(filteredWorkers[0].id);
+            } else if (e.key === 'Escape') {
+              setEditing(false);
+              setSearchQuery("");
+            }
+          }}
           placeholder={selectedWorker ? selectedWorker.nickname : "חיפוש..."}
           className="w-full h-full text-xs text-center bg-blue-50 border-0 outline-none px-1 py-1"
           dir="rtl"
