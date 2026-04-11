@@ -28,7 +28,11 @@ import TimeCell from "../components/schedule/TimeCell";
 import PresetsDialog from "../components/schedule/PresetsDialog";
 
 export default function Schedule() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => {
+    const saved = localStorage.getItem('schedule_last_date');
+    if (saved) { const d = new Date(saved); if (!isNaN(d)) return d; }
+    return new Date();
+  });
   const [workers, setWorkers] = useState([]);
   const [availabilities, setAvailabilities] = useState([]);
   const [unavailabilities, setUnavailabilities] = useState([]);
@@ -58,7 +62,10 @@ export default function Schedule() {
   const [tasksList, setTasksList] = useState([]);
   const [taskQualifications, setTaskQualifications] = useState({});
 
-  useEffect(() => { loadData(); }, [currentDate]);
+  useEffect(() => {
+    localStorage.setItem('schedule_last_date', format(currentDate, 'yyyy-MM-dd'));
+    loadData();
+  }, [currentDate]);
 
   const loadData = async () => {
     setLoading(true);
