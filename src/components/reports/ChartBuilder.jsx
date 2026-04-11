@@ -17,6 +17,7 @@ const DATA_SOURCES = [
   { value: "hours_per_worker", label: "שעות לעובד" },
   { value: "schedule_col_values", label: "עמודת לוח — ספירת ערכים" },
   { value: "quantitative_col", label: "ספירה כמותית מטבלת מעקב" },
+  { value: "tracker_col", label: "עמודה מטבלת מעקב — לפי עובד" },
 ];
 
 const DATE_MODES = [
@@ -32,7 +33,7 @@ const COLORS = ["#1e3a5f", "#16a34a", "#dc2626", "#9333ea", "#ea580c", "#0891b2"
 export default function ChartBuilder({ open, onOpenChange, chart, onSaved, scheduleColumns, trackers, workers, populations, workerRoles }) {
   const [form, setForm] = useState({
     title: "", chart_type: "bar", data_source: "shifts_per_worker",
-    schedule_col_name: "", tracker_id: "", quantitative_col_id: "",
+    schedule_col_name: "", tracker_id: "", quantitative_col_id: "", tracker_col_id: "",
     date_mode: "month", date_start: "", date_end: "",
     filter_populations: [], filter_roles: [], color: "#1e3a5f",
   });
@@ -46,7 +47,7 @@ export default function ChartBuilder({ open, onOpenChange, chart, onSaved, sched
     } else {
       setForm({
         title: "", chart_type: "bar", data_source: "shifts_per_worker",
-        schedule_col_name: "", tracker_id: "", quantitative_col_id: "",
+        schedule_col_name: "", tracker_id: "", quantitative_col_id: "", tracker_col_id: "",
         date_mode: "month", date_start: "", date_end: "",
         filter_populations: [], filter_roles: [], color: "#1e3a5f",
       });
@@ -81,6 +82,7 @@ export default function ChartBuilder({ open, onOpenChange, chart, onSaved, sched
   };
 
   const quantCols = (selectedTracker?.columns || []).filter(c => c.type === "count_quantitative");
+  const allTrackerCols = (selectedTracker?.columns || []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,24 +129,35 @@ export default function ChartBuilder({ open, onOpenChange, chart, onSaved, sched
             </div>
           )}
 
-          {form.data_source === "quantitative_col" && (
+          {(form.data_source === "quantitative_col" || form.data_source === "tracker_col") && (
             <div className="space-y-2">
               <div>
                 <Label className="text-sm">טבלת מעקב</Label>
-                <Select value={form.tracker_id} onValueChange={v => set("tracker_id", v)}>
+                <Select value={form.tracker_id} onValueChange={v => { set("tracker_id", v); set("quantitative_col_id", ""); set("tracker_col_id", ""); }}>
                   <SelectTrigger className="mt-1" dir="rtl"><SelectValue placeholder="בחר טבלה..." /></SelectTrigger>
                   <SelectContent dir="rtl">
                     {trackers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-              {quantCols.length > 0 && (
+              {form.data_source === "quantitative_col" && quantCols.length > 0 && (
                 <div>
                   <Label className="text-sm">עמודה כמותית</Label>
                   <Select value={form.quantitative_col_id} onValueChange={v => set("quantitative_col_id", v)}>
                     <SelectTrigger className="mt-1" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
                     <SelectContent dir="rtl">
                       {quantCols.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {form.data_source === "tracker_col" && allTrackerCols.length > 0 && (
+                <div>
+                  <Label className="text-sm">עמודה</Label>
+                  <Select value={form.tracker_col_id} onValueChange={v => set("tracker_col_id", v)}>
+                    <SelectTrigger className="mt-1" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
+                    <SelectContent dir="rtl">
+                      {allTrackerCols.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

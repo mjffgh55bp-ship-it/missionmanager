@@ -117,6 +117,27 @@ export default function ChartDisplay({ chart, workers, assignments, templateRows
       return Object.entries(totals).map(([name, value]) => ({ name, value }));
     }
 
+    if (chart.data_source === "tracker_col" && chart.tracker_id && chart.tracker_col_id) {
+      return filteredWorkers.map(w => {
+        const entry = (trackerEntries || []).find(e =>
+          e.tracker_id === chart.tracker_id && e.column_id === chart.tracker_col_id && e.worker_id === w.id
+        );
+        const raw = entry?.value || "";
+        let val = 0;
+        try {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed === "object" && parsed !== null) {
+            val = Object.values(parsed).reduce((s, v) => s + (Number(v) || 0), 0);
+          } else {
+            val = Number(parsed) || 0;
+          }
+        } catch {
+          val = Number(raw) || 0;
+        }
+        return { name: w.nickname, value: val };
+      }).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+    }
+
     return [];
   }, [chart, workers, assignments, templateRows, allTemplates, trackers, trackerEntries]);
 
