@@ -33,13 +33,18 @@ export default function Settings() {
   const [newTaskName, setNewTaskName] = useState("");
   const [taskQualifications, setTaskQualifications] = useState({}); // { taskName: [workerId, ...] }
   const [expandedTask, setExpandedTask] = useState(null);
+  // Quantitative presets
+  const [quantitativePresets, setQuantitativePresets] = useState([]); // [{name, items:[]}]
+  const [newPresetName, setNewPresetName] = useState("");
+  const [expandedPreset, setExpandedPreset] = useState(null);
+  const [newPresetItem, setNewPresetItem] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const [rolesSettings, workersData, scheduleColsSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings, tasksSettings, taskQualSettings] = await Promise.all([
+    const [rolesSettings, workersData, scheduleColsSettings, populationsSettings, workerRolesSettings, shiftStatusesSettings, tasksSettings, taskQualSettings, quantPresetsSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
@@ -47,7 +52,8 @@ export default function Settings() {
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
       base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
-      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" })
+      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
+      base44.entities.AppSettings.filter({ setting_key: "quantitative_presets" })
     ]);
     
 
@@ -70,6 +76,7 @@ export default function Settings() {
     }
     if (tasksSettings.length > 0) setTasks(JSON.parse(tasksSettings[0].setting_value) || []);
     if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
+    if (quantPresetsSettings.length > 0) setQuantitativePresets(JSON.parse(quantPresetsSettings[0].setting_value) || []);
     setWorkers(workersData);
     setLoading(false);
   };
@@ -189,6 +196,42 @@ export default function Settings() {
     const settings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
     await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
     setShiftStatuses(updated);
+  };
+
+  const saveQuantitativePresets = async (updated) => {
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "quantitative_presets" });
+    const data = { setting_key: "quantitative_presets", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setQuantitativePresets(updated);
+  };
+
+  const handleAddQuantitativePreset = async () => {
+    if (!newPresetName.trim()) return;
+    const updated = [...quantitativePresets, { name: newPresetName.trim(), items: [] }];
+    await saveQuantitativePresets(updated);
+    setNewPresetName("");
+    setExpandedPreset(updated.length - 1);
+  };
+
+  const handleRemoveQuantitativePreset = async (idx) => {
+    await saveQuantitativePresets(quantitativePresets.filter((_, i) => i !== idx));
+  };
+
+  const handleAddPresetItem = async (presetIdx) => {
+    if (!newPresetItem.trim()) return;
+    const updated = quantitativePresets.map((p, i) =>
+      i === presetIdx ? { ...p, items: [...(p.items || []), newPresetItem.trim()] } : p
+    );
+    await saveQuantitativePresets(updated);
+    setNewPresetItem("");
+  };
+
+  const handleRemovePresetItem = async (presetIdx, itemIdx) => {
+    const updated = quantitativePresets.map((p, i) =>
+      i === presetIdx ? { ...p, items: (p.items || []).filter((_, si) => si !== itemIdx) } : p
+    );
+    await saveQuantitativePresets(updated);
   };
 
   const saveTaskQualifications = async (updated) => {
@@ -530,8 +573,66 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Activity Types Management - Removed as requested */}
-
+        {/* Quantitative Presets */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><ClipboardList className="w-5 h-5 text-emerald-600" />ספירה כמותית — רשימות מוגדרות מראש</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600 mb-4" dir="rtl">
+              הגדר רשימות פריטים לספירה כמותית בדוחות. לכל רשימה הגדר שם ופריטים (לדוגמה: &quot;צריכת פירות&quot; עם פריטים: תפוחים, בננות).
+            </p>
+            <div className="flex gap-2 mb-4" dir="rtl">
+              <Input value={newPresetName} onChange={e => setNewPresetName(e.target.value)} placeholder="שם רשימה חדשה..." dir="rtl" className="flex-1" onKeyDown={e => e.key === 'Enter' && handleAddQuantitativePreset()} />
+              <Button onClick={handleAddQuantitativePreset}><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="space-y-2">
+              {quantitativePresets.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו רשימות</p>}
+              {quantitativePresets.map((preset, idx) => (
+                <div key={idx} className="border rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50" dir="rtl">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm">{preset.name}</span>
+                      <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700">
+                        {(preset.items || []).length} פריטים
+                      </Badge>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => setExpandedPreset(expandedPreset === idx ? null : idx)} className="text-gray-400 hover:text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-200">
+                        {expandedPreset === idx ? "סגור" : "ערוך פריטים"}
+                      </button>
+                      <button onClick={() => handleRemoveQuantitativePreset(idx)} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                  {expandedPreset === idx && (
+                    <div className="p-3 border-t space-y-2" dir="rtl">
+                      <div className="flex gap-2">
+                        <Input
+                          value={newPresetItem}
+                          onChange={e => setNewPresetItem(e.target.value)}
+                          placeholder="שם פריט... (לדוגמה: תפוחים)"
+                          className="h-8 text-sm flex-1"
+                          dir="rtl"
+                          onKeyDown={e => e.key === 'Enter' && handleAddPresetItem(idx)}
+                        />
+                        <Button size="sm" onClick={() => handleAddPresetItem(idx)}><Plus className="w-3 h-3" /></Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {(preset.items || []).map((item, ii) => (
+                          <Badge key={ii} className="bg-emerald-100 text-emerald-800 pr-1">
+                            {item}
+                            <button onClick={() => handleRemovePresetItem(idx, ii)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                          </Badge>
+                        ))}
+                        {(preset.items || []).length === 0 && <p className="text-xs text-gray-400">לא הוגדרו פריטים</p>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
       </div>
     </div>

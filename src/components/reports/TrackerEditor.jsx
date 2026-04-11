@@ -23,6 +23,13 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
   const [name, setName] = useState("");
   const [columns, setColumns] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [quantitativePresets, setQuantitativePresets] = useState([]);
+
+  useEffect(() => {
+    base44.entities.AppSettings.filter({ setting_key: "quantitative_presets" }).then(res => {
+      if (res.length > 0) setQuantitativePresets(JSON.parse(res[0].setting_value) || []);
+    });
+  }, []);
 
   useEffect(() => {
     if (tracker) {
@@ -201,6 +208,20 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                     {col.type === "count_quantitative" && (
                       <div className="col-span-2 space-y-2">
                         <Label className="text-xs" dir="rtl">אפשרויות (פריטים)</Label>
+                        {quantitativePresets.length > 0 && (
+                          <div className="flex gap-2 items-center">
+                            <span className="text-xs text-gray-500">טען מרשימה:</span>
+                            <Select onValueChange={v => {
+                              const preset = quantitativePresets.find(p => p.name === v);
+                              if (preset) updateColumn(idx, "quantitative_options", [...(preset.items || [])]);
+                            }}>
+                              <SelectTrigger className="h-7 text-xs flex-1" dir="rtl"><SelectValue placeholder="טען רשימה מוגדרת מראש..." /></SelectTrigger>
+                              <SelectContent dir="rtl">
+                                {quantitativePresets.map(p => <SelectItem key={p.name} value={p.name} className="text-xs">{p.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         <div className="space-y-1">
                           {(col.quantitative_options || []).map((opt, oi) => (
                             <div key={oi} className="flex gap-1 items-center">
