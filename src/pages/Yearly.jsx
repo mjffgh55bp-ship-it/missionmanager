@@ -49,18 +49,22 @@ export default function Yearly() {
   const [workerRoleFilter, setWorkerRoleFilter] = useState("__all__");
   const [dragging, setDragging] = useState(null);
   const scrollContainerRef = useRef(null);
+  const scrollToTodayAfterLoad = useRef(false);
 
   useEffect(() => { loadData(); }, [currentYear]);
 
   useEffect(() => {
     if (!loading && scrollContainerRef.current) {
       setTimeout(() => {
-        // Load saved scroll position from localStorage
+        if (scrollToTodayAfterLoad.current) {
+          scrollToTodayAfterLoad.current = false;
+          scrollToToday();
+          return;
+        }
         const savedScrollPosition = localStorage.getItem(`yearly_scroll_${currentYear}`);
         if (savedScrollPosition !== null) {
           scrollContainerRef.current.scrollLeft = parseInt(savedScrollPosition, 10);
         } else {
-          // If no saved position, center on today
           scrollToToday();
         }
       }, 100);
@@ -366,8 +370,10 @@ export default function Yearly() {
             <Button variant="outline" onClick={() => {
               const todayYear = new Date().getFullYear();
               localStorage.removeItem(`yearly_scroll_${todayYear}`);
+              scrollToTodayAfterLoad.current = true;
               if (currentYear === todayYear) {
                 scrollToToday();
+                setTimeout(scrollToToday, 150);
               } else {
                 setCurrentYear(todayYear);
               }
