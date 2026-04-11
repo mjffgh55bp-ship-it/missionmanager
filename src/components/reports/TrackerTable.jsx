@@ -61,6 +61,7 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
 const COLUMN_TYPES = [
   { value: "shifts_count", label: "מספר משמרות" },
   { value: "schedule_col", label: "עמודת לוח" },
+  { value: "combined_data", label: "נתונים משולבים" },
 ];
 
 const calcHours = (start, end) => {
@@ -229,6 +230,51 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
       return Math.round(total * 10) / 10;
     }
+    if (col.type === "combined_data") {
+      const filters = col.combined_filters || {};
+      let total = 0;
+      let count = 0;
+
+      // From template rows
+      templateRows.forEach(row => {
+        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+        const tmpl = allTemplates.find(t => t.id === row.template_id);
+        if (!tmpl) return;
+        const workerIsInRow = (tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId);
+        if (!workerIsInRow) return;
+        if (filters.schedule_col_name) {
+          const fieldVal = row.values?.[filters.schedule_col_name];
+          const subTypes = row.values?.[`${filters.schedule_col_name}_subTypes`] || [];
+          const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
+          if (filters.schedule_col_value) {
+            if (!allVals.includes(String(filters.schedule_col_value))) return;
+          } else {
+            if (allVals.length === 0) return;
+          }
+        }
+        count++;
+        const h = calcHours(
+          row.values?.["\u05d4\u05ea\u05d7\u05dc\u05d4"] || row.values?.["\u05e9\u05e2\u05ea \u05d4\u05ea\u05d7\u05dc\u05d4"] || "",
+          row.values?.["\u05e1\u05d9\u05d5\u05dd"] || row.values?.["\u05e9\u05e2\u05ea \u05e1\u05d9\u05d5\u05dd"] || ""
+        );
+        total += h;
+      });
+
+      // From assignments
+      filtered.forEach(a => {
+        if (filters.schedule_col_name) {
+          const vals = a.column_values || {};
+          const fieldVal = vals[filters.schedule_col_name];
+          if (!fieldVal) return;
+          if (filters.schedule_col_value && String(fieldVal) !== String(filters.schedule_col_value)) return;
+        }
+        count++;
+        total += a.hours || 0;
+      });
+
+      if (col.combined_operation === "count_shifts") return count;
+      return Math.round(total * 10) / 10;
+    }
     return null;
   };
 
@@ -241,7 +287,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return true;
   });
 
-  const isAuto = (type) => ["shifts_count", "schedule_col"].includes(type);
+  const isAuto = (type) => ["shifts_count", "schedule_col", "combined_data"].includes(type);
   const displayColumns = editMode ? editColumns : (tracker.columns || []);
 
   return (
@@ -386,8 +432,37 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                               </Select>
                               ) : null;
                               })()}
+                      {col.type === "combined_data" && (
+                        <div className="space-y-1">
+                          <Select value={col.combined_filters?.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, schedule_col_name: v })}>
+                            <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          {col.combined_filters?.schedule_col_name && (() => {
+                            const sc = scheduleColumns.find(c => c.name === col.combined_filters.schedule_col_name);
+                            const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
+                            return opts.length > 0 ? (
+                              <Select value={col.combined_filters?.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, schedule_col_value: v })}>
+                                <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="ערך בעמודה..." /></SelectTrigger>
+                                <SelectContent dir="rtl">
+                                  {opts.map(o => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            ) : null;
+                          })()}
+                          <Select value={col.combined_operation || "sum_hours"} onValueChange={v => updateColumn(idx, "combined_operation", v)}>
+                            <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              <SelectItem value="sum_hours" className="text-xs">סה"כ שעות</SelectItem>
+                              <SelectItem value="count_shifts" className="text-xs">מספר משמרות</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                               </div>
-                              ) : (
+                               ) : (
                     <div className="flex flex-col gap-0.5 py-1 items-center text-center">
                       <span className="font-medium">{col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}</span>
                       <span className="text-[10px] text-gray-400 font-normal">
