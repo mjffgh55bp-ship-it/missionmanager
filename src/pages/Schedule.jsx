@@ -389,7 +389,10 @@ export default function Schedule() {
                 const allColumns = [...(template.columns || []), ...dailyColumns];
                 const customOrder = customColumnOrders[template.id];
                 const orderedColumns = customOrder
-                  ? customOrder.map((name) => allColumns.find((col) => col.name === name)).filter(Boolean)
+                  ? [
+                      ...customOrder.map((name) => allColumns.find((col) => col.name === name)).filter(Boolean),
+                      ...allColumns.filter((col) => !customOrder.includes(col.name))
+                    ]
                   : allColumns;
 
                 return (
