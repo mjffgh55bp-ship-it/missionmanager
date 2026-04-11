@@ -30,7 +30,7 @@ import PresetsDialog from "../components/schedule/PresetsDialog";
 export default function Schedule() {
   const [currentDate, setCurrentDate] = useState(() => {
     const saved = localStorage.getItem('schedule_last_date');
-    if (saved) { const d = new Date(saved); if (!isNaN(d)) return d; }
+    if (saved) { const d = new Date(saved + 'T12:00:00'); if (!isNaN(d)) return d; }
     return new Date();
   });
   const [workers, setWorkers] = useState([]);
