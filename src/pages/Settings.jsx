@@ -18,6 +18,7 @@ export default function Settings() {
   const [scheduleColumns, setScheduleColumns] = useState([]);
   const [newColName, setNewColName] = useState("");
   const [newColReportType, setNewColReportType] = useState("sum_numbers");
+  const [newColQuantPreset, setNewColQuantPreset] = useState("");
   const [newColOption, setNewColOption] = useState("");
   const [newSubOptionName, setNewSubOptionName] = useState("");
   const [newSubOptionCriterion, setNewSubOptionCriterion] = useState("");
@@ -107,9 +108,16 @@ export default function Settings() {
 
   const handleAddScheduleColumn = async () => {
     if (!newColName.trim()) return;
-    const updated = [...scheduleColumns, { name: newColName.trim(), report_type: newColReportType, options: [] }];
+    const col = { name: newColName.trim(), report_type: newColReportType, options: [] };
+    if (newColReportType === "count_quantitative" && newColQuantPreset) {
+      const preset = quantitativePresets.find(p => p.name === newColQuantPreset);
+      if (preset) col.quantitative_items = preset.items || [];
+      col.quantitative_preset_name = newColQuantPreset;
+    }
+    const updated = [...scheduleColumns, col];
     await saveScheduleColumns(updated);
     setNewColName("");
+    setNewColQuantPreset("");
   };
 
   const handleRemoveScheduleColumn = async (idx) => {
@@ -291,32 +299,52 @@ export default function Settings() {
               הגדר עמודות שיופיעו בלוח ובדוחות. לכל עמודה קבע כיצד לסכם את הנתונים בדוחות.
             </p>
             {/* Add new column */}
-            <div className="flex gap-2 mb-4" dir="rtl">
-              <Input value={newColName} onChange={e => setNewColName(e.target.value)} placeholder="שם עמודה חדשה..." dir="rtl" className="flex-1" />
-              <Select value={newColReportType} onValueChange={setNewColReportType}>
-                <SelectTrigger className="w-56" dir="rtl"><SelectValue /></SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value="sum_numbers">
-                    <div dir="rtl">
-                      <div className="font-medium">סיכום מספרים</div>
-                      <div className="text-xs text-gray-500">מסכם ערכים מספריים שהוזנו בתאים (כמויות, כמו מנות)</div>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="sum_hours">
-                    <div dir="rtl">
-                      <div className="font-medium">סיכום שעות לפי טקסט</div>
-                      <div className="text-xs text-gray-500">סופר שעות עבודה של עובדים לפי ערך טקסטואלי מוגדר (למשל "נוכח")</div>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="count_by_text">
-                    <div dir="rtl">
-                      <div className="font-medium">סיכום פעמים לפי טקסט</div>
-                      <div className="text-xs text-gray-500">סופר כמה פעמים עובד עשה משמרת עם טקסט מוגדר בעמודה (למשל ספירת מספר משמרות עם "ויש")</div>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <Button onClick={handleAddScheduleColumn}><Plus className="w-4 h-4" /></Button>
+            <div className="space-y-2 mb-4" dir="rtl">
+              <div className="flex gap-2">
+                <Input value={newColName} onChange={e => setNewColName(e.target.value)} placeholder="שם עמודה חדשה..." dir="rtl" className="flex-1" />
+                <Select value={newColReportType} onValueChange={v => { setNewColReportType(v); setNewColQuantPreset(""); }}>
+                  <SelectTrigger className="w-56" dir="rtl"><SelectValue /></SelectTrigger>
+                  <SelectContent dir="rtl">
+                    <SelectItem value="sum_numbers">
+                      <div dir="rtl">
+                        <div className="font-medium">סיכום מספרים</div>
+                        <div className="text-xs text-gray-500">מסכם ערכים מספריים שהוזנו בתאים</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="sum_hours">
+                      <div dir="rtl">
+                        <div className="font-medium">סיכום שעות לפי טקסט</div>
+                        <div className="text-xs text-gray-500">סופר שעות עבודה לפי ערך טקסטואלי מוגדר</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="count_by_text">
+                      <div dir="rtl">
+                        <div className="font-medium">סיכום פעמים לפי טקסט</div>
+                        <div className="text-xs text-gray-500">סופר כמה פעמים הופיע ערך מסוים בעמודה</div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="count_quantitative">
+                      <div dir="rtl">
+                        <div className="font-medium">ספירה כמותית</div>
+                        <div className="text-xs text-gray-500">עמודת ספירה לפי רשימת פריטים מוגדרת מראש</div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleAddScheduleColumn}><Plus className="w-4 h-4" /></Button>
+              </div>
+              {newColReportType === "count_quantitative" && (
+                <div className="flex gap-2 items-center p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                  <span className="text-xs text-emerald-800 font-medium whitespace-nowrap">רשימת פריטים:</span>
+                  <Select value={newColQuantPreset} onValueChange={setNewColQuantPreset}>
+                    <SelectTrigger className="flex-1 h-8 text-sm" dir="rtl"><SelectValue placeholder="בחר רשימה מוגדרת מראש..." /></SelectTrigger>
+                    <SelectContent dir="rtl">
+                      {quantitativePresets.map(p => <SelectItem key={p.name} value={p.name}>{p.name} ({(p.items||[]).length} פריטים)</SelectItem>)}
+                      {quantitativePresets.length === 0 && <div className="p-2 text-xs text-gray-400">הגדר רשימות בקטע "ספירה כמותית" למטה</div>}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             {/* Column list */}
@@ -330,9 +358,10 @@ export default function Settings() {
                       <Badge variant="outline" className={`text-xs ${
                         col.report_type === "sum_hours" ? "border-purple-300 text-purple-700" :
                         col.report_type === "count_by_text" ? "border-green-300 text-green-700" :
+                        col.report_type === "count_quantitative" ? "border-emerald-300 text-emerald-700" :
                         "border-blue-300 text-blue-700"
                       }`}>
-                        {col.report_type === "sum_hours" ? "סיכום שעות לפי טקסט" : col.report_type === "count_by_text" ? "סיכום פעמים לפי טקסט" : "סיכום מספרים"}
+                        {col.report_type === "sum_hours" ? "סיכום שעות לפי טקסט" : col.report_type === "count_by_text" ? "סיכום פעמים לפי טקסט" : col.report_type === "count_quantitative" ? `ספירה כמותית${col.quantitative_preset_name ? ` — ${col.quantitative_preset_name}` : ""}` : "סיכום מספרים"}
                       </Badge>
                       {(col.options || []).length > 0 && (
                         <span className="text-xs text-gray-500">{col.options.length} אפשרויות</span>
