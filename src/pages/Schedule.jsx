@@ -655,7 +655,7 @@ export default function Schedule() {
                                     const span = spanMap[spanKey] ?? 1;
                                     if (span === 0) return null;
                                      return (
-                                       <TableCell key={idx} dir="rtl" className="p-0 text-center" rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'middle', height: `${span * 32}px`, border: '2px solid #6b7280' } : {}}>
+                                       <TableCell key={idx} dir="rtl" className="p-0 text-center" rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
                                         {col.type === "worker" ? (
                                           <WorkerCell
                                             rowId={row.id}

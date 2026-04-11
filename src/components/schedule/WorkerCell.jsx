@@ -142,7 +142,7 @@ export default function WorkerCell({
     !taskQualifiedWorkerIds.includes(selectedWorker.id);
 
   return (
-    <div ref={containerRef} className="relative w-full h-full" dir="rtl">
+    <div ref={containerRef} className="relative w-full h-full min-h-full" style={{ height: '100%' }} dir="rtl">
       {/* Cell display / input */}
       {editing ? (
         <input
@@ -164,7 +164,8 @@ export default function WorkerCell({
       ) : (
         <button
           onClick={() => setEditing(true)}
-          className={`w-full h-full text-center p-2 hover:bg-blue-50 transition-colors ${isCurrentUnavailable ? "bg-red-50" : ""}`}
+          className={`w-full text-center p-2 hover:bg-blue-50 transition-colors ${isCurrentUnavailable ? "bg-red-50" : ""}`}
+          style={{ minHeight: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           dir="rtl"
         >
           {selectedWorker ? (
