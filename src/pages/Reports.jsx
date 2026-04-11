@@ -203,6 +203,10 @@ export default function Reports() {
         workers={workers}
         populations={populations}
         workerRoles={workerRoles}
+        assignments={assignments}
+        templateRows={templateRows}
+        allTemplates={allTemplates}
+        trackerEntries={trackerEntries}
       />
     </div>
   );
