@@ -40,6 +40,7 @@ export default function Schedule() {
   const [columnTypes, setColumnTypes] = useState([]);
   const [columnSubTypes, setColumnSubTypes] = useState({});
   const [columnFreeText, setColumnFreeText] = useState({});
+  const [columnQuantitative, setColumnQuantitative] = useState({});
   const [templates, setTemplates] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
@@ -102,6 +103,9 @@ export default function Schedule() {
         if (allOpts.length > 0) subTypesMap[c.name] = allOpts;
         if (c.free_text) freeTextMap[c.name] = true;
       });
+      const quantMap = {};
+      customParams.forEach(c => { if (c.report_type === 'count_quantitative') quantMap[c.name] = true; });
+      setColumnQuantitative(quantMap);
       setColumnSubTypes(subTypesMap);
       setColumnFreeText(freeTextMap);
     }
@@ -706,6 +710,7 @@ export default function Schedule() {
                                             availableSubTypes={columnSubTypes[col.name] || []}
                                             freeText={!!columnFreeText[col.name]}
                                             isTemplateRow={true}
+                                            isQuantitative={!!columnQuantitative[col.name]}
                                             onSaved={(updatedColumnValues) => {
                                               const newValues = { ...row.values, ...updatedColumnValues };
                                               base44.entities.TemplateRow.update(row.id, { values: newValues });
