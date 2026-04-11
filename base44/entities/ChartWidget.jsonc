@@ -1,0 +1,83 @@
+{
+  "name": "ChartWidget",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Chart title"
+    },
+    "chart_type": {
+      "type": "string",
+      "enum": [
+        "bar",
+        "line",
+        "pie"
+      ],
+      "description": "Type of chart"
+    },
+    "data_source": {
+      "type": "string",
+      "enum": [
+        "shifts_per_worker",
+        "hours_per_worker",
+        "schedule_col_values",
+        "quantitative_col"
+      ],
+      "description": "Data source"
+    },
+    "schedule_col_name": {
+      "type": "string",
+      "description": "For schedule_col_values source"
+    },
+    "quantitative_col_id": {
+      "type": "string",
+      "description": "For quantitative_col source: tracker column id"
+    },
+    "tracker_id": {
+      "type": "string",
+      "description": "Tracker to read data from (for quantitative)"
+    },
+    "date_mode": {
+      "type": "string",
+      "enum": [
+        "all",
+        "week",
+        "month",
+        "half_year",
+        "custom"
+      ],
+      "default": "month"
+    },
+    "date_start": {
+      "type": "string"
+    },
+    "date_end": {
+      "type": "string"
+    },
+    "filter_populations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "filter_roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "color": {
+      "type": "string",
+      "default": "#1e3a5f"
+    },
+    "order": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "title",
+    "chart_type",
+    "data_source"
+  ]
+}
