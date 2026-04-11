@@ -777,7 +777,7 @@ export default function Schedule() {
                     <SelectItem value="time_end">זמן סיום</SelectItem>
                     {columnTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     <SelectItem value="worker_member">חבר צוות</SelectItem>
-                    {tasksList.map(t => <SelectItem key={`task_${t}`} value={`task_${t}`}>משימה: {t}</SelectItem>)}
+                    {tasksList.length > 0 && <SelectItem value="task">משימה</SelectItem>}
                   </SelectContent>
                 </Select>
               </div>
@@ -804,6 +804,17 @@ export default function Schedule() {
                   )}
                 </>
               )}
+              {newTemplateColumnName === "task" && (
+                <div>
+                  <Label dir="rtl">בחר משימה</Label>
+                  <Select value={newTemplateColumnRole} onValueChange={setNewTemplateColumnRole}>
+                    <SelectTrigger dir="rtl"><SelectValue placeholder="בחר משימה..." /></SelectTrigger>
+                    <SelectContent>
+                      {tasksList.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setShowAddTemplateColumnDialog(false); setNewTemplateColumnName(""); setNewTemplateColumnType("text"); }} dir="rtl">ביטול</Button>
@@ -820,9 +831,8 @@ export default function Schedule() {
                   } else if (newTemplateColumnName === "worker_member") {
                     const colName = newTemplateColumnType.trim() || newTemplateColumnRole;
                     columnToAdd = { name: colName, type: "worker", width: 150, role_filter: newTemplateColumnRole };
-                  } else if (newTemplateColumnName.startsWith("task_")) {
-                    const taskName = newTemplateColumnName.replace("task_", "");
-                    columnToAdd = { name: taskName, type: "worker", width: 150, task_name: taskName };
+                  } else if (newTemplateColumnName === "task") {
+                    columnToAdd = { name: newTemplateColumnRole, type: "worker", width: 150, task_name: newTemplateColumnRole };
                   } else {
                     columnToAdd = { name: newTemplateColumnName, type: "text", width: 120 };
                   }
@@ -842,7 +852,7 @@ export default function Schedule() {
                   await loadData();
                   toast.success('עמודה נוספה בהצלחה');
                 }}
-                disabled={!newTemplateColumnName || (newTemplateColumnName === "worker_member" && !newTemplateColumnRole)}
+                disabled={!newTemplateColumnName || (newTemplateColumnName === "worker_member" && !newTemplateColumnRole) || (newTemplateColumnName === "task" && !newTemplateColumnRole)}
                 className="bg-blue-900 hover:bg-blue-800"
                 dir="rtl">
                 הוסף עמודה
