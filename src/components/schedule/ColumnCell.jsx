@@ -100,8 +100,8 @@ export default function ColumnCell({ assignmentId, colType, columnValues, availa
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button className="w-full text-center p-1 rounded border border-gray-200 hover:bg-blue-50 min-h-[28px]">
+      <PopoverTrigger asChild className="h-full">
+        <button className="w-full h-full text-center p-1 hover:bg-blue-50" style={{ minHeight: '100%', display: 'block' }}>
           <span className="text-xs truncate block text-center">
             {isQuantitative ? quantDisplay() : (savedValue || savedSubTypes.join(", ") || "-")}
           </span>
