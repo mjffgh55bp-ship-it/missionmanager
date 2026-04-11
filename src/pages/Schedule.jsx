@@ -656,7 +656,7 @@ export default function Schedule() {
                                             dateString={dateString}
                                             rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
                                             rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
-                                            taskQualifiedWorkerIds={col.task_name ? Object.values(taskQualifications[col.task_name] || {}).flat() : undefined}
+                                            taskQualifiedWorkerIds={col.task_name ? Object.values(taskQualifications[col.task_name] || {}).flat() : (row.values?.task ? Object.values(taskQualifications[row.values.task] || {}).flat() : undefined)}
                                             onSaved={(workerId) => {
                                               const newValues = { ...row.values, [col.name]: workerId };
                                               setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
@@ -672,6 +672,22 @@ export default function Schedule() {
                                               handleTimeSaved(row, newValues);
                                             }}
                                             rowValues={row.values || {}} />
+                                        ) : col.type === 'task' ? (
+                                          <Select
+                                            value={row.values?.task || ""}
+                                            onValueChange={async (value) => {
+                                              const newValues = { ...row.values, task: value };
+                                              await base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                              setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                            }}>
+                                            <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
+                                              <SelectValue placeholder="-" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value={null}>ללא</SelectItem>
+                                              {tasksList.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                            </SelectContent>
+                                          </Select>
                                         ) : ((columnSubTypes[col.name] || []).length > 0 || columnFreeText[col.name]) ? (
                                           <ColumnCell
                                             assignmentId={row.id}
@@ -786,17 +802,7 @@ export default function Schedule() {
                   )}
                 </>
               )}
-              {newTemplateColumnName === "task" && (
-                <div>
-                  <Label dir="rtl">בחר משימה</Label>
-                  <Select value={newTemplateColumnRole} onValueChange={setNewTemplateColumnRole}>
-                    <SelectTrigger dir="rtl"><SelectValue placeholder="בחר משימה..." /></SelectTrigger>
-                    <SelectContent>
-                      {tasksList.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setShowAddTemplateColumnDialog(false); setNewTemplateColumnName(""); setNewTemplateColumnType("text"); }} dir="rtl">ביטול</Button>
@@ -814,7 +820,7 @@ export default function Schedule() {
                     const colName = newTemplateColumnType.trim() || newTemplateColumnRole;
                     columnToAdd = { name: colName, type: "worker", width: 150, role_filter: newTemplateColumnRole };
                   } else if (newTemplateColumnName === "task") {
-                    columnToAdd = { name: newTemplateColumnRole, type: "worker", width: 150, task_name: newTemplateColumnRole };
+                    columnToAdd = { name: "משימה", type: "task", width: 120 };
                   } else {
                     columnToAdd = { name: newTemplateColumnName, type: "text", width: 120 };
                   }
@@ -834,7 +840,7 @@ export default function Schedule() {
                   await loadData();
                   toast.success('עמודה נוספה בהצלחה');
                 }}
-                disabled={!newTemplateColumnName || (newTemplateColumnName === "worker_member" && !newTemplateColumnRole) || (newTemplateColumnName === "task" && !newTemplateColumnRole)}
+                disabled={!newTemplateColumnName || (newTemplateColumnName === "worker_member" && !newTemplateColumnRole)}
                 className="bg-blue-900 hover:bg-blue-800"
                 dir="rtl">
                 הוסף עמודה
