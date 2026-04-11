@@ -91,6 +91,7 @@ export default function Schedule() {
         const allOpts = [];
         if (c.options && c.options.length > 0) allOpts.push(...c.options);
         if (c.sub_options && c.sub_options.length > 0) allOpts.push(...c.sub_options.map(so => so.name));
+        if (c.quantitative_items && c.quantitative_items.length > 0) allOpts.push(...c.quantitative_items);
         if (allOpts.length > 0) subTypesMap[c.name] = allOpts;
         if (c.free_text) freeTextMap[c.name] = true;
       });
