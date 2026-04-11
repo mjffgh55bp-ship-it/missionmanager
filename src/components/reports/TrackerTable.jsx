@@ -62,6 +62,7 @@ const COLUMN_TYPES = [
   { value: "shifts_count", label: "מספר משמרות" },
   { value: "schedule_col", label: "עמודת לוח" },
   { value: "combined_data", label: "נתונים משולבים" },
+  { value: "count_quantitative", label: "ספירה כמותית" },
 ];
 
 const calcHours = (start, end) => {
@@ -133,7 +134,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const [newOptionDraft, setNewOptionDraft] = useState({});
 
-  const addColumn = () => setEditColumns([...editColumns, { id: Date.now().toString(), name: "", type: "shifts_count", template_column: "", schedule_col_name: "", schedule_col_value: "", options: [] }]);
+  const addColumn = () => setEditColumns([...editColumns, { id: Date.now().toString(), name: "", type: "shifts_count", template_column: "", schedule_col_name: "", schedule_col_value: "", options: [], quantitative_options: [] }]);
   const updateColumn = (idx, field, value) => { const c = [...editColumns]; c[idx] = { ...c[idx], [field]: value }; setEditColumns(c); };
   const removeColumn = (idx) => setEditColumns(editColumns.filter((_, i) => i !== idx));
 
@@ -288,6 +289,25 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   });
 
   const isAuto = (type) => ["shifts_count", "schedule_col", "combined_data"].includes(type);
+
+  const parseQuantitativeValue = (raw) => {
+    try { return JSON.parse(raw || "{}"); } catch { return {}; }
+  };
+
+  const saveQuantitativeItem = async (workerId, colId, optionName, delta) => {
+    const existing = getEntry(workerId, colId);
+    const current = parseQuantitativeValue(existing?.value);
+    const newVal = Math.max(0, (current[optionName] || 0) + delta);
+    const updated = { ...current, [optionName]: newVal };
+    const strVal = JSON.stringify(updated);
+    if (existing) {
+      const res = await base44.entities.TrackerEntry.update(existing.id, { value: strVal });
+      setEntries(entries.map(e => e.id === existing.id ? res : e));
+    } else {
+      const res = await base44.entities.TrackerEntry.create({ tracker_id: tracker.id, worker_id: workerId, column_id: colId, value: strVal });
+      setEntries([...entries, res]);
+    }
+  };
   const displayColumns = editMode ? editColumns : (tracker.columns || []);
 
   return (
@@ -461,6 +481,39 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           </Select>
                         </div>
                       )}
+                      {col.type === "count_quantitative" && (
+                        <div className="space-y-1">
+                          <div className="text-xs text-gray-500 mb-1">אפשרויות:</div>
+                          {(col.quantitative_options || []).map((opt, oi) => (
+                            <div key={oi} className="flex gap-1 items-center">
+                              <Input
+                                value={opt}
+                                onChange={e => {
+                                  const opts = [...(col.quantitative_options || [])];
+                                  opts[oi] = e.target.value;
+                                  updateColumn(idx, "quantitative_options", opts);
+                                }}
+                                placeholder="שם פריט..."
+                                dir="rtl"
+                                className="h-6 text-xs flex-1"
+                              />
+                              <button type="button" onClick={() => {
+                                const opts = (col.quantitative_options || []).filter((_, i) => i !== oi);
+                                updateColumn(idx, "quantitative_options", opts);
+                              }} className="text-red-400 hover:text-red-600">
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => updateColumn(idx, "quantitative_options", [...(col.quantitative_options || []), ""])}
+                            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                          >
+                            <Plus className="w-3 h-3" />הוסף
+                          </button>
+                        </div>
+                      )}
                               </div>
                                ) : (
                     <div className="flex flex-col gap-0.5 py-1 items-center text-center">
@@ -495,6 +548,27 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   const value = auto ? computeAutoValue(col, worker.id) : entryValue;
                   const isEditing = editingCell?.workerId === worker.id && editingCell?.colId === col.id;
 
+                  if (col.type === "count_quantitative") {
+                    const opts = col.quantitative_options || [];
+                    const vals = parseQuantitativeValue(entryValue);
+                    return (
+                      <TableCell key={col.id} className="px-2 min-w-[140px]">
+                        <div className="space-y-0.5">
+                          {opts.map(opt => (
+                            <div key={opt} className="flex items-center justify-between gap-1 text-xs">
+                              <span className="text-gray-600 truncate">{opt}</span>
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => saveQuantitativeItem(worker.id, col.id, opt, -1)} className="w-5 h-5 rounded border border-gray-300 flex items-center justify-center hover:bg-red-50 text-gray-500 hover:text-red-500 text-xs font-bold">-</button>
+                                <span className="w-6 text-center font-semibold text-blue-900">{vals[opt] || 0}</span>
+                                <button onClick={() => saveQuantitativeItem(worker.id, col.id, opt, 1)} className="w-5 h-5 rounded border border-gray-300 flex items-center justify-center hover:bg-green-50 text-gray-500 hover:text-green-600 text-xs font-bold">+</button>
+                              </div>
+                            </div>
+                          ))}
+                          {opts.length === 0 && <span className="text-gray-300 text-xs">אין פריטים</span>}
+                        </div>
+                      </TableCell>
+                    );
+                  }
                   if (auto) {
                     const showAsNumber = col.type === "shifts_count";
                     return (

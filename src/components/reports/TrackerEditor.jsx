@@ -11,6 +11,7 @@ const COLUMN_TYPES = [
   { value: "shifts_count", label: "מספר משמרות" },
   { value: "schedule_col", label: "עמודת לוח" },
   { value: "combined_data", label: "נתונים משולבים" },
+  { value: "count_quantitative", label: "ספירה כמותית" },
 ];
 
 const COMBINED_OPS = [
@@ -194,6 +195,47 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                               <SelectItem value="count_shifts">מספר משמרות</SelectItem>
                             </SelectContent>
                           </Select>
+                        </div>
+                      </div>
+                    )}
+                    {col.type === "count_quantitative" && (
+                      <div className="col-span-2 space-y-2">
+                        <Label className="text-xs" dir="rtl">אפשרויות (פריטים)</Label>
+                        <div className="space-y-1">
+                          {(col.quantitative_options || []).map((opt, oi) => (
+                            <div key={oi} className="flex gap-1 items-center">
+                              <Input
+                                value={opt}
+                                onChange={e => {
+                                  const opts = [...(col.quantitative_options || [])];
+                                  opts[oi] = e.target.value;
+                                  updateColumn(idx, "quantitative_options", opts);
+                                }}
+                                placeholder="שם פריט..."
+                                dir="rtl"
+                                className="h-7 text-sm flex-1"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const opts = (col.quantitative_options || []).filter((_, i) => i !== oi);
+                                  updateColumn(idx, "quantitative_options", opts);
+                                }}
+                                className="text-red-400 hover:text-red-600"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs w-full"
+                            onClick={() => updateColumn(idx, "quantitative_options", [...(col.quantitative_options || []), ""])}
+                            dir="rtl"
+                          >
+                            <Plus className="w-3 h-3 ml-1" />הוסף פריט
+                          </Button>
                         </div>
                       </div>
                     )}
