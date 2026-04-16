@@ -207,31 +207,36 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                       </div>
                     )}
                     {col.type === "sum_quantitative" && (() => {
-                      const quantCols = columns.filter((c, ci) => ci !== idx && c.type === "count_quantitative");
-                      const sourceCol = columns.find(c => c.id === col.source_quantitative_col_id);
-                      const availableItems = sourceCol?.quantitative_options || [];
+                      const quantCols = columns.filter(c => c.type === "count_quantitative");
+                      const selectedSourceColId = col.source_quantitative_col_id || "";
+                      const sourceCol = quantCols.find(c => c.id === selectedSourceColId);
+                      const availableItems = sourceCol?.quantitative_options?.filter(Boolean) || [];
                       return (
                         <div className="col-span-2 space-y-2">
                           <div>
                             <Label className="text-xs" dir="rtl">עמודת ספירה כמותית</Label>
-                            <Select value={col.source_quantitative_col_id || ""} onValueChange={v => updateColumn(idx, "source_quantitative_col_id", v)}>
+                            <Select value={selectedSourceColId} onValueChange={v => updateColumn(idx, "source_quantitative_col_id", v)}>
                               <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
                               <SelectContent dir="rtl">
                                 {quantCols.map(qc => <SelectItem key={qc.id} value={qc.id}>{qc.name || "ללא שם"}</SelectItem>)}
                               </SelectContent>
                             </Select>
                           </div>
-                          {availableItems.length > 0 && (
-                            <div>
-                              <Label className="text-xs" dir="rtl">פריט לסכום</Label>
+                          <div>
+                            <Label className="text-xs" dir="rtl">פריט לסכום</Label>
+                            {availableItems.length > 0 ? (
                               <Select value={col.quantitative_item || ""} onValueChange={v => updateColumn(idx, "quantitative_item", v)}>
                                 <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר פריט..." /></SelectTrigger>
                                 <SelectContent dir="rtl">
                                   {availableItems.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}
                                 </SelectContent>
                               </Select>
-                            </div>
-                          )}
+                            ) : (
+                              <p className="text-xs text-gray-400 mt-1" dir="rtl">
+                                {selectedSourceColId ? "לעמודה הנבחרת אין פריטים מוגדרים" : "יש לבחור עמודת ספירה כמותית תחילה"}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       );
                     })()}
