@@ -332,7 +332,6 @@ export default function Workers() {
             </Card>
           </TabsContent>
         </Tabs>
-        }
 
         {/* Worker Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
