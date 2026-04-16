@@ -9,7 +9,8 @@ import { base44 } from "@/api/base44Client";
 
 const COLUMN_TYPES = [
   { value: "shifts_count", label: "מספר משמרות" },
-  { value: "schedule_col", label: "עמודת לוח" },
+  { value: "schedule_col", label: "עמודת לוח — שעות" },
+  { value: "status_count", label: "ספירת סטטוס" },
   { value: "combined_data", label: "נתונים משולבים" },
   { value: "count_quantitative", label: "ספירה כמותית" },
   { value: "sum_quantitative", label: "סכום ספירה כמותית" },
@@ -117,6 +118,36 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                         </SelectContent>
                       </Select>
                     </div>
+                    {col.type === "status_count" && (() => {
+                      const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+                      const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
+                      return (
+                        <div className="col-span-2 space-y-2">
+                          <div>
+                            <Label className="text-xs" dir="rtl">עמודת לוח (עם סטטוסים)</Label>
+                            <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
+                              <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
+                              <SelectContent dir="rtl">
+                                {scheduleColumns.map(sc => (
+                                  <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {opts.length > 0 && (
+                            <div>
+                              <Label className="text-xs" dir="rtl">סטטוס לספירה</Label>
+                              <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
+                                <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר סטטוס..." /></SelectTrigger>
+                                <SelectContent dir="rtl">
+                                  {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {col.type === "schedule_col" && (
                       <div className="col-span-2 space-y-2">
                         <div>
