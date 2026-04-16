@@ -599,6 +599,50 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 {editMode && <TableCell />}
               </TableRow>
             ))}
+            {/* Summary row for count_quantitative columns */}
+            {!editMode && displayColumns.some(c => c.type === "count_quantitative") && (
+              <TableRow className="bg-blue-50 border-t-2 border-blue-200 font-semibold">
+                <TableCell className="px-4 text-blue-900 font-bold">סה"כ</TableCell>
+                {displayColumns.map(col => {
+                  if (col.type === "count_quantitative") {
+                    const opts = col.quantitative_options || [];
+                    // Sum each option across all filtered workers
+                    const totals = {};
+                    opts.forEach(opt => {
+                      totals[opt] = filteredWorkers.reduce((sum, w) => {
+                        const vals = parseQuantitativeValue(getEntry(w.id, col.id)?.value);
+                        return sum + (vals[opt] || 0);
+                      }, 0);
+                    });
+                    return (
+                      <TableCell key={col.id} className="px-2 min-w-[140px]">
+                        <div className="space-y-0.5">
+                          {opts.map(opt => (
+                            <div key={opt} className="flex items-center justify-between gap-1 text-xs">
+                              <span className="text-blue-800 truncate font-medium">{opt}</span>
+                              <span className="w-8 text-center font-bold text-blue-900">{totals[opt]}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                    );
+                  }
+                  // For auto columns, sum numerics
+                  if (isAuto(col.type)) {
+                    const total = filteredWorkers.reduce((sum, w) => {
+                      const v = computeAutoValue(col, w.id);
+                      return sum + (typeof v === "number" ? v : 0);
+                    }, 0);
+                    return (
+                      <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
+                        {total > 0 ? (col.type === "shifts_count" ? total : `${total}h`) : <span className="text-gray-300">-</span>}
+                      </TableCell>
+                    );
+                  }
+                  return <TableCell key={col.id} />;
+                })}
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </CardContent>
