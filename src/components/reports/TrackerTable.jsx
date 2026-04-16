@@ -259,6 +259,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return null;
   };
 
+  const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text"].includes(type);
+
   const filteredWorkers = workers.filter(w => {
     if (!w.active) return false;
     if (selectedPopulations.length > 0 && !selectedPopulations.includes(w.population)) return false;
@@ -282,8 +284,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const vb = getEntry(b.id, sortColId)?.value || "";
     return mult * va.localeCompare(vb, "he");
   });
-
-  const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text"].includes(type);
 
   const parseQuantitativeValue = (raw) => {
     try { return JSON.parse(raw || "{}"); } catch { return {}; }
