@@ -61,7 +61,7 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
 const COLUMN_TYPES = [
   { value: "shifts_count", label: "מספר משמרות" },
   { value: "schedule_col", label: "עמודת לוח — שעות" },
-  { value: "status_count", label: "ספירת סטטוס" },
+  { value: "status_count", label: "שעות לפי סטטוס" },
   { value: "combined_data", label: "נתונים משולבים" },
   { value: "count_quantitative", label: "ספירה כמותית" },
   { value: "sum_quantitative", label: "סכום ספירה כמותית" },
@@ -292,9 +292,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       return Math.round(total * 10) / 10;
     }
     if (col.type === "status_count") {
-      let count = 0;
+      // Sums HOURS for rows where the selected schedule column contains the selected sub_option value
+      let total = 0;
       const colName = col.schedule_col_name;
-      const colValue = col.schedule_col_value;
+      const colValue = col.schedule_col_value; // the sub_option name/criterion to match
       if (!colName) return 0;
 
       // From assignments
@@ -303,11 +304,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const fieldVal = vals[colName];
         const subTypes = vals[`${colName}_subTypes`] || [];
         const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
-        if (colValue) {
-          if (allVals.includes(String(colValue))) count++;
-        } else {
-          if (allVals.length > 0) count++;
-        }
+        const matches = colValue ? allVals.includes(String(colValue)) : allVals.length > 0;
+        if (matches) total += a.hours || 0;
       });
 
       // From template rows
@@ -320,14 +318,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const fieldVal = row.values?.[colName];
         const subTypes = row.values?.[`${colName}_subTypes`] || [];
         const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
-        if (colValue) {
-          if (allVals.includes(String(colValue))) count++;
-        } else {
-          if (allVals.length > 0) count++;
-        }
+        const matches = colValue ? allVals.includes(String(colValue)) : allVals.length > 0;
+        if (!matches) return;
+        const h = calcHours(
+          row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
+          row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
+        );
+        total += h;
       });
 
-      return count;
+      return Math.round(total * 10) / 10;
     }
     if (col.type === "sum_quantitative") {
       return computeSumQuantitative(col, workerId);
@@ -521,20 +521,24 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       </Select>
                       {col.type === "status_count" && (() => {
                         const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                        const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
+                        const subOpts = sc?.sub_options || [];
                         return (
                           <div className="space-y-1">
                             <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
                               <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
                               <SelectContent dir="rtl">
-                                {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
+                                {scheduleColumns.filter(sc => (sc.sub_options || []).length > 0).map(sc => (
+                                  <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
-                            {opts.length > 0 && (
+                            {subOpts.length > 0 && (
                               <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
-                                <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="סטטוס לספירה..." /></SelectTrigger>
+                                <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="בחר סטטוס..." /></SelectTrigger>
                                 <SelectContent dir="rtl">
-                                  {opts.map(o => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
+                                  {subOpts.map(so => (
+                                    <SelectItem key={so.name} value={so.name} className="text-xs">{so.name}</SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             )}
@@ -721,7 +725,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     );
                   }
                   if (auto) {
-                    const showAsNumber = ["shifts_count", "status_count"].includes(col.type);
+                    const showAsNumber = col.type === "shifts_count";
                     return (
                       <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2">
                         {value > 0 ? (showAsNumber ? value : `${value}h`) : <span className="text-gray-300">-</span>}
@@ -784,7 +788,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       const v = computeAutoValue(col, w.id);
                       return sum + (typeof v === "number" ? v : 0);
                     }, 0);
-                    const isCount = ["shifts_count", "status_count"].includes(col.type);
+                    const isCount = col.type === "shifts_count";
                     return (
                       <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
                         {total > 0 ? (isCount ? total : `${total}h`) : <span className="text-gray-300">-</span>}
