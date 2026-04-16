@@ -1479,10 +1479,9 @@ export default function Matrix() {
                      })
                     ) : (
                      getWeeklyTimeSlots(zoomRange, startOfWeek(currentDate, { weekStartsOn: 0 })).map((slot, idx) => (
-                       <div key={idx} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium">
+                       <div key={idx} className={`flex-1 text-xs text-gray-600 py-3 text-center font-medium ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : ''}`}>
                          {slot.label && <div className="font-bold">{slot.label}</div>}
                          {slot.dateLabel && <div className="text-[9px] text-gray-500">{slot.dateLabel}</div>}
-                         {slot.hour === 0 && <div className="text-[10px]">{String(slot.hour).padStart(2, '0')}:00</div>}
                        </div>
                      ))
                     )}
