@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Check, X, Plus, Save, ChevronDown, ChevronUp, Pencil } from "lucide-react";
+import { Trash2, Check, X, Plus, Save, ChevronDown, ChevronUp, Pencil, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
@@ -116,6 +116,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [guide, setGuide] = useState("__all__");
   const [showFilters, setShowFilters] = useState(false);
+
+  // Sorting
+  const [sortColId, setSortColId] = useState(null); // null = sort by name
+  const [sortDir, setSortDir] = useState("asc");
+
+  const handleSortClick = (colId) => {
+    if (sortColId === colId) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortColId(colId);
+      setSortDir("asc");
+    }
+  };
 
   // Inline edit
   const [editMode, setEditMode] = useState(false);
@@ -329,6 +342,21 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     if (guide === "yes" && !w.is_guide) return false;
     if (guide === "no" && w.is_guide) return false;
     return true;
+  }).sort((a, b) => {
+    const mult = sortDir === "asc" ? 1 : -1;
+    if (sortColId === null) {
+      return mult * (a.nickname || "").localeCompare(b.nickname || "", "he");
+    }
+    const col = (tracker.columns || []).find(c => c.id === sortColId);
+    if (!col) return 0;
+    if (isAuto(col.type)) {
+      const va = computeAutoValue(col, a.id) ?? 0;
+      const vb = computeAutoValue(col, b.id) ?? 0;
+      return mult * (va - vb);
+    }
+    const va = getEntry(a.id, sortColId)?.value || "";
+    const vb = getEntry(b.id, sortColId)?.value || "";
+    return mult * va.localeCompare(vb, "he");
   });
 
   const isAuto = (type) => ["shifts_count", "schedule_col", "status_count", "combined_data", "sum_quantitative"].includes(type);
@@ -457,7 +485,18 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50">
-              <TableHead dir="rtl" className="font-bold px-4 min-w-[100px]">עובד</TableHead>
+              <TableHead dir="rtl" className="font-bold px-4 min-w-[100px]">
+                <button
+                  onClick={() => handleSortClick(null)}
+                  className="flex items-center gap-1 hover:text-blue-700 transition-colors"
+                  title="מיון לפי שם"
+                >
+                  עובד
+                  {sortColId === null
+                    ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
+                    : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
+                </button>
+              </TableHead>
               {displayColumns.map((col, idx) => (
                 <TableHead key={col.id} dir="rtl" className="px-2 min-w-[160px]">
                   {editMode ? (
@@ -620,12 +659,20 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       })()}
                               </div>
                                ) : (
-                    <div className="flex flex-col gap-0.5 py-1 items-center text-center">
-                      <span className="font-medium">{col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}</span>
+                    <button
+                      onClick={() => handleSortClick(col.id)}
+                      className="flex flex-col gap-0.5 py-1 items-center text-center w-full hover:text-blue-700 transition-colors"
+                    >
+                      <span className="font-medium flex items-center gap-1">
+                        {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
+                        {sortColId === col.id
+                          ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
+                          : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
+                      </span>
                       <span className="text-[10px] text-gray-400 font-normal">
                         {COLUMN_TYPES.find(ct => ct.value === col.type)?.label || ""}
                       </span>
-                    </div>
+                    </button>
                   )}
                 </TableHead>
               ))}
