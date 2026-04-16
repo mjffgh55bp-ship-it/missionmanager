@@ -9,16 +9,9 @@ import { base44 } from "@/api/base44Client";
 
 const COLUMN_TYPES = [
   { value: "shifts_count", label: "מספר משמרות" },
-  { value: "schedule_col", label: "עמודת לוח — שעות" },
-  { value: "status_count", label: "ספירת סטטוס" },
-  { value: "combined_data", label: "נתונים משולבים" },
+  { value: "schedule_col", label: "סיכום שעות לפי טקסט" },
+  { value: "count_by_text", label: "סיכום פעמים לפי טקסט" },
   { value: "count_quantitative", label: "ספירה כמותית" },
-  { value: "sum_quantitative", label: "סכום ספירה כמותית" },
-];
-
-const COMBINED_OPS = [
-  { value: "sum_hours", label: "סהכו שעות" },
-  { value: "count_shifts", label: "מספר משמרות" },
 ];
 
 export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, allTemplates, scheduleColumns = [] }) {
@@ -118,55 +111,23 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                         </SelectContent>
                       </Select>
                     </div>
-                    {col.type === "status_count" && (() => {
+                    {(col.type === "schedule_col" || col.type === "count_by_text") && (() => {
                       const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
                       const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
                       return (
                         <div className="col-span-2 space-y-2">
                           <div>
-                            <Label className="text-xs" dir="rtl">עמודת לוח (עם סטטוסים)</Label>
+                            <Label className="text-xs" dir="rtl">עמודת לוח</Label>
                             <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
                               <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
                               <SelectContent dir="rtl">
-                                {scheduleColumns.map(sc => (
-                                  <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>
-                                ))}
+                                {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>)}
                               </SelectContent>
                             </Select>
                           </div>
                           {opts.length > 0 && (
                             <div>
-                              <Label className="text-xs" dir="rtl">סטטוס לספירה</Label>
-                              <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
-                                <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר סטטוס..." /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                  {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    {col.type === "schedule_col" && (
-                      <div className="col-span-2 space-y-2">
-                        <div>
-                          <Label className="text-xs" dir="rtl">שדה לוח (עמודה)</Label>
-                          <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
-                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
-                            <SelectContent dir="rtl">
-                              {scheduleColumns.map(sc => (
-                                <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {col.schedule_col_name && (() => {
-                          const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                          const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
-                          return opts.length > 0 ? (
-                            <div>
-                              <Label className="text-xs" dir="rtl">סנן לפי ערך (אופציונאלי)</Label>
+                              <Label className="text-xs" dir="rtl">ערך ספציפי (אופציונלי)</Label>
                               <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
                                 <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="כל ערך" /></SelectTrigger>
                                 <SelectContent dir="rtl">
@@ -175,99 +136,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                                 </SelectContent>
                               </Select>
                             </div>
-                          ) : null;
-                        })()}
-                      </div>
-                    )}
-                    {col.type === "combined_data" && (
-                      <div className="col-span-2 space-y-2">
-                        <div>
-                          <Label className="text-xs" dir="rtl">שדה לוח</Label>
-                          <Select value={col.combined_filters?.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, schedule_col_name: v })}>
-                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר..." /></SelectTrigger>
-                            <SelectContent dir="rtl">
-                              {scheduleColumns.map(sc => (
-                                <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        {col.combined_filters?.schedule_col_name && (() => {
-                          const sc = scheduleColumns.find(c => c.name === col.combined_filters.schedule_col_name);
-                          const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
-                          return opts.length > 0 ? (
-                            <div>
-                              <Label className="text-xs" dir="rtl">ערך בעמודה</Label>
-                              <Select value={col.combined_filters?.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, schedule_col_value: v })}>
-                                <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר" /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                  {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          ) : null;
-                        })()}
-                        <div>
-                          <Label className="text-xs" dir="rtl">תפקיד (אופציונאלי)</Label>
-                          <Select value={col.combined_filters?.role || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, role: v })}>
-                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר" /></SelectTrigger>
-                            <SelectContent dir="rtl">
-                              <SelectItem value={null}>בחירה חטיבה</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs" dir="rtl">משימה (אופציונאלי)</Label>
-                          <Select value={col.combined_filters?.task || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, task: v })}>
-                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר" /></SelectTrigger>
-                            <SelectContent dir="rtl">
-                              <SelectItem value={null}>בחירה חטיבה</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label className="text-xs" dir="rtl">חישוב</Label>
-                          <Select value={col.combined_operation || "sum_hours"} onValueChange={v => updateColumn(idx, "combined_operation", v)}>
-                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue /></SelectTrigger>
-                            <SelectContent dir="rtl">
-                              <SelectItem value="sum_hours">סהכו שעות</SelectItem>
-                              <SelectItem value="count_shifts">מספר משמרות</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    )}
-                    {col.type === "sum_quantitative" && (() => {
-                      const quantCols = columns.filter(c => c.type === "count_quantitative");
-                      const selectedSourceColId = col.source_quantitative_col_id || "";
-                      const sourceCol = quantCols.find(c => c.id === selectedSourceColId);
-                      const availableItems = sourceCol?.quantitative_options?.filter(Boolean) || [];
-                      return (
-                        <div className="col-span-2 space-y-2">
-                          <div>
-                            <Label className="text-xs" dir="rtl">עמודת ספירה כמותית</Label>
-                            <Select value={selectedSourceColId} onValueChange={v => updateColumn(idx, "source_quantitative_col_id", v)}>
-                              <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
-                              <SelectContent dir="rtl">
-                                {quantCols.map(qc => <SelectItem key={qc.id} value={qc.id}>{qc.name || "ללא שם"}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label className="text-xs" dir="rtl">פריט לסכום</Label>
-                            {availableItems.length > 0 ? (
-                              <Select value={col.quantitative_item || ""} onValueChange={v => updateColumn(idx, "quantitative_item", v)}>
-                                <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר פריט..." /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                  {availableItems.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <p className="text-xs text-gray-400 mt-1" dir="rtl">
-                                {selectedSourceColId ? "לעמודה הנבחרת אין פריטים מוגדרים" : "יש לבחור עמודת ספירה כמותית תחילה"}
-                              </p>
-                            )}
-                          </div>
+                          )}
                         </div>
                       );
                     })()}

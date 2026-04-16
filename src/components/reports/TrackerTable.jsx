@@ -60,11 +60,9 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
 
 const COLUMN_TYPES = [
   { value: "shifts_count", label: "מספר משמרות" },
-  { value: "schedule_col", label: "עמודת לוח — שעות" },
-  { value: "status_count", label: "שעות לפי סטטוס" },
-  { value: "combined_data", label: "נתונים משולבים" },
+  { value: "schedule_col", label: "סיכום שעות לפי טקסט" },
+  { value: "count_by_text", label: "סיכום פעמים לפי טקסט" },
   { value: "count_quantitative", label: "ספירה כמותית" },
-  { value: "sum_quantitative", label: "סכום ספירה כמותית" },
 ];
 
 const calcHours = (start, end) => {
@@ -209,129 +207,55 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       if (dateRange && (a.date < dateRange.start || a.date > dateRange.end)) return false;
       return true;
     });
+
     if (col.type === "shifts_count") return filtered.length;
+
+    // Helper: check if a schedule column value matches the filter
+    const matchesFilter = (vals, colName, colValue) => {
+      const fieldVal = vals?.[colName];
+      const subTypes = vals?.[`${colName}_subTypes`] || [];
+      const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
+      if (!colValue) return allVals.length > 0;
+      return allVals.includes(String(colValue));
+    };
+
     if (col.type === "schedule_col") {
+      if (!col.schedule_col_name) return 0;
       let total = 0;
-
-      // Count from assignments (column_values)
       filtered.forEach(a => {
-        const vals = a.column_values || {};
-        const fieldVal = vals[col.schedule_col_name];
-        if (!fieldVal) return;
-        if (col.schedule_col_value && String(fieldVal) !== String(col.schedule_col_value)) return;
+        if (!matchesFilter(a.column_values, col.schedule_col_name, col.schedule_col_value)) return;
         total += a.hours || 0;
       });
-
-      // Count from template rows
       templateRows.forEach(row => {
         if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
-        const workerIsInRow = (tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId);
-        if (!workerIsInRow) return;
-        const fieldVal = row.values?.[col.schedule_col_name];
-        const subTypes = row.values?.[`${col.schedule_col_name}_subTypes`] || [];
-        const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
-        if (col.schedule_col_value) {
-          if (!allVals.includes(String(col.schedule_col_value))) return;
-        } else {
-          if (allVals.length === 0) return;
-        }
-        const h = calcHours(
-          row.values?.["\u05d4\u05ea\u05d7\u05dc\u05d4"] || row.values?.["\u05e9\u05e2\u05ea \u05d4\u05ea\u05d7\u05dc\u05d4"] || "",
-          row.values?.["\u05e1\u05d9\u05d5\u05dd"] || row.values?.["\u05e9\u05e2\u05ea \u05e1\u05d9\u05d5\u05dd"] || ""
-        );
-        total += h;
-      });
-
-      return Math.round(total * 10) / 10;
-    }
-    if (col.type === "combined_data") {
-      const filters = col.combined_filters || {};
-      let total = 0;
-      let count = 0;
-
-      // From template rows
-      templateRows.forEach(row => {
-        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
-        const tmpl = allTemplates.find(t => t.id === row.template_id);
-        if (!tmpl) return;
-        const workerIsInRow = (tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId);
-        if (!workerIsInRow) return;
-        if (filters.schedule_col_name) {
-          const fieldVal = row.values?.[filters.schedule_col_name];
-          const subTypes = row.values?.[`${filters.schedule_col_name}_subTypes`] || [];
-          const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
-          if (filters.schedule_col_value) {
-            if (!allVals.includes(String(filters.schedule_col_value))) return;
-          } else {
-            if (allVals.length === 0) return;
-          }
-        }
-        count++;
-        const h = calcHours(
-          row.values?.["\u05d4\u05ea\u05d7\u05dc\u05d4"] || row.values?.["\u05e9\u05e2\u05ea \u05d4\u05ea\u05d7\u05dc\u05d4"] || "",
-          row.values?.["\u05e1\u05d9\u05d5\u05dd"] || row.values?.["\u05e9\u05e2\u05ea \u05e1\u05d9\u05d5\u05dd"] || ""
-        );
-        total += h;
-      });
-
-      // From assignments
-      filtered.forEach(a => {
-        if (filters.schedule_col_name) {
-          const vals = a.column_values || {};
-          const fieldVal = vals[filters.schedule_col_name];
-          if (!fieldVal) return;
-          if (filters.schedule_col_value && String(fieldVal) !== String(filters.schedule_col_value)) return;
-        }
-        count++;
-        total += a.hours || 0;
-      });
-
-      if (col.combined_operation === "count_shifts") return count;
-      return Math.round(total * 10) / 10;
-    }
-    if (col.type === "status_count") {
-      // Sums HOURS for rows where the selected schedule column contains the selected sub_option value
-      let total = 0;
-      const colName = col.schedule_col_name;
-      const colValue = col.schedule_col_value; // the sub_option name/criterion to match
-      if (!colName) return 0;
-
-      // From assignments
-      filtered.forEach(a => {
-        const vals = a.column_values || {};
-        const fieldVal = vals[colName];
-        const subTypes = vals[`${colName}_subTypes`] || [];
-        const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
-        const matches = colValue ? allVals.includes(String(colValue)) : allVals.length > 0;
-        if (matches) total += a.hours || 0;
-      });
-
-      // From template rows
-      templateRows.forEach(row => {
-        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
-        const tmpl = allTemplates.find(t => t.id === row.template_id);
-        if (!tmpl) return;
-        const workerIsInRow = (tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId);
-        if (!workerIsInRow) return;
-        const fieldVal = row.values?.[colName];
-        const subTypes = row.values?.[`${colName}_subTypes`] || [];
-        const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
-        const matches = colValue ? allVals.includes(String(colValue)) : allVals.length > 0;
-        if (!matches) return;
-        const h = calcHours(
+        if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
+        if (!matchesFilter(row.values, col.schedule_col_name, col.schedule_col_value)) return;
+        total += calcHours(
           row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
           row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
         );
-        total += h;
       });
-
       return Math.round(total * 10) / 10;
     }
-    if (col.type === "sum_quantitative") {
-      return computeSumQuantitative(col, workerId);
+
+    if (col.type === "count_by_text") {
+      if (!col.schedule_col_name) return 0;
+      let count = 0;
+      filtered.forEach(a => {
+        if (matchesFilter(a.column_values, col.schedule_col_name, col.schedule_col_value)) count++;
+      });
+      templateRows.forEach(row => {
+        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+        const tmpl = allTemplates.find(t => t.id === row.template_id);
+        if (!tmpl) return;
+        if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
+        if (matchesFilter(row.values, col.schedule_col_name, col.schedule_col_value)) count++;
+      });
+      return count;
     }
+
     return null;
   };
 
@@ -359,17 +283,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return mult * va.localeCompare(vb, "he");
   });
 
-  const isAuto = (type) => ["shifts_count", "schedule_col", "status_count", "combined_data", "sum_quantitative"].includes(type);
-
-  // Compute sum of a specific quantitative item from a count_quantitative column for a worker
-  const computeSumQuantitative = (col, workerId) => {
-    const sourceColId = col.source_quantitative_col_id;
-    const itemName = col.quantitative_item;
-    if (!sourceColId || !itemName) return 0;
-    const entry = entries.find(e => e.worker_id === workerId && e.column_id === sourceColId);
-    const vals = parseQuantitativeValue(entry?.value);
-    return vals[itemName] || 0;
-  };
+  const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text"].includes(type);
 
   const parseQuantitativeValue = (raw) => {
     try { return JSON.parse(raw || "{}"); } catch { return {}; }
@@ -519,86 +433,29 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           {COLUMN_TYPES.map(ct => <SelectItem key={ct.value} value={ct.value} className="text-xs">{ct.label}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      {col.type === "status_count" && (() => {
+                      {(col.type === "schedule_col" || col.type === "count_by_text") && (() => {
                         const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                        const subOpts = sc?.sub_options || [];
+                        const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
                         return (
                           <div className="space-y-1">
                             <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
                               <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
                               <SelectContent dir="rtl">
-                                {scheduleColumns.filter(sc => (sc.sub_options || []).length > 0).map(sc => (
-                                  <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>
-                                ))}
+                                {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
                               </SelectContent>
                             </Select>
-                            {subOpts.length > 0 && (
+                            {opts.length > 0 && (
                               <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
-                                <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="בחר סטטוס..." /></SelectTrigger>
+                                <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="ערך ספציפי (אופציונלי)..." /></SelectTrigger>
                                 <SelectContent dir="rtl">
-                                  {subOpts.map(so => (
-                                    <SelectItem key={so.name} value={so.name} className="text-xs">{so.name}</SelectItem>
-                                  ))}
+                                  <SelectItem value={null}>כל ערך</SelectItem>
+                                  {opts.map(o => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
                                 </SelectContent>
                               </Select>
                             )}
                           </div>
                         );
                       })()}
-                      {col.type === "schedule_col" && (
-                        <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
-                          <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
-                          <SelectContent dir="rtl">
-                            {scheduleColumns.map(sc => (
-                              <SelectItem key={sc.name} value={sc.name} className="text-xs">
-                                {sc.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      {col.type === "schedule_col" && col.schedule_col_name && (() => {
-                        const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                        const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
-                        return opts.length > 0 ? (
-                          <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
-                            <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="סנן לפי ערך..." /></SelectTrigger>
-                            <SelectContent dir="rtl">
-                              <SelectItem value={null}>כל ערך</SelectItem>
-                              {opts.map(o => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
-                              </SelectContent>
-                              </Select>
-                              ) : null;
-                              })()}
-                      {col.type === "combined_data" && (
-                        <div className="space-y-1">
-                          <Select value={col.combined_filters?.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, schedule_col_name: v })}>
-                            <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
-                            <SelectContent dir="rtl">
-                              {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          {col.combined_filters?.schedule_col_name && (() => {
-                            const sc = scheduleColumns.find(c => c.name === col.combined_filters.schedule_col_name);
-                            const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
-                            return opts.length > 0 ? (
-                              <Select value={col.combined_filters?.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "combined_filters", { ...col.combined_filters, schedule_col_value: v })}>
-                                <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="ערך בעמודה..." /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                  {opts.map(o => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            ) : null;
-                          })()}
-                          <Select value={col.combined_operation || "sum_hours"} onValueChange={v => updateColumn(idx, "combined_operation", v)}>
-                            <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue /></SelectTrigger>
-                            <SelectContent dir="rtl">
-                              <SelectItem value="sum_hours" className="text-xs">סה"כ שעות</SelectItem>
-                              <SelectItem value="count_shifts" className="text-xs">מספר משמרות</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
                       {col.type === "count_quantitative" && (
                         <div className="space-y-1">
                           <div className="text-xs text-gray-500 mb-1">אפשרויות:</div>
@@ -632,35 +489,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           </button>
                         </div>
                       )}
-                      {col.type === "sum_quantitative" && (() => {
-                        const quantCols = editColumns.filter(c => c.type === "count_quantitative");
-                        const sourceCol = editColumns.find(c => c.id === col.source_quantitative_col_id);
-                        const availableItems = sourceCol?.quantitative_options || [];
-                        return (
-                          <div className="space-y-1">
-                            <div>
-                              <div className="text-xs text-gray-500 mb-0.5">עמודת ספירה:</div>
-                              <Select value={col.source_quantitative_col_id || ""} onValueChange={v => updateColumn(idx, "source_quantitative_col_id", v)}>
-                                <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                  {quantCols.map(qc => <SelectItem key={qc.id} value={qc.id} className="text-xs">{qc.name || "ללא שם"}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            {availableItems.length > 0 && (
-                              <div>
-                                <div className="text-xs text-gray-500 mb-0.5">פריט לסכום:</div>
-                                <Select value={col.quantitative_item || ""} onValueChange={v => updateColumn(idx, "quantitative_item", v)}>
-                                  <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="בחר פריט..." /></SelectTrigger>
-                                  <SelectContent dir="rtl">
-                                    {availableItems.map(item => <SelectItem key={item} value={item} className="text-xs">{item}</SelectItem>)}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
+
                               </div>
                                ) : (
                     <button
@@ -725,10 +554,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     );
                   }
                   if (auto) {
-                    const showAsNumber = col.type === "shifts_count";
+                    const showAsHours = col.type === "schedule_col";
                     return (
                       <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2">
-                        {value > 0 ? (showAsNumber ? value : `${value}h`) : <span className="text-gray-300">-</span>}
+                        {value > 0 ? (showAsHours ? `${value}h` : value) : <span className="text-gray-300">-</span>}
                       </TableCell>
                     );
                   }
@@ -754,8 +583,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 {editMode && <TableCell />}
               </TableRow>
             ))}
-            {/* Summary row for count_quantitative columns */}
-            {!editMode && displayColumns.some(c => c.type === "count_quantitative") && (
+            {/* Summary row */}
+            {!editMode && displayColumns.some(c => c.type === "count_quantitative" || isAuto(c.type)) && (
               <TableRow className="bg-blue-50 border-t-2 border-blue-200 font-semibold">
                 <TableCell className="px-4 text-blue-900 font-bold">סה"כ</TableCell>
                 {displayColumns.map(col => {
@@ -788,10 +617,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       const v = computeAutoValue(col, w.id);
                       return sum + (typeof v === "number" ? v : 0);
                     }, 0);
-                    const isCount = col.type === "shifts_count";
+                    const showAsHours = col.type === "schedule_col";
                     return (
                       <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
-                        {total > 0 ? (isCount ? total : `${total}h`) : <span className="text-gray-300">-</span>}
+                        {total > 0 ? (showAsHours ? `${total}h` : total) : <span className="text-gray-300">-</span>}
                       </TableCell>
                     );
                   }
