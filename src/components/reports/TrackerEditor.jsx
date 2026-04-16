@@ -12,6 +12,7 @@ const COLUMN_TYPES = [
   { value: "schedule_col", label: "עמודת לוח" },
   { value: "combined_data", label: "נתונים משולבים" },
   { value: "count_quantitative", label: "ספירה כמותית" },
+  { value: "sum_quantitative", label: "סכום ספירה כמותית" },
 ];
 
 const COMBINED_OPS = [
@@ -205,6 +206,35 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                         </div>
                       </div>
                     )}
+                    {col.type === "sum_quantitative" && (() => {
+                      const quantCols = columns.filter((c, ci) => ci !== idx && c.type === "count_quantitative");
+                      const sourceCol = columns.find(c => c.id === col.source_quantitative_col_id);
+                      const availableItems = sourceCol?.quantitative_options || [];
+                      return (
+                        <div className="col-span-2 space-y-2">
+                          <div>
+                            <Label className="text-xs" dir="rtl">עמודת ספירה כמותית</Label>
+                            <Select value={col.source_quantitative_col_id || ""} onValueChange={v => updateColumn(idx, "source_quantitative_col_id", v)}>
+                              <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
+                              <SelectContent dir="rtl">
+                                {quantCols.map(qc => <SelectItem key={qc.id} value={qc.id}>{qc.name || "ללא שם"}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {availableItems.length > 0 && (
+                            <div>
+                              <Label className="text-xs" dir="rtl">פריט לסכום</Label>
+                              <Select value={col.quantitative_item || ""} onValueChange={v => updateColumn(idx, "quantitative_item", v)}>
+                                <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר פריט..." /></SelectTrigger>
+                                <SelectContent dir="rtl">
+                                  {availableItems.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {col.type === "count_quantitative" && (
                       <div className="col-span-2 space-y-2">
                         <Label className="text-xs" dir="rtl">אפשרויות (פריטים)</Label>

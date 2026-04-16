@@ -63,6 +63,7 @@ const COLUMN_TYPES = [
   { value: "schedule_col", label: "עמודת לוח" },
   { value: "combined_data", label: "נתונים משולבים" },
   { value: "count_quantitative", label: "ספירה כמותית" },
+  { value: "sum_quantitative", label: "סכום ספירה כמותית" },
 ];
 
 const calcHours = (start, end) => {
@@ -276,6 +277,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       if (col.combined_operation === "count_shifts") return count;
       return Math.round(total * 10) / 10;
     }
+    if (col.type === "sum_quantitative") {
+      return computeSumQuantitative(col, workerId);
+    }
     return null;
   };
 
@@ -288,7 +292,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return true;
   });
 
-  const isAuto = (type) => ["shifts_count", "schedule_col", "combined_data"].includes(type);
+  const isAuto = (type) => ["shifts_count", "schedule_col", "combined_data", "sum_quantitative"].includes(type);
+
+  // Compute sum of a specific quantitative item from a count_quantitative column for a worker
+  const computeSumQuantitative = (col, workerId) => {
+    const sourceColId = col.source_quantitative_col_id;
+    const itemName = col.quantitative_item;
+    if (!sourceColId || !itemName) return 0;
+    const entry = entries.find(e => e.worker_id === workerId && e.column_id === sourceColId);
+    const vals = parseQuantitativeValue(entry?.value);
+    return vals[itemName] || 0;
+  };
 
   const parseQuantitativeValue = (raw) => {
     try { return JSON.parse(raw || "{}"); } catch { return {}; }
@@ -514,6 +528,35 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           </button>
                         </div>
                       )}
+                      {col.type === "sum_quantitative" && (() => {
+                        const quantCols = editColumns.filter(c => c.type === "count_quantitative");
+                        const sourceCol = editColumns.find(c => c.id === col.source_quantitative_col_id);
+                        const availableItems = sourceCol?.quantitative_options || [];
+                        return (
+                          <div className="space-y-1">
+                            <div>
+                              <div className="text-xs text-gray-500 mb-0.5">עמודת ספירה:</div>
+                              <Select value={col.source_quantitative_col_id || ""} onValueChange={v => updateColumn(idx, "source_quantitative_col_id", v)}>
+                                <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
+                                <SelectContent dir="rtl">
+                                  {quantCols.map(qc => <SelectItem key={qc.id} value={qc.id} className="text-xs">{qc.name || "ללא שם"}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {availableItems.length > 0 && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-0.5">פריט לסכום:</div>
+                                <Select value={col.quantitative_item || ""} onValueChange={v => updateColumn(idx, "quantitative_item", v)}>
+                                  <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="בחר פריט..." /></SelectTrigger>
+                                  <SelectContent dir="rtl">
+                                    {availableItems.map(item => <SelectItem key={item} value={item} className="text-xs">{item}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                               </div>
                                ) : (
                     <div className="flex flex-col gap-0.5 py-1 items-center text-center">
