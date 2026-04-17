@@ -508,35 +508,56 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                               {scheduleColumns.filter(sc => sc.report_type === "count_quantitative").map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
                             </SelectContent>
                           </Select>
-                          <div className="text-xs text-gray-500 pt-1">ערכים לספור:</div>
-                          {(col.quantitative_options || []).map((opt, oi) => (
-                            <div key={oi} className="flex gap-1 items-center">
-                              <Input
-                                value={opt}
-                                onChange={e => {
-                                  const opts = [...(col.quantitative_options || [])];
-                                  opts[oi] = e.target.value;
-                                  updateColumn(idx, "quantitative_options", opts);
-                                }}
-                                placeholder="ערך לספור (לדוגמה: A)..."
-                                dir="rtl"
-                                className="h-6 text-xs flex-1"
-                              />
-                              <button type="button" onClick={() => {
-                                const opts = (col.quantitative_options || []).filter((_, i) => i !== oi);
-                                updateColumn(idx, "quantitative_options", opts);
-                              }} className="text-red-400 hover:text-red-600">
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => updateColumn(idx, "quantitative_options", [...(col.quantitative_options || []), ""])}
-                            className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                          >
-                            <Plus className="w-3 h-3" />הוסף ערך
-                          </button>
+                          {(() => {
+                            const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+                            const availableItems = sc?.quantitative_items || [];
+                            const selected = col.quantitative_options || [];
+                            if (availableItems.length > 0) {
+                              return (
+                                <div>
+                                  <div className="text-xs text-gray-500 mb-1">ערכים לספור:</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {availableItems.map(item => {
+                                      const isSelected = selected.includes(item);
+                                      return (
+                                        <button
+                                          key={item}
+                                          type="button"
+                                          onClick={() => {
+                                            const next = isSelected
+                                              ? selected.filter(s => s !== item)
+                                              : [...selected, item];
+                                            updateColumn(idx, "quantitative_options", next);
+                                          }}
+                                          className={`px-1.5 py-0.5 rounded text-xs border transition-colors ${
+                                            isSelected
+                                              ? "bg-blue-600 border-blue-600 text-white font-semibold"
+                                              : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
+                                          }`}
+                                        >
+                                          {item}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return (
+                              <>
+                                <div className="text-xs text-gray-500 pt-1">ערכים לספור:</div>
+                                {selected.map((opt, oi) => (
+                                  <div key={oi} className="flex gap-1 items-center">
+                                    <Input value={opt} onChange={e => { const opts = [...selected]; opts[oi] = e.target.value; updateColumn(idx, "quantitative_options", opts); }} placeholder="ערך לספור..." dir="rtl" className="h-6 text-xs flex-1" />
+                                    <button type="button" onClick={() => updateColumn(idx, "quantitative_options", selected.filter((_, i) => i !== oi))} className="text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
+                                  </div>
+                                ))}
+                                <button type="button" onClick={() => updateColumn(idx, "quantitative_options", [...selected, ""])} className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                                  <Plus className="w-3 h-3" />הוסף ערך
+                                </button>
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
 
