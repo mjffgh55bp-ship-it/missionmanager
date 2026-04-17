@@ -490,7 +490,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       })()}
                       {col.type === "count_quantitative" && (
                         <div className="space-y-1">
-                          <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
+                          <Select
+                            value={col.schedule_col_name || ""}
+                            onValueChange={v => {
+                              const sc = scheduleColumns.find(c => c.name === v);
+                              const autoOpts = [
+                                ...(sc?.options || []),
+                                ...(sc?.sub_options?.map(so => so.name) || [])
+                              ];
+                              const next = [...editColumns];
+                              next[idx] = { ...next[idx], schedule_col_name: v, ...(autoOpts.length > 0 ? { quantitative_options: autoOpts } : {}) };
+                              setEditColumns(next);
+                            }}
+                          >
                             <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח לספירה..." /></SelectTrigger>
                             <SelectContent dir="rtl">
                               {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}

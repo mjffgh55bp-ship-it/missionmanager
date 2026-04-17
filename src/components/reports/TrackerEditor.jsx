@@ -142,7 +142,30 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                     })()}
                     {col.type === "count_quantitative" && (
                       <div className="col-span-2 space-y-2">
-                        <Label className="text-xs" dir="rtl">אפשרויות (פריטים)</Label>
+                        <div>
+                          <Label className="text-xs" dir="rtl">עמודת לוח לספירה</Label>
+                          <Select
+                            value={col.schedule_col_name || ""}
+                            onValueChange={v => {
+                              const sc = scheduleColumns.find(c => c.name === v);
+                              const autoOpts = [
+                                ...(sc?.options || []),
+                                ...(sc?.sub_options?.map(so => so.name) || [])
+                              ];
+                              const updated = { ...columns[idx], schedule_col_name: v };
+                              if (autoOpts.length > 0) updated.quantitative_options = autoOpts;
+                              const next = [...columns];
+                              next[idx] = updated;
+                              setColumns(next);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Label className="text-xs" dir="rtl">ערכים לספור</Label>
                         {quantitativePresets.length > 0 && (
                           <div className="flex gap-2 items-center">
                             <span className="text-xs text-gray-500">טען מרשימה:</span>
@@ -167,7 +190,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                                   opts[oi] = e.target.value;
                                   updateColumn(idx, "quantitative_options", opts);
                                 }}
-                                placeholder="שם פריט..."
+                                placeholder="ערך לספור (לדוגמה: A)..."
                                 dir="rtl"
                                 className="h-7 text-sm flex-1"
                               />
@@ -190,7 +213,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                             onClick={() => updateColumn(idx, "quantitative_options", [...(col.quantitative_options || []), ""])}
                             dir="rtl"
                           >
-                            <Plus className="w-3 h-3 ml-1" />הוסף פריט
+                            <Plus className="w-3 h-3 ml-1" />הוסף ערך
                           </Button>
                         </div>
                       </div>
