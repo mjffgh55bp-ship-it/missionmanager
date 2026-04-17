@@ -148,10 +148,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                             value={col.schedule_col_name || ""}
                             onValueChange={v => {
                               const sc = scheduleColumns.find(c => c.name === v);
-                              const autoOpts = [
-                                ...(sc?.options || []),
-                                ...(sc?.sub_options?.map(so => so.name) || [])
-                              ];
+                              const autoOpts = sc?.quantitative_items || [];
                               const updated = { ...columns[idx], schedule_col_name: v };
                               if (autoOpts.length > 0) updated.quantitative_options = autoOpts;
                               const next = [...columns];
@@ -161,7 +158,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                           >
                             <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
                             <SelectContent dir="rtl">
-                              {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>)}
+                              {scheduleColumns.filter(sc => sc.report_type === "count_quantitative").map(sc => <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         </div>

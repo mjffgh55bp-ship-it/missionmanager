@@ -273,8 +273,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       const countFromVals = (vals) => {
         const fieldVal = vals?.[col.schedule_col_name];
         const subTypes = vals?.[`${col.schedule_col_name}_subTypes`] || [];
-        const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
-        allVals.forEach(v => { if (counts[v] !== undefined) counts[v]++; });
+        const allVals = [fieldVal, ...subTypes].filter(Boolean).map(v => String(v).trim());
+        allVals.forEach(v => {
+          const matchKey = Object.keys(counts).find(k => k.trim() === v);
+          if (matchKey !== undefined) counts[matchKey]++;
+        });
       };
 
       filtered.forEach(a => countFromVals(a.column_values));
@@ -494,10 +497,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                             value={col.schedule_col_name || ""}
                             onValueChange={v => {
                               const sc = scheduleColumns.find(c => c.name === v);
-                              const autoOpts = [
-                                ...(sc?.options || []),
-                                ...(sc?.sub_options?.map(so => so.name) || [])
-                              ];
+                              const autoOpts = sc?.quantitative_items || [];
                               const next = [...editColumns];
                               next[idx] = { ...next[idx], schedule_col_name: v, ...(autoOpts.length > 0 ? { quantitative_options: autoOpts } : {}) };
                               setEditColumns(next);
@@ -505,7 +505,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           >
                             <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח לספירה..." /></SelectTrigger>
                             <SelectContent dir="rtl">
-                              {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
+                              {scheduleColumns.filter(sc => sc.report_type === "count_quantitative").map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <div className="text-xs text-gray-500 pt-1">ערכים לספור:</div>
