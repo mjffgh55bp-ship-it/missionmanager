@@ -87,6 +87,12 @@ const getDateRange = (mode, startDate, endDate) => {
   if (mode === "week") return { start: format(startOfWeek(today, { weekStartsOn: 0 }), "yyyy-MM-dd"), end: format(endOfWeek(today, { weekStartsOn: 0 }), "yyyy-MM-dd") };
   if (mode === "month") return { start: format(startOfMonth(today), "yyyy-MM-dd"), end: format(endOfMonth(today), "yyyy-MM-dd") };
   if (mode === "half_year") { const s = new Date(today); s.setMonth(s.getMonth() - 6); return { start: format(s, "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }; }
+  if (mode === "half_year_start") {
+    const m = today.getMonth(); // 0-indexed
+    const halfStart = m < 6 ? new Date(today.getFullYear(), 0, 1) : new Date(today.getFullYear(), 6, 1);
+    return { start: format(halfStart, "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") };
+  }
+  if (mode === "year_start") { return { start: format(new Date(today.getFullYear(), 0, 1), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }; }
   if (mode === "custom" && startDate && endDate) return { start: startDate, end: endDate };
   return null;
 };
@@ -97,6 +103,8 @@ const DATE_MODES = [
   { value: "week", label: "השבוע" },
   { value: "month", label: "החודש" },
   { value: "half_year", label: "חצי שנה" },
+  { value: "half_year_start", label: "מתחילת חציון" },
+  { value: "year_start", label: "מתחילת שנה" },
   { value: "custom", label: "מותאם" },
 ];
 
