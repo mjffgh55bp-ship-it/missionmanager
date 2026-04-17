@@ -264,10 +264,34 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       return count;
     }
 
+    if (col.type === "count_quantitative") {
+      if (!col.schedule_col_name) return {};
+      const opts = col.quantitative_options || [];
+      const counts = {};
+      opts.forEach(o => { counts[o] = 0; });
+
+      const countFromVals = (vals) => {
+        const fieldVal = vals?.[col.schedule_col_name];
+        const subTypes = vals?.[`${col.schedule_col_name}_subTypes`] || [];
+        const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
+        allVals.forEach(v => { if (counts[v] !== undefined) counts[v]++; });
+      };
+
+      filtered.forEach(a => countFromVals(a.column_values));
+      templateRows.forEach(row => {
+        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+        const tmpl = allTemplates.find(t => t.id === row.template_id);
+        if (!tmpl) return;
+        if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
+        countFromVals(row.values);
+      });
+      return counts;
+    }
+
     return null;
   };
 
-  const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text"].includes(type);
+  const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_quantitative"].includes(type);
 
   const filteredWorkers = workers.filter(w => {
     if (!w.active) return false;
@@ -466,7 +490,13 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       })()}
                       {col.type === "count_quantitative" && (
                         <div className="space-y-1">
-                          <div className="text-xs text-gray-500 mb-1">אפשרויות:</div>
+                          <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
+                            <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח לספירה..." /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <div className="text-xs text-gray-500 pt-1">ערכים לספור:</div>
                           {(col.quantitative_options || []).map((opt, oi) => (
                             <div key={oi} className="flex gap-1 items-center">
                               <Input
@@ -476,7 +506,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                                   opts[oi] = e.target.value;
                                   updateColumn(idx, "quantitative_options", opts);
                                 }}
-                                placeholder="שם פריט..."
+                                placeholder="ערך לספור (לדוגמה: A)..."
                                 dir="rtl"
                                 className="h-6 text-xs flex-1"
                               />
@@ -493,7 +523,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                             onClick={() => updateColumn(idx, "quantitative_options", [...(col.quantitative_options || []), ""])}
                             className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
                           >
-                            <Plus className="w-3 h-3" />הוסף
+                            <Plus className="w-3 h-3" />הוסף ערך
                           </button>
                         </div>
                       )}
@@ -535,28 +565,25 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               <TableRow key={worker.id} className="hover:bg-gray-50">
                 <TableCell className="font-medium whitespace-nowrap px-4">{worker.nickname}</TableCell>
                 {displayColumns.map(col => {
-                  const auto = isAuto(col.type);
-                  const entryValue = getEntry(worker.id, col.id)?.value || "";
-                  const value = auto ? computeAutoValue(col, worker.id) : entryValue;
+                   const auto = isAuto(col.type);
+                   const entryValue = getEntry(worker.id, col.id)?.value || "";
+                   const value = auto ? computeAutoValue(col, worker.id) : entryValue;
                   const isEditing = editingCell?.workerId === worker.id && editingCell?.colId === col.id;
 
                   if (col.type === "count_quantitative") {
                     const opts = col.quantitative_options || [];
-                    const vals = parseQuantitativeValue(entryValue);
+                    const counts = typeof value === "object" && value !== null ? value : {};
                     return (
-                      <TableCell key={col.id} className="px-2 min-w-[140px]">
+                      <TableCell key={col.id} className="px-2 min-w-[120px]">
                         <div className="space-y-0.5">
                           {opts.map(opt => (
                             <div key={opt} className="flex items-center justify-between gap-1 text-xs">
                               <span className="text-gray-600 truncate">{opt}</span>
-                              <div className="flex items-center gap-1">
-                                <button onClick={() => saveQuantitativeItem(worker.id, col.id, opt, -1)} className="w-5 h-5 rounded border border-gray-300 flex items-center justify-center hover:bg-red-50 text-gray-500 hover:text-red-500 text-xs font-bold">-</button>
-                                <span className="w-6 text-center font-semibold text-blue-900">{vals[opt] || 0}</span>
-                                <button onClick={() => saveQuantitativeItem(worker.id, col.id, opt, 1)} className="w-5 h-5 rounded border border-gray-300 flex items-center justify-center hover:bg-green-50 text-gray-500 hover:text-green-600 text-xs font-bold">+</button>
-                              </div>
+                              <span className={`font-semibold ${(counts[opt] || 0) > 0 ? "text-blue-900" : "text-gray-300"}`}>{counts[opt] || 0}</span>
                             </div>
                           ))}
                           {opts.length === 0 && <span className="text-gray-300 text-xs">אין פריטים</span>}
+                          {!col.schedule_col_name && opts.length > 0 && <span className="text-orange-400 text-xs">יש לבחור עמודת לוח</span>}
                         </div>
                       </TableCell>
                     );
@@ -598,21 +625,20 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 {displayColumns.map(col => {
                   if (col.type === "count_quantitative") {
                     const opts = col.quantitative_options || [];
-                    // Sum each option across all filtered workers
                     const totals = {};
                     opts.forEach(opt => {
                       totals[opt] = filteredWorkers.reduce((sum, w) => {
-                        const vals = parseQuantitativeValue(getEntry(w.id, col.id)?.value);
-                        return sum + (vals[opt] || 0);
+                        const counts = computeAutoValue(col, w.id);
+                        return sum + ((typeof counts === "object" && counts !== null) ? (counts[opt] || 0) : 0);
                       }, 0);
                     });
                     return (
-                      <TableCell key={col.id} className="px-2 min-w-[140px]">
+                      <TableCell key={col.id} className="px-2 min-w-[120px]">
                         <div className="space-y-0.5">
                           {opts.map(opt => (
                             <div key={opt} className="flex items-center justify-between gap-1 text-xs">
                               <span className="text-blue-800 truncate font-medium">{opt}</span>
-                              <span className="w-8 text-center font-bold text-blue-900">{totals[opt]}</span>
+                              <span className="font-bold text-blue-900">{totals[opt]}</span>
                             </div>
                           ))}
                         </div>
