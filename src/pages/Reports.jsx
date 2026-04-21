@@ -23,6 +23,7 @@ export default function Reports() {
   const [trackerEntries, setTrackerEntries] = useState([]);
   const [chartBuilderOpen, setChartBuilderOpen] = useState(false);
   const [editingChart, setEditingChart] = useState(null);
+  const [selectedTrackerForCharts, setSelectedTrackerForCharts] = useState(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -162,33 +163,49 @@ export default function Reports() {
         )}
 
         {activeTab === "charts" && (
-          charts.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-xl shadow-sm border">
-              <p className="text-4xl mb-4">📈</p>
-              <p className="text-xl font-semibold text-gray-700 mb-2">אין גרפים עדיין</p>
-              <p className="text-gray-400 mb-6">לחץ על "בנה גרף חדש" כדי להתחיל</p>
-              <Button onClick={() => { setEditingChart(null); setChartBuilderOpen(true); }} className="bg-blue-900 hover:bg-blue-800">
-                <Plus className="w-4 h-4 ml-1" />בנה גרף חדש
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {charts.map(chart => (
-                <ChartDisplay
-                  key={chart.id}
-                  chart={chart}
-                  workers={workers}
-                  assignments={assignments}
-                  templateRows={templateRows}
-                  allTemplates={allTemplates}
-                  trackers={trackers}
-                  trackerEntries={trackerEntries}
-                  onEdit={() => { setEditingChart(chart); setChartBuilderOpen(true); }}
-                  onDelete={() => handleDeleteChart(chart.id)}
-                />
-              ))}
-            </div>
-          )
+          <>
+            {trackers.length > 0 && (
+              <div className="mb-6 bg-white rounded-xl shadow-sm border p-4">
+                <label className="block text-sm font-medium text-gray-700 mb-3">בחר טבלת מעקב להצגת גרפים</label>
+                <select
+                  value={selectedTrackerForCharts || ""}
+                  onChange={e => setSelectedTrackerForCharts(e.target.value || null)}
+                  className="w-full md:w-80 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  dir="rtl"
+                >
+                  <option value="">הצג את כל הגרפים</option>
+                  {trackers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
+            {charts.length === 0 ? (
+              <div className="text-center py-20 bg-white rounded-xl shadow-sm border">
+                <p className="text-4xl mb-4">📈</p>
+                <p className="text-xl font-semibold text-gray-700 mb-2">אין גרפים עדיין</p>
+                <p className="text-gray-400 mb-6">לחץ על "בנה גרף חדש" כדי להתחיל</p>
+                <Button onClick={() => { setEditingChart(null); setChartBuilderOpen(true); }} className="bg-blue-900 hover:bg-blue-800">
+                  <Plus className="w-4 h-4 ml-1" />בנה גרף חדש
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {charts.filter(chart => !selectedTrackerForCharts || chart.tracker_id === selectedTrackerForCharts).map(chart => (
+                  <ChartDisplay
+                    key={chart.id}
+                    chart={chart}
+                    workers={workers}
+                    assignments={assignments}
+                    templateRows={templateRows}
+                    allTemplates={allTemplates}
+                    trackers={trackers}
+                    trackerEntries={trackerEntries}
+                    onEdit={() => { setEditingChart(chart); setChartBuilderOpen(true); }}
+                    onDelete={() => handleDeleteChart(chart.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
