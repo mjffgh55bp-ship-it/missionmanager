@@ -397,12 +397,34 @@ export default function Settings() {
                            </div>
                            <div className="space-y-1">
                              {(col.sub_options || []).map((so, si) => (
-                               <div key={si} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 text-xs">
-                                 <span className="font-medium">{so.name}</span>
-                                 <div className="flex items-center gap-2">
-                                   <Badge variant="outline" className="text-xs">{so.criterion}</Badge>
-                                   <button onClick={() => handleRemoveSubOption(idx, si)} className="text-red-400 hover:text-red-600"><X className="w-3 h-3" /></button>
-                                 </div>
+                               <div key={si} className="flex items-center gap-2 bg-gray-50 rounded px-2 py-1 text-xs">
+                                 <button onClick={() => handleRemoveSubOption(idx, si)} className="text-red-400 hover:text-red-600 flex-shrink-0"><X className="w-3 h-3" /></button>
+                                 <Input
+                                   value={so.name}
+                                   onChange={async e => {
+                                     const updated = scheduleColumns.map((c, i) => i === idx ? {
+                                       ...c,
+                                       sub_options: (c.sub_options || []).map((s, j) => j === si ? { ...s, name: e.target.value } : s)
+                                     } : c);
+                                     await saveScheduleColumns(updated);
+                                   }}
+                                   className="h-6 text-xs flex-1 min-w-0"
+                                   dir="rtl"
+                                   placeholder="שם"
+                                 />
+                                 <Input
+                                   value={so.criterion}
+                                   onChange={async e => {
+                                     const updated = scheduleColumns.map((c, i) => i === idx ? {
+                                       ...c,
+                                       sub_options: (c.sub_options || []).map((s, j) => j === si ? { ...s, criterion: e.target.value } : s)
+                                     } : c);
+                                     await saveScheduleColumns(updated);
+                                   }}
+                                   className="h-6 text-xs flex-1 min-w-0 text-gray-500"
+                                   dir="rtl"
+                                   placeholder="קריטריון"
+                                 />
                                </div>
                              ))}
                              {(col.sub_options || []).length === 0 && <p className="text-xs text-gray-400">לא הוגדרו אפשרויות</p>}
