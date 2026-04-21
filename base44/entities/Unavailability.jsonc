@@ -1,0 +1,43 @@
+{
+  "name": "Unavailability",
+  "type": "object",
+  "properties": {
+    "worker_id": {
+      "type": "string",
+      "description": "ID of the worker"
+    },
+    "worker_name": {
+      "type": "string",
+      "description": "Name of the worker for quick reference"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of unavailability"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Start time of unavailability"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "End time of unavailability"
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "overseas",
+        "occupied"
+      ],
+      "description": "Reason for unavailability"
+    }
+  },
+  "required": [
+    "worker_id",
+    "worker_name",
+    "date",
+    "start_time",
+    "end_time",
+    "reason"
+  ]
+}

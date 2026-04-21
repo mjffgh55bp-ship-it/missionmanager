@@ -1,0 +1,47 @@
+{
+  "name": "FoodCart",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the food cart"
+    },
+    "location": {
+      "type": "string",
+      "description": "Location where the cart operates"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the cart is currently operational"
+    },
+    "description": {
+      "type": "string",
+      "description": "Additional details about the cart"
+    },
+    "serial_number": {
+      "type": "string",
+      "description": "Serial number of the cart (e.g., 123)"
+    },
+    "weight_category": {
+      "type": "string",
+      "enum": [
+        "heavy",
+        "light"
+      ],
+      "description": "Weight category of the cart"
+    },
+    "cargo_type": {
+      "type": "string",
+      "enum": [
+        "golden",
+        "silver"
+      ],
+      "description": "Type of cargo container"
+    }
+  },
+  "required": [
+    "name",
+    "location"
+  ]
+}

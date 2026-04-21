@@ -1,0 +1,23 @@
+{
+  "name": "YearlyRow",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the row"
+    },
+    "order": {
+      "type": "number",
+      "default": 0,
+      "description": "Display order"
+    },
+    "color": {
+      "type": "string",
+      "default": "#3b82f6",
+      "description": "Row color"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

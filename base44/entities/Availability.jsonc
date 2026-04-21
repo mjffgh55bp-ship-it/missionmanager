@@ -1,0 +1,76 @@
+{
+  "name": "Availability",
+  "type": "object",
+  "properties": {
+    "worker_id": {
+      "type": "string",
+      "description": "ID of the worker"
+    },
+    "worker_name": {
+      "type": "string",
+      "description": "Name of the worker for quick reference"
+    },
+    "week_start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Start date of the week (Monday)"
+    },
+    "shifts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "start_time": {
+            "type": "string"
+          },
+          "end_time": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "number",
+            "description": "Priority order (1 = highest priority)"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "wanted",
+              "available",
+              "unavailable"
+            ],
+            "description": "Type of availability"
+          }
+        }
+      },
+      "description": "Array of available shift blocks with priorities and types"
+    },
+    "extra_tasks": {
+      "type": "object",
+      "description": "Worker preferences for additional registration tasks. Keys are task names, values are 'wanted'|'available'|'unavailable'"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "submitted",
+        "approved",
+        "pending_change"
+      ],
+      "default": "draft",
+      "description": "Status of the availability submission"
+    },
+    "change_request": {
+      "type": "string",
+      "description": "Reason for requesting a change to approved availability"
+    }
+  },
+  "required": [
+    "worker_id",
+    "worker_name",
+    "week_start_date",
+    "shifts"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "WorkerQualification",
+  "type": "object",
+  "properties": {
+    "worker_id": {
+      "type": "string",
+      "description": "ID of the worker"
+    },
+    "worker_name": {
+      "type": "string",
+      "description": "Name of the worker"
+    },
+    "qualification_id": {
+      "type": "string",
+      "description": "ID of the qualification"
+    },
+    "qualification_name": {
+      "type": "string",
+      "description": "Name of the qualification"
+    },
+    "granted_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when qualification was granted"
+    }
+  },
+  "required": [
+    "worker_id",
+    "worker_name",
+    "qualification_id",
+    "qualification_name"
+  ]
+}

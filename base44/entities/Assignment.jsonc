@@ -1,0 +1,103 @@
+{
+  "name": "Assignment",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of the shift"
+    },
+    "chef_id": {
+      "type": "string",
+      "description": "ID of the assigned chef"
+    },
+    "chef_name": {
+      "type": "string",
+      "description": "Name of the chef for quick reference"
+    },
+    "chef_seniority": {
+      "type": "string",
+      "description": "Seniority of the chef"
+    },
+    "sous_chef_id": {
+      "type": "string",
+      "description": "ID of the assigned sous-chef"
+    },
+    "sous_chef_name": {
+      "type": "string",
+      "description": "Name of the sous-chef for quick reference"
+    },
+    "sous_chef_seniority": {
+      "type": "string",
+      "description": "Seniority of the sous-chef"
+    },
+    "additional_chef_id": {
+      "type": "string",
+      "description": "ID of optional third chef"
+    },
+    "additional_chef_name": {
+      "type": "string",
+      "description": "Name of the optional third chef"
+    },
+    "additional_chef_role": {
+      "type": "string",
+      "description": "Role of the optional third chef"
+    },
+    "food_cart_id": {
+      "type": "string",
+      "description": "ID of the food cart"
+    },
+    "food_cart_name": {
+      "type": "string",
+      "description": "Name of the food cart for quick reference"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Shift start time"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "Shift end time"
+    },
+    "hours": {
+      "type": "number",
+      "description": "Total hours worked in this shift"
+    },
+    "menu": {
+      "type": "string",
+      "description": "Menu being prepared"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes about the shift"
+    },
+    "has_trainee": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if a trainee is working this shift"
+    },
+    "qualification_id": {
+      "type": "string",
+      "description": "Qualification used in this shift (optional)"
+    },
+    "custom_params": {
+      "type": "object",
+      "description": "Custom parameters for reporting"
+    },
+    "status": {
+      "type": "string",
+      "description": "Status of the shift"
+    },
+    "column_values": {
+      "type": "object",
+      "description": "Values for dynamic columns"
+    }
+  },
+  "required": [
+    "date",
+    "food_cart_id",
+    "start_time",
+    "end_time",
+    "hours"
+  ]
+}

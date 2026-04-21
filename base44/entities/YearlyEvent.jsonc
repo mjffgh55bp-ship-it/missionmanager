@@ -1,0 +1,56 @@
+{
+  "name": "YearlyEvent",
+  "type": "object",
+  "properties": {
+    "row_id": {
+      "type": "string",
+      "description": "ID of the row this event belongs to"
+    },
+    "start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Start date of the event"
+    },
+    "end_date": {
+      "type": "string",
+      "format": "date",
+      "description": "End date of the event"
+    },
+    "title": {
+      "type": "string",
+      "description": "Event title"
+    },
+    "color": {
+      "type": "string",
+      "description": "Event color (optional, uses row color if not set)"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Start time (HH:MM)"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "End time (HH:MM)"
+    },
+    "worker_id": {
+      "type": "string",
+      "description": "Primary worker ID (for backward compatibility)"
+    },
+    "worker_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of worker IDs assigned to this event"
+    },
+    "worker_name": {
+      "type": "string",
+      "description": "Worker names (comma separated)"
+    }
+  },
+  "required": [
+    "row_id",
+    "start_date",
+    "end_date"
+  ]
+}

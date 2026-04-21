@@ -1,0 +1,36 @@
+{
+  "name": "CompanyEvent",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Title of the event"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of the event"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the event"
+    },
+    "all_day": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the event is all day"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Start time if not all day"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "End time if not all day"
+    }
+  },
+  "required": [
+    "title",
+    "date"
+  ]
+}

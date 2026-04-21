@@ -1,0 +1,27 @@
+{
+  "name": "Qualification",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the qualification"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the qualification"
+    },
+    "newbie_threshold_hours": {
+      "type": "number",
+      "default": 50,
+      "description": "Hours required before a worker is no longer a newbie in this qualification"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this qualification is active"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}
