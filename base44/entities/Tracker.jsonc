@@ -28,16 +28,29 @@
             "enum": [
               "shifts_count",
               "schedule_col",
-              "combined_data"
+              "combined_data",
+              "count_by_text",
+              "count_quantitative"
             ]
           },
           "schedule_col_name": {
             "type": "string",
-            "description": "For schedule_col: which schedule column name to use"
+            "description": "For schedule_col/count_quantitative: which schedule column name to use"
           },
           "schedule_col_value": {
             "type": "string",
             "description": "For schedule_col: optional value filter"
+          },
+          "quantitative_options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "For count_quantitative: list of items to count"
+          },
+          "quantitative_single_item": {
+            "type": "string",
+            "description": "For count_quantitative: if set, show only this single item's count"
           },
           "combined_filters": {
             "type": "object",
