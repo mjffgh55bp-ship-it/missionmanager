@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, BarChart2, Table2, GripVertical } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import TrackerTable from "../components/reports/TrackerTable";
+import TrackerEditor from "../components/reports/TrackerEditor";
 import ChartBuilder from "../components/reports/ChartBuilder";
 import ChartDisplay from "../components/reports/ChartDisplay";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -26,6 +27,8 @@ export default function Reports() {
   const [editingChart, setEditingChart] = useState(null);
   const [selectedTrackerForCharts, setSelectedTrackerForCharts] = useState(null);
   const [qualifications, setQualifications] = useState([]);
+  const [trackerEditorOpen, setTrackerEditorOpen] = useState(false);
+  const [editingTracker, setEditingTracker] = useState(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -70,9 +73,19 @@ export default function Reports() {
     setLoading(false);
   };
 
-  const createNewTracker = async () => {
-    const created = await base44.entities.Tracker.create({ name: "מעקב חדש", columns: [], order: Date.now() });
-    setTrackers(prev => [...prev, created]);
+  const createNewTracker = () => {
+    setEditingTracker(null);
+    setTrackerEditorOpen(true);
+  };
+
+  const handleTrackerSaved = (saved) => {
+    if (editingTracker) {
+      setTrackers(prev => prev.map(t => t.id === saved.id ? saved : t));
+    } else {
+      setTrackers(prev => [...prev, saved]);
+    }
+    setTrackerEditorOpen(false);
+    setEditingTracker(null);
   };
 
   const handleTrackerUpdated = (updated) => {
@@ -247,6 +260,16 @@ export default function Reports() {
           </>
         )}
       </div>
+
+      <TrackerEditor
+        open={trackerEditorOpen}
+        onOpenChange={setTrackerEditorOpen}
+        tracker={editingTracker}
+        onSaved={handleTrackerSaved}
+        allTemplates={allTemplates}
+        scheduleColumns={scheduleColumns}
+        qualifications={qualifications}
+      />
 
       <ChartBuilder
         open={chartBuilderOpen}

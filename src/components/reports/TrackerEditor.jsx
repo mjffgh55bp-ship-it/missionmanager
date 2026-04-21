@@ -15,17 +15,11 @@ const COLUMN_TYPES = [
   { value: "count_quantitative", label: "ספירה כמותית" },
 ];
 
-export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, allTemplates, scheduleColumns = [] }) {
+export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, allTemplates, scheduleColumns = [], qualifications = [] }) {
   const [name, setName] = useState("");
   const [columns, setColumns] = useState([]);
   const [saving, setSaving] = useState(false);
   const [quantitativePresets, setQuantitativePresets] = useState([]);
-
-  useEffect(() => {
-    base44.entities.AppSettings.filter({ setting_key: "quantitative_presets" }).then(res => {
-      if (res.length > 0) setQuantitativePresets(JSON.parse(res[0].setting_value) || []);
-    });
-  }, []);
 
   useEffect(() => {
     if (tracker) {
@@ -146,25 +140,26 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                       <div>
                         <Label className="text-xs" dir="rtl">בחר משימות</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {allTemplates.flatMap(t => (t.columns || []).filter(c => c.type === "select" && c.name === "משימה").flatMap(c => c.options || [])).filter((v, i, a) => a.indexOf(v) === i).map(task => (
+                          {qualifications.map(qual => (
                             <button
-                              key={task}
+                              key={qual.id}
                               type="button"
                               onClick={() => {
                                 const tasks = col.task_list || [];
-                                const updated = tasks.includes(task) ? tasks.filter(t => t !== task) : [...tasks, task];
+                                const updated = tasks.includes(qual.id) ? tasks.filter(t => t !== qual.id) : [...tasks, qual.id];
                                 updateColumn(idx, "task_list", updated);
                               }}
                               className={`px-2 py-1 rounded text-xs border transition-colors ${
-                                (col.task_list || []).includes(task)
+                                (col.task_list || []).includes(qual.id)
                                   ? "bg-blue-600 border-blue-600 text-white font-semibold"
                                   : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
                               }`}
                             >
-                              {task}
+                              {qual.name}
                             </button>
                           ))}
                         </div>
+                        {qualifications.length === 0 && <p className="text-xs text-gray-400 mt-1" dir="rtl">אין משימות זמינות</p>}
                       </div>
                     </div>
                     )}
