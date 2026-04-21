@@ -74,7 +74,6 @@ export default function Reports() {
   };
 
   const handleDeleteTracker = async (trackerId) => {
-    if (!window.confirm("האם למחוק את טבלת המעקב?")) return;
     await base44.entities.Tracker.delete(trackerId);
     setTrackers(prev => prev.filter(t => t.id !== trackerId));
   };

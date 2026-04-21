@@ -113,6 +113,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
   const [cellDraft, setCellDraft] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Filters
   const [dateFilterMode, setDateFilterMode] = useState("all");
@@ -270,24 +271,30 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       const counts = {};
       opts.forEach(o => { counts[o] = 0; });
 
-      const countFromVals = (vals) => {
-        const fieldVal = vals?.[col.schedule_col_name];
-        const subTypes = vals?.[`${col.schedule_col_name}_subTypes`] || [];
-        const allVals = [fieldVal, ...subTypes].filter(Boolean).map(v => String(v).trim());
-        allVals.forEach(v => {
-          const matchKey = Object.keys(counts).find(k => k.trim() === v);
-          if (matchKey !== undefined) counts[matchKey]++;
-        });
+      // Parse JSON quantitative value (stored as '{"A":1,"B":2}')
+      const parseQuantJson = (raw) => {
+        if (!raw) return {};
+        try { return JSON.parse(raw); } catch { return {}; }
       };
 
-      filtered.forEach(a => countFromVals(a.column_values));
+      // For assignments: stored in column_values[colName].value as JSON string
+      filtered.forEach(a => {
+        const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
+        const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
+        opts.forEach(o => { counts[o] += parsed[o] || 0; });
+      });
+
+      // For templateRows: stored in values[colName] as JSON string
       templateRows.forEach(row => {
         if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
-        countFromVals(row.values);
+        const raw = row.values?.[col.schedule_col_name];
+        const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
+        opts.forEach(o => { counts[o] += parsed[o] || 0; });
       });
+
       return counts;
     }
 
@@ -369,9 +376,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 <Button size="sm" variant="outline" onClick={() => { setEditName(tracker.name); setEditColumns(tracker.columns || []); setEditMode(true); }}>
                   <Pencil className="w-4 h-4 ml-1" />ערוך
                 </Button>
-                <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={onDelete}>
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                {confirmDelete ? (
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-red-600">למחוק?</span>
+                    <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => { setConfirmDelete(false); onDelete(); }}>כן</Button>
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setConfirmDelete(false)}>לא</Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => setConfirmDelete(true)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
               </>
             )}
           </div>
