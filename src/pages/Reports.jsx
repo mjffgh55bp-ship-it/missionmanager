@@ -26,7 +26,7 @@ export default function Reports() {
   const [chartBuilderOpen, setChartBuilderOpen] = useState(false);
   const [editingChart, setEditingChart] = useState(null);
   const [selectedTrackerForCharts, setSelectedTrackerForCharts] = useState(null);
-  const [qualifications, setQualifications] = useState([]);
+  const [taskQualifications, setTaskQualifications] = useState({});
   const [trackerEditorOpen, setTrackerEditorOpen] = useState(false);
   const [editingTracker, setEditingTracker] = useState(null);
 
@@ -35,7 +35,7 @@ export default function Reports() {
   const loadData = async () => {
     const [
       workersData, assignmentsData, templateRowsData, templatesData, trackersData,
-      populationsSettings, workerRolesSettings, globalColSettings, cartColSettings, tasksSettings
+      populationsSettings, workerRolesSettings, globalColSettings, cartColSettings, taskQualSettings
     ] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
@@ -46,7 +46,7 @@ export default function Reports() {
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
-      base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
+      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -54,13 +54,9 @@ export default function Reports() {
     setAllTemplates(templatesData);
     setTrackers(trackersData);
     
-    // Load tasks from AppSettings - המשימות מהגדרות (מיוחדים, חוזי, סיוע, וכו')
-    const tasksList = tasksSettings.length > 0 ? JSON.parse(tasksSettings[0].setting_value) || [] : [];
-    const qualificationsFromTasks = tasksList.map(taskName => ({
-      id: taskName,
-      name: taskName
-    }));
-    setQualifications(qualificationsFromTasks);
+    // Load task qualifications from AppSettings
+    const taskQuals = taskQualSettings.length > 0 ? JSON.parse(taskQualSettings[0].setting_value) || {} : {};
+    setTaskQualifications(taskQuals);
     if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
     // Load charts and all tracker entries
@@ -205,7 +201,6 @@ export default function Reports() {
                               populations={populations}
                               workerRoles={workerRoles}
                               scheduleColumns={scheduleColumns}
-                              qualifications={qualifications}
                               onDelete={() => handleDeleteTracker(tracker.id)}
                               onUpdated={handleTrackerUpdated}
                             />
@@ -275,7 +270,7 @@ export default function Reports() {
         onSaved={handleTrackerSaved}
         allTemplates={allTemplates}
         scheduleColumns={scheduleColumns}
-        qualifications={qualifications}
+        taskQualifications={taskQualifications}
       />
 
       <ChartBuilder

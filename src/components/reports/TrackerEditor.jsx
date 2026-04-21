@@ -15,7 +15,7 @@ const COLUMN_TYPES = [
   { value: "count_quantitative", label: "ספירה כמותית" },
 ];
 
-export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, allTemplates, scheduleColumns = [], qualifications = [] }) {
+export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, allTemplates, scheduleColumns = [], taskQualifications = {} }) {
   const [name, setName] = useState("");
   const [columns, setColumns] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -140,26 +140,26 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                       <div>
                         <Label className="text-xs" dir="rtl">בחר משימות</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {qualifications.map(qual => (
+                          {Object.keys(taskQualifications).map(taskName => (
                             <button
-                              key={qual.id}
+                              key={taskName}
                               type="button"
                               onClick={() => {
                                 const tasks = col.task_list || [];
-                                const updated = tasks.includes(qual.id) ? tasks.filter(t => t !== qual.id) : [...tasks, qual.id];
+                                const updated = tasks.includes(taskName) ? tasks.filter(t => t !== taskName) : [...tasks, taskName];
                                 updateColumn(idx, "task_list", updated);
                               }}
                               className={`px-2 py-1 rounded text-xs border transition-colors ${
-                                (col.task_list || []).includes(qual.id)
+                                (col.task_list || []).includes(taskName)
                                   ? "bg-blue-600 border-blue-600 text-white font-semibold"
                                   : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
                               }`}
                             >
-                              {qual.name}
+                              {taskName}
                             </button>
                           ))}
                         </div>
-                        {qualifications.length === 0 && <p className="text-xs text-gray-400 mt-1" dir="rtl">אין משימות זמינות</p>}
+                        {Object.keys(taskQualifications).length === 0 && <p className="text-xs text-gray-400 mt-1" dir="rtl">אין משימות זמינות</p>}
                       </div>
                     </div>
                     )}
