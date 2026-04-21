@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,24 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-f
 
 function MultiSelect({ options, selected, onChange, placeholder }) {
   const [open, setOpen] = useState(false);
+  const [dropPos, setDropPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef(null);
   const toggle = (val) => onChange(selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val]);
+
+  const handleOpen = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setDropPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    }
+    setOpen(!open);
+  };
+
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={handleOpen}
         className="h-8 min-w-[140px] max-w-[200px] border border-input rounded-md px-2 text-sm text-right flex items-center justify-between gap-2 bg-white hover:bg-gray-50"
         dir="rtl"
       >
@@ -28,8 +40,12 @@ function MultiSelect({ options, selected, onChange, placeholder }) {
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-9 z-50 bg-white border border-gray-200 rounded-md shadow-lg min-w-[160px] py-1" dir="rtl">
+          <div className="fixed inset-0 z-[999]" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-[1000] bg-white border border-gray-200 rounded-md shadow-lg min-w-[160px] py-1"
+            style={{ top: dropPos.top, right: dropPos.right }}
+            dir="rtl"
+          >
             {options.map(opt => (
               <button
                 key={opt}
