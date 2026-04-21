@@ -508,8 +508,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
                 </button>
               </TableHead>
-              {displayColumns.map((col, idx) => (
-                <TableHead key={col.id} dir="rtl" className="px-2 min-w-[160px]">
+              {displayColumns.map((col, idx) => {
+                const isMultiTask = col.type === "count_by_task" && (col.task_list || []).length > 1;
+                return (
+                <TableHead key={col.id} dir="rtl" className={`px-2 ${isMultiTask ? "min-w-[180px]" : "min-w-[160px]"}`}>
                   {editMode ? (
                     <div className="flex flex-col gap-1 py-1">
                       <div className="flex items-center gap-1">
@@ -628,23 +630,33 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
                               </div>
                                ) : (
-                    <button
-                      onClick={() => handleSortClick(col.id)}
-                      className="flex flex-col gap-0.5 py-1 items-center text-center w-full hover:text-blue-700 transition-colors"
-                    >
-                      <span className="font-medium flex items-center gap-1">
-                        {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
-                        {sortColId === col.id
-                          ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
-                          : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
-                      </span>
-                      <span className="text-[10px] text-gray-400 font-normal">
-                        {COLUMN_TYPES.find(ct => ct.value === col.type)?.label || ""}
-                      </span>
-                    </button>
-                  )}
-                </TableHead>
-              ))}
+                                <button
+                                  onClick={() => handleSortClick(col.id)}
+                                  className="flex flex-col gap-0.5 py-1 items-center text-center w-full hover:text-blue-700 transition-colors"
+                                >
+                                  <span className="font-medium flex items-center gap-1">
+                                    {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
+                                    {sortColId === col.id
+                                      ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
+                                      : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
+                                  </span>
+                                  {col.type === "count_by_task" && (col.task_list || []).length > 1 && (
+                                    <div className="flex flex-wrap gap-1 justify-center mt-1">
+                                      {(col.task_list || []).map(taskName => (
+                                        <span key={taskName} className="text-[9px] bg-blue-50 border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded">
+                                          {taskName}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  <span className="text-[10px] text-gray-400 font-normal">
+                                    {COLUMN_TYPES.find(ct => ct.value === col.type)?.label || ""}
+                                  </span>
+                                </button>
+                               )}
+                  </TableHead>
+                  );
+                  })}
               {/* Add column button in header */}
               {editMode && (
                 <TableHead className="px-2">
@@ -674,17 +686,25 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     if (tasks.length === 0) {
                       return <TableCell key={col.id} className="px-2 text-gray-300 text-xs">אין משימות</TableCell>;
                     }
+                    // Single task: show just the number
+                    if (tasks.length === 1) {
+                      const taskName = tasks[0];
+                      const h = hours[taskName] || 0;
+                      return (
+                        <TableCell key={col.id} className="text-center font-semibold px-2">
+                          <span className={h > 0 ? "text-blue-900" : "text-gray-300"}>{h > 0 ? `${Math.round(h * 10) / 10}h` : "-"}</span>
+                        </TableCell>
+                      );
+                    }
+                    // Multiple tasks: show as column headers with values only
                     return (
-                      <TableCell key={col.id} className="px-2 min-w-[140px]">
-                        <div className="space-y-0.5">
-                          {tasks.map(taskName => (
-                            <div key={taskName} className="flex items-center justify-between gap-1 text-xs">
-                              <span className="text-gray-600 truncate">{taskName}</span>
-                              <span className={`font-semibold ${(hours[taskName] || 0) > 0 ? "text-blue-900" : "text-gray-300"}`}>
-                                {(hours[taskName] || 0) > 0 ? `${Math.round(hours[taskName] * 10) / 10}h` : "-"}
-                              </span>
-                            </div>
-                          ))}
+                      <TableCell key={col.id} className="px-2 min-w-[80px]">
+                        <div className="text-center">
+                          <span className={`font-semibold ${Object.values(hours).some(h => h > 0) ? "text-blue-900" : "text-gray-300"}`}>
+                            {Object.values(hours).reduce((sum, h) => sum + (h || 0), 0) > 0 
+                              ? `${Math.round(Object.values(hours).reduce((sum, h) => sum + (h || 0), 0) * 10) / 10}h` 
+                              : "-"}
+                          </span>
                         </div>
                       </TableCell>
                     );
@@ -763,16 +783,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                          return sum + ((typeof taskHours === "object" && taskHours !== null) ? (taskHours[taskName] || 0) : 0);
                        }, 0);
                      });
+                     const grandTotal = Object.values(totals).reduce((sum, h) => sum + (h || 0), 0);
                      return (
-                       <TableCell key={col.id} className="px-2 min-w-[140px]">
-                         <div className="space-y-0.5">
-                           {taskList.map(taskName => (
-                             <div key={taskName} className="flex items-center justify-between gap-1 text-xs">
-                               <span className="text-blue-800 truncate font-medium">{taskName}</span>
-                               <span className="font-bold text-blue-900">{totals[taskName] > 0 ? `${Math.round(totals[taskName] * 10) / 10}h` : "-"}</span>
-                             </div>
-                           ))}
-                         </div>
+                       <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
+                         {grandTotal > 0 ? `${Math.round(grandTotal * 10) / 10}h` : "-"}
                        </TableCell>
                      );
                    }
