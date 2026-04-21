@@ -35,7 +35,7 @@ export default function Reports() {
   const loadData = async () => {
     const [
       workersData, assignmentsData, templateRowsData, templatesData, trackersData,
-      populationsSettings, workerRolesSettings, globalColSettings, cartColSettings, qualificationsData
+      populationsSettings, workerRolesSettings, globalColSettings, cartColSettings, tasksSettings
     ] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
@@ -46,14 +46,21 @@ export default function Reports() {
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
-      base44.entities.Qualification.list(),
+      base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
     setTemplateRows(templateRowsData);
     setAllTemplates(templatesData);
     setTrackers(trackersData);
-    setQualifications(qualificationsData);
+    
+    // Load tasks and convert to qualification-like objects for display
+    const tasksList = tasksSettings.length > 0 ? JSON.parse(tasksSettings[0].setting_value) || [] : [];
+    const qualificationsFromTasks = tasksList.map((taskName, idx) => ({
+      id: taskName,
+      name: taskName
+    }));
+    setQualifications(qualificationsFromTasks);
     if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
     // Load charts and all tracker entries
