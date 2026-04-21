@@ -358,12 +358,24 @@ export default function Settings() {
                            />
                            <Button size="sm" className="h-7" onClick={() => handleAddQuantItem(idx, newQuantItem)}><Plus className="w-3 h-3" /></Button>
                          </div>
-                         <div className="flex flex-wrap gap-2">
+                         <div className="space-y-1">
                            {(col.quantitative_items || []).map((item, ii) => (
-                             <Badge key={ii} className="bg-emerald-100 text-emerald-800 pr-1">
-                               {item}
-                               <button onClick={() => handleRemoveQuantItem(idx, ii)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
-                             </Badge>
+                             <div key={ii} className="flex items-center gap-2">
+                               <button onClick={() => handleRemoveQuantItem(idx, ii)} className="text-red-400 hover:text-red-600 flex-shrink-0"><X className="w-3 h-3" /></button>
+                               <Input
+                                 value={item}
+                                 onChange={async e => {
+                                   const updated = scheduleColumns.map((c, i) => i === idx ? {
+                                     ...c,
+                                     quantitative_items: (c.quantitative_items || []).map((it, j) => j === ii ? e.target.value : it)
+                                   } : c);
+                                   await saveScheduleColumns(updated);
+                                 }}
+                                 className="h-6 text-xs flex-1"
+                                 dir="rtl"
+                                 placeholder="שם פריט"
+                               />
+                             </div>
                            ))}
                            {(col.quantitative_items || []).length === 0 && <p className="text-xs text-gray-400">לא הוגדרו פריטים</p>}
                          </div>
