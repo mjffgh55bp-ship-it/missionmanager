@@ -288,9 +288,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       if (taskList.length === 0) return 0;
       let count = 0;
       filtered.forEach(a => {
-        const taskVal = a.column_values?.["משימה"] || a.column_values?.["task"];
-        // תמיד ספור משימות מה-assignment במידה שהמשימה במערך task_list
-        if (taskVal && taskList.includes(String(taskVal))) count++;
+        // בדוק אם ה-qualification_id של ה-assignment נמצא ברשימת המשימות
+        if (a.qualification_id && taskList.includes(a.qualification_id)) count++;
       });
       return count;
     }
