@@ -269,9 +269,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     if (col.type === "count_quantitative") {
       if (!col.schedule_col_name) return {};
       const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-      const opts = (col.quantitative_options && col.quantitative_options.length > 0)
+      const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
         ? col.quantitative_options
         : (sc?.quantitative_items || []);
+      // If single item selected, only count that one
+      const opts = col.quantitative_single_item ? [col.quantitative_single_item] : allOpts;
       const counts = {};
       opts.forEach(o => { counts[o] = 0; });
 
@@ -520,7 +522,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                               const sc = scheduleColumns.find(c => c.name === v);
                               const autoOpts = sc?.quantitative_items || [];
                               const next = [...editColumns];
-                              next[idx] = { ...next[idx], schedule_col_name: v, quantitative_options: autoOpts };
+                              next[idx] = { ...next[idx], schedule_col_name: v, quantitative_options: autoOpts, quantitative_single_item: "" };
                               setEditColumns(next);
                             }}
                           >
@@ -531,52 +533,29 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           </Select>
                           {(() => {
                             const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                            const availableItems = sc?.quantitative_items || [];
-                            const selected = col.quantitative_options || [];
-                            if (availableItems.length > 0) {
-                              return (
-                                <div>
-                                  <div className="text-xs text-gray-500 mb-1">ערכים לספור:</div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {availableItems.map(item => {
-                                      const isSelected = selected.includes(item);
-                                      return (
-                                        <button
-                                          key={item}
-                                          type="button"
-                                          onClick={() => {
-                                            const next = isSelected
-                                              ? selected.filter(s => s !== item)
-                                              : [...selected, item];
-                                            updateColumn(idx, "quantitative_options", next);
-                                          }}
-                                          className={`px-1.5 py-0.5 rounded text-xs border transition-colors ${
-                                            isSelected
-                                              ? "bg-blue-600 border-blue-600 text-white font-semibold"
-                                              : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
-                                          }`}
-                                        >
-                                          {item}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              );
-                            }
+                            const availableItems = sc?.quantitative_items || col.quantitative_options || [];
+                            if (availableItems.length === 0) return null;
+                            const singleItem = col.quantitative_single_item || "";
                             return (
-                              <>
-                                <div className="text-xs text-gray-500 pt-1">ערכים לספור:</div>
-                                {selected.map((opt, oi) => (
-                                  <div key={oi} className="flex gap-1 items-center">
-                                    <Input value={opt} onChange={e => { const opts = [...selected]; opts[oi] = e.target.value; updateColumn(idx, "quantitative_options", opts); }} placeholder="ערך לספור..." dir="rtl" className="h-6 text-xs flex-1" />
-                                    <button type="button" onClick={() => updateColumn(idx, "quantitative_options", selected.filter((_, i) => i !== oi))} className="text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
-                                  </div>
-                                ))}
-                                <button type="button" onClick={() => updateColumn(idx, "quantitative_options", [...selected, ""])} className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
-                                  <Plus className="w-3 h-3" />הוסף ערך
-                                </button>
-                              </>
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1">פריט לספירה:</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {availableItems.map(item => (
+                                    <button
+                                      key={item}
+                                      type="button"
+                                      onClick={() => updateColumn(idx, "quantitative_single_item", singleItem === item ? "" : item)}
+                                      className={`px-1.5 py-0.5 rounded text-xs border transition-colors ${
+                                        singleItem === item
+                                          ? "bg-blue-600 border-blue-600 text-white font-semibold"
+                                          : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
+                                      }`}
+                                    >
+                                      {item}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
                             );
                           })()}
                         </div>
@@ -626,21 +605,30 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
                   if (col.type === "count_quantitative") {
                     const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                    const opts = (col.quantitative_options && col.quantitative_options.length > 0)
+                    const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
                       ? col.quantitative_options
                       : (sc?.quantitative_items || []);
                     const counts = typeof value === "object" && value !== null ? value : {};
+                    // Single item mode: show just one number
+                    if (col.quantitative_single_item) {
+                      const num = counts[col.quantitative_single_item] || 0;
+                      return (
+                        <TableCell key={col.id} className="text-center font-semibold px-2">
+                          <span className={num > 0 ? "text-blue-900" : "text-gray-300"}>{num > 0 ? num : "-"}</span>
+                        </TableCell>
+                      );
+                    }
+                    // Multi-item mode: show list
                     return (
                       <TableCell key={col.id} className="px-2 min-w-[120px]">
                         <div className="space-y-0.5">
-                          {opts.map(opt => (
+                          {allOpts.map(opt => (
                             <div key={opt} className="flex items-center justify-between gap-1 text-xs">
                               <span className="text-gray-600 truncate">{opt}</span>
                               <span className={`font-semibold ${(counts[opt] || 0) > 0 ? "text-blue-900" : "text-gray-300"}`}>{counts[opt] || 0}</span>
                             </div>
                           ))}
-                          {opts.length === 0 && <span className="text-gray-300 text-xs">אין פריטים</span>}
-                          {!col.schedule_col_name && opts.length > 0 && <span className="text-orange-400 text-xs">יש לבחור עמודת לוח</span>}
+                          {allOpts.length === 0 && <span className="text-gray-300 text-xs">אין פריטים</span>}
                         </div>
                       </TableCell>
                     );
@@ -682,11 +670,24 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 {displayColumns.map(col => {
                   if (col.type === "count_quantitative") {
                     const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                    const opts = (col.quantitative_options && col.quantitative_options.length > 0)
+                    const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
                       ? col.quantitative_options
                       : (sc?.quantitative_items || []);
+                    // Single item mode
+                    if (col.quantitative_single_item) {
+                      const total = filteredWorkers.reduce((sum, w) => {
+                        const counts = computeAutoValue(col, w.id);
+                        return sum + ((typeof counts === "object" && counts !== null) ? (counts[col.quantitative_single_item] || 0) : 0);
+                      }, 0);
+                      return (
+                        <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
+                          {total > 0 ? total : <span className="text-gray-300">-</span>}
+                        </TableCell>
+                      );
+                    }
+                    // Multi-item mode
                     const totals = {};
-                    opts.forEach(opt => {
+                    allOpts.forEach(opt => {
                       totals[opt] = filteredWorkers.reduce((sum, w) => {
                         const counts = computeAutoValue(col, w.id);
                         return sum + ((typeof counts === "object" && counts !== null) ? (counts[opt] || 0) : 0);
@@ -695,7 +696,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     return (
                       <TableCell key={col.id} className="px-2 min-w-[120px]">
                         <div className="space-y-0.5">
-                          {opts.map(opt => (
+                          {allOpts.map(opt => (
                             <div key={opt} className="flex items-center justify-between gap-1 text-xs">
                               <span className="text-blue-800 truncate font-medium">{opt}</span>
                               <span className="font-bold text-blue-900">{totals[opt]}</span>

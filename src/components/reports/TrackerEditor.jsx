@@ -149,9 +149,8 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                             onValueChange={v => {
                               const sc = scheduleColumns.find(c => c.name === v);
                               const autoOpts = sc?.quantitative_items || [];
-                              const updated = { ...columns[idx], schedule_col_name: v, quantitative_options: autoOpts };
                               const next = [...columns];
-                              next[idx] = updated;
+                              next[idx] = { ...next[idx], schedule_col_name: v, quantitative_options: autoOpts, quantitative_single_item: "" };
                               setColumns(next);
                             }}
                           >
@@ -163,73 +162,29 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                         </div>
                         {(() => {
                           const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                          const availableItems = sc?.quantitative_items || [];
-                          const selected = col.quantitative_options || [];
-                          if (availableItems.length > 0) {
-                            return (
-                              <div>
-                                <Label className="text-xs" dir="rtl">ערכים לספור</Label>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {availableItems.map(item => {
-                                    const isSelected = selected.includes(item);
-                                    return (
-                                      <button
-                                        key={item}
-                                        type="button"
-                                        onClick={() => {
-                                          const next = isSelected
-                                            ? selected.filter(s => s !== item)
-                                            : [...selected, item];
-                                          updateColumn(idx, "quantitative_options", next);
-                                        }}
-                                        className={`px-2 py-1 rounded text-xs border transition-colors ${
-                                          isSelected
-                                            ? "bg-blue-600 border-blue-600 text-white font-semibold"
-                                            : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
-                                        }`}
-                                      >
-                                        {item}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                {selected.length === 0 && (
-                                  <button
-                                    type="button"
-                                    className="text-xs text-blue-600 hover:underline mt-1"
-                                    onClick={() => updateColumn(idx, "quantitative_options", availableItems)}
-                                  >
-                                    בחר הכל
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          }
-                          // Fallback: manual entry if no items defined
+                          const availableItems = sc?.quantitative_items || col.quantitative_options || [];
+                          if (availableItems.length === 0) return null;
+                          const singleItem = col.quantitative_single_item || "";
                           return (
-                            <div className="space-y-1">
-                              <Label className="text-xs" dir="rtl">ערכים לספור</Label>
-                              {selected.map((opt, oi) => (
-                                <div key={oi} className="flex gap-1 items-center">
-                                  <Input
-                                    value={opt}
-                                    onChange={e => {
-                                      const opts = [...selected];
-                                      opts[oi] = e.target.value;
-                                      updateColumn(idx, "quantitative_options", opts);
-                                    }}
-                                    placeholder="ערך לספור..."
-                                    dir="rtl"
-                                    className="h-7 text-sm flex-1"
-                                  />
-                                  <button type="button" onClick={() => updateColumn(idx, "quantitative_options", selected.filter((_, i) => i !== oi))} className="text-red-400 hover:text-red-600">
-                                    <Trash2 className="w-3.5 h-3.5" />
+                            <div>
+                              <Label className="text-xs" dir="rtl">פריט לספירה (בחר אחד)</Label>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {availableItems.map(item => (
+                                  <button
+                                    key={item}
+                                    type="button"
+                                    onClick={() => updateColumn(idx, "quantitative_single_item", singleItem === item ? "" : item)}
+                                    className={`px-2 py-1 rounded text-xs border transition-colors ${
+                                      singleItem === item
+                                        ? "bg-blue-600 border-blue-600 text-white font-semibold"
+                                        : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
+                                    }`}
+                                  >
+                                    {item}
                                   </button>
-                                </div>
-                              ))}
-                              <Button size="sm" variant="outline" className="h-7 text-xs w-full" onClick={() => updateColumn(idx, "quantitative_options", [...selected, ""])} dir="rtl">
-                                <Plus className="w-3 h-3 ml-1" />הוסף ערך
-                              </Button>
+                                ))}
+                              </div>
+                              {!singleItem && <p className="text-xs text-gray-400 mt-1">אם לא נבחר פריט — יוצגו כל הפריטים בשורות נפרדות</p>}
                             </div>
                           );
                         })()}
