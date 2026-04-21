@@ -25,13 +25,14 @@ export default function Reports() {
   const [chartBuilderOpen, setChartBuilderOpen] = useState(false);
   const [editingChart, setEditingChart] = useState(null);
   const [selectedTrackerForCharts, setSelectedTrackerForCharts] = useState(null);
+  const [qualifications, setQualifications] = useState([]);
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     const [
       workersData, assignmentsData, templateRowsData, templatesData, trackersData,
-      populationsSettings, workerRolesSettings, globalColSettings, cartColSettings
+      populationsSettings, workerRolesSettings, globalColSettings, cartColSettings, qualificationsData
     ] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
@@ -42,12 +43,14 @@ export default function Reports() {
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
+      base44.entities.Qualification.list(),
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
     setTemplateRows(templateRowsData);
     setAllTemplates(templatesData);
     setTrackers(trackersData);
+    setQualifications(qualificationsData);
     if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
     // Load charts and all tracker entries
@@ -182,6 +185,7 @@ export default function Reports() {
                               populations={populations}
                               workerRoles={workerRoles}
                               scheduleColumns={scheduleColumns}
+                              qualifications={qualifications}
                               onDelete={() => handleDeleteTracker(tracker.id)}
                               onUpdated={handleTrackerUpdated}
                             />

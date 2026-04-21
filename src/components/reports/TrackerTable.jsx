@@ -126,7 +126,7 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], onDelete, onUpdated }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], onDelete, onUpdated }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -289,6 +289,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       let count = 0;
       filtered.forEach(a => {
         const taskVal = a.column_values?.["משימה"] || a.column_values?.["task"];
+        // תמיד ספור משימות מה-assignment במידה שהמשימה במערך task_list
         if (taskVal && taskList.includes(String(taskVal))) count++;
       });
       return count;
@@ -552,24 +553,24 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       })()}
                       {col.type === "count_by_task" && (
                         <div className="col-span-2 space-y-1">
-                          <Label className="text-xs" dir="rtl">בחר משימות</Label>
+                          <Label className="text-xs" dir="rtl">בחר משימות/כישרויות</Label>
                           <div className="flex flex-wrap gap-1">
-                            {allTemplates.flatMap(t => (t.columns || []).filter(c => c.type === "select" && c.name === "משימה").flatMap(c => c.options || [])).filter((v, i, a) => a.indexOf(v) === i).map(task => (
+                            {(qualifications || []).map(qual => (
                               <button
-                                key={task}
+                                key={qual.id}
                                 type="button"
                                 onClick={() => {
                                   const tasks = col.task_list || [];
-                                  const updated = tasks.includes(task) ? tasks.filter(t => t !== task) : [...tasks, task];
+                                  const updated = tasks.includes(qual.id) ? tasks.filter(t => t !== qual.id) : [...tasks, qual.id];
                                   updateColumn(idx, "task_list", updated);
                                 }}
                                 className={`px-1.5 py-0.5 rounded text-xs border transition-colors ${
-                                  (col.task_list || []).includes(task)
+                                  (col.task_list || []).includes(qual.id)
                                     ? "bg-blue-600 border-blue-600 text-white font-semibold"
                                     : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
                                 }`}
                               >
-                                {task}
+                                {qual.name}
                               </button>
                             ))}
                           </div>

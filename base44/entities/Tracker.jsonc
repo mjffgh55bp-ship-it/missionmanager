@@ -30,6 +30,7 @@
               "schedule_col",
               "combined_data",
               "count_by_text",
+              "count_by_task",
               "count_quantitative"
             ]
           },
@@ -40,6 +41,13 @@
           "schedule_col_value": {
             "type": "string",
             "description": "For schedule_col: optional value filter"
+          },
+          "task_list": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "For count_by_task: list of qualification IDs to count"
           },
           "quantitative_options": {
             "type": "array",
