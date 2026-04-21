@@ -20,6 +20,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
   const [columns, setColumns] = useState([]);
   const [saving, setSaving] = useState(false);
   const [quantitativePresets, setQuantitativePresets] = useState([]);
+  const [localTaskQualifications, setLocalTaskQualifications] = useState(taskQualifications);
 
   useEffect(() => {
     if (tracker) {
@@ -30,6 +31,24 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
       setColumns([]);
     }
   }, [tracker, open]);
+
+  useEffect(() => {
+    const loadTaskQualifications = async () => {
+      try {
+        const settings = await base44.entities.AppSettings.filter({ setting_key: "task_qualifications" });
+        if (settings.length > 0) {
+          const tasks = JSON.parse(settings[0].setting_value);
+          setLocalTaskQualifications(tasks);
+        }
+      } catch (error) {
+        console.error("Failed to load task qualifications:", error);
+      }
+    };
+    
+    if (open) {
+      loadTaskQualifications();
+    }
+  }, [open]);
 
   const addColumn = () => {
     setColumns([...columns, { id: Date.now().toString(), name: "", type: "shifts_count", schedule_col_name: "", schedule_col_value: "", combined_filters: {}, combined_operation: "sum_hours" }]);
@@ -140,7 +159,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                       <div>
                         <Label className="text-xs" dir="rtl">בחר משימות</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {Object.keys(taskQualifications).map(taskName => (
+                          {Object.keys(localTaskQualifications).map(taskName => (
                             <button
                               key={taskName}
                               type="button"
@@ -159,7 +178,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                             </button>
                           ))}
                         </div>
-                        {Object.keys(taskQualifications).length === 0 && <p className="text-xs text-gray-400 mt-1" dir="rtl">אין משימות זמינות</p>}
+                        {Object.keys(localTaskQualifications).length === 0 && <p className="text-xs text-gray-400 mt-1" dir="rtl">אין משימות מוגדרות בהגדרות</p>}
                       </div>
                     </div>
                     )}
