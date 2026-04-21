@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil } from "lucide-react";
+import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -193,7 +194,7 @@ export default function ChartDisplay({ chart, workers, assignments, templateRows
           <CardTitle className="text-base">{chart.title}</CardTitle>
           <div className="flex gap-1">
             <Button size="sm" variant="ghost" onClick={onEdit}><Pencil className="w-4 h-4" /></Button>
-            <Button size="sm" variant="ghost" className="text-red-500" onClick={onDelete}><Trash2 className="w-4 h-4" /></Button>
+            <ConfirmDeleteButton onConfirm={onDelete} variant="icon" />
           </div>
         </div>
       </CardHeader>

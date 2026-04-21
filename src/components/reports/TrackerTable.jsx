@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, Check, X, Plus, Save, ChevronDown, ChevronUp, Pencil, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { base44 } from "@/api/base44Client";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
@@ -391,17 +392,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 }}>
                   <Pencil className="w-4 h-4 ml-1" />ערוך
                 </Button>
-                {confirmDelete ? (
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-red-600">למחוק?</span>
-                    <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => { setConfirmDelete(false); onDelete(); }}>כן</Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setConfirmDelete(false)}>לא</Button>
-                  </div>
-                ) : (
-                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => setConfirmDelete(true)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
+                <ConfirmDeleteButton onConfirm={onDelete} variant="button" label="מחק טבלה" />
               </>
             )}
           </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Plus, BarChart2, Table2 } from "lucide-react";
+import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import TrackerTable from "../components/reports/TrackerTable";
 import ChartBuilder from "../components/reports/ChartBuilder";
 import ChartDisplay from "../components/reports/ChartDisplay";
@@ -84,7 +85,6 @@ export default function Reports() {
   };
 
   const handleDeleteChart = async (chartId) => {
-    if (!window.confirm("האם למחוק את הגרף?")) return;
     await base44.entities.ChartWidget.delete(chartId);
     setCharts(prev => prev.filter(c => c.id !== chartId));
   };

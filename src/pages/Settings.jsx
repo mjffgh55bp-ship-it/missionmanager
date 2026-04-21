@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList } from "lucide-react";
+import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 
@@ -336,7 +337,7 @@ export default function Settings() {
                       <button onClick={() => setExpandedCol(expandedCol === idx ? null : idx)} className="text-gray-400 hover:text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-200">
                         {expandedCol === idx ? "סגור" : "אפשרויות"}
                       </button>
-                      <button onClick={() => handleRemoveScheduleColumn(idx)} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+                      <ConfirmDeleteButton onConfirm={() => handleRemoveScheduleColumn(idx)} />
                     </div>
                   </div>
                   {expandedCol === idx && (
@@ -430,9 +431,9 @@ export default function Settings() {
             </div>
             <div className="flex flex-wrap gap-2">
               {workerRoles.map(role => (
-                <Badge key={role} className="bg-indigo-100 text-indigo-800 pr-1">
+                <Badge key={role} className="bg-indigo-100 text-indigo-800 pr-1 flex items-center gap-1">
                   {role}
-                  <button onClick={() => handleRemoveWorkerRole(role)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                  <ConfirmDeleteButton onConfirm={() => handleRemoveWorkerRole(role)} className="ml-1" />
                 </Badge>
               ))}
               {workerRoles.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו תפקידים</p>}
@@ -453,9 +454,9 @@ export default function Settings() {
             </div>
             <div className="flex flex-wrap gap-2">
               {shiftStatuses.map(status => (
-                <Badge key={status} className="bg-teal-100 text-teal-800 pr-1">
+                <Badge key={status} className="bg-teal-100 text-teal-800 pr-1 flex items-center gap-1">
                   {status}
-                  <button onClick={() => handleRemoveShiftStatus(status)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                  <ConfirmDeleteButton onConfirm={() => handleRemoveShiftStatus(status)} className="ml-1" />
                 </Badge>
               ))}
               {shiftStatuses.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סטטוסים</p>}
@@ -476,9 +477,9 @@ export default function Settings() {
             </div>
             <div className="flex flex-wrap gap-2">
               {populations.map(pop => (
-                <Badge key={pop} className="bg-orange-100 text-orange-800 pr-1">
+                <Badge key={pop} className="bg-orange-100 text-orange-800 pr-1 flex items-center gap-1">
                   {pop}
-                  <button onClick={() => handleRemovePopulation(pop)} className="ml-2 hover:text-red-600"><X className="w-3 h-3" /></button>
+                  <ConfirmDeleteButton onConfirm={() => handleRemovePopulation(pop)} className="ml-1" />
                 </Badge>
               ))}
               {populations.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו אוכלוסיות</p>}
@@ -548,7 +549,7 @@ export default function Settings() {
                       <button onClick={() => setExpandedTask(expandedTask === task ? null : task)} className="text-gray-400 hover:text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-200">
                         {expandedTask === task ? "סגור" : "נהל כשירויות"}
                       </button>
-                      <button onClick={() => handleRemoveTask(task)} className="text-red-400 hover:text-red-600"><X className="w-4 h-4" /></button>
+                      <ConfirmDeleteButton onConfirm={() => handleRemoveTask(task)} />
                     </div>
                   </div>
                   {expandedTask === task && (
