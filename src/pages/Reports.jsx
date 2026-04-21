@@ -54,9 +54,9 @@ export default function Reports() {
     setAllTemplates(templatesData);
     setTrackers(trackersData);
     
-    // Load tasks and convert to qualification-like objects for display
+    // Load tasks from AppSettings - המשימות מהגדרות (מיוחדים, חוזי, סיוע, וכו')
     const tasksList = tasksSettings.length > 0 ? JSON.parse(tasksSettings[0].setting_value) || [] : [];
-    const qualificationsFromTasks = tasksList.map((taskName, idx) => ({
+    const qualificationsFromTasks = tasksList.map(taskName => ({
       id: taskName,
       name: taskName
     }));
