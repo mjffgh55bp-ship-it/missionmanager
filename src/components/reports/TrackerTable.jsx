@@ -289,9 +289,21 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
        // Return object with task names as keys and counts/hours as values
        const result = {};
        taskList.forEach(taskName => { result[taskName] = 0; });
+       
+       // Check each assignment and match by qualification_id
        filtered.forEach(a => {
+         // qualification_id may be the task name itself or an ID
+         let matchedTask = null;
          if (a.qualification_id && taskList.includes(a.qualification_id)) {
-           result[a.qualification_id] += a.hours || 0;
+           matchedTask = a.qualification_id;
+         }
+         // Also check if qualification_name matches
+         else if (a.qualification_name && taskList.includes(a.qualification_name)) {
+           matchedTask = a.qualification_name;
+         }
+         
+         if (matchedTask) {
+           result[matchedTask] += a.hours || 0;
          }
        });
        return result;

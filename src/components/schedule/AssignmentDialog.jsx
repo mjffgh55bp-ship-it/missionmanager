@@ -9,17 +9,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, Check, Star } from "lucide-react";
 
-export default function AssignmentDialog({ open, onOpenChange, selectedShift, workers, carts, onSave }) {
-  const [formData, setFormData] = useState({
-    chef_id: "",
-    sous_chef_id: "",
-    additional_chef_id: "",
-    start_time: "",
-    end_time: "",
-    hours: 4,
-    menu: "",
-    notes: ""
-  });
+export default function AssignmentDialog({ open, onOpenChange, selectedShift, workers, carts, onSave, taskQualifications = {} }) {
+   const [formData, setFormData] = useState({
+     chef_id: "",
+     sous_chef_id: "",
+     additional_chef_id: "",
+     start_time: "",
+     end_time: "",
+     hours: 4,
+     menu: "",
+     notes: "",
+     qualification_id: "",
+     qualification_name: ""
+   });
   const [availabilities, setAvailabilities] = useState([]);
   const [validationError, setValidationError] = useState("");
 
@@ -54,7 +56,9 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
           end_time: selectedShift.end_time,
           hours: selectedShift.hours,
           menu: selectedShift.menu || "",
-          notes: selectedShift.notes || ""
+          notes: selectedShift.notes || "",
+          qualification_id: selectedShift.qualification_id || "",
+          qualification_name: selectedShift.qualification_name || ""
         });
       } else {
         setFormData({
@@ -65,7 +69,9 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
           end_time: selectedShift.end_time,
           hours: 4,
           menu: "",
-          notes: ""
+          notes: "",
+          qualification_id: "",
+          qualification_name: ""
         });
       }
     }
@@ -178,7 +184,9 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
       hours: formData.hours,
       menu: formData.menu,
       notes: formData.notes,
-      has_trainee: hasTrainee
+      has_trainee: hasTrainee,
+      qualification_id: formData.qualification_id || null,
+      qualification_name: formData.qualification_name || null
     };
 
     if (selectedShift.id) {
@@ -344,7 +352,24 @@ export default function AssignmentDialog({ open, onOpenChange, selectedShift, wo
               dir="rtl"
             />
           </div>
-        </div>
+          <div>
+            <Label dir="rtl">משימה / כישרון (אופציונלי)</Label>
+            <Select 
+              value={formData.qualification_id} 
+              onValueChange={(value) => setFormData({ ...formData, qualification_id: value, qualification_name: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="בחר משימה (אופציונלי)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={null}>ללא</SelectItem>
+                {Object.keys(taskQualifications || {}).sort().map((taskName) => (
+                  <SelectItem key={taskName} value={taskName}>{taskName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          </div>
         <DialogFooter className="flex-col sm:flex-row gap-2">
           {selectedShift.id && (
             <Button 
