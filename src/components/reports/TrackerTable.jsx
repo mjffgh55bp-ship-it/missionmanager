@@ -286,12 +286,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     if (col.type === "count_by_task") {
        const taskList = col.task_list || [];
        if (taskList.length === 0) return 0;
-       let count = 0;
+       // Return object with task names as keys and counts/hours as values
+       const result = {};
+       taskList.forEach(taskName => { result[taskName] = 0; });
        filtered.forEach(a => {
-         // ספור assignments שיש להם qualification_id (שם משימה) שנמצא ברשימת המשימות שנבחרו בעמודה
-         if (a.qualification_id && taskList.includes(a.qualification_id)) count++;
+         if (a.qualification_id && taskList.includes(a.qualification_id)) {
+           result[a.qualification_id] += a.hours || 0;
+         }
        });
-       return count;
+       return result;
      }
 
     if (col.type === "count_quantitative") {
@@ -665,6 +668,27 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                    const value = auto ? computeAutoValue(col, worker.id) : entryValue;
                   const isEditing = editingCell?.workerId === worker.id && editingCell?.colId === col.id;
 
+                  if (col.type === "count_by_task") {
+                    const tasks = col.task_list || [];
+                    const hours = typeof value === "object" && value !== null ? value : {};
+                    if (tasks.length === 0) {
+                      return <TableCell key={col.id} className="px-2 text-gray-300 text-xs">אין משימות</TableCell>;
+                    }
+                    return (
+                      <TableCell key={col.id} className="px-2 min-w-[140px]">
+                        <div className="space-y-0.5">
+                          {tasks.map(taskName => (
+                            <div key={taskName} className="flex items-center justify-between gap-1 text-xs">
+                              <span className="text-gray-600 truncate">{taskName}</span>
+                              <span className={`font-semibold ${(hours[taskName] || 0) > 0 ? "text-blue-900" : "text-gray-300"}`}>
+                                {(hours[taskName] || 0) > 0 ? `${Math.round(hours[taskName] * 10) / 10}h` : "-"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                    );
+                  }
                   if (col.type === "count_quantitative") {
                     const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
                     const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
@@ -726,11 +750,33 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               </TableRow>
             ))}
             {/* Summary row */}
-            {!editMode && displayColumns.some(c => c.type === "count_quantitative" || isAuto(c.type)) && (
-              <TableRow className="bg-blue-50 border-t-2 border-blue-200 font-semibold">
-                <TableCell className="px-4 text-blue-900 font-bold">סה"כ</TableCell>
-                {displayColumns.map(col => {
-                  if (col.type === "count_quantitative") {
+            {!editMode && displayColumns.some(c => c.type === "count_quantitative" || c.type === "count_by_task" || isAuto(c.type)) && (
+               <TableRow className="bg-blue-50 border-t-2 border-blue-200 font-semibold">
+                 <TableCell className="px-4 text-blue-900 font-bold">סה"כ</TableCell>
+                 {displayColumns.map(col => {
+                   if (col.type === "count_by_task") {
+                     const taskList = col.task_list || [];
+                     const totals = {};
+                     taskList.forEach(taskName => {
+                       totals[taskName] = filteredWorkers.reduce((sum, w) => {
+                         const taskHours = computeAutoValue(col, w.id);
+                         return sum + ((typeof taskHours === "object" && taskHours !== null) ? (taskHours[taskName] || 0) : 0);
+                       }, 0);
+                     });
+                     return (
+                       <TableCell key={col.id} className="px-2 min-w-[140px]">
+                         <div className="space-y-0.5">
+                           {taskList.map(taskName => (
+                             <div key={taskName} className="flex items-center justify-between gap-1 text-xs">
+                               <span className="text-blue-800 truncate font-medium">{taskName}</span>
+                               <span className="font-bold text-blue-900">{totals[taskName] > 0 ? `${Math.round(totals[taskName] * 10) / 10}h` : "-"}</span>
+                             </div>
+                           ))}
+                         </div>
+                       </TableCell>
+                     );
+                   }
+                   if (col.type === "count_quantitative") {
                     const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
                     const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
                       ? col.quantitative_options
