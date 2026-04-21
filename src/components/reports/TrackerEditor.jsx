@@ -149,8 +149,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                             onValueChange={v => {
                               const sc = scheduleColumns.find(c => c.name === v);
                               const autoOpts = sc?.quantitative_items || [];
-                              const updated = { ...columns[idx], schedule_col_name: v };
-                              if (autoOpts.length > 0) updated.quantitative_options = autoOpts;
+                              const updated = { ...columns[idx], schedule_col_name: v, quantitative_options: autoOpts };
                               const next = [...columns];
                               next[idx] = updated;
                               setColumns(next);
@@ -169,7 +168,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                           if (availableItems.length > 0) {
                             return (
                               <div>
-                                <Label className="text-xs" dir="rtl">ערכים לספור (בחר מהרשימה)</Label>
+                                <Label className="text-xs" dir="rtl">ערכים לספור</Label>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {availableItems.map(item => {
                                     const isSelected = selected.includes(item);
@@ -195,7 +194,13 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                                   })}
                                 </div>
                                 {selected.length === 0 && (
-                                  <p className="text-xs text-orange-500 mt-1" dir="rtl">בחר לפחות ערך אחד לספירה</p>
+                                  <button
+                                    type="button"
+                                    className="text-xs text-blue-600 hover:underline mt-1"
+                                    onClick={() => updateColumn(idx, "quantitative_options", availableItems)}
+                                  >
+                                    בחר הכל
+                                  </button>
                                 )}
                               </div>
                             );

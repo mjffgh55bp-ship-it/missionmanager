@@ -267,7 +267,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
     if (col.type === "count_quantitative") {
       if (!col.schedule_col_name) return {};
-      const opts = col.quantitative_options || [];
+      const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+      const opts = (col.quantitative_options && col.quantitative_options.length > 0)
+        ? col.quantitative_options
+        : (sc?.quantitative_items || []);
       const counts = {};
       opts.forEach(o => { counts[o] = 0; });
 
@@ -373,7 +376,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   {showFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
                   סינון
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => { setEditName(tracker.name); setEditColumns(tracker.columns || []); setEditMode(true); }}>
+                <Button size="sm" variant="outline" onClick={() => {
+                  setEditName(tracker.name);
+                  // Auto-fill quantitative_options from scheduleColumns if empty
+                  const cols = (tracker.columns || []).map(col => {
+                    if (col.type === "count_quantitative" && (!col.quantitative_options || col.quantitative_options.length === 0) && col.schedule_col_name) {
+                      const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+                      if (sc?.quantitative_items?.length > 0) return { ...col, quantitative_options: sc.quantitative_items };
+                    }
+                    return col;
+                  });
+                  setEditColumns(cols);
+                  setEditMode(true);
+                }}>
                   <Pencil className="w-4 h-4 ml-1" />ערוך
                 </Button>
                 {confirmDelete ? (
@@ -514,7 +529,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                               const sc = scheduleColumns.find(c => c.name === v);
                               const autoOpts = sc?.quantitative_items || [];
                               const next = [...editColumns];
-                              next[idx] = { ...next[idx], schedule_col_name: v, ...(autoOpts.length > 0 ? { quantitative_options: autoOpts } : {}) };
+                              next[idx] = { ...next[idx], schedule_col_name: v, quantitative_options: autoOpts };
                               setEditColumns(next);
                             }}
                           >
@@ -619,7 +634,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   const isEditing = editingCell?.workerId === worker.id && editingCell?.colId === col.id;
 
                   if (col.type === "count_quantitative") {
-                    const opts = col.quantitative_options || [];
+                    const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+                    const opts = (col.quantitative_options && col.quantitative_options.length > 0)
+                      ? col.quantitative_options
+                      : (sc?.quantitative_items || []);
                     const counts = typeof value === "object" && value !== null ? value : {};
                     return (
                       <TableCell key={col.id} className="px-2 min-w-[120px]">
@@ -672,7 +690,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 <TableCell className="px-4 text-blue-900 font-bold">סה"כ</TableCell>
                 {displayColumns.map(col => {
                   if (col.type === "count_quantitative") {
-                    const opts = col.quantitative_options || [];
+                    const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+                    const opts = (col.quantitative_options && col.quantitative_options.length > 0)
+                      ? col.quantitative_options
+                      : (sc?.quantitative_items || []);
                     const totals = {};
                     opts.forEach(opt => {
                       totals[opt] = filteredWorkers.reduce((sum, w) => {
