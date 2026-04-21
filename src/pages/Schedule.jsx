@@ -22,6 +22,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ColumnCell from "../components/schedule/ColumnCell";
 import WorkerCell from "../components/schedule/WorkerCell";
 import TimeCell from "../components/schedule/TimeCell";
@@ -310,7 +312,19 @@ export default function Schedule() {
                 <CardTitle className="text-2xl" dir="rtl">לוח</CardTitle>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
-                  <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center" dir="rtl">{formatDateHebrew(currentDate)}</div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center cursor-pointer hover:bg-blue-800 transition-colors" dir="rtl">{formatDateHebrew(currentDate)}</div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={currentDate}
+                        onSelect={(date) => date && setCurrentDate(date)}
+                        disabled={(date) => false}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
                   <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
                   <div className="w-px h-6 bg-gray-300 mx-1" />
