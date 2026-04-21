@@ -23,12 +23,14 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
   const [localTaskQualifications, setLocalTaskQualifications] = useState(taskQualifications);
 
   useEffect(() => {
-    if (tracker) {
-      setName(tracker.name || "");
-      setColumns(tracker.columns || []);
-    } else {
-      setName("");
-      setColumns([]);
+    if (open) {
+      if (tracker) {
+        setName(tracker.name || "");
+        setColumns(tracker.columns || []);
+      } else {
+        setName("");
+        setColumns([]);
+      }
     }
   }, [tracker, open]);
 
@@ -39,9 +41,12 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
         if (settings.length > 0) {
           const tasks = JSON.parse(settings[0].setting_value);
           setLocalTaskQualifications(tasks);
+        } else {
+          setLocalTaskQualifications({});
         }
       } catch (error) {
         console.error("Failed to load task qualifications:", error);
+        setLocalTaskQualifications({});
       }
     };
     
@@ -157,9 +162,9 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                     {col.type === "count_by_task" && (
                     <div className="col-span-2 space-y-2">
                       <div>
-                        <Label className="text-xs" dir="rtl">בחר משימות</Label>
+                        <Label className="text-xs" dir="rtl">בחר משימות/כישורים</Label>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {Object.keys(localTaskQualifications).map(taskName => (
+                          {Object.keys(localTaskQualifications).sort().map(taskName => (
                             <button
                               key={taskName}
                               type="button"
@@ -168,7 +173,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                                 const updated = tasks.includes(taskName) ? tasks.filter(t => t !== taskName) : [...tasks, taskName];
                                 updateColumn(idx, "task_list", updated);
                               }}
-                              className={`px-2 py-1 rounded text-xs border transition-colors ${
+                              className={`px-3 py-1.5 rounded text-xs border transition-colors ${
                                 (col.task_list || []).includes(taskName)
                                   ? "bg-blue-600 border-blue-600 text-white font-semibold"
                                   : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
@@ -178,7 +183,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                             </button>
                           ))}
                         </div>
-                        {Object.keys(localTaskQualifications).length === 0 && <p className="text-xs text-gray-400 mt-1" dir="rtl">אין משימות מוגדרות בהגדרות</p>}
+                        {Object.keys(localTaskQualifications).length === 0 && <p className="text-xs text-gray-400 mt-1" dir="rtl">אין משימות או כישורים מוגדרים בהגדרות</p>}
                       </div>
                     </div>
                     )}
