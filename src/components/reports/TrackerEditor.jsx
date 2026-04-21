@@ -11,6 +11,7 @@ const COLUMN_TYPES = [
   { value: "shifts_count", label: "מספר משמרות" },
   { value: "schedule_col", label: "סיכום שעות לפי טקסט" },
   { value: "count_by_text", label: "סיכום פעמים לפי טקסט" },
+  { value: "count_by_task", label: "ספירה לפי משימה" },
   { value: "count_quantitative", label: "ספירה כמותית" },
 ];
 
@@ -112,34 +113,61 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, al
                       </Select>
                     </div>
                     {(col.type === "schedule_col" || col.type === "count_by_text") && (() => {
-                      const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                      const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
-                      return (
-                        <div className="col-span-2 space-y-2">
+                    const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+                    const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
+                    return (
+                      <div className="col-span-2 space-y-2">
+                        <div>
+                          <Label className="text-xs" dir="rtl">עמודת לוח</Label>
+                          <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
+                            <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
+                            <SelectContent dir="rtl">
+                              {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {opts.length > 0 && (
                           <div>
-                            <Label className="text-xs" dir="rtl">עמודת לוח</Label>
-                            <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
-                              <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="בחר עמודה..." /></SelectTrigger>
+                            <Label className="text-xs" dir="rtl">ערך ספציפי (אופציונלי)</Label>
+                            <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
+                              <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="כל ערך" /></SelectTrigger>
                               <SelectContent dir="rtl">
-                                {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name}>{sc.name}</SelectItem>)}
+                                <SelectItem value={null}>כל ערך</SelectItem>
+                                {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                               </SelectContent>
                             </Select>
                           </div>
-                          {opts.length > 0 && (
-                            <div>
-                              <Label className="text-xs" dir="rtl">ערך ספציפי (אופציונלי)</Label>
-                              <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
-                                <SelectTrigger className="h-8 mt-0.5 text-sm" dir="rtl"><SelectValue placeholder="כל ערך" /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                  <SelectItem value={null}>כל ערך</SelectItem>
-                                  {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-                        </div>
-                      );
+                        )}
+                      </div>
+                    );
                     })()}
+                    {col.type === "count_by_task" && (
+                    <div className="col-span-2 space-y-2">
+                      <div>
+                        <Label className="text-xs" dir="rtl">בחר משימות</Label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {allTemplates.flatMap(t => (t.columns || []).filter(c => c.type === "select" && c.name === "משימה").flatMap(c => c.options || [])).filter((v, i, a) => a.indexOf(v) === i).map(task => (
+                            <button
+                              key={task}
+                              type="button"
+                              onClick={() => {
+                                const tasks = col.task_list || [];
+                                const updated = tasks.includes(task) ? tasks.filter(t => t !== task) : [...tasks, task];
+                                updateColumn(idx, "task_list", updated);
+                              }}
+                              className={`px-2 py-1 rounded text-xs border transition-colors ${
+                                (col.task_list || []).includes(task)
+                                  ? "bg-blue-600 border-blue-600 text-white font-semibold"
+                                  : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
+                              }`}
+                            >
+                              {task}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    )}
                     {col.type === "count_quantitative" && (
                       <div className="col-span-2 space-y-2">
                         <div>

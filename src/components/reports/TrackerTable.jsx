@@ -79,6 +79,7 @@ const COLUMN_TYPES = [
   { value: "shifts_count", label: "מספר משמרות" },
   { value: "schedule_col", label: "סיכום שעות לפי טקסט" },
   { value: "count_by_text", label: "סיכום פעמים לפי טקסט" },
+  { value: "count_by_task", label: "ספירה לפי משימה" },
   { value: "count_quantitative", label: "ספירה כמותית" },
 ];
 
@@ -282,6 +283,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       return count;
     }
 
+    if (col.type === "count_by_task") {
+      const taskList = col.task_list || [];
+      if (taskList.length === 0) return 0;
+      let count = 0;
+      filtered.forEach(a => {
+        const taskVal = a.column_values?.["משימה"] || a.column_values?.["task"];
+        if (taskVal && taskList.includes(String(taskVal))) count++;
+      });
+      return count;
+    }
+
     if (col.type === "count_quantitative") {
       if (!col.schedule_col_name) return {};
       const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
@@ -323,7 +335,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return null;
   };
 
-  const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_quantitative"].includes(type);
+  const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_by_task", "count_quantitative"].includes(type);
 
   const filteredWorkers = workers.filter(w => {
     if (!w.active) return false;
@@ -538,6 +550,31 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           </div>
                         );
                       })()}
+                      {col.type === "count_by_task" && (
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-xs" dir="rtl">בחר משימות</Label>
+                          <div className="flex flex-wrap gap-1">
+                            {allTemplates.flatMap(t => (t.columns || []).filter(c => c.type === "select" && c.name === "משימה").flatMap(c => c.options || [])).filter((v, i, a) => a.indexOf(v) === i).map(task => (
+                              <button
+                                key={task}
+                                type="button"
+                                onClick={() => {
+                                  const tasks = col.task_list || [];
+                                  const updated = tasks.includes(task) ? tasks.filter(t => t !== task) : [...tasks, task];
+                                  updateColumn(idx, "task_list", updated);
+                                }}
+                                className={`px-1.5 py-0.5 rounded text-xs border transition-colors ${
+                                  (col.task_list || []).includes(task)
+                                    ? "bg-blue-600 border-blue-600 text-white font-semibold"
+                                    : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
+                                }`}
+                              >
+                                {task}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {col.type === "count_quantitative" && (
                         <div className="space-y-1">
                           <Select

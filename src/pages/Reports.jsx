@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Plus, BarChart2, Table2 } from "lucide-react";
+import { Plus, BarChart2, Table2, GripVertical } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import TrackerTable from "../components/reports/TrackerTable";
 import ChartBuilder from "../components/reports/ChartBuilder";
 import ChartDisplay from "../components/reports/ChartDisplay";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 export default function Reports() {
   const [workers, setWorkers] = useState([]);
@@ -90,6 +91,19 @@ export default function Reports() {
     setCharts(prev => prev.filter(c => c.id !== chartId));
   };
 
+  const handleReorderTrackers = async (result) => {
+    const { source, destination } = result;
+    if (!destination) return;
+    const newTrackers = Array.from(trackers);
+    const [movedTracker] = newTrackers.splice(source.index, 1);
+    newTrackers.splice(destination.index, 0, movedTracker);
+    setTrackers(newTrackers);
+    // Update order in database
+    newTrackers.forEach(async (t, idx) => {
+      await base44.entities.Tracker.update(t.id, { order: idx });
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -144,21 +158,42 @@ export default function Reports() {
               </Button>
             </div>
           ) : (
-            trackers.map(tracker => (
-              <TrackerTable
-                key={tracker.id}
-                tracker={tracker}
-                workers={workers}
-                assignments={assignments}
-                templateRows={templateRows}
-                allTemplates={allTemplates}
-                populations={populations}
-                workerRoles={workerRoles}
-                scheduleColumns={scheduleColumns}
-                onDelete={() => handleDeleteTracker(tracker.id)}
-                onUpdated={handleTrackerUpdated}
-              />
-            ))
+            <DragDropContext onDragEnd={handleReorderTrackers}>
+              <Droppable droppableId="trackers">
+                {(provided, snapshot) => (
+                  <div {...provided.droppableProps} ref={provided.innerRef} className={snapshot.isDraggingOver ? "bg-blue-50 rounded-lg" : ""}>
+                    {trackers.map((tracker, idx) => (
+                      <Draggable key={tracker.id} draggableId={tracker.id} index={idx}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            className="relative mb-6"
+                          >
+                            <div className="absolute right-4 top-4 text-gray-300 hover:text-gray-500" {...provided.dragHandleProps}>
+                              <GripVertical className="w-5 h-5" />
+                            </div>
+                            <TrackerTable
+                              tracker={tracker}
+                              workers={workers}
+                              assignments={assignments}
+                              templateRows={templateRows}
+                              allTemplates={allTemplates}
+                              populations={populations}
+                              workerRoles={workerRoles}
+                              scheduleColumns={scheduleColumns}
+                              onDelete={() => handleDeleteTracker(tracker.id)}
+                              onUpdated={handleTrackerUpdated}
+                            />
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
           )
         )}
 
