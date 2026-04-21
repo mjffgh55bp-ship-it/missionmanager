@@ -126,7 +126,7 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], onDelete, onUpdated }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], taskQualifications = {}, onDelete, onUpdated }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -284,15 +284,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     }
 
     if (col.type === "count_by_task") {
-      const taskList = col.task_list || [];
-      if (taskList.length === 0) return 0;
-      let count = 0;
-      filtered.forEach(a => {
-        // ספור assignments שיש להם qualification_id (שם משימה) שנמצא ברשימת המשימות
-        if (a.qualification_id && taskList.includes(a.qualification_id)) count++;
-      });
-      return count;
-    }
+       const taskList = col.task_list || [];
+       if (taskList.length === 0) return 0;
+       let count = 0;
+       filtered.forEach(a => {
+         // ספור assignments שיש להם qualification_id (שם משימה) שנמצא ברשימת המשימות שנבחרו בעמודה
+         if (a.qualification_id && taskList.includes(a.qualification_id)) count++;
+       });
+       return count;
+     }
 
     if (col.type === "count_quantitative") {
       if (!col.schedule_col_name) return {};
@@ -554,25 +554,26 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                         <div className="col-span-2 space-y-1">
                           <Label className="text-xs" dir="rtl">בחר משימות/כישרויות</Label>
                           <div className="flex flex-wrap gap-1">
-                            {(qualifications || []).map(qual => (
+                            {Object.keys(taskQualifications).sort().map(taskName => (
                               <button
-                                key={qual.id}
+                                key={taskName}
                                 type="button"
                                 onClick={() => {
                                   const tasks = col.task_list || [];
-                                  const updated = tasks.includes(qual.id) ? tasks.filter(t => t !== qual.id) : [...tasks, qual.id];
+                                  const updated = tasks.includes(taskName) ? tasks.filter(t => t !== taskName) : [...tasks, taskName];
                                   updateColumn(idx, "task_list", updated);
                                 }}
                                 className={`px-1.5 py-0.5 rounded text-xs border transition-colors ${
-                                  (col.task_list || []).includes(qual.id)
+                                  (col.task_list || []).includes(taskName)
                                     ? "bg-blue-600 border-blue-600 text-white font-semibold"
                                     : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
                                 }`}
                               >
-                                {qual.name}
+                                {taskName}
                               </button>
                             ))}
                           </div>
+                          {Object.keys(taskQualifications).length === 0 && <p className="text-xs text-gray-400">אין משימות מוגדרות בהגדרות</p>}
                         </div>
                       )}
                       {col.type === "count_quantitative" && (

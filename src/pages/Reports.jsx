@@ -201,6 +201,7 @@ export default function Reports() {
                               populations={populations}
                               workerRoles={workerRoles}
                               scheduleColumns={scheduleColumns}
+                              taskQualifications={taskQualifications}
                               onDelete={() => handleDeleteTracker(tracker.id)}
                               onUpdated={handleTrackerUpdated}
                             />
