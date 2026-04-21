@@ -29,6 +29,8 @@ export default function Reports() {
   const [taskQualifications, setTaskQualifications] = useState({});
   const [trackerEditorOpen, setTrackerEditorOpen] = useState(false);
   const [editingTracker, setEditingTracker] = useState(null);
+  const [trackerSizes, setTrackerSizes] = useState({});
+  const [draggedTracker, setDraggedTracker] = useState(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -181,34 +183,98 @@ export default function Reports() {
               <Droppable droppableId="trackers">
                 {(provided, snapshot) => (
                   <div {...provided.droppableProps} ref={provided.innerRef} className={snapshot.isDraggingOver ? "bg-blue-50 rounded-lg" : ""}>
-                    {trackers.map((tracker, idx) => (
-                      <Draggable key={tracker.id} draggableId={tracker.id} index={idx}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            className="relative mb-6"
-                          >
-                            <div className="absolute right-4 top-4 text-gray-300 hover:text-gray-500" {...provided.dragHandleProps}>
-                              <GripVertical className="w-5 h-5" />
+                    {trackers.map((tracker, idx) => {
+                      const size = trackerSizes[tracker.id] || { width: 100, height: "auto" };
+                      return (
+                        <Draggable key={tracker.id} draggableId={tracker.id} index={idx}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className="relative mb-6 group"
+                              style={{
+                                ...provided.draggableProps.style,
+                                width: size.width === 100 ? "100%" : `${size.width}px`,
+                                height: size.height === "auto" ? "auto" : size.height
+                              }}
+                            >
+                              <div className="absolute right-4 top-4 text-gray-300 hover:text-gray-500 z-10" {...provided.dragHandleProps}>
+                                <GripVertical className="w-5 h-5" />
+                              </div>
+
+                              {/* Resize handle - bottom right */}
+                              {size.width < 100 && (
+                                <div
+                                  className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    setDraggedTracker(tracker.id);
+                                    const startX = e.clientX;
+                                    const startY = e.clientY;
+                                    const startWidth = size.width;
+                                    const startHeight = size.height === "auto" ? 500 : parseInt(size.height);
+
+                                    const handleMouseMove = (moveE) => {
+                                      const deltaX = moveE.clientX - startX;
+                                      const deltaY = moveE.clientY - startY;
+                                      const newWidth = Math.max(400, startWidth + deltaX);
+                                      const newHeight = Math.max(300, startHeight + deltaY);
+                                      setTrackerSizes(prev => ({
+                                        ...prev,
+                                        [tracker.id]: { width: newWidth, height: newHeight }
+                                      }));
+                                    };
+
+                                    const handleMouseUp = () => {
+                                      document.removeEventListener('mousemove', handleMouseMove);
+                                      document.removeEventListener('mouseup', handleMouseUp);
+                                      setDraggedTracker(null);
+                                    };
+
+                                    document.addEventListener('mousemove', handleMouseMove);
+                                    document.addEventListener('mouseup', handleMouseUp);
+                                  }}
+                                  style={{
+                                    borderRight: '2px solid rgb(59, 130, 246)',
+                                    borderBottom: '2px solid rgb(59, 130, 246)'
+                                  }}
+                                />
+                              )}
+
+                              {/* Toggle fullwidth/floating button */}
+                              <button
+                                onClick={() => {
+                                  setTrackerSizes(prev => ({
+                                    ...prev,
+                                    [tracker.id]: prev[tracker.id]?.width === 100 ? { width: 800, height: 600 } : { width: 100, height: "auto" }
+                                  }));
+                                }}
+                                className="absolute left-4 top-4 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-xs rounded z-10 text-gray-700"
+                                title={size.width === 100 ? "שחרר חלון" : "מצא חלון"}
+                              >
+                                {size.width === 100 ? "🔲" : "📦"}
+                              </button>
+
+                              <div className={size.width === 100 ? "" : "overflow-auto"} style={size.width < 100 ? { height: size.height, width: size.width } : {}}>
+                                <TrackerTable
+                                  tracker={tracker}
+                                  workers={workers}
+                                  assignments={assignments}
+                                  templateRows={templateRows}
+                                  allTemplates={allTemplates}
+                                  populations={populations}
+                                  workerRoles={workerRoles}
+                                  scheduleColumns={scheduleColumns}
+                                  taskQualifications={taskQualifications}
+                                  onDelete={() => handleDeleteTracker(tracker.id)}
+                                  onUpdated={handleTrackerUpdated}
+                                />
+                              </div>
                             </div>
-                            <TrackerTable
-                              tracker={tracker}
-                              workers={workers}
-                              assignments={assignments}
-                              templateRows={templateRows}
-                              allTemplates={allTemplates}
-                              populations={populations}
-                              workerRoles={workerRoles}
-                              scheduleColumns={scheduleColumns}
-                              taskQualifications={taskQualifications}
-                              onDelete={() => handleDeleteTracker(tracker.id)}
-                              onUpdated={handleTrackerUpdated}
-                            />
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
+                          )}
+                        </Draggable>
+                      );
+                    })}
                     {provided.placeholder}
                   </div>
                 )}
