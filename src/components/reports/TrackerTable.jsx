@@ -324,8 +324,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const col = (tracker.columns || []).find(c => c.id === sortColId);
     if (!col) return 0;
     if (isAuto(col.type)) {
-      const va = computeAutoValue(col, a.id) ?? 0;
-      const vb = computeAutoValue(col, b.id) ?? 0;
+      const extractNum = (raw) => {
+        if (typeof raw === "number") return raw;
+        if (typeof raw === "object" && raw !== null) {
+          if (col.quantitative_single_item) return raw[col.quantitative_single_item] || 0;
+          return Object.values(raw).reduce((s, v) => s + (v || 0), 0);
+        }
+        return 0;
+      };
+      const va = extractNum(computeAutoValue(col, a.id));
+      const vb = extractNum(computeAutoValue(col, b.id));
       return mult * (va - vb);
     }
     const va = getEntry(a.id, sortColId)?.value || "";
