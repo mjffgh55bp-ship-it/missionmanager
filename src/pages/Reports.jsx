@@ -339,9 +339,10 @@ export default function Reports() {
         onOpenChange={setTrackerEditorOpen}
         tracker={editingTracker}
         onSaved={handleTrackerSaved}
-        allTemplates={allTemplates}
         scheduleColumns={scheduleColumns}
         taskQualifications={taskQualifications}
+        populations={populations}
+        workerRoles={workerRoles}
       />
 
       <ChartBuilder
