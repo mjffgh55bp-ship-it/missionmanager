@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -272,12 +272,15 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
   const [configuringCol, setConfiguringCol] = useState(null);
   const [localTaskNames, setLocalTaskNames] = useState([]);
 
+  const prevOpenRef = useRef(false);
   useEffect(() => {
-    if (open) {
+    // Only reset internal state when the dialog transitions from closed → open
+    if (open && !prevOpenRef.current) {
       setName(tracker ? tracker.name || "" : "");
-      setColumns(tracker ? tracker.columns || [] : []);
+      setColumns(tracker ? (tracker.columns || []).map(c => ({ ...c })) : []);
     }
-  }, [tracker, open]);
+    prevOpenRef.current = open;
+  }, [open, tracker]);
 
   useEffect(() => {
     if (open) {
