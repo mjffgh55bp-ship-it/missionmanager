@@ -171,6 +171,36 @@ function ColumnConfigDialog({ col, scheduleColumns, taskNames, populations, work
             </div>
           )}
 
+          {/* ── Time range filter ── */}
+          {(reportType === "sum_hours" || reportType === "count_by_text" || !draft.schedule_col_name) && (
+            <div>
+              <Label className="text-sm font-medium">טווח שעות משמרת</Label>
+              <p className="text-xs text-gray-500 mt-0.5 mb-2">ספור רק משמרות שמתחילות בין השעות האלה (לדוגמה: 02:00 עד 06:00)</p>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="time"
+                  value={draft.time_range_filter?.start || ""}
+                  onChange={e => update("time_range_filter", { ...draft.time_range_filter, start: e.target.value })}
+                  className="w-28"
+                />
+                <span className="text-sm text-gray-500">עד</span>
+                <Input
+                  type="time"
+                  value={draft.time_range_filter?.end || ""}
+                  onChange={e => update("time_range_filter", { ...draft.time_range_filter, end: e.target.value })}
+                  className="w-28"
+                />
+                {(draft.time_range_filter?.start || draft.time_range_filter?.end) && (
+                  <button
+                    type="button"
+                    onClick={() => update("time_range_filter", { start: "", end: "" })}
+                    className="text-xs text-gray-400 hover:text-gray-600 underline"
+                  >נקה</button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ── Task filter ── */}
           {taskNames.length > 0 && (
             <MultiCriterion
@@ -230,6 +260,8 @@ function getColSummary(col) {
   if (pf?.include?.length) tags.push(`אוכ׳: ${pf.include.join(", ")}`);
   const rf = col.role_filter;
   if (rf?.include?.length) tags.push(`תפקיד: ${rf.include.join(", ")}`);
+  const trf = col.time_range_filter;
+  if (trf?.start || trf?.end) tags.push(`שעות: ${trf.start || "?"}-${trf.end || "?"}`);
   return tags;
 }
 
@@ -270,6 +302,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
     task_filter: { include: [], exclude: [] },
     population_filter: { include: [], exclude: [] },
     role_filter: { include: [], exclude: [] },
+    time_range_filter: { start: "", end: "" },
   });
 
   const toggleScheduleCol = (schedColName) => {

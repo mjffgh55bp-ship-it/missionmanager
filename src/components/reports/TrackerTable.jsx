@@ -221,6 +221,27 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       return cellVals.length > 0;
     };
 
+    // Check time_range_filter — shift start_time must fall within [start, end]
+    const matchesTimeRangeFilter = (a) => {
+      const trf = col.time_range_filter;
+      if (!trf || (!trf.start && !trf.end)) return true;
+      const shiftStart = a.start_time || "";
+      if (!shiftStart) return false;
+      // Normalize to HH:MM
+      const norm = shiftStart.slice(0, 5);
+      if (trf.start && trf.end) {
+        if (trf.start <= trf.end) {
+          return norm >= trf.start && norm <= trf.end;
+        } else {
+          // Wraps midnight (e.g. 22:00-06:00)
+          return norm >= trf.start || norm <= trf.end;
+        }
+      }
+      if (trf.start) return norm >= trf.start;
+      if (trf.end) return norm <= trf.end;
+      return true;
+    };
+
     // Check task_filter (new: {include,exclude}) — matches assignment.qualification_id
     const matchesTaskFilter = (a) => {
       const tf = col.task_filter;
@@ -240,7 +261,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     });
 
     if (col.type === "shifts_count") {
-      return filtered.filter(a => matchesTaskFilter(a)).length;
+      return filtered.filter(a => matchesTaskFilter(a) && matchesTimeRangeFilter(a)).length;
     }
 
     if (col.type === "schedule_col") {
@@ -249,6 +270,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       filtered.forEach(a => {
         if (!matchesColValueFilter(a.column_values, col.schedule_col_name)) return;
         if (!matchesTaskFilter(a)) return;
+        if (!matchesTimeRangeFilter(a)) return;
         total += a.hours || 0;
       });
       templateRows.forEach(row => {
@@ -271,6 +293,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       filtered.forEach(a => {
         if (!matchesColValueFilter(a.column_values, col.schedule_col_name)) return;
         if (!matchesTaskFilter(a)) return;
+        if (!matchesTimeRangeFilter(a)) return;
         count++;
       });
       templateRows.forEach(row => {
@@ -292,6 +315,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
        
        // Check each assignment and match by qualification_id
        filtered.forEach(a => {
+         if (!matchesTimeRangeFilter(a)) return;
          // qualification_id may be the task name itself or an ID
          let matchedTask = null;
          if (a.qualification_id && taskList.includes(a.qualification_id)) {
@@ -329,6 +353,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       // For assignments: stored in column_values[colName].value as JSON string
       filtered.forEach(a => {
         if (!matchesTaskFilter(a)) return;
+        if (!matchesTimeRangeFilter(a)) return;
         const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
         const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
         opts.forEach(o => { counts[o] += parsed[o] || 0; });
