@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Settings2, Check, Plus } from "lucide-react";
+import { Trash2, Settings2, Check, X } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const REPORT_TYPE_MAP = {
@@ -21,33 +21,109 @@ const REPORT_TYPE_LABEL = {
   sum_numbers: "סיכום מספרים",
 };
 
-const REPORT_TYPE_COLOR = {
-  sum_hours: "bg-purple-100 text-purple-700 border-purple-200",
-  count_by_text: "bg-green-100 text-green-700 border-green-200",
-  count_quantitative: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  sum_numbers: "bg-blue-100 text-blue-700 border-blue-200",
-};
+// Multi-tag selector: include/exclude chips
+function MultiCriterion({ label, description, options, value = { include: [], exclude: [] }, onChange }) {
+  const toggle = (mode, opt) => {
+    const other = mode === "include" ? "exclude" : "include";
+    const current = value[mode] || [];
+    const otherList = value[other] || [];
+    if (current.includes(opt)) {
+      // deselect
+      onChange({ ...value, [mode]: current.filter(v => v !== opt) });
+    } else {
+      // select: remove from other list first
+      onChange({ ...value, [mode]: [...current, opt], [other]: otherList.filter(v => v !== opt) });
+    }
+  };
+
+  const isIncluded = (opt) => (value.include || []).includes(opt);
+  const isExcluded = (opt) => (value.exclude || []).includes(opt);
+
+  return (
+    <div className="space-y-2">
+      <div>
+        <Label className="text-sm font-medium">{label}</Label>
+        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(opt => {
+          const inc = isIncluded(opt);
+          const exc = isExcluded(opt);
+          return (
+            <div key={opt} className="flex rounded-lg overflow-hidden border text-xs">
+              <button
+                type="button"
+                title="כלול"
+                onClick={() => toggle("include", opt)}
+                className={`px-2.5 py-1.5 font-medium transition-colors ${
+                  inc ? "bg-green-600 text-white border-green-600" : "bg-white text-gray-500 hover:bg-green-50"
+                }`}
+              >
+                ✓ {opt}
+              </button>
+              <button
+                type="button"
+                title="אל תכלול"
+                onClick={() => toggle("exclude", opt)}
+                className={`px-2 py-1.5 border-r transition-colors ${
+                  exc ? "bg-red-500 text-white" : "bg-white text-gray-300 hover:bg-red-50 hover:text-red-400"
+                }`}
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {((value.include?.length || 0) > 0 || (value.exclude?.length || 0) > 0) && (
+        <div className="text-xs text-gray-500 flex flex-wrap gap-1 mt-0.5">
+          {(value.include || []).length > 0 && (
+            <span className="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
+              כולל: {value.include.join(", ")}
+            </span>
+          )}
+          {(value.exclude || []).length > 0 && (
+            <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-full">
+              לא כולל: {value.exclude.join(", ")}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => onChange({ include: [], exclude: [] })}
+            className="text-gray-400 hover:text-gray-600 underline"
+          >נקה</button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Pop-up dialog for configuring a single column's criteria
-function ColumnConfigDialog({ col, scheduleColumns, taskQualifications, populations, workerRoles, onSave, onClose }) {
+function ColumnConfigDialog({ col, scheduleColumns, taskNames, populations, workerRoles, onSave, onClose }) {
   const [draft, setDraft] = useState({ ...col });
 
   const schedCol = scheduleColumns.find(c => c.name === draft.schedule_col_name);
   const reportType = schedCol?.report_type || "";
-  const opts = [...(schedCol?.options || []), ...(schedCol?.sub_options?.map(so => so.name) || [])];
-  const taskNames = Object.keys(taskQualifications || {}).sort();
+
+  // All selectable values for this column (options + sub_options)
+  const colOptions = [
+    ...(schedCol?.options || []),
+    ...(schedCol?.sub_options?.map(so => so.name) || [])
+  ];
   const quantItems = schedCol?.quantitative_items || [];
 
   const update = (field, value) => setDraft(d => ({ ...d, [field]: value }));
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="sm:max-w-lg max-h-[88vh] overflow-y-auto" dir="rtl">
         <DialogHeader>
-          <DialogTitle dir="rtl">הגדרת עמודה — {draft.schedule_col_name || "מספר משמרות"}</DialogTitle>
+          <DialogTitle dir="rtl">
+            הגדרת עמודה — {draft.schedule_col_name || "מספר משמרות"}
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-5 py-2">
           {/* Column display name */}
           <div>
             <Label className="text-sm font-medium">שם תצוגה בטבלה</Label>
@@ -60,28 +136,22 @@ function ColumnConfigDialog({ col, scheduleColumns, taskQualifications, populati
             />
           </div>
 
-          {/* Value filter for text-based cols */}
-          {(reportType === "sum_hours" || reportType === "count_by_text" || reportType === "sum_numbers") && opts.length > 0 && (
-            <div>
-              <Label className="text-sm font-medium">ערך ספציפי בעמודת הלוח</Label>
-              <p className="text-xs text-gray-500 mb-1">ספור רק שורות שבהן העמודה שווה לערך זה</p>
-              <Select value={draft.schedule_col_value || ""} onValueChange={v => update("schedule_col_value", v)}>
-                <SelectTrigger className="mt-1" dir="rtl">
-                  <SelectValue placeholder="כל ערך (ללא סינון)" />
-                </SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value={null}>כל ערך</SelectItem>
-                  {opts.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          {/* ── Value filter (for text/hours columns) ── */}
+          {(reportType === "sum_hours" || reportType === "count_by_text" || reportType === "sum_numbers") && colOptions.length > 0 && (
+            <MultiCriterion
+              label="ערכים בעמודת הלוח"
+              description='✓ = כלול בחישוב  |  ✕ = אל תכלול. ללא בחירה — כל הערכים נספרים'
+              options={colOptions}
+              value={draft.col_value_filter || { include: [], exclude: [] }}
+              onChange={v => update("col_value_filter", v)}
+            />
           )}
 
-          {/* Quantitative: pick a single item */}
+          {/* ── Quantitative: pick items ── */}
           {reportType === "count_quantitative" && quantItems.length > 0 && (
             <div>
               <Label className="text-sm font-medium">פריט לספירה</Label>
-              <p className="text-xs text-gray-500 mb-2">בחר פריט אחד, או השאר ריק להציג את כולם</p>
+              <p className="text-xs text-gray-500 mt-0.5 mb-2">בחר פריט אחד בלחיצה, או השאר ריק להציג את כולם</p>
               <div className="flex flex-wrap gap-2">
                 {quantItems.map(item => (
                   <button
@@ -101,69 +171,37 @@ function ColumnConfigDialog({ col, scheduleColumns, taskQualifications, populati
             </div>
           )}
 
-          {/* Task filter */}
+          {/* ── Task filter ── */}
           {taskNames.length > 0 && (
-            <div>
-              <Label className="text-sm font-medium">ספור רק אם בוצעה משימה</Label>
-              <p className="text-xs text-gray-500 mb-2">הגבל לשורות בהן שויכה משימה זו</p>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => update("filter_task", "")}
-                  className={`px-3 py-1.5 rounded-lg text-sm border-2 transition-colors font-medium ${
-                    !draft.filter_task ? "bg-gray-700 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-600 hover:border-gray-400"
-                  }`}
-                >
-                  ללא סינון
-                </button>
-                {taskNames.map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => update("filter_task", draft.filter_task === t ? "" : t)}
-                    className={`px-3 py-1.5 rounded-lg text-sm border-2 transition-colors font-medium ${
-                      draft.filter_task === t
-                        ? "bg-violet-600 border-violet-600 text-white"
-                        : "bg-white border-gray-200 text-gray-600 hover:border-violet-300"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <MultiCriterion
+              label="משימות"
+              description="ספור רק שורות עם המשימות האלה (✓), או הוצא (✕). ללא בחירה — כל המשימות"
+              options={taskNames}
+              value={draft.task_filter || { include: [], exclude: [] }}
+              onChange={v => update("task_filter", v)}
+            />
           )}
 
-          {/* Population filter */}
+          {/* ── Population filter ── */}
           {(populations || []).length > 0 && (
-            <div>
-              <Label className="text-sm font-medium">ספור רק לאוכלוסייה</Label>
-              <Select value={draft.filter_population || ""} onValueChange={v => update("filter_population", v)}>
-                <SelectTrigger className="mt-1" dir="rtl">
-                  <SelectValue placeholder="כל האוכלוסיות" />
-                </SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value={null}>כל האוכלוסיות</SelectItem>
-                  {populations.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            <MultiCriterion
+              label="אוכלוסיות"
+              description="כלול או הוצא לפי אוכלוסייה. ללא בחירה — כל האוכלוסיות"
+              options={populations}
+              value={draft.population_filter || { include: [], exclude: [] }}
+              onChange={v => update("population_filter", v)}
+            />
           )}
 
-          {/* Role filter */}
+          {/* ── Role filter ── */}
           {(workerRoles || []).length > 0 && (
-            <div>
-              <Label className="text-sm font-medium">ספור רק לתפקיד</Label>
-              <Select value={draft.filter_role || ""} onValueChange={v => update("filter_role", v)}>
-                <SelectTrigger className="mt-1" dir="rtl">
-                  <SelectValue placeholder="כל התפקידים" />
-                </SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value={null}>כל התפקידים</SelectItem>
-                  {workerRoles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            <MultiCriterion
+              label="תפקידים"
+              description="כלול או הוצא לפי תפקיד. ללא בחירה — כל התפקידים"
+              options={workerRoles}
+              value={draft.role_filter || { include: [], exclude: [] }}
+              onChange={v => update("role_filter", v)}
+            />
           )}
         </div>
 
@@ -178,12 +216,29 @@ function ColumnConfigDialog({ col, scheduleColumns, taskQualifications, populati
   );
 }
 
+// Helper: summarize a column's active filters into display tags
+function getColSummary(col) {
+  const tags = [];
+  const cf = col.col_value_filter;
+  if (cf?.include?.length) tags.push(`ערך: ${cf.include.join(", ")}`);
+  if (cf?.exclude?.length) tags.push(`לא: ${cf.exclude.join(", ")}`);
+  if (col.quantitative_single_item) tags.push(col.quantitative_single_item);
+  const tf = col.task_filter;
+  if (tf?.include?.length) tags.push(`משימה: ${tf.include.join(", ")}`);
+  if (tf?.exclude?.length) tags.push(`לא משימה: ${tf.exclude.join(", ")}`);
+  const pf = col.population_filter;
+  if (pf?.include?.length) tags.push(`אוכ׳: ${pf.include.join(", ")}`);
+  const rf = col.role_filter;
+  if (rf?.include?.length) tags.push(`תפקיד: ${rf.include.join(", ")}`);
+  return tags;
+}
+
 export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, scheduleColumns = [], taskQualifications = {}, populations = [], workerRoles = [] }) {
   const [name, setName] = useState("");
   const [columns, setColumns] = useState([]);
   const [saving, setSaving] = useState(false);
-  const [configuringCol, setConfiguringCol] = useState(null); // { col, idx } | null
-  const [localTaskQuals, setLocalTaskQuals] = useState(taskQualifications);
+  const [configuringCol, setConfiguringCol] = useState(null);
+  const [localTaskNames, setLocalTaskNames] = useState([]);
 
   useEffect(() => {
     if (open) {
@@ -194,15 +249,28 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
 
   useEffect(() => {
     if (open) {
-      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }).then(settings => {
-        setLocalTaskQuals(settings.length > 0 ? JSON.parse(settings[0].setting_value) || {} : {});
+      base44.entities.AppSettings.filter({ setting_key: "tasks_list" }).then(settings => {
+        setLocalTaskNames(settings.length > 0 ? JSON.parse(settings[0].setting_value) || [] : []);
       });
     }
   }, [open]);
 
-  // Check if a schedule column is already added
   const isAdded = (schedColName) => columns.some(c => c.schedule_col_name === schedColName);
   const shiftsCountAdded = columns.some(c => c.type === "shifts_count");
+
+  const buildNewCol = (schedCol) => ({
+    id: Date.now().toString(),
+    name: schedCol.name,
+    type: REPORT_TYPE_MAP[schedCol.report_type] || "schedule_col",
+    schedule_col_name: schedCol.name,
+    quantitative_options: schedCol.quantitative_items || [],
+    quantitative_single_item: "",
+    // New rich filter fields
+    col_value_filter: { include: [], exclude: [] },
+    task_filter: { include: [], exclude: [] },
+    population_filter: { include: [], exclude: [] },
+    role_filter: { include: [], exclude: [] },
+  });
 
   const toggleScheduleCol = (schedColName) => {
     if (isAdded(schedColName)) {
@@ -210,21 +278,10 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
     } else {
       const schedCol = scheduleColumns.find(c => c.name === schedColName);
       if (!schedCol) return;
-      const newCol = {
-        id: Date.now().toString(),
-        name: schedCol.name,
-        type: REPORT_TYPE_MAP[schedCol.report_type] || "schedule_col",
-        schedule_col_name: schedCol.name,
-        schedule_col_value: "",
-        quantitative_options: schedCol.quantitative_items || [],
-        quantitative_single_item: "",
-        filter_task: "",
-        filter_population: "",
-        filter_role: "",
-      };
+      const newCol = buildNewCol(schedCol);
       setColumns(prev => [...prev, newCol]);
-      // Auto-open config dialog for the new column
-      setConfiguringCol({ col: newCol, idx: columns.length });
+      // Auto-open config for new column
+      setConfiguringCol(newCol);
     }
   };
 
@@ -232,16 +289,15 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
     if (shiftsCountAdded) {
       setColumns(prev => prev.filter(c => c.type !== "shifts_count"));
     } else {
-      const newCol = {
+      setColumns(prev => [...prev, {
         id: Date.now().toString(),
         name: "מספר משמרות",
         type: "shifts_count",
         schedule_col_name: "",
-        filter_task: "",
-        filter_population: "",
-        filter_role: "",
-      };
-      setColumns(prev => [...prev, newCol]);
+        task_filter: { include: [], exclude: [] },
+        population_filter: { include: [], exclude: [] },
+        role_filter: { include: [], exclude: [] },
+      }]);
     }
   };
 
@@ -269,17 +325,6 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
     onOpenChange(false);
   };
 
-  // Build summary tags for a column
-  const getColSummary = (col) => {
-    const tags = [];
-    if (col.schedule_col_value) tags.push(col.schedule_col_value);
-    if (col.quantitative_single_item) tags.push(col.quantitative_single_item);
-    if (col.filter_task) tags.push(`משימה: ${col.filter_task}`);
-    if (col.filter_population) tags.push(`אוכ׳: ${col.filter_population}`);
-    if (col.filter_role) tags.push(`תפקיד: ${col.filter_role}`);
-    return tags;
-  };
-
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -305,6 +350,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
             <div>
               <Label dir="rtl" className="mb-3 block">בחר עמודות להוספה</Label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2" dir="rtl">
+
                 {/* Shifts count */}
                 <button
                   type="button"
@@ -349,9 +395,10 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
                       </span>
                       {tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1.5">
-                          {tags.map((t, i) => (
-                            <span key={i} className="text-[10px] bg-blue-700 text-blue-100 px-1 rounded">{t}</span>
+                          {tags.slice(0, 2).map((t, i) => (
+                            <span key={i} className="text-[10px] bg-blue-700 text-blue-100 px-1 rounded leading-4">{t}</span>
                           ))}
+                          {tags.length > 2 && <span className="text-[10px] text-blue-200">+{tags.length - 2}</span>}
                         </div>
                       )}
                     </button>
@@ -364,12 +411,12 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
               </div>
             </div>
 
-            {/* Added columns list with config buttons */}
+            {/* Added columns list */}
             {columns.length > 0 && (
               <div>
                 <Label dir="rtl" className="mb-2 block">עמודות שנוספו ({columns.length})</Label>
                 <div className="space-y-1.5" dir="rtl">
-                  {columns.map((col, idx) => {
+                  {columns.map((col) => {
                     const tags = getColSummary(col);
                     return (
                       <div key={col.id} className="flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2">
@@ -384,7 +431,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
                           )}
                         </div>
                         <button
-                          onClick={() => setConfiguringCol({ col, idx })}
+                          onClick={() => setConfiguringCol(col)}
                           className="text-gray-400 hover:text-blue-600 transition-colors"
                           title="הגדר קריטריונים"
                         >
@@ -416,9 +463,9 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
       {/* Column config popup */}
       {configuringCol && (
         <ColumnConfigDialog
-          col={configuringCol.col}
+          col={configuringCol}
           scheduleColumns={scheduleColumns}
-          taskQualifications={localTaskQuals}
+          taskNames={localTaskNames}
           populations={populations}
           workerRoles={workerRoles}
           onSave={saveColConfig}
