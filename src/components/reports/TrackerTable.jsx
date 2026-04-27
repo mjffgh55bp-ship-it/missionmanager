@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Check, X, Plus, Save, ChevronDown, ChevronUp, Pencil, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Check, X, ChevronDown, ChevronUp, Pencil, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { base44 } from "@/api/base44Client";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
@@ -126,12 +126,11 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], taskQualifications = {}, onDelete, onUpdated }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], taskQualifications = {}, onDelete, onUpdated, onEdit }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
   const [cellDraft, setCellDraft] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Filters
   const [dateFilterMode, setDateFilterMode] = useState("all");
@@ -143,7 +142,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [showFilters, setShowFilters] = useState(false);
 
   // Sorting
-  const [sortColId, setSortColId] = useState(null); // null = sort by name
+  const [sortColId, setSortColId] = useState(null);
   const [sortDir, setSortDir] = useState("asc");
 
   const handleSortClick = (colId) => {
@@ -155,42 +154,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     }
   };
 
-  // Inline edit
-  const [editMode, setEditMode] = useState(false);
-  const [editName, setEditName] = useState(tracker.name);
-  const [editColumns, setEditColumns] = useState(tracker.columns || []);
-  const [saving, setSaving] = useState(false);
-
-  const allWorkerColumnNames = [...new Set(
-    (allTemplates || []).flatMap(t => (t.columns || []).filter(c => c.type === "worker").map(c => c.name))
-  )];
-
   useEffect(() => { loadEntries(); }, [tracker.id]);
+  useEffect(() => { setTracker(initialTracker); }, [initialTracker]);
 
   const loadEntries = async () => {
     const data = await base44.entities.TrackerEntry.filter({ tracker_id: tracker.id });
     setEntries(data);
-  };
-
-  const [newOptionDraft, setNewOptionDraft] = useState({});
-
-  const addColumn = () => setEditColumns([...editColumns, { id: Date.now().toString(), name: "", type: "shifts_count", template_column: "", schedule_col_name: "", schedule_col_value: "", options: [], quantitative_options: [] }]);
-  const updateColumn = (idx, field, value) => { const c = [...editColumns]; c[idx] = { ...c[idx], [field]: value }; setEditColumns(c); };
-  const removeColumn = (idx) => setEditColumns(editColumns.filter((_, i) => i !== idx));
-
-  const saveTracker = async () => {
-    setSaving(true);
-    const updated = await base44.entities.Tracker.update(tracker.id, { name: editName, columns: editColumns });
-    setTracker(updated);
-    if (onUpdated) onUpdated(updated);
-    setSaving(false);
-    setEditMode(false);
-  };
-
-  const cancelEdit = () => {
-    setEditName(tracker.name);
-    setEditColumns(tracker.columns || []);
-    setEditMode(false);
   };
 
   const getEntry = (workerId, colId) => entries.find(e => e.worker_id === workerId && e.column_id === colId);
@@ -384,6 +353,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_by_task", "count_quantitative"].includes(type);
 
+  const displayColumns = tracker.columns || [];
+
   const filteredWorkers = workers.filter(w => {
     if (!w.active) return false;
     if (selectedPopulations.length > 0 && !selectedPopulations.includes(w.population)) return false;
@@ -420,6 +391,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     try { return JSON.parse(raw || "{}"); } catch { return {}; }
   };
 
+
+
   const saveQuantitativeItem = async (workerId, colId, optionName, delta) => {
     const existing = getEntry(workerId, colId);
     const current = parseQuantitativeValue(existing?.value);
@@ -434,52 +407,23 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       setEntries([...entries, res]);
     }
   };
-  const displayColumns = editMode ? editColumns : (tracker.columns || []);
+
 
   return (
     <Card className="border-none shadow-lg mb-6" dir="rtl">
       {/* Header */}
       <CardHeader className="border-b py-3 px-4">
         <div className="flex items-center justify-between gap-2">
-          {editMode ? (
-            <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-8 font-semibold text-base w-56" dir="rtl" placeholder="שם הטבלה" />
-          ) : (
-            <CardTitle className="text-base">{tracker.name}</CardTitle>
-          )}
+          <CardTitle className="text-base">{tracker.name}</CardTitle>
           <div className="flex gap-2">
-            {editMode ? (
-              <>
-                <Button size="sm" onClick={saveTracker} disabled={saving || !editName.trim()} className="bg-green-600 hover:bg-green-700">
-                  <Save className="w-4 h-4 ml-1" />{saving ? "שומר..." : "שמור"}
-                </Button>
-                <Button size="sm" variant="outline" onClick={cancelEdit}>
-                  <X className="w-4 h-4 ml-1" />ביטול
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button size="sm" variant="outline" onClick={() => setShowFilters(!showFilters)}>
-                  {showFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-                  סינון
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => {
-                  setEditName(tracker.name);
-                  // Auto-fill quantitative_options from scheduleColumns if empty
-                  const cols = (tracker.columns || []).map(col => {
-                    if (col.type === "count_quantitative" && (!col.quantitative_options || col.quantitative_options.length === 0) && col.schedule_col_name) {
-                      const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                      if (sc?.quantitative_items?.length > 0) return { ...col, quantitative_options: sc.quantitative_items };
-                    }
-                    return col;
-                  });
-                  setEditColumns(cols);
-                  setEditMode(true);
-                }}>
-                  <Pencil className="w-4 h-4 ml-1" />ערוך
-                </Button>
-                <ConfirmDeleteButton onConfirm={onDelete} variant="button" label="מחק טבלה" />
-              </>
-            )}
+            <Button size="sm" variant="outline" onClick={() => setShowFilters(!showFilters)}>
+              {showFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
+              סינון
+            </Button>
+            <Button size="sm" variant="outline" onClick={onEdit}>
+              <Pencil className="w-4 h-4 ml-1" />ערוך
+            </Button>
+            <ConfirmDeleteButton onConfirm={onDelete} variant="button" label="מחק טבלה" />
           </div>
         </div>
 
@@ -552,166 +496,21 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
                 </button>
               </TableHead>
-              {displayColumns.map((col, idx) => {
-                const isMultiTask = col.type === "count_by_task" && (col.task_list || []).length > 1;
-                return (
-                <TableHead key={col.id} dir="rtl" className={`px-2 ${isMultiTask ? "min-w-[180px]" : "min-w-[160px]"}`}>
-                  {editMode ? (
-                    <div className="flex flex-col gap-1 py-1">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => removeColumn(idx)} className="text-red-400 hover:text-red-600 flex-shrink-0">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                        <Input
-                          value={col.name}
-                          onChange={e => updateColumn(idx, "name", e.target.value)}
-                          placeholder="שם עמודה"
-                          className="h-7 text-xs flex-1 min-w-0"
-                          dir="rtl"
-                        />
-                      </div>
-                      <Select value={col.type} onValueChange={v => updateColumn(idx, "type", v)}>
-                        <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue /></SelectTrigger>
-                        <SelectContent dir="rtl">
-                          {COLUMN_TYPES.map(ct => <SelectItem key={ct.value} value={ct.value} className="text-xs">{ct.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      {(col.type === "schedule_col" || col.type === "count_by_text") && (() => {
-                        const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                        const opts = [...(sc?.options || []), ...(sc?.sub_options?.map(so => so.name) || [])];
-                        return (
-                          <div className="space-y-1">
-                            <Select value={col.schedule_col_name || ""} onValueChange={v => updateColumn(idx, "schedule_col_name", v)}>
-                              <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח..." /></SelectTrigger>
-                              <SelectContent dir="rtl">
-                                {scheduleColumns.map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            {opts.length > 0 && (
-                              <Select value={col.schedule_col_value || ""} onValueChange={v => updateColumn(idx, "schedule_col_value", v)}>
-                                <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="ערך ספציפי (אופציונלי)..." /></SelectTrigger>
-                                <SelectContent dir="rtl">
-                                  <SelectItem value={null}>כל ערך</SelectItem>
-                                  {opts.map(o => <SelectItem key={o} value={o} className="text-xs">{o}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </div>
-                        );
-                      })()}
-                      {col.type === "count_by_task" && (
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-xs" dir="rtl">בחר משימות/כישרויות</Label>
-                          <div className="flex flex-wrap gap-1">
-                            {Object.keys(taskQualifications).sort().map(taskName => (
-                              <button
-                                key={taskName}
-                                type="button"
-                                onClick={() => {
-                                  const tasks = col.task_list || [];
-                                  const updated = tasks.includes(taskName) ? tasks.filter(t => t !== taskName) : [...tasks, taskName];
-                                  updateColumn(idx, "task_list", updated);
-                                }}
-                                className={`px-1.5 py-0.5 rounded text-xs border transition-colors ${
-                                  (col.task_list || []).includes(taskName)
-                                    ? "bg-blue-600 border-blue-600 text-white font-semibold"
-                                    : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
-                                }`}
-                              >
-                                {taskName}
-                              </button>
-                            ))}
-                          </div>
-                          {Object.keys(taskQualifications).length === 0 && <p className="text-xs text-gray-400">אין משימות מוגדרות בהגדרות</p>}
-                        </div>
-                      )}
-                      {col.type === "count_quantitative" && (
-                        <div className="space-y-1">
-                          <Select
-                            value={col.schedule_col_name || ""}
-                            onValueChange={v => {
-                              const sc = scheduleColumns.find(c => c.name === v);
-                              const autoOpts = sc?.quantitative_items || [];
-                              const next = [...editColumns];
-                              next[idx] = { ...next[idx], schedule_col_name: v, quantitative_options: autoOpts, quantitative_single_item: "" };
-                              setEditColumns(next);
-                            }}
-                          >
-                            <SelectTrigger className="h-7 text-xs w-full" dir="rtl"><SelectValue placeholder="עמודת לוח לספירה..." /></SelectTrigger>
-                            <SelectContent dir="rtl">
-                              {scheduleColumns.filter(sc => sc.report_type === "count_quantitative").map(sc => <SelectItem key={sc.name} value={sc.name} className="text-xs">{sc.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          {(() => {
-                            const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                            const availableItems = sc?.quantitative_items || col.quantitative_options || [];
-                            if (availableItems.length === 0) return null;
-                            const singleItem = col.quantitative_single_item || "";
-                            return (
-                              <div>
-                                <div className="text-xs text-gray-500 mb-1">פריט לספירה:</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {availableItems.map(item => (
-                                    <button
-                                      key={item}
-                                      type="button"
-                                      onClick={() => updateColumn(idx, "quantitative_single_item", singleItem === item ? "" : item)}
-                                      className={`px-1.5 py-0.5 rounded text-xs border transition-colors ${
-                                        singleItem === item
-                                          ? "bg-blue-600 border-blue-600 text-white font-semibold"
-                                          : "bg-gray-50 border-gray-300 text-gray-600 hover:border-blue-400"
-                                      }`}
-                                    >
-                                      {item}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-
-                              </div>
-                               ) : (
-                                <button
-                                  onClick={() => handleSortClick(col.id)}
-                                  className="flex flex-col gap-0.5 py-1 items-center text-center w-full hover:text-blue-700 transition-colors"
-                                >
-                                  <span className="font-medium flex items-center gap-1">
-                                    {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
-                                    {sortColId === col.id
-                                      ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
-                                      : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
-                                  </span>
-                                  {col.type === "count_by_task" && (col.task_list || []).length > 1 && (
-                                    <div className="flex flex-wrap gap-1 justify-center mt-1">
-                                      {(col.task_list || []).map(taskName => (
-                                        <span key={taskName} className="text-[9px] bg-blue-50 border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded">
-                                          {taskName}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                  <span className="text-[10px] text-gray-400 font-normal">
-                                    {COLUMN_TYPES.find(ct => ct.value === col.type)?.label || ""}
-                                  </span>
-                                </button>
-                               )}
-                  </TableHead>
-                  );
-                  })}
-              {/* Add column button in header */}
-              {editMode && (
-                <TableHead className="px-2">
+              {displayColumns.map((col) => (
+                <TableHead key={col.id} dir="rtl" className="px-2 min-w-[140px]">
                   <button
-                    onClick={addColumn}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 border border-dashed border-blue-300 hover:border-blue-500 rounded px-2 py-1 whitespace-nowrap transition-colors"
+                    onClick={() => handleSortClick(col.id)}
+                    className="flex flex-col gap-0.5 py-1 items-center text-center w-full hover:text-blue-700 transition-colors"
                   >
-                    <Plus className="w-3.5 h-3.5" />הוסף עמודה
+                    <span className="font-medium flex items-center gap-1">
+                      {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
+                      {sortColId === col.id
+                        ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
+                        : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
+                    </span>
                   </button>
                 </TableHead>
-              )}
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -810,11 +609,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                    </TableCell>
                   );
                   })}
-                {editMode && <TableCell />}
-              </TableRow>
-            ))}
-            {/* Summary row */}
-            {!editMode && displayColumns.some(c => c.type === "count_quantitative" || c.type === "count_by_task" || isAuto(c.type)) && (
+                  </TableRow>
+                  ))}
+                  {/* Summary row */}
+                  {displayColumns.some(c => c.type === "count_quantitative" || c.type === "count_by_task" || isAuto(c.type)) && (
                <TableRow className="bg-blue-50 border-t-2 border-blue-200 font-semibold">
                  <TableCell className="px-4 text-blue-900 font-bold">סה"כ</TableCell>
                  {displayColumns.map(col => {
