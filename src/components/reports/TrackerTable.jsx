@@ -428,7 +428,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         </div>
 
         {/* Filters panel */}
-        {!editMode && showFilters && (
+        {showFilters && (
           <div className="pt-3 mt-3 border-t flex flex-wrap gap-3 items-end">
             <div>
               <Label className="text-xs block mb-1">תקופה</Label>
