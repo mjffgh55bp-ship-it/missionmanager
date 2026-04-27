@@ -229,28 +229,57 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const computeAutoValue = (col, workerId) => {
     const dateRange = getDateRange(dateFilterMode, startDate, endDate);
+
+    // ── Rich filter helpers ──────────────────────────────────────────
+    // Get the actual cell values for a schedule column (supports old string + new JSON)
+    const getCellVals = (vals, colName) => {
+      const fieldVal = vals?.[colName];
+      const subTypes = vals?.[`${colName}_subTypes`] || [];
+      return [fieldVal, ...subTypes].filter(Boolean).map(String);
+    };
+
+    // Check col_value_filter (new: {include,exclude}) or fall back to old schedule_col_value
+    const matchesColValueFilter = (vals, colName) => {
+      const cellVals = getCellVals(vals, colName);
+      const f = col.col_value_filter;
+      if (f && (f.include?.length || f.exclude?.length)) {
+        if (f.exclude?.length && cellVals.some(v => f.exclude.includes(v))) return false;
+        if (f.include?.length && !cellVals.some(v => f.include.includes(v))) return false;
+        return cellVals.length > 0;
+      }
+      // Legacy: col.schedule_col_value
+      if (col.schedule_col_value) return cellVals.includes(String(col.schedule_col_value));
+      return cellVals.length > 0;
+    };
+
+    // Check task_filter (new: {include,exclude}) — matches assignment.qualification_id
+    const matchesTaskFilter = (a) => {
+      const tf = col.task_filter;
+      if (!tf || (!tf.include?.length && !tf.exclude?.length)) return true;
+      const taskVal = a.qualification_id || a.qualification_name || "";
+      if (tf.exclude?.length && tf.exclude.includes(taskVal)) return false;
+      if (tf.include?.length && !tf.include.includes(taskVal)) return false;
+      return true;
+    };
+
+    // ────────────────────────────────────────────────────────────────
+
     const filtered = assignments.filter(a => {
       if (!(a.chef_id === workerId || a.sous_chef_id === workerId || a.additional_chef_id === workerId)) return false;
       if (dateRange && (a.date < dateRange.start || a.date > dateRange.end)) return false;
       return true;
     });
 
-    if (col.type === "shifts_count") return filtered.length;
-
-    // Helper: check if a schedule column value matches the filter
-    const matchesFilter = (vals, colName, colValue) => {
-      const fieldVal = vals?.[colName];
-      const subTypes = vals?.[`${colName}_subTypes`] || [];
-      const allVals = [fieldVal, ...subTypes].filter(Boolean).map(String);
-      if (!colValue) return allVals.length > 0;
-      return allVals.includes(String(colValue));
-    };
+    if (col.type === "shifts_count") {
+      return filtered.filter(a => matchesTaskFilter(a)).length;
+    }
 
     if (col.type === "schedule_col") {
       if (!col.schedule_col_name) return 0;
       let total = 0;
       filtered.forEach(a => {
-        if (!matchesFilter(a.column_values, col.schedule_col_name, col.schedule_col_value)) return;
+        if (!matchesColValueFilter(a.column_values, col.schedule_col_name)) return;
+        if (!matchesTaskFilter(a)) return;
         total += a.hours || 0;
       });
       templateRows.forEach(row => {
@@ -258,7 +287,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
-        if (!matchesFilter(row.values, col.schedule_col_name, col.schedule_col_value)) return;
+        if (!matchesColValueFilter(row.values, col.schedule_col_name)) return;
         total += calcHours(
           row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
           row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
@@ -271,14 +300,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       if (!col.schedule_col_name) return 0;
       let count = 0;
       filtered.forEach(a => {
-        if (matchesFilter(a.column_values, col.schedule_col_name, col.schedule_col_value)) count++;
+        if (!matchesColValueFilter(a.column_values, col.schedule_col_name)) return;
+        if (!matchesTaskFilter(a)) return;
+        count++;
       });
       templateRows.forEach(row => {
         if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
-        if (matchesFilter(row.values, col.schedule_col_name, col.schedule_col_value)) count++;
+        if (matchesColValueFilter(row.values, col.schedule_col_name)) count++;
       });
       return count;
     }
@@ -328,6 +359,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
       // For assignments: stored in column_values[colName].value as JSON string
       filtered.forEach(a => {
+        if (!matchesTaskFilter(a)) return;
         const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
         const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
         opts.forEach(o => { counts[o] += parsed[o] || 0; });
