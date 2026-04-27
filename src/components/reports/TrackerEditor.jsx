@@ -28,10 +28,8 @@ function MultiCriterion({ label, description, options, value = { include: [], ex
     const current = value[mode] || [];
     const otherList = value[other] || [];
     if (current.includes(opt)) {
-      // deselect
       onChange({ ...value, [mode]: current.filter(v => v !== opt) });
     } else {
-      // select: remove from other list first
       onChange({ ...value, [mode]: [...current, opt], [other]: otherList.filter(v => v !== opt) });
     }
   };
@@ -105,7 +103,6 @@ function ColumnConfigDialog({ col, scheduleColumns, taskNames, populations, work
   const schedCol = scheduleColumns.find(c => c.name === draft.schedule_col_name);
   const reportType = schedCol?.report_type || "";
 
-  // All selectable values for this column (options + sub_options)
   const colOptions = [
     ...(schedCol?.options || []),
     ...(schedCol?.sub_options?.map(so => so.name) || [])
@@ -269,15 +266,16 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
   const [name, setName] = useState("");
   const [columns, setColumns] = useState([]);
   const [saving, setSaving] = useState(false);
-  const [configuringCol, setConfiguringCol] = useState(null);
+  // Store only the ID of the column being configured, then look it up from `columns` state
+  const [configuringColId, setConfiguringColId] = useState(null);
   const [localTaskNames, setLocalTaskNames] = useState([]);
 
   const prevOpenRef = useRef(false);
   useEffect(() => {
-    // Only reset internal state when the dialog transitions from closed → open
     if (open && !prevOpenRef.current) {
       setName(tracker ? tracker.name || "" : "");
       setColumns(tracker ? (tracker.columns || []).map(c => ({ ...c })) : []);
+      setConfiguringColId(null);
     }
     prevOpenRef.current = open;
   }, [open, tracker]);
@@ -290,6 +288,9 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
     }
   }, [open]);
 
+  // Always get fresh column data from state by ID
+  const configuringCol = configuringColId ? columns.find(c => c.id === configuringColId) || null : null;
+
   const isAdded = (schedColName) => columns.some(c => c.schedule_col_name === schedColName);
   const shiftsCountAdded = columns.some(c => c.type === "shifts_count");
 
@@ -300,7 +301,6 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
     schedule_col_name: schedCol.name,
     quantitative_options: schedCol.quantitative_items || [],
     quantitative_single_item: "",
-    // New rich filter fields
     col_value_filter: { include: [], exclude: [] },
     task_filter: { include: [], exclude: [] },
     population_filter: { include: [], exclude: [] },
@@ -316,8 +316,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
       if (!schedCol) return;
       const newCol = buildNewCol(schedCol);
       setColumns(prev => [...prev, newCol]);
-      // Auto-open config for new column
-      setConfiguringCol(newCol);
+      setConfiguringColId(newCol.id);
     }
   };
 
@@ -339,7 +338,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
 
   const saveColConfig = (updatedCol) => {
     setColumns(prev => prev.map(c => c.id === updatedCol.id ? updatedCol : c));
-    setConfiguringCol(null);
+    setConfiguringColId(null);
   };
 
   const removeColumn = (colId) => {
@@ -467,7 +466,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
                           )}
                         </div>
                         <button
-                          onClick={() => setConfiguringCol(col)}
+                          onClick={() => setConfiguringColId(col.id)}
                           className="text-gray-400 hover:text-blue-600 transition-colors"
                           title="הגדר קריטריונים"
                         >
@@ -496,7 +495,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
         </DialogContent>
       </Dialog>
 
-      {/* Column config popup */}
+      {/* Column config popup — reads fresh data from `columns` state via ID */}
       {configuringCol && (
         <ColumnConfigDialog
           col={configuringCol}
@@ -505,7 +504,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
           populations={populations}
           workerRoles={workerRoles}
           onSave={saveColConfig}
-          onClose={() => setConfiguringCol(null)}
+          onClose={() => setConfiguringColId(null)}
         />
       )}
     </>

@@ -106,7 +106,7 @@ const getDateRange = (mode, startDate, endDate) => {
   if (mode === "month") return { start: format(startOfMonth(today), "yyyy-MM-dd"), end: format(endOfMonth(today), "yyyy-MM-dd") };
   if (mode === "half_year") { const s = new Date(today); s.setMonth(s.getMonth() - 6); return { start: format(s, "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }; }
   if (mode === "half_year_start") {
-    const m = today.getMonth(); // 0-indexed
+    const m = today.getMonth();
     const halfStart = m < 6 ? new Date(today.getFullYear(), 0, 1) : new Date(today.getFullYear(), 6, 1);
     return { start: format(halfStart, "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") };
   }
@@ -199,7 +199,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const computeAutoValue = (col, workerId) => {
     const dateRange = getDateRange(dateFilterMode, startDate, endDate);
 
-    // ── Rich filter helpers ──────────────────────────────────────────
     // Get the actual cell values for a schedule column (supports old string + new JSON)
     const getCellVals = (vals, colName) => {
       const fieldVal = vals?.[colName];
@@ -208,17 +207,22 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     };
 
     // Check col_value_filter (new: {include,exclude}) or fall back to old schedule_col_value
+    // IMPORTANT: If no filter is defined (include/exclude both empty), return true (match all)
     const matchesColValueFilter = (vals, colName) => {
-      const cellVals = getCellVals(vals, colName);
       const f = col.col_value_filter;
       if (f && (f.include?.length || f.exclude?.length)) {
+        const cellVals = getCellVals(vals, colName);
         if (f.exclude?.length && cellVals.some(v => f.exclude.includes(v))) return false;
         if (f.include?.length && !cellVals.some(v => f.include.includes(v))) return false;
-        return cellVals.length > 0;
+        return true;
       }
       // Legacy: col.schedule_col_value
-      if (col.schedule_col_value) return cellVals.includes(String(col.schedule_col_value));
-      return cellVals.length > 0;
+      if (col.schedule_col_value) {
+        const cellVals = getCellVals(vals, colName);
+        return cellVals.includes(String(col.schedule_col_value));
+      }
+      // No filter defined → match everything
+      return true;
     };
 
     // Check time_range_filter — shift start_time must fall within [start, end]
@@ -226,8 +230,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       const trf = col.time_range_filter;
       if (!trf || (!trf.start && !trf.end)) return true;
       const shiftStart = a.start_time || "";
-      if (!shiftStart) return false;
-      // Normalize to HH:MM
+      if (!shiftStart) return true;
       const norm = shiftStart.slice(0, 5);
       if (trf.start && trf.end) {
         if (trf.start <= trf.end) {
@@ -242,7 +245,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       return true;
     };
 
-    // Check task_filter (new: {include,exclude}) — matches assignment.qualification_id
+    // Check task_filter (new: {include,exclude}) — matches assignment.qualification_id or qualification_name
     const matchesTaskFilter = (a) => {
       const tf = col.task_filter;
       if (!tf || (!tf.include?.length && !tf.exclude?.length)) return true;
@@ -251,8 +254,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       if (tf.include?.length && !tf.include.includes(taskVal)) return false;
       return true;
     };
-
-    // ────────────────────────────────────────────────────────────────
 
     const filtered = assignments.filter(a => {
       if (!(a.chef_id === workerId || a.sous_chef_id === workerId || a.additional_chef_id === workerId)) return false;
@@ -309,23 +310,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     if (col.type === "count_by_task") {
        const taskList = col.task_list || [];
        if (taskList.length === 0) return 0;
-       // Return object with task names as keys and counts/hours as values
        const result = {};
        taskList.forEach(taskName => { result[taskName] = 0; });
-       
-       // Check each assignment and match by qualification_id
        filtered.forEach(a => {
          if (!matchesTimeRangeFilter(a)) return;
-         // qualification_id may be the task name itself or an ID
          let matchedTask = null;
          if (a.qualification_id && taskList.includes(a.qualification_id)) {
            matchedTask = a.qualification_id;
-         }
-         // Also check if qualification_name matches
-         else if (a.qualification_name && taskList.includes(a.qualification_name)) {
+         } else if (a.qualification_name && taskList.includes(a.qualification_name)) {
            matchedTask = a.qualification_name;
          }
-         
          if (matchedTask) {
            result[matchedTask] += a.hours || 0;
          }
@@ -339,18 +333,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
         ? col.quantitative_options
         : (sc?.quantitative_items || []);
-      // If single item selected, only count that one
       const opts = col.quantitative_single_item ? [col.quantitative_single_item] : allOpts;
       const counts = {};
       opts.forEach(o => { counts[o] = 0; });
 
-      // Parse JSON quantitative value (stored as '{"A":1,"B":2}')
       const parseQuantJson = (raw) => {
         if (!raw) return {};
         try { return JSON.parse(raw); } catch { return {}; }
       };
 
-      // For assignments: stored in column_values[colName].value as JSON string
       filtered.forEach(a => {
         if (!matchesTaskFilter(a)) return;
         if (!matchesTimeRangeFilter(a)) return;
@@ -359,7 +350,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         opts.forEach(o => { counts[o] += parsed[o] || 0; });
       });
 
-      // For templateRows: stored in values[colName] as JSON string
       templateRows.forEach(row => {
         if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
         const tmpl = allTemplates.find(t => t.id === row.template_id);
@@ -415,8 +405,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const parseQuantitativeValue = (raw) => {
     try { return JSON.parse(raw || "{}"); } catch { return {}; }
   };
-
-
 
   const saveQuantitativeItem = async (workerId, colId, optionName, delta) => {
     const existing = getEntry(workerId, colId);
@@ -554,7 +542,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     if (tasks.length === 0) {
                       return <TableCell key={col.id} className="px-2 text-gray-300 text-xs">אין משימות</TableCell>;
                     }
-                    // Single task: show just the number
                     if (tasks.length === 1) {
                       const taskName = tasks[0];
                       const h = hours[taskName] || 0;
@@ -564,7 +551,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                         </TableCell>
                       );
                     }
-                    // Multiple tasks: show as column headers with values only
                     return (
                       <TableCell key={col.id} className="px-2 min-w-[80px]">
                         <div className="text-center">
@@ -583,7 +569,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       ? col.quantitative_options
                       : (sc?.quantitative_items || []);
                     const counts = typeof value === "object" && value !== null ? value : {};
-                    // Single item mode: show just one number
                     if (col.quantitative_single_item) {
                       const num = counts[col.quantitative_single_item] || 0;
                       return (
@@ -592,7 +577,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                         </TableCell>
                       );
                     }
-                    // Multi-item mode: show list
                     return (
                       <TableCell key={col.id} className="px-2 min-w-[120px]">
                         <div className="space-y-0.5">
@@ -662,7 +646,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
                       ? col.quantitative_options
                       : (sc?.quantitative_items || []);
-                    // Single item mode
                     if (col.quantitative_single_item) {
                       const total = filteredWorkers.reduce((sum, w) => {
                         const counts = computeAutoValue(col, w.id);
@@ -674,7 +657,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                         </TableCell>
                       );
                     }
-                    // Multi-item mode
                     const totals = {};
                     allOpts.forEach(opt => {
                       totals[opt] = filteredWorkers.reduce((sum, w) => {
@@ -695,7 +677,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       </TableCell>
                     );
                   }
-                  // For auto columns, sum numerics
                   if (isAuto(col.type)) {
                     const total = filteredWorkers.reduce((sum, w) => {
                       const v = computeAutoValue(col, w.id);
