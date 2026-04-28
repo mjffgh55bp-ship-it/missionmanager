@@ -556,12 +556,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         try { return JSON.parse(raw); } catch { return {}; }
       };
 
-      // Check all criteria
-      const nonTimeRangeCriteria = (col.criteria || []).filter(c => c.col_name !== TIME_RANGE_COL);
-      const timeRangeCriteria = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
-
+      // Check all criteria - for count_quantitative, we include ALL criteria including time range
       filtered.forEach(a => {
-        // Check if assignment matches all criteria
+        // Check ALL criteria (including time range) using matchesCriteria
         if (!matchesCriteria(a.column_values, a)) return;
         
         const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
@@ -575,7 +572,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
         
-        // Check if row matches all criteria
+        // Check if row matches ALL criteria using matchesCriteria
         const rowAsAssignment = { qualification_id: row.values?.task || "" };
         if (!matchesCriteria(row.values, rowAsAssignment)) return;
         
