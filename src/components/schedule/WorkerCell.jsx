@@ -185,8 +185,13 @@ export default function WorkerCell({
       {/* Dropdown list */}
       {editing && (
         <div
-          className="absolute top-full right-0 z-[200] bg-white border border-gray-200 rounded-lg shadow-xl w-56 max-h-60 overflow-y-auto"
-          style={{ minWidth: "180px" }}
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-2xl w-56 max-h-60 overflow-y-auto"
+          style={{
+            minWidth: "180px",
+            zIndex: 50,
+            top: containerRef.current ? containerRef.current.getBoundingClientRect().bottom + window.scrollY : 'auto',
+            right: containerRef.current ? window.innerWidth - containerRef.current.getBoundingClientRect().right + window.scrollX : 'auto'
+          }}
           dir="rtl"
         >
           {selectedWorker && (
