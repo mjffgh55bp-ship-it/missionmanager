@@ -21,7 +21,7 @@ function getColSummary(col) {
 
 // ── Main TrackerEditor ────────────────────────────────────────────────────────
 
-export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, scheduleColumns = [], populations = [], workerRoles = [] }) {
+export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, scheduleColumns = [], populations = [], workerRoles = [], qualifications = [] }) {
   const [name, setName] = useState("");
   const [columns, setColumns] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -196,6 +196,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
         <ColumnConfigDialog
           col={configuringCol}
           scheduleColumns={scheduleColumns}
+          qualifications={qualifications}
           onSave={saveColConfig}
           onClose={() => setConfiguringColId(null)}
         />

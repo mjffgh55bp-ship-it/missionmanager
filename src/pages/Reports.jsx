@@ -345,7 +345,7 @@ export default function Reports() {
         tracker={editingTracker}
         onSaved={handleTrackerSaved}
         scheduleColumns={scheduleColumns}
-        taskQualifications={taskQualifications}
+        qualifications={qualifications}
         populations={populations}
         workerRoles={workerRoles}
       />

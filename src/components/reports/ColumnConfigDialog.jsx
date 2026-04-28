@@ -22,11 +22,16 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
         ]
       : [];
 
+  // Filter out any stale name-based values that are no longer valid IDs
+  const validIds = isTaskCriterion ? qualifications.map(q => q.id) : null;
+  const cleanInclude = isTaskCriterion
+    ? (criterion.include || []).filter(v => validIds.includes(v))
+    : (criterion.include || []);
+
   const toggleInclude = (opt) => {
-    const current = criterion.include || [];
-    const next = current.includes(opt)
-      ? current.filter(v => v !== opt)
-      : [...current, opt];
+    const next = cleanInclude.includes(opt)
+      ? cleanInclude.filter(v => v !== opt)
+      : [...cleanInclude, opt];
     onUpdate({ ...criterion, include: next });
   };
 
@@ -87,7 +92,7 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
                 {availableOptions.map(opt => {
                   const optValue = typeof opt === "object" ? opt.value : opt;
                   const optLabel = typeof opt === "object" ? opt.label : opt;
-                  const isSelected = (criterion.include || []).includes(optValue);
+                  const isSelected = cleanInclude.includes(optValue);
                   return (
                     <button key={optValue} type="button" onClick={() => toggleInclude(optValue)}
                       className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
@@ -101,7 +106,7 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
                   );
                 })}
               </div>
-              {(criterion.include || []).length > 1 && (
+              {cleanInclude.length > 1 && (
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-xs text-blue-700 ml-2">שיטת ספירה:</span>
                   <button type="button" onClick={() => onUpdate({ ...criterion, logic: "and" })}
