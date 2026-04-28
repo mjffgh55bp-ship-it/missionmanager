@@ -8,38 +8,48 @@ const TASK_COL_NAME = "__משימה__";
 const TIME_RANGE_COL_NAME = "__טווח_שעות__";
 
 function TimeRangeSelector({ criterion, onUpdate }) {
-  const timeRanges = criterion.include || [];
+  // Store time ranges as strings like "00:00-23:59"
+  const parseTimeRanges = (include) => {
+    return (include || []).map(str => {
+      const [start, end] = str.split("-");
+      return { start: start || "00:00", end: end || "23:59", id: str };
+    });
+  };
+
+  const timeRanges = parseTimeRanges(criterion.include || []);
 
   const addTimeRange = () => {
-    const newRanges = [...timeRanges, { start: "00:00", end: "23:59", id: Date.now().toString() }];
-    onUpdate({ ...criterion, include: newRanges });
+    const newRange = "00:00-23:59";
+    const newInclude = [...(criterion.include || []), newRange];
+    onUpdate({ ...criterion, include: newInclude });
   };
 
-  const updateTimeRange = (id, field, value) => {
-    const newRanges = timeRanges.map(r => r.id === id ? { ...r, [field]: value } : r);
-    onUpdate({ ...criterion, include: newRanges });
+  const updateTimeRange = (oldStr, newStart, newEnd) => {
+    const newStr = `${newStart}-${newEnd}`;
+    const newInclude = (criterion.include || []).map(r => r === oldStr ? newStr : r);
+    onUpdate({ ...criterion, include: newInclude });
   };
 
-  const removeTimeRange = (id) => {
-    const newRanges = timeRanges.filter(r => r.id !== id);
-    onUpdate({ ...criterion, include: newRanges });
+  const removeTimeRange = (str) => {
+    const newInclude = (criterion.include || []).filter(r => r !== str);
+    onUpdate({ ...criterion, include: newInclude });
   };
 
   return (
     <div className="space-y-2">
-      {timeRanges.map((range, idx) => (
+      {timeRanges.map((range) => (
         <div key={range.id} className="flex items-center gap-2">
           <Input
             type="time"
             value={range.start}
-            onChange={(e) => updateTimeRange(range.id, "start", e.target.value)}
+            onChange={(e) => updateTimeRange(range.id, e.target.value, range.end)}
             className="h-7 text-xs flex-1"
           />
           <span className="text-xs text-gray-600">עד</span>
           <Input
             type="time"
             value={range.end}
-            onChange={(e) => updateTimeRange(range.id, "end", e.target.value)}
+            onChange={(e) => updateTimeRange(range.id, range.start, e.target.value)}
             className="h-7 text-xs flex-1"
           />
           <button
@@ -244,7 +254,7 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
       id: Date.now().toString(),
       col_name: TIME_RANGE_COL_NAME,
       col_type: "time_range",
-      include: [{ start: "00:00", end: "23:59", id: Date.now().toString() }],
+      include: ["00:00-23:59"],
       logic: "or",
     };
     update("criteria", [...(draft.criteria || []), newC]);

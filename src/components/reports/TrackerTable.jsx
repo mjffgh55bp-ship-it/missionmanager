@@ -294,9 +294,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             // Check if shift start time falls within any of the time ranges
             const shiftStart = assignmentObj?.start_time || vals?.["התחלה"] || vals?.["שעת התחלה"];
             if (!shiftStart) return false;
-            const matches = (range) => {
-              const rangeStart = range.start;
-              const rangeEnd = range.end;
+            const matches = (rangeStr) => {
+              const [rangeStart, rangeEnd] = rangeStr.split("-");
               return shiftStart >= rangeStart && shiftStart < rangeEnd;
             };
             if (c.logic === "and") return c.include.every(r => matches(r));
