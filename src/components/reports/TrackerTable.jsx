@@ -194,20 +194,22 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     setConfiguringCol(newCol);
   };
 
-  const saveColConfig = (updatedCol) => {
-    setEditColumns(prev => {
-      const exists = prev.find(c => c.id === updatedCol.id);
-      const newCols = exists
-        ? prev.map(c => c.id === updatedCol.id ? updatedCol : c)
-        : [...prev, updatedCol];
-      // Save immediately to DB so changes persist even if user navigates away
-      base44.entities.Tracker.update(tracker.id, { columns: newCols }).then(updated => {
-        setTracker(updated);
-        onUpdated(updated);
-      });
-      return newCols;
-    });
+  const saveColConfig = async (updatedCol) => {
+    // Compute new columns synchronously
+    const currentCols = editColumns;
+    const exists = currentCols.find(c => c.id === updatedCol.id);
+    const newCols = exists
+      ? currentCols.map(c => c.id === updatedCol.id ? updatedCol : c)
+      : [...currentCols, updatedCol];
+
+    // Update state and close dialog
+    setEditColumns(newCols);
     setConfiguringCol(null);
+
+    // Persist to DB
+    const updated = await base44.entities.Tracker.update(tracker.id, { columns: newCols });
+    setTracker(updated);
+    onUpdated(updated);
   };
 
   const loadEntries = async () => {
