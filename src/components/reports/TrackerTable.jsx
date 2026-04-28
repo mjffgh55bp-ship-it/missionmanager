@@ -263,6 +263,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
     // Check criteria array (new format) or fall back to old col_value_filter
     const TASK_COL = "__משימה__";
+    const parseQuantJson = (raw) => {
+      if (!raw) return {};
+      if (typeof raw === "object") return raw;
+      try { return JSON.parse(raw); } catch { return {}; }
+    };
     const matchesCriteria = (vals, assignmentObj) => {
       const criteria = col.criteria;
       if (criteria && criteria.length > 0) {
@@ -293,6 +298,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               if (qualByName && qualByName.id === v) return true;
               return false;
             };
+            if (c.logic === "and") return c.include.every(v => matches(v));
+            return c.include.some(v => matches(v));
+          }
+          // Check if this is a quantitative column (value stored as JSON like {"A":1,"B":0})
+          const rawVal = vals?.[c.col_name];
+          if (typeof rawVal === "string" && rawVal.startsWith("{")) {
+            const parsed = parseQuantJson(rawVal);
+            const matches = (v) => (parsed[v] || 0) > 0;
             if (c.logic === "and") return c.include.every(v => matches(v));
             return c.include.some(v => matches(v));
           }
