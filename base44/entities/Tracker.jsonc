@@ -34,6 +34,10 @@
               "count_quantitative"
             ]
           },
+          "description": {
+            "type": "string",
+            "description": "Optional description shown below column name"
+          },
           "schedule_col_name": {
             "type": "string",
             "description": "For schedule_col/count_quantitative: which schedule column name to use"
@@ -85,6 +89,45 @@
               "count_shifts"
             ],
             "description": "For combined_data: aggregation operation"
+          },
+          "criteria": {
+            "type": "array",
+            "description": "List of filter criteria for this column",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "col_name": {
+                  "type": "string"
+                },
+                "col_type": {
+                  "type": "string"
+                },
+                "include": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "logic": {
+                  "type": "string",
+                  "enum": [
+                    "and",
+                    "or"
+                  ]
+                }
+              }
+            }
+          },
+          "criteria_logic": {
+            "type": "string",
+            "enum": [
+              "and",
+              "or"
+            ],
+            "description": "How multiple criteria are combined (and/or)"
           }
         }
       }
