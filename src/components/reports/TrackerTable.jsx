@@ -127,7 +127,7 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], taskQualifications = {}, onDelete, onUpdated }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], taskQualifications = {}, onDelete, onUpdated }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -252,18 +252,23 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     };
 
     // Check criteria array (new format) or fall back to old col_value_filter
+    const TASK_COL = "__משימה__";
     const matchesCriteria = (vals, assignmentObj) => {
       const criteria = col.criteria;
       if (criteria && criteria.length > 0) {
         // Each criterion must match (AND between criteria)
         return criteria.every(c => {
           if (!c.col_name || !(c.include?.length)) return true; // no selection = match all
+          // Task criterion: match against assignment's qualification_id or qualification_name
+          if (c.col_name === TASK_COL) {
+            const taskVal = assignmentObj?.qualification_id || assignmentObj?.qualification_name || "";
+            if (c.logic === "and") return c.include.every(v => v === taskVal);
+            return c.include.some(v => v === taskVal);
+          }
           const cellVals = getCellVals(vals, c.col_name);
           if (c.logic === "and") {
-            // All selected values must be present
             return c.include.every(v => cellVals.includes(v));
           } else {
-            // OR: at least one selected value is present
             return c.include.some(v => cellVals.includes(v));
           }
         });
@@ -273,9 +278,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
     // Check col_value_filter (legacy: {include,exclude}) or fall back to old schedule_col_value
     // IMPORTANT: If no filter is defined (include/exclude both empty), return true (match all)
-    const matchesColValueFilter = (vals, colName) => {
+    const matchesColValueFilter = (vals, colName, assignmentObj) => {
       // New criteria format takes priority
-      if (col.criteria?.length) return matchesCriteria(vals, null);
+      if (col.criteria?.length) return matchesCriteria(vals, assignmentObj);
       const f = col.col_value_filter;
       if (f && (f.include?.length || f.exclude?.length)) {
         const cellVals = getCellVals(vals, colName);
@@ -336,7 +341,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       if (!col.schedule_col_name) return 0;
       let total = 0;
       filtered.forEach(a => {
-        if (!matchesColValueFilter(a.column_values, col.schedule_col_name)) return;
+        if (!matchesColValueFilter(a.column_values, col.schedule_col_name, a)) return;
         if (!matchesTaskFilter(a)) return;
         if (!matchesTimeRangeFilter(a)) return;
         total += a.hours || 0;
@@ -346,7 +351,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
-        if (!matchesColValueFilter(row.values, col.schedule_col_name)) return;
+        if (!matchesColValueFilter(row.values, col.schedule_col_name, null)) return;
         total += calcHours(
           row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
           row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
@@ -359,7 +364,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       if (!col.schedule_col_name) return 0;
       let count = 0;
       filtered.forEach(a => {
-        if (!matchesColValueFilter(a.column_values, col.schedule_col_name)) return;
+        if (!matchesColValueFilter(a.column_values, col.schedule_col_name, a)) return;
         if (!matchesTaskFilter(a)) return;
         if (!matchesTimeRangeFilter(a)) return;
         count++;
@@ -369,7 +374,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
-        if (matchesColValueFilter(row.values, col.schedule_col_name)) count++;
+        if (matchesColValueFilter(row.values, col.schedule_col_name, null)) count++;
       });
       return count;
     }
@@ -566,6 +571,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         <ColumnConfigDialog
           col={configuringCol}
           scheduleColumns={scheduleColumns}
+          qualifications={qualifications}
           onSave={saveColConfig}
           onClose={() => setConfiguringCol(null)}
         />

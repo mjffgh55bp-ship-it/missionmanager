@@ -27,6 +27,7 @@ export default function Reports() {
   const [editingChart, setEditingChart] = useState(null);
   const [selectedTrackerForCharts, setSelectedTrackerForCharts] = useState(null);
   const [taskQualifications, setTaskQualifications] = useState({});
+  const [qualifications, setQualifications] = useState([]);
   const [trackerEditorOpen, setTrackerEditorOpen] = useState(false);
   const [editingTracker, setEditingTracker] = useState(null);
   const [trackerSizes, setTrackerSizes] = useState({});
@@ -36,7 +37,8 @@ export default function Reports() {
   const loadData = async () => {
     const [
       workersData, assignmentsData, templateRowsData, templatesData, trackersData,
-      populationsSettings, workerRolesSettings, globalColSettings, cartColSettings, taskQualSettings
+      populationsSettings, workerRolesSettings, globalColSettings, cartColSettings, taskQualSettings,
+      qualificationsData
     ] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
@@ -48,6 +50,7 @@ export default function Reports() {
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
       base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
+      base44.entities.Qualification.filter({ active: true }),
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -58,6 +61,7 @@ export default function Reports() {
     // Load task qualifications from AppSettings
     const taskQuals = taskQualSettings.length > 0 ? JSON.parse(taskQualSettings[0].setting_value) || {} : {};
     setTaskQualifications(taskQuals);
+    setQualifications(qualificationsData);
     if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
     // Load charts and all tracker entries
@@ -269,6 +273,7 @@ export default function Reports() {
                                   populations={populations}
                                   workerRoles={workerRoles}
                                   scheduleColumns={scheduleColumns}
+                                  qualifications={qualifications}
                                   taskQualifications={taskQualifications}
                                   onDelete={() => handleDeleteTracker(tracker.id)}
                                   onUpdated={handleTrackerUpdated}
