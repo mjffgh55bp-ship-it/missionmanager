@@ -409,9 +409,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
           const tmpl = allTemplates.find(t => t.id === row.template_id);
           if (!tmpl) return;
-          if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
+          // Check if this row has the worker anywhere (not just one column)
+          const hasWorker = (tmpl.columns || []).some(tc => 
+            tc.type === "worker" && row.values?.[tc.name] === workerId
+          );
+          if (!hasWorker) return;
+          
+          // Check if criteria match this row (as if it's an assignment)
           const rowAsAssignment = { qualification_id: row.values?.task || "" };
-          if (!matchesColValueFilter(row.values, col.schedule_col_name, rowAsAssignment)) return;
+          if (!matchesCriteria(row.values, rowAsAssignment)) return;
+          
           total += calcHours(
             row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
             row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
