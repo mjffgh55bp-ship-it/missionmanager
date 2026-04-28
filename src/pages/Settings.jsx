@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList } from "lucide-react";
+import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -36,6 +36,8 @@ export default function Settings() {
   const [taskQualifications, setTaskQualifications] = useState({}); // { taskName: [workerId, ...] }
   const [expandedTask, setExpandedTask] = useState(null);
   const [newQuantItem, setNewQuantItem] = useState(""); // for new column quant item
+  const [renamingQuantItem, setRenamingQuantItem] = useState(null); // { colIdx, itemIdx, value }
+  const [renamingSubOption, setRenamingSubOption] = useState(null); // { colIdx, subIdx, field, value }
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -157,6 +159,88 @@ export default function Settings() {
       i === colIdx ? { ...c, sub_options: (c.sub_options || []).filter((_, si) => si !== subIdx) } : c
     );
     await saveScheduleColumns(updated);
+  };
+
+  // Rename sub_option criterion globally — updates all Assignments and TemplateRows
+  const handleRenameSubOptionCriterion = async (colIdx, subIdx, oldCriterion, newCriterion) => {
+    if (!newCriterion.trim() || newCriterion.trim() === oldCriterion) return;
+    const colName = scheduleColumns[colIdx].name;
+    const trimmed = newCriterion.trim();
+
+    // 1. Update the setting
+    const updated = scheduleColumns.map((c, i) => i === colIdx ? {
+      ...c,
+      sub_options: (c.sub_options || []).map((s, j) => j === subIdx ? { ...s, criterion: trimmed } : s)
+    } : c);
+    await saveScheduleColumns(updated);
+
+    // 2. Update Assignments
+    const assignments = await base44.entities.Assignment.list();
+    for (const a of assignments) {
+      const val = a.column_values?.[colName];
+      if (val === oldCriterion) {
+        await base44.entities.Assignment.update(a.id, { column_values: { ...a.column_values, [colName]: trimmed } });
+      }
+    }
+
+    // 3. Update TemplateRows
+    const rows = await base44.entities.TemplateRow.list();
+    for (const r of rows) {
+      const val = r.values?.[colName];
+      if (val === oldCriterion) {
+        await base44.entities.TemplateRow.update(r.id, { values: { ...r.values, [colName]: trimmed } });
+      }
+    }
+  };
+
+  // Rename quant item globally — updates all Assignments and TemplateRows
+  const handleRenameQuantItem = async (colIdx, itemIdx, oldName, newName) => {
+    if (!newName.trim() || newName.trim() === oldName) return;
+    const colName = scheduleColumns[colIdx].name;
+    const trimmed = newName.trim();
+
+    // 1. Update the setting
+    const updated = scheduleColumns.map((c, i) => i === colIdx ? {
+      ...c,
+      quantitative_items: (c.quantitative_items || []).map((it, j) => j === itemIdx ? trimmed : it)
+    } : c);
+    await saveScheduleColumns(updated);
+
+    // 2. Update all Assignments that have this column
+    const assignments = await base44.entities.Assignment.list();
+    for (const a of assignments) {
+      const raw = a.column_values?.[colName];
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw);
+        if (oldName in parsed) {
+          const renamed = {};
+          for (const [k, v] of Object.entries(parsed)) {
+            renamed[k === oldName ? trimmed : k] = v;
+          }
+          const newColVals = { ...a.column_values, [colName]: JSON.stringify(renamed) };
+          await base44.entities.Assignment.update(a.id, { column_values: newColVals });
+        }
+      } catch {}
+    }
+
+    // 3. Update all TemplateRows that have this column
+    const rows = await base44.entities.TemplateRow.list();
+    for (const r of rows) {
+      const raw = r.values?.[colName];
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw);
+        if (oldName in parsed) {
+          const renamed = {};
+          for (const [k, v] of Object.entries(parsed)) {
+            renamed[k === oldName ? trimmed : k] = v;
+          }
+          const newVals = { ...r.values, [colName]: JSON.stringify(renamed) };
+          await base44.entities.TemplateRow.update(r.id, { values: newVals });
+        }
+      } catch {}
+    }
   };
 
   const handleAddPopulation = async () => {
@@ -359,24 +443,54 @@ export default function Settings() {
                            <Button size="sm" className="h-7" onClick={() => handleAddQuantItem(idx, newQuantItem)}><Plus className="w-3 h-3" /></Button>
                          </div>
                          <div className="space-y-1">
-                           {(col.quantitative_items || []).map((item, ii) => (
-                             <div key={ii} className="flex items-center gap-2">
-                               <button onClick={() => handleRemoveQuantItem(idx, ii)} className="text-red-400 hover:text-red-600 flex-shrink-0"><X className="w-3 h-3" /></button>
-                               <Input
-                                 value={item}
-                                 onChange={async e => {
-                                   const updated = scheduleColumns.map((c, i) => i === idx ? {
-                                     ...c,
-                                     quantitative_items: (c.quantitative_items || []).map((it, j) => j === ii ? e.target.value : it)
-                                   } : c);
-                                   await saveScheduleColumns(updated);
-                                 }}
-                                 className="h-6 text-xs flex-1"
-                                 dir="rtl"
-                                 placeholder="שם פריט"
-                               />
-                             </div>
-                           ))}
+                           {(col.quantitative_items || []).map((item, ii) => {
+                             const isRenaming = renamingQuantItem?.colIdx === idx && renamingQuantItem?.itemIdx === ii;
+                             return (
+                               <div key={ii} className="flex items-center gap-2">
+                                 <button onClick={() => handleRemoveQuantItem(idx, ii)} className="text-red-400 hover:text-red-600 flex-shrink-0"><X className="w-3 h-3" /></button>
+                                 {isRenaming ? (
+                                   <>
+                                     <Input
+                                       autoFocus
+                                       value={renamingQuantItem.value}
+                                       onChange={e => setRenamingQuantItem(prev => ({ ...prev, value: e.target.value }))}
+                                       onKeyDown={async e => {
+                                         if (e.key === 'Enter') {
+                                           await handleRenameQuantItem(idx, ii, item, renamingQuantItem.value);
+                                           setRenamingQuantItem(null);
+                                         }
+                                         if (e.key === 'Escape') setRenamingQuantItem(null);
+                                       }}
+                                       className="h-6 text-xs flex-1"
+                                       dir="rtl"
+                                     />
+                                     <button
+                                       onClick={async () => {
+                                         await handleRenameQuantItem(idx, ii, item, renamingQuantItem.value);
+                                         setRenamingQuantItem(null);
+                                       }}
+                                       className="text-green-600 hover:text-green-700 flex-shrink-0"
+                                       title="שמור שינוי שם (גורפי)"
+                                     >
+                                       <Check className="w-3 h-3" />
+                                     </button>
+                                     <button onClick={() => setRenamingQuantItem(null)} className="text-gray-400 hover:text-gray-600 flex-shrink-0"><X className="w-3 h-3" /></button>
+                                   </>
+                                 ) : (
+                                   <>
+                                     <span className="text-xs flex-1 px-1">{item}</span>
+                                     <button
+                                       onClick={() => setRenamingQuantItem({ colIdx: idx, itemIdx: ii, value: item })}
+                                       className="text-gray-400 hover:text-blue-600 flex-shrink-0"
+                                       title="שנה שם (יעדכן נתונים קיימים)"
+                                     >
+                                       <Pencil className="w-3 h-3" />
+                                     </button>
+                                   </>
+                                 )}
+                               </div>
+                             );
+                           })}
                            {(col.quantitative_items || []).length === 0 && <p className="text-xs text-gray-400">לא הוגדרו פריטים</p>}
                          </div>
                        </div>
@@ -408,37 +522,64 @@ export default function Settings() {
                              <Button size="sm" className="h-7" onClick={() => handleAddSubOption(idx)}><Plus className="w-3 h-3" /></Button>
                            </div>
                            <div className="space-y-1">
-                             {(col.sub_options || []).map((so, si) => (
-                               <div key={si} className="flex items-center gap-2 bg-gray-50 rounded px-2 py-1 text-xs">
-                                 <button onClick={() => handleRemoveSubOption(idx, si)} className="text-red-400 hover:text-red-600 flex-shrink-0"><X className="w-3 h-3" /></button>
-                                 <Input
-                                   value={so.name}
-                                   onChange={async e => {
-                                     const updated = scheduleColumns.map((c, i) => i === idx ? {
-                                       ...c,
-                                       sub_options: (c.sub_options || []).map((s, j) => j === si ? { ...s, name: e.target.value } : s)
-                                     } : c);
-                                     await saveScheduleColumns(updated);
-                                   }}
-                                   className="h-6 text-xs flex-1 min-w-0"
-                                   dir="rtl"
-                                   placeholder="שם"
-                                 />
-                                 <Input
-                                   value={so.criterion}
-                                   onChange={async e => {
-                                     const updated = scheduleColumns.map((c, i) => i === idx ? {
-                                       ...c,
-                                       sub_options: (c.sub_options || []).map((s, j) => j === si ? { ...s, criterion: e.target.value } : s)
-                                     } : c);
-                                     await saveScheduleColumns(updated);
-                                   }}
-                                   className="h-6 text-xs flex-1 min-w-0 text-gray-500"
-                                   dir="rtl"
-                                   placeholder="קריטריון"
-                                 />
-                               </div>
-                             ))}
+                             {(col.sub_options || []).map((so, si) => {
+                               const isRenamingCrit = renamingSubOption?.colIdx === idx && renamingSubOption?.subIdx === si && renamingSubOption?.field === 'criterion';
+                               return (
+                                 <div key={si} className="flex items-center gap-2 bg-gray-50 rounded px-2 py-1 text-xs">
+                                   <button onClick={() => handleRemoveSubOption(idx, si)} className="text-red-400 hover:text-red-600 flex-shrink-0"><X className="w-3 h-3" /></button>
+                                   {/* Name — plain editable, no data impact */}
+                                   <Input
+                                     value={so.name}
+                                     onChange={async e => {
+                                       const updated = scheduleColumns.map((c, i) => i === idx ? {
+                                         ...c,
+                                         sub_options: (c.sub_options || []).map((s, j) => j === si ? { ...s, name: e.target.value } : s)
+                                       } : c);
+                                       await saveScheduleColumns(updated);
+                                     }}
+                                     className="h-6 text-xs flex-1 min-w-0"
+                                     dir="rtl"
+                                     placeholder="שם"
+                                   />
+                                   {/* Criterion — rename gloablly */}
+                                   {isRenamingCrit ? (
+                                     <>
+                                       <Input
+                                         autoFocus
+                                         value={renamingSubOption.value}
+                                         onChange={e => setRenamingSubOption(prev => ({ ...prev, value: e.target.value }))}
+                                         onKeyDown={async e => {
+                                           if (e.key === 'Enter') {
+                                             await handleRenameSubOptionCriterion(idx, si, so.criterion, renamingSubOption.value);
+                                             setRenamingSubOption(null);
+                                           }
+                                           if (e.key === 'Escape') setRenamingSubOption(null);
+                                         }}
+                                         className="h-6 text-xs flex-1 min-w-0"
+                                         dir="rtl"
+                                       />
+                                       <button
+                                         onClick={async () => {
+                                           await handleRenameSubOptionCriterion(idx, si, so.criterion, renamingSubOption.value);
+                                           setRenamingSubOption(null);
+                                         }}
+                                         className="text-green-600 hover:text-green-700 flex-shrink-0" title="שמור שם גורפי"
+                                       ><Check className="w-3 h-3" /></button>
+                                       <button onClick={() => setRenamingSubOption(null)} className="text-gray-400 hover:text-gray-600 flex-shrink-0"><X className="w-3 h-3" /></button>
+                                     </>
+                                   ) : (
+                                     <>
+                                       <span className="text-xs text-gray-500 flex-1 px-1">{so.criterion}</span>
+                                       <button
+                                         onClick={() => setRenamingSubOption({ colIdx: idx, subIdx: si, field: 'criterion', value: so.criterion })}
+                                         className="text-gray-400 hover:text-blue-600 flex-shrink-0"
+                                         title="שנה קריטריון (יעדכן נתונים קיימים)"
+                                       ><Pencil className="w-3 h-3" /></button>
+                                     </>
+                                   )}
+                                 </div>
+                               );
+                             })}
                              {(col.sub_options || []).length === 0 && <p className="text-xs text-gray-400">לא הוגדרו אפשרויות</p>}
                            </div>
                          </div>
