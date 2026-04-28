@@ -260,7 +260,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const checkOne = (c) => {
           if (!c.col_name || !(c.include?.length)) return true; // no selection = match all
           if (c.col_name === TASK_COL) {
-            const taskId = assignmentObj?.qualification_id || "";
+            // Task can be stored as qualification_id (old) OR as column_values["משימה"] (new schedule col)
+            const taskFromQual = assignmentObj?.qualification_id || "";
+            const taskFromCol = vals?.["משימה"] || "";
+            const taskId = taskFromQual || taskFromCol;
+            if (!taskId) return false; // no task at all = no match
             if (c.logic === "and") return c.include.every(v => v === taskId);
             return c.include.some(v => v === taskId);
           }
