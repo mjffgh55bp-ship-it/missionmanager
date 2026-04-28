@@ -303,7 +303,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
-        if (!matchesColValueFilter(row.values, col.schedule_col_name, null)) return;
+        const rowAsAssignment = { qualification_id: row.values?.task || "" };
+        if (!matchesColValueFilter(row.values, col.schedule_col_name, rowAsAssignment)) return;
         total += calcHours(
           row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
           row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
@@ -324,7 +325,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
-        if (matchesColValueFilter(row.values, col.schedule_col_name, null)) count++;
+        const rowAsAssignment = { qualification_id: row.values?.task || "" };
+        if (matchesColValueFilter(row.values, col.schedule_col_name, rowAsAssignment)) count++;
       });
       return count;
     }

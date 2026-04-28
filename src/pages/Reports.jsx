@@ -61,7 +61,17 @@ export default function Reports() {
     // Load task qualifications from AppSettings
     const taskQuals = taskQualSettings.length > 0 ? JSON.parse(taskQualSettings[0].setting_value) || {} : {};
     setTaskQualifications(taskQuals);
-    setQualifications(qualificationsData);
+    // Build qualifications list from task_qualifications keys (these are the task names)
+    // Also include any Qualification entities that are still active
+    const qualsFromSettings = Object.keys(taskQuals).map(name => ({ id: name, name }));
+    const qualsFromEntity = qualificationsData.map(q => ({ id: q.id, name: q.name }));
+    // Merge: prefer entity records, fill in from settings
+    const entityNames = new Set(qualsFromEntity.map(q => q.name));
+    const merged = [
+      ...qualsFromEntity,
+      ...qualsFromSettings.filter(q => !entityNames.has(q.name))
+    ];
+    setQualifications(merged);
     if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
     // Load charts and all tracker entries
