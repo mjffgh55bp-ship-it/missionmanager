@@ -361,18 +361,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             if (!shiftStart || !shiftEnd) return false;
             
             const matches = (rangeStr) => {
-              const [rangeStart, rangeEnd] = rangeStr.split("-");
-              const inRange = (time) => {
-                if (rangeStart < rangeEnd) {
-                  // Regular range (e.g., 06:00-22:00)
-                  return time >= rangeStart && time < rangeEnd;
-                } else {
-                  // Cross-midnight range (e.g., 22:00-06:00)
-                  return time >= rangeStart || time < rangeEnd;
-                }
-              };
-              // Check if shift start or end overlaps with the range
-              return inRange(shiftStart) || inRange(shiftEnd);
+              // Use calculateHoursInRange to check if there's any overlap
+              const hoursInRange = calculateHoursInRange(shiftStart, shiftEnd, [rangeStr]);
+              return hoursInRange > 0;
             };
             if (c.logic === "and") return c.include.every(r => matches(r));
             return c.include.some(r => matches(r));
