@@ -193,12 +193,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     setConfiguringCol(newCol);
   };
 
-  const saveColConfig = (updatedCol) => {
-    setEditColumns(prev => {
-      const exists = prev.find(c => c.id === updatedCol.id);
-      if (exists) return prev.map(c => c.id === updatedCol.id ? updatedCol : c);
-      return [...prev, updatedCol];
-    });
+  const saveColConfig = async (updatedCol) => {
+    const newCols = editColumns.map(c => c.id === updatedCol.id ? updatedCol : c);
+    if (!newCols.find(c => c.id === updatedCol.id)) newCols.push(updatedCol);
+    setEditColumns(newCols);
+    // Save immediately to DB so changes persist even if user navigates away
+    const updated = await base44.entities.Tracker.update(tracker.id, { columns: newCols });
+    setTracker(updated);
+    onUpdated(updated);
     setConfiguringCol(null);
   };
 
@@ -260,13 +262,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const checkOne = (c) => {
           if (!c.col_name || !(c.include?.length)) return true; // no selection = match all
           if (c.col_name === TASK_COL) {
-            // Task can be stored as qualification_id (old) OR as column_values["משימה"] (new schedule col)
+            // Task stored as qualification_id (ID) OR as column_values["משימה"] (name string)
             const taskFromQual = assignmentObj?.qualification_id || "";
-            const taskFromCol = vals?.["משימה"] || "";
-            const taskId = taskFromQual || taskFromCol;
-            if (!taskId) return false; // no task at all = no match
-            if (c.logic === "and") return c.include.every(v => v === taskId);
-            return c.include.some(v => v === taskId);
+            const taskFromColName = vals?.["משימה"] || "";
+            if (!taskFromQual && !taskFromColName) return false; // no task at all = no match
+            // c.include contains qualification IDs — match by ID or by name lookup
+            const matchesById = (v) => v === taskFromQual || v === taskFromColName;
+            const matchesByName = (v) => {
+              const qual = qualifications.find(q => q.id === v);
+              return qual && qual.name === taskFromColName;
+            };
+            const matches = (v) => matchesById(v) || matchesByName(v);
+            if (c.logic === "and") return c.include.every(v => matches(v));
+            return c.include.some(v => matches(v));
           }
           const cellVals = getCellVals(vals, c.col_name);
           if (c.logic === "and") return c.include.every(v => cellVals.includes(v));
