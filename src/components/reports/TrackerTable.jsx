@@ -335,23 +335,63 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     }
 
     if (col.type === "schedule_col") {
+      // Check if this is a quantitative-sum mode: criteria targets a quantitative column (JSON values)
+      const quantCriteria = (col.criteria || []).filter(c =>
+        c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0
+      );
+      const isQuantSum = quantCriteria.length > 0 && (() => {
+        // Check if any templateRow has that column stored as JSON
+        const colName = quantCriteria[0].col_name;
+        return templateRows.some(r => {
+          const v = r.values?.[colName];
+          return typeof v === "string" && v.startsWith("{");
+        }) || assignments.some(a => {
+          const v = a.column_values?.[quantCriteria[0].col_name];
+          return typeof v === "string" && v.startsWith("{");
+        });
+      })();
+
       let total = 0;
-      filtered.forEach(a => {
-        if (!matchesCriteria(a.column_values, a)) return;
-        total += a.hours || 0;
-      });
-      templateRows.forEach(row => {
-        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
-        const tmpl = allTemplates.find(t => t.id === row.template_id);
-        if (!tmpl) return;
-        if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
-        const rowAsAssignment = { qualification_id: row.values?.task || "" };
-        if (!matchesColValueFilter(row.values, col.schedule_col_name, rowAsAssignment)) return;
-        total += calcHours(
-          row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
-          row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
-        );
-      });
+
+      if (isQuantSum) {
+        // Sum the numeric values from JSON for each include item across all matching rows
+        const colName = quantCriteria[0].col_name;
+        const includeItems = quantCriteria.flatMap(c => c.include);
+        filtered.forEach(a => {
+          const raw = a.column_values?.[colName];
+          if (!raw) return;
+          const parsed = parseQuantJson(raw);
+          includeItems.forEach(item => { total += parsed[item] || 0; });
+        });
+        templateRows.forEach(row => {
+          if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+          const tmpl = allTemplates.find(t => t.id === row.template_id);
+          if (!tmpl) return;
+          if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
+          const raw = row.values?.[colName];
+          if (!raw) return;
+          const parsed = parseQuantJson(raw);
+          includeItems.forEach(item => { total += parsed[item] || 0; });
+        });
+      } else {
+        filtered.forEach(a => {
+          if (!matchesCriteria(a.column_values, a)) return;
+          total += a.hours || 0;
+        });
+        templateRows.forEach(row => {
+          if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+          const tmpl = allTemplates.find(t => t.id === row.template_id);
+          if (!tmpl) return;
+          if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
+          const rowAsAssignment = { qualification_id: row.values?.task || "" };
+          if (!matchesColValueFilter(row.values, col.schedule_col_name, rowAsAssignment)) return;
+          total += calcHours(
+            row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
+            row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
+          );
+        });
+      }
+
       return Math.round(total * 10) / 10;
     }
 
@@ -691,7 +731,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     );
                   }
                   if (auto) {
-                    const showAsHours = col.type === "schedule_col";
+                    const quantCriteriaCheck = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
+                    const isQuantSumCol = col.type === "schedule_col" && quantCriteriaCheck.length > 0;
+                    const showAsHours = col.type === "schedule_col" && !isQuantSumCol;
                     return (
                       <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2 py-0.5 text-sm">
                         {value > 0 ? (showAsHours ? `${value}h` : value) : <span className="text-gray-300">-</span>}
@@ -778,7 +820,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       const v = computeAutoValue(col, w.id);
                       return sum + (typeof v === "number" ? v : 0);
                     }, 0);
-                    const showAsHours = col.type === "schedule_col";
+                    const quantCriteriaCheckTotal = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
+                    const isQuantSumTotal = col.type === "schedule_col" && quantCriteriaCheckTotal.length > 0;
+                    const showAsHours = col.type === "schedule_col" && !isQuantSumTotal;
                     return (
                       <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
                         {total > 0 ? (showAsHours ? `${total}h` : total) : <span className="text-gray-300">-</span>}
