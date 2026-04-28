@@ -133,7 +133,19 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
   const [draft, setDraft] = useState({ ...col });
   const [showCriteriaPicker, setShowCriteriaPicker] = useState(false);
 
-  useEffect(() => { setDraft({ ...col }); }, [col.id]);
+  useEffect(() => {
+    const validQualIds = qualifications.map(q => q.id);
+    const cleaned = {
+      ...col,
+      criteria: (col.criteria || []).map(c => ({
+        ...c,
+        include: c.col_name === TASK_COL_NAME
+          ? (c.include || []).filter(v => validQualIds.includes(v))
+          : (c.include || [])
+      }))
+    };
+    setDraft(cleaned);
+  }, [col.id]);
 
   const update = (field, value) => setDraft(d => ({ ...d, [field]: value }));
 
@@ -224,7 +236,19 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
 
         <DialogFooter className="px-4 pb-4 gap-2">
           <Button variant="outline" onClick={onClose} dir="rtl" className="flex-1">ביטול</Button>
-          <Button onClick={() => { onSave(draft); onClose(); }}
+          <Button onClick={() => {
+              const validQualIds = qualifications.map(q => q.id);
+              const cleaned = {
+                ...draft,
+                criteria: (draft.criteria || []).map(c => ({
+                  ...c,
+                  include: c.col_name === TASK_COL_NAME
+                    ? (c.include || []).filter(v => validQualIds.includes(v))
+                    : (c.include || [])
+                }))
+              };
+              onSave(cleaned); onClose();
+            }}
             className="bg-blue-700 hover:bg-blue-800 flex-1" dir="rtl">אישור</Button>
         </DialogFooter>
       </DialogContent>
