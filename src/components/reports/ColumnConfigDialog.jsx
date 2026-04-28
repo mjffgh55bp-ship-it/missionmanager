@@ -223,7 +223,12 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [col.id]);
 
-  const update = (field, value) => setDraft(d => ({ ...d, [field]: value }));
+  const update = (field, value) => {
+    const newDraft = { ...draft, [field]: value };
+    setDraft(newDraft);
+    // Auto-save on update
+    setTimeout(() => onSave(newDraft), 0);
+  };
 
   const addCriterion = (col) => {
     const newC = {
@@ -233,7 +238,9 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
       include: [],
       logic: "or",
     };
-    update("criteria", [...(draft.criteria || []), newC]);
+    const newDraft = { ...draft, criteria: [...(draft.criteria || []), newC] };
+    setDraft(newDraft);
+    setTimeout(() => onSave(newDraft), 0);
     setShowCriteriaPicker(false);
   };
 
@@ -245,7 +252,9 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
       include: [],
       logic: "or",
     };
-    update("criteria", [...(draft.criteria || []), newC]);
+    const newDraft = { ...draft, criteria: [...(draft.criteria || []), newC] };
+    setDraft(newDraft);
+    setTimeout(() => onSave(newDraft), 0);
     setShowCriteriaPicker(false);
   };
 
@@ -257,16 +266,24 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
       include: ["00:00-23:59"],
       logic: "or",
     };
-    update("criteria", [...(draft.criteria || []), newC]);
+    const newDraft = { ...draft, criteria: [...(draft.criteria || []), newC] };
+    setDraft(newDraft);
+    setTimeout(() => onSave(newDraft), 0);
     setShowCriteriaPicker(false);
   };
 
   const updateCriterion = (id, updated) => {
-    update("criteria", (draft.criteria || []).map(c => c.id === id ? updated : c));
+    const newCriteria = (draft.criteria || []).map(c => c.id === id ? updated : c);
+    const newDraft = { ...draft, criteria: newCriteria };
+    setDraft(newDraft);
+    setTimeout(() => onSave(newDraft), 0);
   };
 
   const removeCriterion = (id) => {
-    update("criteria", (draft.criteria || []).filter(c => c.id !== id));
+    const newCriteria = (draft.criteria || []).filter(c => c.id !== id);
+    const newDraft = { ...draft, criteria: newCriteria };
+    setDraft(newDraft);
+    setTimeout(() => onSave(newDraft), 0);
   };
 
   return (
@@ -352,21 +369,8 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
 
         <DialogFooter className="px-4 pb-4 gap-2">
           <Button variant="outline" onClick={onClose} dir="rtl" className="flex-1">ביטול</Button>
-          <Button onClick={() => {
-              const validQualIds = qualifications.map(q => q.id);
-              const cleaned = {
-                ...draft,
-                criteria: (draft.criteria || []).map(c => ({
-                  ...c,
-                  include: c.col_name === TASK_COL_NAME
-                    ? (c.include || []).filter(v => validQualIds.includes(v))
-                    : (c.include || [])
-                }))
-              };
-              onSave(cleaned);
-              // onClose is called inside saveColConfig after state update
-            }}
-            className="bg-blue-700 hover:bg-blue-800 flex-1" dir="rtl">אישור</Button>
+          <Button onClick={() => onClose()}
+            className="bg-blue-700 hover:bg-blue-800 flex-1" dir="rtl">סגור</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
