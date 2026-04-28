@@ -35,7 +35,7 @@ export default function Reports() {
   useEffect(() => {
     loadData();
 
-    // Real-time updates for assignments and template rows
+    // Real-time updates for assignments, template rows, and tracker entries
     const unsubAssignments = base44.entities.Assignment.subscribe((event) => {
       if (event.type === "create") {
         setAssignments(prev => [event.data, ...prev]);
@@ -56,9 +56,20 @@ export default function Reports() {
       }
     });
 
+    const unsubTrackerEntries = base44.entities.TrackerEntry.subscribe((event) => {
+      if (event.type === "create") {
+        setTrackerEntries(prev => [...prev, event.data]);
+      } else if (event.type === "update") {
+        setTrackerEntries(prev => prev.map(e => e.id === event.id ? event.data : e));
+      } else if (event.type === "delete") {
+        setTrackerEntries(prev => prev.filter(e => e.id !== event.id));
+      }
+    });
+
     return () => {
       unsubAssignments();
       unsubTemplateRows();
+      unsubTrackerEntries();
     };
   }, []);
 

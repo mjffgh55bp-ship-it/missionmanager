@@ -162,6 +162,21 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   useEffect(() => { loadEntries(); }, [tracker.id]);
   useEffect(() => { setTracker(initialTracker); }, [initialTracker]);
 
+  useEffect(() => {
+    // Real-time sync for this tracker's entries
+    const unsubTrackerEntries = base44.entities.TrackerEntry.subscribe((event) => {
+      if (event.data?.tracker_id !== tracker.id) return;
+      if (event.type === "create") {
+        setEntries(prev => [...prev, event.data]);
+      } else if (event.type === "update") {
+        setEntries(prev => prev.map(e => e.id === event.id ? event.data : e));
+      } else if (event.type === "delete") {
+        setEntries(prev => prev.filter(e => e.id !== event.id));
+      }
+    });
+    return unsubTrackerEntries;
+  }, [tracker.id]);
+
   const openEditMode = () => {
     setEditColumns((tracker.columns || []).map(c => ({ ...c })));
     setEditMode(true);
