@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, ChevronDown, ChevronUp, Pencil, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Check, X, ChevronDown, ChevronUp, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2 } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { base44 } from "@/api/base44Client";
+import ColumnConfigDialog from "./ColumnConfigDialog";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
 function MultiSelect({ options, selected, onChange, placeholder }) {
@@ -126,7 +127,7 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], taskQualifications = {}, onDelete, onUpdated, onEdit }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], taskQualifications = {}, onDelete, onUpdated }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -140,6 +141,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [guide, setGuide] = useState("__all__");
   const [showFilters, setShowFilters] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editColumns, setEditColumns] = useState([]);
+  const [configuringCol, setConfiguringCol] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Sorting
   const [sortColId, setSortColId] = useState(null);
@@ -156,6 +161,42 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   useEffect(() => { loadEntries(); }, [tracker.id]);
   useEffect(() => { setTracker(initialTracker); }, [initialTracker]);
+
+  const openEditMode = () => {
+    setEditColumns((tracker.columns || []).map(c => ({ ...c })));
+    setEditMode(true);
+  };
+
+  const saveEditColumns = async () => {
+    setSavingEdit(true);
+    const updated = await base44.entities.Tracker.update(tracker.id, { columns: editColumns });
+    setTracker(updated);
+    onUpdated(updated);
+    setEditMode(false);
+    setSavingEdit(false);
+  };
+
+  const removeEditColumn = (colId) => {
+    setEditColumns(prev => prev.filter(c => c.id !== colId));
+  };
+
+  const addNewEditColumn = () => {
+    const newCol = {
+      id: Date.now().toString(),
+      name: "עמודה חדשה",
+      description: "",
+      type: "schedule_col",
+      schedule_col_name: "",
+      criteria: [],
+    };
+    setEditColumns(prev => [...prev, newCol]);
+    setConfiguringCol(newCol);
+  };
+
+  const saveColConfig = (updatedCol) => {
+    setEditColumns(prev => prev.map(c => c.id === updatedCol.id ? updatedCol : c));
+    setConfiguringCol(null);
+  };
 
   const loadEntries = async () => {
     const data = await base44.entities.TrackerEntry.filter({ tracker_id: tracker.id });
@@ -455,8 +496,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               {showFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
               סינון
             </Button>
-            <Button size="sm" variant="outline" onClick={onEdit}>
-              <Pencil className="w-4 h-4 ml-1" />ערוך
+            <Button size="sm" variant="outline" onClick={openEditMode}>
+              <Pencil className="w-4 h-4 ml-1" />ערוך עמודות
             </Button>
             <ConfirmDeleteButton onConfirm={onDelete} variant="button" label="מחק טבלה" />
           </div>
@@ -512,7 +553,61 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             </div>
           </div>
         )}
+        {/* Inline edit panel */}
+        {editMode && (
+          <div className="mt-3 pt-3 border-t" dir="rtl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold text-sm text-gray-700">עריכת עמודות</span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => setEditMode(false)}>ביטול</Button>
+                <Button size="sm" onClick={saveEditColumns} disabled={savingEdit} className="bg-blue-900 hover:bg-blue-800">
+                  {savingEdit ? "שומר..." : "שמור"}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              {editColumns.map(col => (
+                <div key={col.id} className="flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-sm text-gray-800">{col.name}</span>
+                    {col.description && <p className="text-xs text-gray-500">{col.description}</p>}
+                    {(col.criteria?.length > 0) && (
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {col.criteria.filter(c => c.include?.length).map((c, i) => (
+                          <span key={i} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{c.col_name}: {c.include.join(", ")}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setConfiguringCol(editColumns.find(c => c.id === col.id))}
+                    className="text-xs border border-gray-200 rounded px-2 py-0.5 text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                  >ערוך</button>
+                  <button onClick={() => removeEditColumn(col.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={addNewEditColumn}
+                className="w-full flex items-center justify-center gap-1 text-sm text-blue-700 hover:text-blue-900 border-2 border-dashed border-blue-200 rounded-lg py-2 transition-colors"
+              >
+                <Plus className="w-4 h-4" />הוסף עמודה
+              </button>
+            </div>
+          </div>
+        )}
       </CardHeader>
+
+      {/* Column config popup */}
+      {configuringCol && (
+        <ColumnConfigDialog
+          col={configuringCol}
+          scheduleColumns={scheduleColumns}
+          onSave={saveColConfig}
+          onClose={() => setConfiguringCol(null)}
+        />
+      )}
 
       {/* Table */}
       <CardContent className="pt-0 px-0 overflow-x-auto">
