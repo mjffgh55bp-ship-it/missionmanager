@@ -606,6 +606,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                         ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
                         : <ArrowUpDown className="w-3 h-3 text-gray-300" />)}
                     </button>
+                    {col.description && (
+                      <span className="text-xs text-gray-400 font-normal text-center leading-tight">{col.description}</span>
+                    )}
                     {editMode && (
                       <div className="flex gap-0.5 items-center">
                         <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === 0}
