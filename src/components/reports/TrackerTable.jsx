@@ -356,9 +356,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const checkOne = (c) => {
           if (!c.col_name) return true; // no column selected = match all
           if (!c.include?.length) {
-            // Empty include means nothing selected for this criterion
-            // For time range, empty = match all; for others = match none
-            return c.col_name === TIME_RANGE_COL ? true : false;
+            // Empty include means nothing selected - don't match
+            // This prevents untrained criteria from passing
+            return false;
           }
           if (c.col_name === TIME_RANGE_COL) {
             // Check if shift overlaps with any of the time ranges (handles cross-midnight ranges)
