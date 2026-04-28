@@ -565,7 +565,25 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         try { return JSON.parse(raw); } catch { return {}; }
       };
 
+      // Check if there's a time range criterion
+      const timeRangeCriteria = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
+
       filtered.forEach(a => {
+        // If time range criterion exists, only count if assignment matches it
+        if (timeRangeCriteria && timeRangeCriteria.include?.length > 0) {
+          const matches = (rangeStr) => {
+            const [rangeStart, rangeEnd] = rangeStr.split("-");
+            const inRange = (time) => {
+              if (rangeStart < rangeEnd) {
+                return time >= rangeStart && time < rangeEnd;
+              } else {
+                return time >= rangeStart || time < rangeEnd;
+              }
+            };
+            return inRange(a.start_time) || inRange(a.end_time);
+          };
+          if (!timeRangeCriteria.include.some(r => matches(r))) return;
+        }
         const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
         const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
         opts.forEach(o => { counts[o] += parsed[o] || 0; });
@@ -576,6 +594,25 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
+        
+        // Check time range criterion
+        if (timeRangeCriteria && timeRangeCriteria.include?.length > 0) {
+          const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "";
+          const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || "";
+          const matches = (rangeStr) => {
+            const [rangeStart, rangeEnd] = rangeStr.split("-");
+            const inRange = (time) => {
+              if (rangeStart < rangeEnd) {
+                return time >= rangeStart && time < rangeEnd;
+              } else {
+                return time >= rangeStart || time < rangeEnd;
+              }
+            };
+            return inRange(startTime) || inRange(endTime);
+          };
+          if (!timeRangeCriteria.include.some(r => matches(r))) return;
+        }
+        
         const raw = row.values?.[col.schedule_col_name];
         const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
         opts.forEach(o => { counts[o] += parsed[o] || 0; });
