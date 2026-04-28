@@ -626,8 +626,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           </TableHeader>
           <TableBody>
             {filteredWorkers.map(worker => (
-              <TableRow key={worker.id} className="hover:bg-gray-50">
-                <TableCell className="font-medium whitespace-nowrap px-4">{worker.nickname}</TableCell>
+              <TableRow key={worker.id} className="hover:bg-gray-50 h-6">
+                <TableCell className="font-medium whitespace-nowrap px-4 py-0.5 text-sm">{worker.nickname}</TableCell>
                 {displayColumns.map(col => {
                    const auto = isAuto(col.type);
                    const entryValue = getEntry(worker.id, col.id)?.value || "";
@@ -638,11 +638,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     const tasks = col.task_list || [];
                     const hours = typeof value === "object" && value !== null ? value : {};
                     if (tasks.length === 0) {
-                      return <TableCell key={col.id} className="px-2 text-gray-300 text-xs">אין משימות</TableCell>;
+                      return <TableCell key={col.id} className="px-2 py-0.5 text-gray-300 text-xs">אין משימות</TableCell>;
                     }
                     const grandTotal = Object.values(hours).reduce((sum, h) => sum + (h || 0), 0);
                     return (
-                      <TableCell key={col.id} className="text-center font-semibold px-2">
+                      <TableCell key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm">
                         <span className={grandTotal > 0 ? "text-blue-900" : "text-gray-300"}>
                           {grandTotal > 0 ? `${Math.round(grandTotal * 10) / 10}h` : "-"}
                         </span>
@@ -658,14 +658,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     if (col.quantitative_single_item) {
                       const num = counts[col.quantitative_single_item] || 0;
                       return (
-                        <TableCell key={col.id} className="text-center font-semibold px-2">
+                        <TableCell key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm">
                           <span className={num > 0 ? "text-blue-900" : "text-gray-300"}>{num > 0 ? num : "-"}</span>
                         </TableCell>
                       );
                     }
                     return (
-                      <TableCell key={col.id} className="px-2 min-w-[120px]">
-                        <div className="space-y-0.5">
+                      <TableCell key={col.id} className="px-2 py-0.5 min-w-[120px]">
+                        <div className="space-y-0">
                           {allOpts.map(opt => (
                             <div key={opt} className="flex items-center justify-between gap-1 text-xs">
                               <span className="text-gray-600 truncate">{opt}</span>
@@ -680,13 +680,13 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   if (auto) {
                     const showAsHours = col.type === "schedule_col";
                     return (
-                      <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2">
+                      <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2 py-0.5 text-sm">
                         {value > 0 ? (showAsHours ? `${value}h` : value) : <span className="text-gray-300">-</span>}
                       </TableCell>
                     );
                   }
                   return (
-                   <TableCell key={col.id} className="px-2">
+                   <TableCell key={col.id} className="px-2 py-0.5">
                      {isEditing ? (
                        <div className="flex items-center gap-1">
                          <Input autoFocus value={cellDraft} onChange={e => setCellDraft(e.target.value)}
