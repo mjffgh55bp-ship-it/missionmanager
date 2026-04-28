@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, ChevronDown, ChevronUp, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2 } from "lucide-react";
+import { Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2 } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { base44 } from "@/api/base44Client";
 import ColumnConfigDialog from "./ColumnConfigDialog";
@@ -642,7 +642,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                             [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
                             setEditColumns(next);
                           }}>
-                          <ChevronDown className="w-3 h-3" />
+                          <ChevronRight className="w-3 h-3" />
                         </Button>
                         <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === displayColumns.length - 1}
                           onClick={() => {
@@ -650,7 +650,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                             [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
                             setEditColumns(next);
                           }}>
-                          <ChevronUp className="w-3 h-3" />
+                          <ChevronLeft className="w-3 h-3" />
                         </Button>
                         <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-blue-500 hover:text-blue-700"
                           onClick={() => setConfiguringCol({ ...editColumns.find(c => c.id === col.id) })}>
