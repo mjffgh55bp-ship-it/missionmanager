@@ -274,7 +274,6 @@ export default function Reports() {
                                   workerRoles={workerRoles}
                                   scheduleColumns={scheduleColumns}
                                   qualifications={qualifications}
-                                  taskQualifications={taskQualifications}
                                   onDelete={() => handleDeleteTracker(tracker.id)}
                                   onUpdated={handleTrackerUpdated}
                                   onResize={() => setTrackerSizes(prev => ({ ...prev, [tracker.id]: { width: 800, height: 500 } }))}

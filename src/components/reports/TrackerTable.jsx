@@ -127,7 +127,7 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], taskQualifications = {}, onDelete, onUpdated }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], onDelete, onUpdated }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -276,54 +276,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       return true; // no criteria = match all
     };
 
-    // Check col_value_filter (legacy: {include,exclude}) or fall back to old schedule_col_value
-    // IMPORTANT: If no filter is defined (include/exclude both empty), return true (match all)
     const matchesColValueFilter = (vals, colName, assignmentObj) => {
-      // New criteria format takes priority
       if (col.criteria?.length) return matchesCriteria(vals, assignmentObj);
-      const f = col.col_value_filter;
-      if (f && (f.include?.length || f.exclude?.length)) {
-        const cellVals = getCellVals(vals, colName);
-        if (f.exclude?.length && cellVals.some(v => f.exclude.includes(v))) return false;
-        if (f.include?.length && !cellVals.some(v => f.include.includes(v))) return false;
-        return true;
-      }
-      // Legacy: col.schedule_col_value
-      if (col.schedule_col_value) {
-        const cellVals = getCellVals(vals, colName);
-        return cellVals.includes(String(col.schedule_col_value));
-      }
-      // No filter defined → match everything
-      return true;
-    };
-
-    // Check time_range_filter — shift start_time must fall within [start, end]
-    const matchesTimeRangeFilter = (a) => {
-      const trf = col.time_range_filter;
-      if (!trf || (!trf.start && !trf.end)) return true;
-      const shiftStart = a.start_time || "";
-      if (!shiftStart) return true;
-      const norm = shiftStart.slice(0, 5);
-      if (trf.start && trf.end) {
-        if (trf.start <= trf.end) {
-          return norm >= trf.start && norm <= trf.end;
-        } else {
-          // Wraps midnight (e.g. 22:00-06:00)
-          return norm >= trf.start || norm <= trf.end;
-        }
-      }
-      if (trf.start) return norm >= trf.start;
-      if (trf.end) return norm <= trf.end;
-      return true;
-    };
-
-    // Check task_filter (new: {include,exclude}) — matches assignment.qualification_id or qualification_name
-    const matchesTaskFilter = (a) => {
-      const tf = col.task_filter;
-      if (!tf || (!tf.include?.length && !tf.exclude?.length)) return true;
-      const taskVal = a.qualification_id || a.qualification_name || "";
-      if (tf.exclude?.length && tf.exclude.includes(taskVal)) return false;
-      if (tf.include?.length && !tf.include.includes(taskVal)) return false;
       return true;
     };
 
@@ -334,7 +288,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     });
 
     if (col.type === "shifts_count") {
-      return filtered.filter(a => matchesTaskFilter(a) && matchesTimeRangeFilter(a)).length;
+      return filtered.filter(a => matchesCriteria(a.column_values, a)).length;
     }
 
     if (col.type === "schedule_col") {
@@ -342,8 +296,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       let total = 0;
       filtered.forEach(a => {
         if (!matchesColValueFilter(a.column_values, col.schedule_col_name, a)) return;
-        if (!matchesTaskFilter(a)) return;
-        if (!matchesTimeRangeFilter(a)) return;
         total += a.hours || 0;
       });
       templateRows.forEach(row => {
@@ -365,8 +317,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       let count = 0;
       filtered.forEach(a => {
         if (!matchesColValueFilter(a.column_values, col.schedule_col_name, a)) return;
-        if (!matchesTaskFilter(a)) return;
-        if (!matchesTimeRangeFilter(a)) return;
         count++;
       });
       templateRows.forEach(row => {
@@ -383,17 +333,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
        const taskList = col.task_list || [];
        if (taskList.length === 0) return 0;
        const result = {};
-       taskList.forEach(taskName => { result[taskName] = 0; });
+       taskList.forEach(taskId => { result[taskId] = 0; });
        filtered.forEach(a => {
-         if (!matchesTimeRangeFilter(a)) return;
-         let matchedTask = null;
          if (a.qualification_id && taskList.includes(a.qualification_id)) {
-           matchedTask = a.qualification_id;
-         } else if (a.qualification_name && taskList.includes(a.qualification_name)) {
-           matchedTask = a.qualification_name;
-         }
-         if (matchedTask) {
-           result[matchedTask] += a.hours || 0;
+           result[a.qualification_id] += a.hours || 0;
          }
        });
        return result;
@@ -415,8 +358,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       };
 
       filtered.forEach(a => {
-        if (!matchesTaskFilter(a)) return;
-        if (!matchesTimeRangeFilter(a)) return;
         const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
         const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
         opts.forEach(o => { counts[o] += parsed[o] || 0; });
@@ -668,24 +609,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     if (tasks.length === 0) {
                       return <TableCell key={col.id} className="px-2 text-gray-300 text-xs">אין משימות</TableCell>;
                     }
-                    if (tasks.length === 1) {
-                      const taskName = tasks[0];
-                      const h = hours[taskName] || 0;
-                      return (
-                        <TableCell key={col.id} className="text-center font-semibold px-2">
-                          <span className={h > 0 ? "text-blue-900" : "text-gray-300"}>{h > 0 ? `${Math.round(h * 10) / 10}h` : "-"}</span>
-                        </TableCell>
-                      );
-                    }
+                    const grandTotal = Object.values(hours).reduce((sum, h) => sum + (h || 0), 0);
                     return (
-                      <TableCell key={col.id} className="px-2 min-w-[80px]">
-                        <div className="text-center">
-                          <span className={`font-semibold ${Object.values(hours).some(h => h > 0) ? "text-blue-900" : "text-gray-300"}`}>
-                            {Object.values(hours).reduce((sum, h) => sum + (h || 0), 0) > 0 
-                              ? `${Math.round(Object.values(hours).reduce((sum, h) => sum + (h || 0), 0) * 10) / 10}h` 
-                              : "-"}
-                          </span>
-                        </div>
+                      <TableCell key={col.id} className="text-center font-semibold px-2">
+                        <span className={grandTotal > 0 ? "text-blue-900" : "text-gray-300"}>
+                          {grandTotal > 0 ? `${Math.round(grandTotal * 10) / 10}h` : "-"}
+                        </span>
                       </TableCell>
                     );
                   }
@@ -752,21 +681,18 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                  <TableCell className="px-4 text-blue-900 font-bold">סה"כ</TableCell>
                  {displayColumns.map(col => {
                    if (col.type === "count_by_task") {
-                     const taskList = col.task_list || [];
-                     const totals = {};
-                     taskList.forEach(taskName => {
-                       totals[taskName] = filteredWorkers.reduce((sum, w) => {
-                         const taskHours = computeAutoValue(col, w.id);
-                         return sum + ((typeof taskHours === "object" && taskHours !== null) ? (taskHours[taskName] || 0) : 0);
-                       }, 0);
-                     });
-                     const grandTotal = Object.values(totals).reduce((sum, h) => sum + (h || 0), 0);
-                     return (
-                       <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
-                         {grandTotal > 0 ? `${Math.round(grandTotal * 10) / 10}h` : "-"}
-                       </TableCell>
-                     );
-                   }
+                      const grandTotal = filteredWorkers.reduce((sum, w) => {
+                        const taskHours = computeAutoValue(col, w.id);
+                        return sum + (typeof taskHours === "object" && taskHours !== null
+                          ? Object.values(taskHours).reduce((s, h) => s + (h || 0), 0)
+                          : 0);
+                      }, 0);
+                      return (
+                        <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
+                          {grandTotal > 0 ? `${Math.round(grandTotal * 10) / 10}h` : "-"}
+                        </TableCell>
+                      );
+                    }
                    if (col.type === "count_quantitative") {
                     const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
                     const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
