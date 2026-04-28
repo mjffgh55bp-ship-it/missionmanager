@@ -167,7 +167,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     setEditMode(true);
   };
 
-  const saveEditColumns = async () => {
+  const saveAndExitEditMode = async () => {
     setSavingEdit(true);
     const updated = await base44.entities.Tracker.update(tracker.id, { columns: editColumns });
     setTracker(updated);
@@ -194,7 +194,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   };
 
   const saveColConfig = (updatedCol) => {
-    setEditColumns(prev => prev.map(c => c.id === updatedCol.id ? updatedCol : c));
+    setEditColumns(prev => {
+      const exists = prev.find(c => c.id === updatedCol.id);
+      if (exists) return prev.map(c => c.id === updatedCol.id ? updatedCol : c);
+      return [...prev, updatedCol];
+    });
     setConfiguringCol(null);
   };
 
@@ -431,7 +435,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_by_task", "count_quantitative"].includes(type);
 
-  const displayColumns = tracker.columns || [];
+  const displayColumns = editMode ? editColumns : (tracker.columns || []);
 
   const filteredWorkers = workers.filter(w => {
     if (!w.active) return false;
@@ -496,8 +500,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               {showFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
               סינון
             </Button>
-            <Button size="sm" variant="outline" onClick={openEditMode}>
-              <Pencil className="w-4 h-4 ml-1" />ערוך עמודות
+            <Button size="sm" variant={editMode ? "default" : "outline"}
+              className={editMode ? "bg-purple-600 hover:bg-purple-700" : ""}
+              onClick={() => editMode ? saveAndExitEditMode() : openEditMode()}>
+              <Pencil className="w-4 h-4 ml-1" />{editMode ? "סיים עריכה" : "ערוך עמודות"}
             </Button>
             <ConfirmDeleteButton onConfirm={onDelete} variant="button" label="מחק טבלה" />
           </div>
@@ -553,50 +559,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             </div>
           </div>
         )}
-        {/* Inline edit panel */}
-        {editMode && (
-          <div className="mt-3 pt-3 border-t" dir="rtl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-semibold text-sm text-gray-700">עריכת עמודות</span>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => setEditMode(false)}>ביטול</Button>
-                <Button size="sm" onClick={saveEditColumns} disabled={savingEdit} className="bg-blue-900 hover:bg-blue-800">
-                  {savingEdit ? "שומר..." : "שמור"}
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              {editColumns.map(col => (
-                <div key={col.id} className="flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2">
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium text-sm text-gray-800">{col.name}</span>
-                    {col.description && <p className="text-xs text-gray-500">{col.description}</p>}
-                    {(col.criteria?.length > 0) && (
-                      <div className="flex flex-wrap gap-1 mt-0.5">
-                        {col.criteria.filter(c => c.include?.length).map((c, i) => (
-                          <span key={i} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{c.col_name}: {c.include.join(", ")}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => setConfiguringCol(editColumns.find(c => c.id === col.id))}
-                    className="text-xs border border-gray-200 rounded px-2 py-0.5 text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
-                  >ערוך</button>
-                  <button onClick={() => removeEditColumn(col.id)} className="text-gray-400 hover:text-red-500 transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={addNewEditColumn}
-                className="w-full flex items-center justify-center gap-1 text-sm text-blue-700 hover:text-blue-900 border-2 border-dashed border-blue-200 rounded-lg py-2 transition-colors"
-              >
-                <Plus className="w-4 h-4" />הוסף עמודה
-              </button>
-            </div>
-          </div>
-        )}
       </CardHeader>
 
       {/* Column config popup */}
@@ -626,21 +588,59 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
                 </button>
               </TableHead>
-              {displayColumns.map((col) => (
+              {displayColumns.map((col, idx) => (
                 <TableHead key={col.id} dir="rtl" className="px-2 min-w-[140px]">
-                  <button
-                    onClick={() => handleSortClick(col.id)}
-                    className="flex flex-col gap-0.5 py-1 items-center text-center w-full hover:text-blue-700 transition-colors"
-                  >
-                    <span className="font-medium flex items-center gap-1">
+                  <div className="flex flex-col items-center gap-0.5 py-0.5">
+                    <button
+                      onClick={() => !editMode && handleSortClick(col.id)}
+                      className="font-medium flex items-center gap-1 hover:text-blue-700 transition-colors"
+                    >
                       {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
-                      {sortColId === col.id
+                      {!editMode && (sortColId === col.id
                         ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
-                        : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
-                    </span>
-                  </button>
+                        : <ArrowUpDown className="w-3 h-3 text-gray-300" />)}
+                    </button>
+                    {editMode && (
+                      <div className="flex gap-0.5 items-center">
+                        <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === 0}
+                          onClick={() => {
+                            const next = [...editColumns];
+                            [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                            setEditColumns(next);
+                          }}>
+                          <ChevronDown className="w-3 h-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === displayColumns.length - 1}
+                          onClick={() => {
+                            const next = [...editColumns];
+                            [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                            setEditColumns(next);
+                          }}>
+                          <ChevronUp className="w-3 h-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-blue-500 hover:text-blue-700"
+                          onClick={() => setConfiguringCol(editColumns.find(c => c.id === col.id))}>
+                          <Pencil className="w-3 h-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
+                          onClick={() => removeEditColumn(col.id)}>
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </TableHead>
               ))}
+              {editMode && (
+                <TableHead className="w-[40px] p-0 text-center">
+                  <button
+                    onClick={addNewEditColumn}
+                    className="flex items-center justify-center w-full h-full px-2 py-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors rounded"
+                    title="הוסף עמודה">
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
