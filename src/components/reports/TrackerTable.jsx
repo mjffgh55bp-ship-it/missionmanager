@@ -562,11 +562,34 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         try { return JSON.parse(raw); } catch { return {}; }
       };
 
-      // Check all criteria - for count_quantitative, we include ALL criteria including time range
+      // Separate quantitative items criteria from time range criteria
+      const quantCriteria = (col.criteria || []).filter(c => c.col_name && c.col_name !== TIME_RANGE_COL && c.include?.length > 0);
+      const timeRangeCriteria = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
+
+      // Check all criteria - quantitative items use OR logic, time range is AND
       filtered.forEach(a => {
-        // Check ALL criteria (including time range) using matchesCriteria
-        if (!matchesCriteria(a.column_values, a)) return;
-        
+        // Check quantitative items criteria (OR logic)
+        let matchesQuant = true;
+        if (quantCriteria.length > 0) {
+          matchesQuant = quantCriteria.some(c => {
+            const rawVal = a.column_values?.[c.col_name];
+            if (typeof rawVal === "string" && rawVal.startsWith("{")) {
+              const parsed = parseQuantJson(rawVal);
+              return c.include.some(v => (parsed[v] || 0) > 0);
+            }
+            return false;
+          });
+        }
+        if (!matchesQuant) return;
+
+        // Check time range criteria (AND - must match)
+        let matchesTime = true;
+        if (timeRangeCriteria && timeRangeCriteria.include?.length > 0) {
+          const hoursInRange = calculateHoursInRange(a.start_time, a.end_time, timeRangeCriteria.include);
+          matchesTime = hoursInRange > 0;
+        }
+        if (!matchesTime) return;
+
         const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
         const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
         opts.forEach(o => { counts[o] += parsed[o] || 0; });
@@ -577,11 +600,31 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
-        
-        // Check if row matches ALL criteria using matchesCriteria
-        const rowAsAssignment = { qualification_id: row.values?.task || "" };
-        if (!matchesCriteria(row.values, rowAsAssignment)) return;
-        
+
+        // Check quantitative items criteria (OR logic)
+        let matchesQuant = true;
+        if (quantCriteria.length > 0) {
+          matchesQuant = quantCriteria.some(c => {
+            const rawVal = row.values?.[c.col_name];
+            if (typeof rawVal === "string" && rawVal.startsWith("{")) {
+              const parsed = parseQuantJson(rawVal);
+              return c.include.some(v => (parsed[v] || 0) > 0);
+            }
+            return false;
+          });
+        }
+        if (!matchesQuant) return;
+
+        // Check time range criteria (AND - must match)
+        let matchesTime = true;
+        if (timeRangeCriteria && timeRangeCriteria.include?.length > 0) {
+          const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "";
+          const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || "";
+          const hoursInRange = calculateHoursInRange(startTime, endTime, timeRangeCriteria.include);
+          matchesTime = hoursInRange > 0;
+        }
+        if (!matchesTime) return;
+
         const raw = row.values?.[col.schedule_col_name];
         const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
         opts.forEach(o => { counts[o] += parsed[o] || 0; });
