@@ -284,6 +284,53 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       if (typeof raw === "object") return raw;
       try { return JSON.parse(raw); } catch { return {}; }
     };
+    const calculateHoursInRange = (startTime, endTime, timeRanges) => {
+      if (!startTime || !endTime) return 0;
+      
+      const timeToMinutes = (timeStr) => {
+        const [h, m] = timeStr.split(":").map(Number);
+        return h * 60 + (m || 0);
+      };
+      
+      const shiftStart = timeToMinutes(startTime);
+      const shiftEnd = timeToMinutes(endTime);
+      
+      let totalMinutes = 0;
+      
+      timeRanges.forEach(rangeStr => {
+        const [rangeStart, rangeEnd] = rangeStr.split("-");
+        const rangeStartMin = timeToMinutes(rangeStart);
+        const rangeEndMin = timeToMinutes(rangeEnd);
+        
+        let overlapStart, overlapEnd;
+        
+        if (rangeStartMin < rangeEndMin) {
+          // Regular range (e.g., 06:00-22:00)
+          overlapStart = Math.max(shiftStart, rangeStartMin);
+          overlapEnd = Math.min(shiftEnd, rangeEndMin);
+        } else {
+          // Cross-midnight range (e.g., 22:00-06:00)
+          if (shiftStart >= rangeStartMin || shiftEnd <= rangeEndMin) {
+            if (shiftStart >= rangeStartMin) {
+              overlapStart = shiftStart;
+              overlapEnd = Math.min(shiftEnd, 24 * 60);
+            } else {
+              overlapStart = 0;
+              overlapEnd = Math.min(shiftEnd, rangeEndMin);
+            }
+          } else {
+            return;
+          }
+        }
+        
+        if (overlapEnd > overlapStart) {
+          totalMinutes += overlapEnd - overlapStart;
+        }
+      });
+      
+      return totalMinutes / 60;
+    };
+
     const matchesCriteria = (vals, assignmentObj) => {
       const criteria = col.criteria;
       if (criteria && criteria.length > 0) {
@@ -415,7 +462,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       } else {
         filtered.forEach(a => {
           if (!matchesCriteria(a.column_values, a)) return;
-          total += a.hours || 0;
+          // If criteria include time range, only count hours within that range
+          const timeRangeCriteria = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
+          if (timeRangeCriteria && timeRangeCriteria.include?.length > 0) {
+            const hoursInRange = calculateHoursInRange(a.start_time, a.end_time, timeRangeCriteria.include);
+            total += hoursInRange;
+          } else {
+            total += a.hours || 0;
+          }
         });
         templateRows.forEach(row => {
           if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
@@ -431,10 +485,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           const rowAsAssignment = { qualification_id: row.values?.task || "" };
           if (!matchesCriteria(row.values, rowAsAssignment)) return;
           
-          total += calcHours(
-            row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "",
-            row.values?.["סיום"] || row.values?.["שעת סיום"] || ""
-          );
+          const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "";
+          const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || "";
+          
+          // If criteria include time range, only count hours within that range
+          const timeRangeCriteria = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
+          if (timeRangeCriteria && timeRangeCriteria.include?.length > 0) {
+            const hoursInRange = calculateHoursInRange(startTime, endTime, timeRangeCriteria.include);
+            total += hoursInRange;
+          } else {
+            total += calcHours(startTime, endTime);
+          }
         });
       }
 
