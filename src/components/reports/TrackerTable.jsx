@@ -206,9 +206,31 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       return [fieldVal, ...subTypes].filter(Boolean).map(String);
     };
 
-    // Check col_value_filter (new: {include,exclude}) or fall back to old schedule_col_value
+    // Check criteria array (new format) or fall back to old col_value_filter
+    const matchesCriteria = (vals, assignmentObj) => {
+      const criteria = col.criteria;
+      if (criteria && criteria.length > 0) {
+        // Each criterion must match (AND between criteria)
+        return criteria.every(c => {
+          if (!c.col_name || !(c.include?.length)) return true; // no selection = match all
+          const cellVals = getCellVals(vals, c.col_name);
+          if (c.logic === "and") {
+            // All selected values must be present
+            return c.include.every(v => cellVals.includes(v));
+          } else {
+            // OR: at least one selected value is present
+            return c.include.some(v => cellVals.includes(v));
+          }
+        });
+      }
+      return true; // no criteria = match all
+    };
+
+    // Check col_value_filter (legacy: {include,exclude}) or fall back to old schedule_col_value
     // IMPORTANT: If no filter is defined (include/exclude both empty), return true (match all)
     const matchesColValueFilter = (vals, colName) => {
+      // New criteria format takes priority
+      if (col.criteria?.length) return matchesCriteria(vals, null);
       const f = col.col_value_filter;
       if (f && (f.include?.length || f.exclude?.length)) {
         const cellVals = getCellVals(vals, colName);
