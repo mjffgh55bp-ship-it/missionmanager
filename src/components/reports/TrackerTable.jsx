@@ -294,6 +294,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       
       const shiftStart = timeToMinutes(startTime);
       const shiftEnd = timeToMinutes(endTime);
+      const shiftCrossesMidnight = shiftStart > shiftEnd; // e.g., 22:00 > 06:00
       
       let totalMinutes = 0;
       
@@ -301,30 +302,46 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const [rangeStart, rangeEnd] = rangeStr.split("-");
         const rangeStartMin = timeToMinutes(rangeStart);
         const rangeEndMin = timeToMinutes(rangeEnd);
+        const rangeCrossesMidnight = rangeStartMin > rangeEndMin;
         
-        let overlapStart, overlapEnd;
-        
-        if (rangeStartMin < rangeEndMin) {
-          // Regular range (e.g., 06:00-22:00)
-          overlapStart = Math.max(shiftStart, rangeStartMin);
-          overlapEnd = Math.min(shiftEnd, rangeEndMin);
+        if (shiftCrossesMidnight) {
+          // Shift crosses midnight (e.g., 22:00-06:00)
+          if (rangeCrossesMidnight) {
+            // Both cross midnight: calculate overlap in both parts
+            const overlap1 = Math.max(0, Math.min(1440, 1440) - Math.max(shiftStart, rangeStartMin));
+            const overlap2 = Math.max(0, Math.min(shiftEnd, rangeEndMin) - Math.max(0, 0));
+            totalMinutes += overlap1 + overlap2;
+          } else {
+            // Range doesn't cross midnight (e.g., 00:00-02:00)
+            // Check if it overlaps with second part [0, shiftEnd)
+            if (rangeEndMin > 0 && rangeStartMin < shiftEnd) {
+              totalMinutes += Math.min(shiftEnd, rangeEndMin) - Math.max(0, rangeStartMin);
+            }
+            // Check if it overlaps with first part [shiftStart, 1440)
+            if (rangeStartMin >= 0 && rangeEndMin >= shiftStart) {
+              totalMinutes += Math.min(1440, rangeEndMin) - Math.max(shiftStart, 0);
+            }
+          }
         } else {
-          // Cross-midnight range (e.g., 22:00-06:00)
-          if (shiftStart >= rangeStartMin || shiftEnd <= rangeEndMin) {
-            if (shiftStart >= rangeStartMin) {
-              overlapStart = shiftStart;
-              overlapEnd = Math.min(shiftEnd, 24 * 60);
-            } else {
-              overlapStart = 0;
-              overlapEnd = Math.min(shiftEnd, rangeEndMin);
+          // Shift doesn't cross midnight (e.g., 06:00-22:00)
+          if (rangeCrossesMidnight) {
+            // Range crosses midnight (e.g., 22:00-06:00)
+            // Check overlap with first part of range [rangeStartMin, 1440)
+            if (shiftStart < 1440 && shiftEnd > rangeStartMin) {
+              totalMinutes += Math.min(1440, shiftEnd) - Math.max(shiftStart, rangeStartMin);
+            }
+            // Check overlap with second part of range [0, rangeEndMin)
+            if (shiftStart < rangeEndMin && shiftEnd > 0) {
+              totalMinutes += Math.min(shiftEnd, rangeEndMin) - Math.max(shiftStart, 0);
             }
           } else {
-            return;
+            // Both don't cross midnight - standard range intersection
+            const overlapStart = Math.max(shiftStart, rangeStartMin);
+            const overlapEnd = Math.min(shiftEnd, rangeEndMin);
+            if (overlapEnd > overlapStart) {
+              totalMinutes += overlapEnd - overlapStart;
+            }
           }
-        }
-        
-        if (overlapEnd > overlapStart) {
-          totalMinutes += overlapEnd - overlapStart;
         }
       });
       
