@@ -32,7 +32,35 @@ export default function Reports() {
   const [editingTracker, setEditingTracker] = useState(null);
   const [trackerSizes, setTrackerSizes] = useState({});
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+
+    // Real-time updates for assignments and template rows
+    const unsubAssignments = base44.entities.Assignment.subscribe((event) => {
+      if (event.type === "create") {
+        setAssignments(prev => [event.data, ...prev]);
+      } else if (event.type === "update") {
+        setAssignments(prev => prev.map(a => a.id === event.id ? event.data : a));
+      } else if (event.type === "delete") {
+        setAssignments(prev => prev.filter(a => a.id !== event.id));
+      }
+    });
+
+    const unsubTemplateRows = base44.entities.TemplateRow.subscribe((event) => {
+      if (event.type === "create") {
+        setTemplateRows(prev => [...prev, event.data]);
+      } else if (event.type === "update") {
+        setTemplateRows(prev => prev.map(r => r.id === event.id ? event.data : r));
+      } else if (event.type === "delete") {
+        setTemplateRows(prev => prev.filter(r => r.id !== event.id));
+      }
+    });
+
+    return () => {
+      unsubAssignments();
+      unsubTemplateRows();
+    };
+  }, []);
 
   const loadData = async () => {
     const [
