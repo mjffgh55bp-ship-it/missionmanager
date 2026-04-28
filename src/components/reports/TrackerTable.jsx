@@ -294,8 +294,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     }
 
     if (col.type === "schedule_col") {
-      if (!col.schedule_col_name) return 0;
       let total = 0;
+      // If no schedule_col_name, count hours directly from assignment (filtered by criteria only)
+      if (!col.schedule_col_name) {
+        filtered.forEach(a => {
+          if (!matchesCriteria(a.column_values, a)) return;
+          total += a.hours || 0;
+        });
+        return Math.round(total * 10) / 10;
+      }
       filtered.forEach(a => {
         if (!matchesColValueFilter(a.column_values, col.schedule_col_name, a)) return;
         total += a.hours || 0;
