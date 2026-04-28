@@ -89,7 +89,8 @@ export default function Reports() {
       setTrackers(prev => [...prev, saved]);
     }
     setTrackerEditorOpen(false);
-    setEditingTracker(null);
+    // Keep editingTracker updated so next open shows latest filters
+    setEditingTracker(saved);
   };
 
   const handleTrackerUpdated = (updated) => {

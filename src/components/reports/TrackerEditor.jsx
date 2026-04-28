@@ -100,6 +100,11 @@ function MultiCriterion({ label, description, options, value = { include: [], ex
 function ColumnConfigDialog({ col, scheduleColumns, taskNames, populations, workerRoles, onSave, onClose }) {
   const [draft, setDraft] = useState({ ...col });
 
+  // Sync draft when col prop changes (e.g. after external state update)
+  useEffect(() => {
+    setDraft({ ...col });
+  }, [col.id]);
+
   const schedCol = scheduleColumns.find(c => c.name === draft.schedule_col_name);
   const reportType = schedCol?.report_type || "";
 
@@ -271,11 +276,16 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
   const [localTaskNames, setLocalTaskNames] = useState([]);
 
   const prevOpenRef = useRef(false);
+  const prevTrackerIdRef = useRef(null);
   useEffect(() => {
-    if (open && !prevOpenRef.current) {
+    const trackerId = tracker?.id ?? null;
+    const justOpened = open && !prevOpenRef.current;
+    const trackerChanged = open && trackerId !== prevTrackerIdRef.current;
+    if (justOpened || trackerChanged) {
       setName(tracker ? tracker.name || "" : "");
       setColumns(tracker ? (tracker.columns || []).map(c => ({ ...c })) : []);
       setConfiguringColId(null);
+      prevTrackerIdRef.current = trackerId;
     }
     prevOpenRef.current = open;
   }, [open, tracker]);
