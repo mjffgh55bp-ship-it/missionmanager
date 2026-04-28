@@ -278,6 +278,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
     // Check criteria array (new format) or fall back to old col_value_filter
     const TASK_COL = "__משימה__";
+    const TIME_RANGE_COL = "__טווח_שעות__";
     const parseQuantJson = (raw) => {
       if (!raw) return {};
       if (typeof raw === "object") return raw;
@@ -289,6 +290,18 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const criteriaLogic = col.criteria_logic || "or";
         const checkOne = (c) => {
           if (!c.col_name || !(c.include?.length)) return true; // no selection = match all
+          if (c.col_name === TIME_RANGE_COL) {
+            // Check if shift start time falls within any of the time ranges
+            const shiftStart = assignmentObj?.start_time || vals?.["התחלה"] || vals?.["שעת התחלה"];
+            if (!shiftStart) return false;
+            const matches = (range) => {
+              const rangeStart = range.start;
+              const rangeEnd = range.end;
+              return shiftStart >= rangeStart && shiftStart < rangeEnd;
+            };
+            if (c.logic === "and") return c.include.every(r => matches(r));
+            return c.include.some(r => matches(r));
+          }
           if (c.col_name === TASK_COL) {
             // Task can be stored as:
             // 1. assignmentObj.qualification_id = ID of qualification

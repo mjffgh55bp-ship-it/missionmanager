@@ -2,18 +2,79 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 const TASK_COL_NAME = "__משימה__";
+const TIME_RANGE_COL_NAME = "__טווח_שעות__";
+
+function TimeRangeSelector({ criterion, onUpdate }) {
+  const timeRanges = criterion.include || [];
+
+  const addTimeRange = () => {
+    const newRanges = [...timeRanges, { start: "00:00", end: "23:59", id: Date.now().toString() }];
+    onUpdate({ ...criterion, include: newRanges });
+  };
+
+  const updateTimeRange = (id, field, value) => {
+    const newRanges = timeRanges.map(r => r.id === id ? { ...r, [field]: value } : r);
+    onUpdate({ ...criterion, include: newRanges });
+  };
+
+  const removeTimeRange = (id) => {
+    const newRanges = timeRanges.filter(r => r.id !== id);
+    onUpdate({ ...criterion, include: newRanges });
+  };
+
+  return (
+    <div className="space-y-2">
+      {timeRanges.map((range, idx) => (
+        <div key={range.id} className="flex items-center gap-2">
+          <Input
+            type="time"
+            value={range.start}
+            onChange={(e) => updateTimeRange(range.id, "start", e.target.value)}
+            className="h-7 text-xs flex-1"
+          />
+          <span className="text-xs text-gray-600">עד</span>
+          <Input
+            type="time"
+            value={range.end}
+            onChange={(e) => updateTimeRange(range.id, "end", e.target.value)}
+            className="h-7 text-xs flex-1"
+          />
+          <button
+            type="button"
+            onClick={() => removeTimeRange(range.id)}
+            className="text-red-600 hover:text-red-800 p-0.5"
+            title="הסר טווח"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addTimeRange}
+        className="text-xs text-blue-700 hover:text-blue-900 font-medium mt-2"
+      >
+        + הוסף טווח שעות
+      </button>
+    </div>
+  );
+}
 
 function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, onRemove }) {
   const [showColPicker, setShowColPicker] = useState(!criterion.col_name);
 
   const isTaskCriterion = criterion.col_name === TASK_COL_NAME;
+  const isTimeRangeCriterion = criterion.col_name === TIME_RANGE_COL_NAME;
   const sc = scheduleColumns.find(c => c.name === criterion.col_name);
 
   // For task criterion: store id as value but display name
   const availableOptions = isTaskCriterion
     ? qualifications.map(q => ({ value: q.id, label: q.name }))
+    : isTimeRangeCriterion
+    ? []
     : sc
       ? [
           ...(sc.options || []),
@@ -26,6 +87,8 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
   const validIds = isTaskCriterion ? qualifications.map(q => q.id) : null;
   const cleanInclude = isTaskCriterion
     ? (criterion.include || []).filter(v => validIds.includes(v))
+    : isTimeRangeCriterion
+    ? (criterion.include || [])  // Keep all time ranges as-is
     : (criterion.include || []);
 
   const toggleInclude = (opt) => {
@@ -45,7 +108,7 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
     setShowColPicker(false);
   };
 
-  const displayName = isTaskCriterion ? "משימה" : (criterion.col_name || "בחר עמודה");
+  const displayName = isTaskCriterion ? "משימה" : isTimeRangeCriterion ? "טווח שעות" : (criterion.col_name || "בחר עמודה");
 
   return (
     <div className="border border-blue-200 rounded-lg bg-blue-50 overflow-hidden mb-2">
@@ -86,7 +149,9 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
       {/* Value selection */}
       {criterion.col_name && !showColPicker && (
         <div className="px-3 py-2">
-          {availableOptions.length > 0 ? (
+          {isTimeRangeCriterion ? (
+            <TimeRangeSelector criterion={criterion} onUpdate={onUpdate} />
+          ) : availableOptions.length > 0 ? (
             <>
               <div className="flex flex-wrap gap-1 mb-2">
                 {availableOptions.map(opt => {
@@ -174,6 +239,18 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
     setShowCriteriaPicker(false);
   };
 
+  const addTimeRangeCriterion = () => {
+    const newC = {
+      id: Date.now().toString(),
+      col_name: TIME_RANGE_COL_NAME,
+      col_type: "time_range",
+      include: [{ start: "00:00", end: "23:59", id: Date.now().toString() }],
+      logic: "or",
+    };
+    update("criteria", [...(draft.criteria || []), newC]);
+    setShowCriteriaPicker(false);
+  };
+
   const updateCriterion = (id, updated) => {
     update("criteria", (draft.criteria || []).map(c => c.id === id ? updated : c));
   };
@@ -239,6 +316,10 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
             </button>
             {showCriteriaPicker && (
               <div className="border-t border-blue-200 bg-blue-100 max-h-40 overflow-y-auto">
+                <button type="button" onClick={addTimeRangeCriterion}
+                  className="w-full text-right px-4 py-1.5 text-sm text-blue-900 hover:bg-blue-200 transition-colors font-medium border-b border-blue-200">
+                  טווח שעות
+                </button>
                 {qualifications.length > 0 && (
                   <button type="button" onClick={addTaskCriterion}
                     className="w-full text-right px-4 py-1.5 text-sm text-blue-900 hover:bg-blue-200 transition-colors font-medium border-b border-blue-200">
