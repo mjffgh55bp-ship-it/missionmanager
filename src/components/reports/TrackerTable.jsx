@@ -169,6 +169,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const saveAndExitEditMode = async () => {
     setSavingEdit(true);
+    // editColumns may have already been saved per-column; save final state to ensure consistency
     const updated = await base44.entities.Tracker.update(tracker.id, { columns: editColumns });
     setTracker(updated);
     onUpdated(updated);
@@ -193,14 +194,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     setConfiguringCol(newCol);
   };
 
-  const saveColConfig = async (updatedCol) => {
-    const newCols = editColumns.map(c => c.id === updatedCol.id ? updatedCol : c);
-    if (!newCols.find(c => c.id === updatedCol.id)) newCols.push(updatedCol);
-    setEditColumns(newCols);
-    // Save immediately to DB so changes persist even if user navigates away
-    const updated = await base44.entities.Tracker.update(tracker.id, { columns: newCols });
-    setTracker(updated);
-    onUpdated(updated);
+  const saveColConfig = (updatedCol) => {
+    setEditColumns(prev => {
+      const exists = prev.find(c => c.id === updatedCol.id);
+      const newCols = exists
+        ? prev.map(c => c.id === updatedCol.id ? updatedCol : c)
+        : [...prev, updatedCol];
+      // Save immediately to DB so changes persist even if user navigates away
+      base44.entities.Tracker.update(tracker.id, { columns: newCols }).then(updated => {
+        setTracker(updated);
+        onUpdated(updated);
+      });
+      return newCols;
+    });
     setConfiguringCol(null);
   };
 

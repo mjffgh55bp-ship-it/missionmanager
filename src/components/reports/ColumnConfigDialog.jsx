@@ -272,7 +272,8 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
                     : (c.include || [])
                 }))
               };
-              onSave(cleaned); onClose();
+              onSave(cleaned);
+              // onClose is called inside saveColConfig after state update
             }}
             className="bg-blue-700 hover:bg-blue-800 flex-1" dir="rtl">אישור</Button>
         </DialogFooter>
