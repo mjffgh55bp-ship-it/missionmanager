@@ -261,9 +261,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           if (!c.col_name || !(c.include?.length)) return true; // no selection = match all
           // Task criterion: match against assignment's qualification_id or qualification_name
           if (c.col_name === TASK_COL) {
-            const taskVal = assignmentObj?.qualification_id || assignmentObj?.qualification_name || "";
-            if (c.logic === "and") return c.include.every(v => v === taskVal);
-            return c.include.some(v => v === taskVal);
+            const taskId = assignmentObj?.qualification_id || "";
+            if (c.logic === "and") return c.include.every(v => v === taskId);
+            return c.include.some(v => v === taskId);
           }
           const cellVals = getCellVals(vals, c.col_name);
           if (c.logic === "and") {

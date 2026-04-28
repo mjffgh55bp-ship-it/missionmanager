@@ -11,8 +11,9 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
   const isTaskCriterion = criterion.col_name === TASK_COL_NAME;
   const sc = scheduleColumns.find(c => c.name === criterion.col_name);
 
+  // For task criterion: store id as value but display name
   const availableOptions = isTaskCriterion
-    ? qualifications.map(q => q.name)
+    ? qualifications.map(q => ({ value: q.id, label: q.name }))
     : sc
       ? [
           ...(sc.options || []),
@@ -84,15 +85,17 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
             <>
               <div className="flex flex-wrap gap-1 mb-2">
                 {availableOptions.map(opt => {
-                  const isSelected = (criterion.include || []).includes(opt);
+                  const optValue = typeof opt === "object" ? opt.value : opt;
+                  const optLabel = typeof opt === "object" ? opt.label : opt;
+                  const isSelected = (criterion.include || []).includes(optValue);
                   return (
-                    <button key={opt} type="button" onClick={() => toggleInclude(opt)}
+                    <button key={optValue} type="button" onClick={() => toggleInclude(optValue)}
                       className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
                         isSelected
                           ? "bg-blue-700 text-white border-blue-700"
                           : "bg-white text-blue-800 border-blue-300 hover:border-blue-500"
                       }`}>
-                      {opt}
+                      {optLabel}
                       {isSelected && <X className="inline w-3 h-3 mr-1" />}
                     </button>
                   );
