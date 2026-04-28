@@ -256,22 +256,20 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const matchesCriteria = (vals, assignmentObj) => {
       const criteria = col.criteria;
       if (criteria && criteria.length > 0) {
-        // Each criterion must match (AND between criteria)
-        return criteria.every(c => {
+        const criteriaLogic = col.criteria_logic || "or";
+        const checkOne = (c) => {
           if (!c.col_name || !(c.include?.length)) return true; // no selection = match all
-          // Task criterion: match against assignment's qualification_id or qualification_name
           if (c.col_name === TASK_COL) {
             const taskId = assignmentObj?.qualification_id || "";
             if (c.logic === "and") return c.include.every(v => v === taskId);
             return c.include.some(v => v === taskId);
           }
           const cellVals = getCellVals(vals, c.col_name);
-          if (c.logic === "and") {
-            return c.include.every(v => cellVals.includes(v));
-          } else {
-            return c.include.some(v => cellVals.includes(v));
-          }
-        });
+          if (c.logic === "and") return c.include.every(v => cellVals.includes(v));
+          return c.include.some(v => cellVals.includes(v));
+        };
+        if (criteriaLogic === "and") return criteria.every(c => checkOne(c));
+        return criteria.some(c => checkOne(c));
       }
       return true; // no criteria = match all
     };
@@ -571,7 +569,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           <ChevronUp className="w-3 h-3" />
                         </Button>
                         <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-blue-500 hover:text-blue-700"
-                          onClick={() => setConfiguringCol(editColumns.find(c => c.id === col.id))}>
+                          onClick={() => setConfiguringCol({ ...editColumns.find(c => c.id === col.id) })}>
                           <Pencil className="w-3 h-3" />
                         </Button>
                         <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-red-500 hover:text-red-700"

@@ -145,6 +145,7 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
       }))
     };
     setDraft(cleaned);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [col.id]);
 
   const update = (field, value) => setDraft(d => ({ ...d, [field]: value }));
@@ -182,7 +183,7 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
   };
 
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={onClose} key={col.id}>
       <DialogContent className="sm:max-w-md max-h-[88vh] overflow-y-auto p-0" dir="rtl">
         <div className="bg-blue-600 px-4 py-3">
           <input value={draft.name} onChange={e => update("name", e.target.value)}
@@ -199,12 +200,36 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
               dir="rtl" />
           </div>
 
-          {(draft.criteria || []).map(c => (
-            <CriterionRow key={c.id} criterion={c}
-              scheduleColumns={scheduleColumns}
-              qualifications={qualifications}
-              onUpdate={(updated) => updateCriterion(c.id, updated)}
-              onRemove={() => removeCriterion(c.id)} />
+          {(draft.criteria || []).map((c, idx) => (
+            <div key={c.id}>
+              <CriterionRow criterion={c}
+                scheduleColumns={scheduleColumns}
+                qualifications={qualifications}
+                onUpdate={(updated) => updateCriterion(c.id, updated)}
+                onRemove={() => removeCriterion(c.id)} />
+              {idx < (draft.criteria || []).length - 1 && (
+                <div className="flex items-center justify-center gap-2 my-1">
+                  <button type="button"
+                    onClick={() => update("criteria_logic", "and")}
+                    className={`px-3 py-0.5 rounded text-xs border transition-colors ${
+                      (draft.criteria_logic || "or") === "and"
+                        ? "bg-blue-700 text-white border-blue-700"
+                        : "bg-white text-blue-700 border-blue-300 hover:border-blue-500"
+                    }`}>
+                    וגם
+                  </button>
+                  <button type="button"
+                    onClick={() => update("criteria_logic", "or")}
+                    className={`px-3 py-0.5 rounded text-xs border transition-colors ${
+                      (draft.criteria_logic || "or") === "or"
+                        ? "bg-blue-700 text-white border-blue-700"
+                        : "bg-white text-blue-700 border-blue-300 hover:border-blue-500"
+                    }`}>
+                    או
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
 
           <div className="border border-blue-200 rounded-lg bg-blue-50 overflow-hidden">
