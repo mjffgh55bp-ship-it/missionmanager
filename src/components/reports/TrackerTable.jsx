@@ -286,24 +286,24 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     };
     const calculateHoursInRange = (startTime, endTime, timeRanges) => {
       if (!startTime || !endTime) return 0;
-      
+
       const timeToMinutes = (timeStr) => {
         const [h, m] = timeStr.split(":").map(Number);
         return h * 60 + (m || 0);
       };
-      
+
       const shiftStart = timeToMinutes(startTime);
       const shiftEnd = timeToMinutes(endTime);
       const shiftCrossesMidnight = shiftStart > shiftEnd; // e.g., 22:00 > 06:00
-      
+
       let totalMinutes = 0;
-      
+
       timeRanges.forEach(rangeStr => {
         const [rangeStart, rangeEnd] = rangeStr.split("-");
         const rangeStartMin = timeToMinutes(rangeStart);
         const rangeEndMin = timeToMinutes(rangeEnd);
         const rangeCrossesMidnight = rangeStartMin > rangeEndMin;
-        
+
         if (shiftCrossesMidnight) {
           // Shift crosses midnight (e.g., 22:00-06:00)
           if (rangeCrossesMidnight) {
@@ -312,14 +312,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             const overlap2 = Math.max(0, Math.min(shiftEnd, rangeEndMin) - Math.max(0, 0));
             totalMinutes += overlap1 + overlap2;
           } else {
-            // Range doesn't cross midnight (e.g., 00:00-02:00)
+            // Range doesn't cross midnight (e.g., 00:00-02:00 or 06:00-14:00)
             // Check if it overlaps with second part [0, shiftEnd)
             if (rangeEndMin > 0 && rangeStartMin < shiftEnd) {
               totalMinutes += Math.min(shiftEnd, rangeEndMin) - Math.max(0, rangeStartMin);
             }
             // Check if it overlaps with first part [shiftStart, 1440)
-            if (rangeStartMin >= 0 && rangeEndMin >= shiftStart) {
-              totalMinutes += Math.min(1440, rangeEndMin) - Math.max(shiftStart, 0);
+            if (rangeEndMin > shiftStart && 1440 > rangeStartMin) {
+              totalMinutes += Math.min(1440, rangeEndMin) - Math.max(shiftStart, rangeStartMin);
             }
           }
         } else {
@@ -344,7 +344,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           }
         }
       });
-      
+
       return totalMinutes / 60;
     };
 
