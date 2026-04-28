@@ -291,12 +291,24 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const checkOne = (c) => {
           if (!c.col_name || !(c.include?.length)) return true; // no selection = match all
           if (c.col_name === TIME_RANGE_COL) {
-            // Check if shift start time falls within any of the time ranges
+            // Check if shift overlaps with any of the time ranges (handles cross-midnight ranges)
             const shiftStart = assignmentObj?.start_time || vals?.["התחלה"] || vals?.["שעת התחלה"];
-            if (!shiftStart) return false;
+            const shiftEnd = assignmentObj?.end_time || vals?.["סיום"] || vals?.["שעת סיום"];
+            if (!shiftStart || !shiftEnd) return false;
+            
             const matches = (rangeStr) => {
               const [rangeStart, rangeEnd] = rangeStr.split("-");
-              return shiftStart >= rangeStart && shiftStart < rangeEnd;
+              const inRange = (time) => {
+                if (rangeStart < rangeEnd) {
+                  // Regular range (e.g., 06:00-22:00)
+                  return time >= rangeStart && time < rangeEnd;
+                } else {
+                  // Cross-midnight range (e.g., 22:00-06:00)
+                  return time >= rangeStart || time < rangeEnd;
+                }
+              };
+              // Check if shift start or end overlaps with the range
+              return inRange(shiftStart) || inRange(shiftEnd);
             };
             if (c.logic === "and") return c.include.every(r => matches(r));
             return c.include.some(r => matches(r));
