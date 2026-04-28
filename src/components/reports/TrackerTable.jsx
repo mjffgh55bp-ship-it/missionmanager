@@ -351,7 +351,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const matchesCriteria = (vals, assignmentObj) => {
       const criteria = col.criteria;
       if (criteria && criteria.length > 0) {
-        const criteriaLogic = col.criteria_logic || "or";
+        // For count_quantitative, always use "and" logic to enforce all criteria must match
+        const criteriaLogic = col.type === "count_quantitative" ? "and" : (col.criteria_logic || "or");
         const checkOne = (c) => {
           if (!c.col_name) return true; // no column selected = match all
           if (!c.include?.length) {
