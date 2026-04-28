@@ -268,17 +268,29 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const checkOne = (c) => {
           if (!c.col_name || !(c.include?.length)) return true; // no selection = match all
           if (c.col_name === TASK_COL) {
-            // Task stored as qualification_id (ID) OR as column_values["משימה"] (name string)
-            const taskFromQual = assignmentObj?.qualification_id || "";
-            const taskFromColName = vals?.["משימה"] || "";
-            if (!taskFromQual && !taskFromColName) return false; // no task at all = no match
-            // c.include contains qualification IDs — match by ID or by name lookup
-            const matchesById = (v) => v === taskFromQual || v === taskFromColName;
-            const matchesByName = (v) => {
+            // Task can be stored as:
+            // 1. assignmentObj.qualification_id = ID of qualification
+            // 2. column_values["משימה"] = ID or name of qualification
+            const taskQualId = assignmentObj?.qualification_id || "";
+            const taskColVal = String(vals?.["משימה"] || "");
+            if (!taskQualId && !taskColVal) return false;
+
+            // For each value in c.include (which is a qualification ID):
+            const matches = (v) => {
+              // Direct ID match against qualification_id field
+              if (v === taskQualId) return true;
+              // Direct match against column value (might be ID or name)
+              if (v === taskColVal) return true;
+              // Column value might be a name — check if qual with this ID has that name
               const qual = qualifications.find(q => q.id === v);
-              return qual && qual.name === taskFromColName;
+              if (qual && qual.name === taskColVal) return true;
+              // Column value might be an ID — check if it matches
+              if (taskColVal && v === taskColVal) return true;
+              // qual_id might be stored as name in column_values
+              const qualByName = qualifications.find(q => q.name === taskColVal);
+              if (qualByName && qualByName.id === v) return true;
+              return false;
             };
-            const matches = (v) => matchesById(v) || matchesByName(v);
             if (c.logic === "and") return c.include.every(v => matches(v));
             return c.include.some(v => matches(v));
           }
@@ -309,16 +321,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
     if (col.type === "schedule_col") {
       let total = 0;
-      // If no schedule_col_name, count hours directly from assignment (filtered by criteria only)
-      if (!col.schedule_col_name) {
-        filtered.forEach(a => {
-          if (!matchesCriteria(a.column_values, a)) return;
-          total += a.hours || 0;
-        });
-        return Math.round(total * 10) / 10;
-      }
       filtered.forEach(a => {
-        if (!matchesColValueFilter(a.column_values, col.schedule_col_name, a)) return;
+        if (!matchesCriteria(a.column_values, a)) return;
         total += a.hours || 0;
       });
       templateRows.forEach(row => {
