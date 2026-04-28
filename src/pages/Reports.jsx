@@ -38,7 +38,7 @@ export default function Reports() {
     const [
       workersData, assignmentsData, templateRowsData, templatesData, trackersData,
       populationsSettings, workerRolesSettings, globalColSettings, cartColSettings, taskQualSettings,
-      qualificationsData
+      qualificationsData, tasksListSettings
     ] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
@@ -51,6 +51,7 @@ export default function Reports() {
       base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
       base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
       base44.entities.Qualification.filter({ active: true }),
+      base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
     ]);
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -61,15 +62,15 @@ export default function Reports() {
     // Load task qualifications from AppSettings
     const taskQuals = taskQualSettings.length > 0 ? JSON.parse(taskQualSettings[0].setting_value) || {} : {};
     setTaskQualifications(taskQuals);
-    // Build qualifications list from task_qualifications keys (these are the task names)
-    // Also include any Qualification entities that are still active
-    const qualsFromSettings = Object.keys(taskQuals).map(name => ({ id: name, name }));
+    // Build qualifications list from all task sources
+    const taskQualNames = Object.keys(taskQuals);
+    const taskListNames = tasksListSettings.length > 0 ? (JSON.parse(tasksListSettings[0].setting_value) || []) : [];
     const qualsFromEntity = qualificationsData.map(q => ({ id: q.id, name: q.name }));
-    // Merge: prefer entity records, fill in from settings
-    const entityNames = new Set(qualsFromEntity.map(q => q.name));
+    const allTaskNames = [...new Set([...taskQualNames, ...taskListNames])];
+    const entityNameSet = new Set(qualsFromEntity.map(q => q.name));
     const merged = [
       ...qualsFromEntity,
-      ...qualsFromSettings.filter(q => !entityNames.has(q.name))
+      ...allTaskNames.filter(name => !entityNameSet.has(name)).map(name => ({ id: name, name }))
     ];
     setQualifications(merged);
     if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
