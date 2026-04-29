@@ -381,10 +381,10 @@ export default function Schedule() {
                               : "text-gray-600 hover:bg-gray-100"
                           }`}
                         >
-                          <span className="font-medium">{HEBREW_DAYS[day.getDay()]}</span>
-                          <span className={`text-[11px] mt-0.5 ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
+                          <span className={`text-[11px] ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
                             {format(day, "d/M")}
                           </span>
+                          <span className="font-medium">{HEBREW_DAYS[day.getDay()]}</span>
                         </button>
                       );
                     })}
