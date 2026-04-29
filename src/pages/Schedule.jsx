@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react"
 import toast from 'react-hot-toast';
 
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
 const formatDateHebrew = (date) => {
   const d = new Date(date);
@@ -306,8 +307,9 @@ export default function Schedule() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-screen-2xl mx-auto">
         <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b bg-white">
-            <div className="flex flex-col gap-4">
+          <CardHeader className="border-b bg-white pb-0">
+            <div className="flex flex-col gap-3">
+              {/* Top row: title + controls */}
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-wrap">
                 <CardTitle className="text-2xl" dir="rtl">לוח</CardTitle>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -355,6 +357,40 @@ export default function Schedule() {
                   )}
                 </div>
               </div>
+
+              {/* Week days navigation bar */}
+              {(() => {
+                const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+                return (
+                  <div className="flex gap-1 pb-2" dir="rtl">
+                    {Array.from({ length: 7 }).map((_, i) => {
+                      const day = addDays(weekStart, i);
+                      const dayStr = format(day, "yyyy-MM-dd");
+                      const todayStr = format(new Date(), "yyyy-MM-dd");
+                      const isSelected = dayStr === dateString;
+                      const isToday = dayStr === todayStr;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setCurrentDate(day)}
+                          className={`flex flex-col items-center px-3 py-1.5 rounded-lg text-xs transition-all duration-150 flex-1 ${
+                            isSelected
+                              ? "bg-blue-900 text-white font-semibold"
+                              : isToday
+                              ? "bg-blue-100 text-blue-900 font-semibold hover:bg-blue-200"
+                              : "text-gray-600 hover:bg-gray-100"
+                          }`}
+                        >
+                          <span className="font-medium">{HEBREW_DAYS[day.getDay()]}</span>
+                          <span className={`text-[11px] mt-0.5 ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
+                            {format(day, "d/M")}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
           </CardHeader>
         </Card>
