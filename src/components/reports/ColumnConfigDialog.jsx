@@ -213,6 +213,10 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
   const [draft, setDraft] = useState({ ...col });
   const [showCriteriaPicker, setShowCriteriaPicker] = useState(false);
 
+  // count_mode is only relevant for schedule_col type
+  // "per_worker" = sum hours per worker (default, current behavior)
+  // "per_shift"  = sum unique shift hours for the criterion (org-level, shown only in total row)
+
   useEffect(() => {
     const validQualIds = qualifications.map(q => q.id);
     const cleaned = {
@@ -323,6 +327,42 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
               )}
             </div>
           ))}
+
+          {/* Count mode toggle — only for schedule_col */}
+          <div className="border border-blue-200 rounded-lg bg-blue-50 overflow-hidden">
+            <div className="px-3 py-2 border-b border-blue-200 bg-blue-100">
+              <p className="text-xs font-semibold text-blue-800 text-right mb-2">אופן ספירה</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => update("count_mode", "per_worker")}
+                  className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors ${
+                    (!draft.count_mode || draft.count_mode === "per_worker")
+                      ? "bg-blue-700 text-white border-blue-700"
+                      : "bg-white text-blue-700 border-blue-300 hover:border-blue-500"
+                  }`}
+                >
+                  ספירת שעות לאיש צוות
+                </button>
+                <button
+                  type="button"
+                  onClick={() => update("count_mode", "per_shift")}
+                  className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors ${
+                    draft.count_mode === "per_shift"
+                      ? "bg-blue-700 text-white border-blue-700"
+                      : "bg-white text-blue-700 border-blue-300 hover:border-blue-500"
+                  }`}
+                >
+                  ספירת שעות לקריטריון
+                </button>
+              </div>
+              <p className="text-[10px] text-blue-600 text-right mt-1">
+                {(!draft.count_mode || draft.count_mode === "per_worker")
+                  ? "מסכם שעות עבודה של כל עובד בנפרד"
+                  : "מסכם שעות משמרת כלליות (מוצג בשורת סה״כ בלבד)"}
+              </p>
+            </div>
+          </div>
 
           <div className="border border-blue-200 rounded-lg bg-blue-50 overflow-hidden">
             <button type="button" onClick={() => setShowCriteriaPicker(!showCriteriaPicker)}

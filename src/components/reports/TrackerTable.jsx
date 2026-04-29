@@ -664,6 +664,148 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return null;
   };
 
+  // Compute org-level hours for a "per_shift" column (deduped by shift, not per worker)
+  const computeShiftTotal = (col) => {
+    const dateRange = getDateRange(dateFilterMode, startDate, endDate);
+    const TIME_RANGE_COL = "__טווח_שעות__";
+
+    const parseQuantJson = (raw) => {
+      if (!raw) return {};
+      if (typeof raw === "object") return raw;
+      try { return JSON.parse(raw); } catch { return {}; }
+    };
+
+    const calculateHoursInRange = (startTime, endTime, timeRanges) => {
+      const timeToMinutes = (t) => {
+        if (!t) return NaN;
+        const nd = t.match(/^\+(\d+)\s+(\d{2}):(\d{2})$/);
+        if (nd) return parseInt(nd[1]) * 1440 + parseInt(nd[2]) * 60 + parseInt(nd[3]);
+        const p = t.split(":");
+        const h = parseInt(p[0]); const m = parseInt(p[1] || "0");
+        if (isNaN(h)) return NaN;
+        return h * 60 + m;
+      };
+      let ss = timeToMinutes(startTime) % 1440;
+      let se = timeToMinutes(endTime) % 1440;
+      if (isNaN(ss) || isNaN(se)) return 0;
+      const shiftX = ss > se;
+      let total = 0;
+      timeRanges.forEach(rs => {
+        const m = rs.match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
+        if (!m) return;
+        const rs_ = timeToMinutes(m[1]); const re_ = timeToMinutes(m[2]);
+        const rangeX = rs_ > re_;
+        if (shiftX) {
+          if (rangeX) {
+            total += Math.max(0, 1440 - Math.max(ss, rs_)) + Math.max(0, Math.min(se, re_));
+          } else {
+            if (re_ > 0 && rs_ < se) total += Math.min(se, re_) - Math.max(0, rs_);
+            if (re_ > ss) total += Math.min(1440, re_) - Math.max(ss, rs_);
+          }
+        } else {
+          if (rangeX) {
+            if (ss < 1440 && se > rs_) total += Math.min(1440, se) - Math.max(ss, rs_);
+            if (ss < re_ && se > 0) total += Math.min(se, re_) - Math.max(ss, 0);
+          } else {
+            const os = Math.max(ss, rs_); const oe = Math.min(se, re_);
+            if (oe > os) total += oe - os;
+          }
+        }
+      });
+      return total / 60;
+    };
+
+    const timeRangeC = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
+    const checkTimeRange = (s, e) => {
+      if (!timeRangeC || !timeRangeC.include?.length) return true;
+      if (!s || !e) return false;
+      return calculateHoursInRange(s, e, timeRangeC.include) > 0;
+    };
+
+    // Build a fake "match criteria" that works without workerId
+    const TASK_COL = "__משימה__";
+    const getCellVals = (vals, colName) => {
+      const fv = vals?.[colName]; const st = vals?.[`${colName}_subTypes`] || [];
+      return [fv, ...st].filter(Boolean).map(String);
+    };
+    const matchesCriteriaForShift = (vals, assignmentObj) => {
+      const criteria = col.criteria;
+      if (!criteria || criteria.length === 0) return true;
+      const criteriaLogic = col.criteria_logic || "or";
+      const checkOne = (c) => {
+        if (!c.col_name) return true;
+        if (!c.include?.length) return false;
+        if (c.col_name === TIME_RANGE_COL) {
+          const s = assignmentObj?.start_time || vals?.["התחלה"] || vals?.["שעת התחלה"];
+          const e = assignmentObj?.end_time || vals?.["סיום"] || vals?.["שעת סיום"];
+          if (!s || !e) return false;
+          if (c.logic === "and") return c.include.every(r => calculateHoursInRange(s, e, [r]) > 0);
+          return c.include.some(r => calculateHoursInRange(s, e, [r]) > 0);
+        }
+        if (c.col_name === TASK_COL) {
+          const tq = assignmentObj?.qualification_id || "";
+          const tv = String(vals?.["משימה"] || "");
+          if (!tq && !tv) return false;
+          const matches = (v) => v === tq || v === tv || (qualifications.find(q => q.id === v)?.name === tv) || (qualifications.find(q => q.name === tv)?.id === v);
+          if (c.logic === "and") return c.include.every(matches);
+          return c.include.some(matches);
+        }
+        const rv = vals?.[c.col_name];
+        if (typeof rv === "string" && rv.startsWith("{")) {
+          const p = parseQuantJson(rv);
+          if (c.logic === "and") return c.include.every(v => (p[v] || 0) > 0);
+          return c.include.some(v => (p[v] || 0) > 0);
+        }
+        const cv = getCellVals(vals, c.col_name);
+        if (c.logic === "and") return c.include.every(v => cv.includes(v));
+        return c.include.some(v => cv.includes(v));
+      };
+      if (criteriaLogic === "and") return criteria.every(c => checkOne(c));
+      return criteria.some(c => checkOne(c));
+    };
+
+    // Collect all assignments in date range (not filtered by worker)
+    const allFiltered = assignments.filter(a => {
+      if (dateRange && (a.date < dateRange.start || a.date > dateRange.end)) return false;
+      return true;
+    });
+
+    let total = 0;
+    const seenShiftIds = new Set();
+
+    allFiltered.forEach(a => {
+      if (seenShiftIds.has(a.id)) return;
+      if (!matchesCriteriaForShift(a.column_values, a)) return;
+      seenShiftIds.add(a.id);
+      if (timeRangeC && timeRangeC.include?.length) {
+        total += calculateHoursInRange(a.start_time, a.end_time, timeRangeC.include);
+      } else {
+        total += a.hours || 0;
+      }
+    });
+
+    templateRows.forEach(row => {
+      if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+      if (seenShiftIds.has(row.id)) return;
+      const tmpl = allTemplates.find(t => t.id === row.template_id);
+      if (!tmpl) return;
+      const rowAsAssignment = { qualification_id: row.values?.task || "" };
+      if (!matchesCriteriaForShift(row.values, rowAsAssignment)) return;
+      seenShiftIds.add(row.id);
+      const tmplTimeCols = (tmpl.columns || []).filter(tc => tc.type === "time");
+      const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || (tmplTimeCols[0] ? row.values?.[tmplTimeCols[0].name] : "") || "";
+      const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || (tmplTimeCols[1] ? row.values?.[tmplTimeCols[1].name] : "") || "";
+      if (!checkTimeRange(startTime, endTime)) return;
+      if (timeRangeC && timeRangeC.include?.length) {
+        total += calculateHoursInRange(startTime, endTime, timeRangeC.include);
+      } else {
+        total += calcHours(startTime, endTime);
+      }
+    });
+
+    return Math.round(total * 10) / 10;
+  };
+
   const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_by_task", "count_quantitative"].includes(type);
 
   const displayColumns = editMode ? editColumns : (tracker.columns || []);
@@ -932,6 +1074,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     );
                   }
                   if (auto) {
+                    // per_shift columns show "-" per worker row (org-level only)
+                    if (col.count_mode === "per_shift") {
+                      return (
+                        <TableCell key={col.id} className="text-center px-2 py-0.5 text-sm">
+                          <span className="text-gray-300">-</span>
+                        </TableCell>
+                      );
+                    }
                     const quantCriteriaCheck = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
                     const isQuantSumCol = col.type === "schedule_col" && quantCriteriaCheck.length > 0;
                     const showAsHours = col.type === "schedule_col" && !isQuantSumCol;
@@ -1017,6 +1167,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     );
                   }
                   if (isAuto(col.type)) {
+                    // per_shift: use org-level computation instead of sum of workers
+                    if (col.count_mode === "per_shift") {
+                      const total = computeShiftTotal(col);
+                      return (
+                        <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
+                          {total > 0 ? `${total}h` : <span className="text-gray-300">-</span>}
+                        </TableCell>
+                      );
+                    }
                     const total = filteredWorkers.reduce((sum, w) => {
                       const v = computeAutoValue(col, w.id);
                       return sum + (typeof v === "number" ? v : 0);
