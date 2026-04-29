@@ -95,10 +95,9 @@ const percentageToTime = (percentage, viewMode = 'daily', zoomRange = { start: 0
 };
 
 export default function Matrix() {
-  const [currentDate, setCurrentDate] = usePageState("matrix", "currentDate", null);
-  // Restore date from string or use today
-  const resolvedDate = currentDate ? new Date(currentDate) : new Date();
-  const setCurrentDateWrapped = (d) => setCurrentDate(d instanceof Date ? d.toISOString() : d);
+  const [_savedDate, _setSavedDate] = usePageState("matrix", "currentDate", null);
+  const currentDate = _savedDate ? new Date(_savedDate) : new Date();
+  const setCurrentDate = (d) => _setSavedDate(d instanceof Date ? d.toISOString() : d);
 
   const [viewMode, setViewMode] = usePageState("matrix", "viewMode", "daily");
   const [populationFilter, setPopulationFilter] = usePageState("matrix", "populationFilter", "__all__");
@@ -138,10 +137,6 @@ export default function Matrix() {
   const [scheduleParams, setScheduleParams] = useState([]);
   const [trackers, setTrackers] = useState([]);
   const [trackerEntries, setTrackerEntries] = useState([]);
-
-  // Use resolvedDate as the actual date object throughout
-  const currentDate = resolvedDate;
-  const setCurrentDate = setCurrentDateWrapped;
 
   useEffect(() => { 
     loadStaticData();
