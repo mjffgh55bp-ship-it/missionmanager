@@ -49,6 +49,7 @@ export default function Yearly() {
   const [workerRoleFilter, setWorkerRoleFilter] = useState("__all__");
   const [dragging, setDragging] = useState(null);
   const scrollContainerRef = useRef(null);
+  const rowHeaderRef = useRef(null);
   const scrollToTodayAfterLoad = useRef(false);
 
   useEffect(() => { loadData(); }, [currentYear]);
@@ -84,6 +85,16 @@ export default function Yearly() {
       return () => container.removeEventListener('scroll', handleScroll);
     }
   }, [currentYear, loading]);
+
+  // Sync vertical scroll from grid to row headers panel
+  useEffect(() => {
+    const grid = scrollContainerRef.current;
+    const headers = rowHeaderRef.current;
+    if (!grid || !headers) return;
+    const syncScroll = () => { headers.scrollTop = grid.scrollTop; };
+    grid.addEventListener('scroll', syncScroll);
+    return () => grid.removeEventListener('scroll', syncScroll);
+  }, [loading]);
 
   const loadData = async () => {
     setLoading(true);
@@ -388,10 +399,10 @@ export default function Yearly() {
           <CardContent className="p-0 h-full">
             <div className="flex h-full">
               {/* Fixed Row Headers */}
-              <div className="flex-shrink-0 bg-white border-l overflow-y-auto sticky right-0 z-40 shadow-lg" style={{ width: 160 }}>
-                <div className="bg-blue-900 text-white p-2 font-semibold text-right h-[36px] flex items-center sticky top-0 z-50">שורה</div>
-                <div className="bg-blue-800 text-white p-2 text-xs text-right h-[28px] flex items-center sticky top-[36px] z-50">שבוע</div>
-                <div className="bg-gray-100 p-2 text-xs font-medium text-right h-[52px] flex items-center sticky top-[64px] z-50 border-b">יום, תאריך</div>
+              <div ref={rowHeaderRef} className="flex-shrink-0 bg-white border-l overflow-y-hidden flex flex-col sticky right-0 z-40 shadow-lg" style={{ width: 160 }}>
+                <div className="bg-blue-900 text-white p-2 font-semibold text-right h-[36px] flex items-center flex-shrink-0">שורה</div>
+                <div className="bg-blue-800 text-white p-2 text-xs text-right h-[28px] flex items-center flex-shrink-0">שבוע</div>
+                <div className="bg-gray-100 p-2 text-xs font-medium text-right h-[52px] flex items-center flex-shrink-0 border-b">יום, תאריך</div>
 
                 <DragDropContext onDragEnd={handleDragEnd}>
                   <Droppable droppableId="rows">
