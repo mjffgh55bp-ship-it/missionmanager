@@ -472,11 +472,20 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
       let total = 0;
 
+      // Time range criteria always applies as AND filter
+      const timeRangeC = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
+      const checkTimeRange = (startT, endT) => {
+        if (!timeRangeC || !timeRangeC.include?.length) return true;
+        if (!startT || !endT) return false;
+        return calculateHoursInRange(startT, endT, timeRangeC.include) > 0;
+      };
+
       if (isQuantSum) {
         // Sum the numeric values from JSON for each include item across all matching rows
         const colName = quantCriteria[0].col_name;
         const includeItems = quantCriteria.flatMap(c => c.include);
         filtered.forEach(a => {
+          if (!checkTimeRange(a.start_time, a.end_time)) return;
           const raw = a.column_values?.[colName];
           if (!raw) return;
           const parsed = parseQuantJson(raw);
@@ -487,6 +496,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           const tmpl = allTemplates.find(t => t.id === row.template_id);
           if (!tmpl) return;
           if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
+          const tmplTimeCols = (tmpl.columns || []).filter(tc => tc.type === "time");
+          const rowStartTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || (tmplTimeCols[0] ? row.values?.[tmplTimeCols[0].name] : "") || "";
+          const rowEndTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || (tmplTimeCols[1] ? row.values?.[tmplTimeCols[1].name] : "") || "";
+          if (!checkTimeRange(rowStartTime, rowEndTime)) return;
           const raw = row.values?.[colName];
           if (!raw) return;
           const parsed = parseQuantJson(raw);
@@ -590,10 +603,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const criteriaLogicForQuant = col.criteria_logic || "or";
         const checkOne = (c) => {
           const rawVal = vals?.[c.col_name];
-          if (typeof rawVal === "string" && rawVal.startsWith("{")) {
+          // Handle both JSON string and plain object
+          if (rawVal !== null && rawVal !== undefined && (typeof rawVal === "object" || (typeof rawVal === "string" && rawVal.startsWith("{")))) {
             const parsed = parseQuantJson(rawVal);
             if (c.logic === "and") return c.include.every(v => (parsed[v] || 0) > 0);
             return c.include.some(v => (parsed[v] || 0) > 0);
+          }
+          // Non-JSON value: check as plain string match
+          if (typeof rawVal === "string" && rawVal.length > 0) {
+            if (c.logic === "and") return c.include.every(v => v === rawVal);
+            return c.include.some(v => v === rawVal);
           }
           return false;
         };
