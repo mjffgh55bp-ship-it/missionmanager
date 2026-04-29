@@ -246,10 +246,6 @@ export default function Reports() {
                               className="relative mb-6 border border-gray-200 rounded-lg bg-white"
                               style={{
                                 ...provided.draggableProps.style,
-                                width: size ? `${size.width}px` : '100%',
-                                height: size ? `${size.height}px` : 'auto',
-                                minHeight: '120px',
-                                overflow: 'hidden',
                               }}
                             >
                               {/* Header */}
@@ -259,18 +255,27 @@ export default function Reports() {
                                   <div className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing" {...provided.dragHandleProps}>
                                     <GripVertical className="w-4 h-4" />
                                   </div>
-                                  {size && (
-                                    <button
-                                      onClick={() => setTrackerSizes(prev => { const n = { ...prev }; delete n[tracker.id]; return n; })}
-                                      className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700"
-                                      title="חזור לגודל מלא"
-                                    >⛶</button>
-                                  )}
                                 </div>
                               </div>
 
-                              {/* Scrollable content */}
-                              <div style={{ height: size ? `calc(${size.height}px - 53px)` : 'auto', overflow: size ? 'auto' : 'visible' }}>
+                              {/* Resizable + scrollable content box */}
+                              <div
+                                style={{
+                                  resize: 'both',
+                                  overflow: 'auto',
+                                  minWidth: '320px',
+                                  minHeight: '150px',
+                                  width: size ? `${size.width}px` : '100%',
+                                  height: size ? `${size.height}px` : 'auto',
+                                }}
+                                onMouseUp={(e) => {
+                                  // Capture size after resize
+                                  setTrackerSizes(prev => ({
+                                    ...prev,
+                                    [tracker.id]: { width: e.currentTarget.offsetWidth, height: e.currentTarget.offsetHeight }
+                                  }));
+                                }}
+                              >
                                 <TrackerTable
                                   tracker={tracker}
                                   workers={workers}
@@ -283,70 +288,9 @@ export default function Reports() {
                                   qualifications={qualifications}
                                   onDelete={() => handleDeleteTracker(tracker.id)}
                                   onUpdated={handleTrackerUpdated}
-                                  onResize={() => setTrackerSizes(prev => ({ ...prev, [tracker.id]: { width: 800, height: 500 } }))}
+                                  onResize={undefined}
                                 />
                               </div>
-
-                              {/* Resize handles — always visible */}
-                              {/* Bottom-right corner */}
-                              <div
-                                className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-30"
-                                style={{ background: 'linear-gradient(135deg, transparent 50%, #93c5fd 50%)', borderBottomRightRadius: '0.5rem' }}
-                                onMouseDown={(e) => {
-                                  e.preventDefault(); e.stopPropagation();
-                                  const startX = e.clientX, startY = e.clientY;
-                                  const startW = size?.width ?? e.currentTarget.parentElement.offsetWidth;
-                                  const startH = size?.height ?? e.currentTarget.parentElement.offsetHeight;
-                                  const move = (me) => {
-                                    setTrackerSizes(prev => ({
-                                      ...prev,
-                                      [tracker.id]: {
-                                        width: Math.max(320, startW + (me.clientX - startX)),
-                                        height: Math.max(150, startH + (me.clientY - startY))
-                                      }
-                                    }));
-                                  };
-                                  const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
-                                  document.addEventListener('mousemove', move);
-                                  document.addEventListener('mouseup', up);
-                                }}
-                              />
-                              {/* Bottom edge */}
-                              <div
-                                className="absolute bottom-0 left-4 right-4 h-2 cursor-s-resize z-30 hover:bg-blue-100 rounded opacity-0 hover:opacity-100 transition-opacity"
-                                onMouseDown={(e) => {
-                                  e.preventDefault(); e.stopPropagation();
-                                  const startY = e.clientY;
-                                  const startH = size?.height ?? e.currentTarget.parentElement.offsetHeight;
-                                  const move = (me) => {
-                                    setTrackerSizes(prev => ({
-                                      ...prev,
-                                      [tracker.id]: { width: prev[tracker.id]?.width ?? e.currentTarget?.parentElement?.offsetWidth ?? 800, height: Math.max(150, startH + (me.clientY - startY)) }
-                                    }));
-                                  };
-                                  const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
-                                  document.addEventListener('mousemove', move);
-                                  document.addEventListener('mouseup', up);
-                                }}
-                              />
-                              {/* Right edge */}
-                              <div
-                                className="absolute top-14 bottom-4 right-0 w-2 cursor-e-resize z-30 hover:bg-blue-100 rounded opacity-0 hover:opacity-100 transition-opacity"
-                                onMouseDown={(e) => {
-                                  e.preventDefault(); e.stopPropagation();
-                                  const startX = e.clientX;
-                                  const startW = size?.width ?? e.currentTarget.parentElement.offsetWidth;
-                                  const move = (me) => {
-                                    setTrackerSizes(prev => ({
-                                      ...prev,
-                                      [tracker.id]: { width: Math.max(320, startW + (me.clientX - startX)), height: prev[tracker.id]?.height ?? e.currentTarget?.parentElement?.offsetHeight ?? 500 }
-                                    }));
-                                  };
-                                  const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
-                                  document.addEventListener('mousemove', move);
-                                  document.addEventListener('mouseup', up);
-                                }}
-                              />
                             </div>
                           );
                         }}
