@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ export default function Schedule() {
   const [availabilities, setAvailabilities] = useState([]);
   const [unavailabilities, setUnavailabilities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dailyLoading, setDailyLoading] = useState(false);
   const [columnTypes, setColumnTypes] = useState([]);
   const [columnSubTypes, setColumnSubTypes] = useState({});
   const [columnFreeText, setColumnFreeText] = useState({});
@@ -65,34 +66,86 @@ export default function Schedule() {
   const [openRegistrations, setOpenRegistrations] = useState([]);
   const [tasksList, setTasksList] = useState([]);
   const [taskQualifications, setTaskQualifications] = useState({});
+  const staticDataLoaded = useRef(false);
+  const lastWeekStart = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('schedule_last_date', format(currentDate, 'yyyy-MM-dd'));
-    loadData();
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const weekChanged = lastWeekStart.current !== weekStartStr;
+
+    if (!staticDataLoaded.current) {
+      loadAllData();
+    } else {
+      loadDailyData(weekChanged);
+    }
   }, [currentDate]);
 
-  const loadData = async () => {
+  // Load everything on first render
+  const loadAllData = async () => {
     setLoading(true);
     const dateString = format(currentDate, "yyyy-MM-dd");
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    lastWeekStart.current = weekStartStr;
 
-    const [workersData, availabilitiesData, unavailabilitiesData] = await Promise.all([
+    const [
+      workersData, availabilitiesData, unavailabilitiesData,
+      colTypesSettings, allTemplatesData, templateRowsData,
+      shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings,
+      openRegSettings, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings
+    ] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.Availability.filter({ week_start_date: weekStartStr }),
-      base44.entities.Unavailability.filter({ date: dateString })
-    ]);
-
-    const [colTypesSettings, allTemplatesData, templateRowsData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings] = await Promise.all([
+      base44.entities.Unavailability.filter({ date: dateString }),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.Template.filter({ active: true }),
       base44.entities.TemplateRow.filter({ date: dateString }),
       base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
-      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" })
+      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
+      base44.entities.AppSettings.filter({ setting_key: "open_registrations" }),
+      base44.entities.AppSettings.filter({ setting_key: `moked_order_${dateString}` }),
+      base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` }),
+      base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` }),
     ]);
 
+    applyStaticData({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData });
+    applyDailyData({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
+    staticDataLoaded.current = true;
+    setLoading(false);
+  };
+
+  // Load only day-specific data on date change
+  const loadDailyData = async (weekChanged = false) => {
+    setDailyLoading(true);
+    const dateString = format(currentDate, "yyyy-MM-dd");
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+
+    const promises = [
+      base44.entities.TemplateRow.filter({ date: dateString }),
+      base44.entities.Unavailability.filter({ date: dateString }),
+      base44.entities.AppSettings.filter({ setting_key: `moked_order_${dateString}` }),
+      base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` }),
+      base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` }),
+    ];
+    if (weekChanged) {
+      promises.push(base44.entities.Availability.filter({ week_start_date: weekStartStr }));
+      lastWeekStart.current = weekStartStr;
+    }
+
+    const results = await Promise.all(promises);
+    const [templateRowsData, unavailabilitiesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings] = results;
+    const availabilitiesData = weekChanged ? results[5] : null;
+
+    applyDailyData({ dateString, templateRowsData, allTemplatesData: allTemplates, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
+    setDailyLoading(false);
+  };
+
+  const applyStaticData = ({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData }) => {
     if (colTypesSettings.length > 0) {
       const customParams = JSON.parse(colTypesSettings[0].setting_value) || [];
       setColumnTypes(customParams.map(c => c.name));
@@ -121,65 +174,58 @@ export default function Schedule() {
     } else {
       setTasksList(Object.keys(parsedTaskQual));
     }
+    if (openRegSettings.length > 0) setOpenRegistrations(JSON.parse(openRegSettings[0].setting_value) || []);
+    setAllTemplates(allTemplatesData);
+    setWorkers(workersData);
+  };
 
-    const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
-    if (openRegSettings.length > 0) {
-      setOpenRegistrations(JSON.parse(openRegSettings[0].setting_value) || []);
-    } else {
-      setOpenRegistrations([]);
-    }
+  const applyDailyData = ({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData }) => {
+    if (mokedOrderSettings.length > 0) setMokedOrder(JSON.parse(mokedOrderSettings[0].setting_value) || []);
+    else setMokedOrder([]);
+    if (columnOrderSettings.length > 0) setCustomColumnOrders(JSON.parse(columnOrderSettings[0].setting_value) || {});
+    else setCustomColumnOrders({});
+    if (dailyColumnsSettings.length > 0) setDailyCustomColumns(JSON.parse(dailyColumnsSettings[0].setting_value) || {});
+    else setDailyCustomColumns({});
+    if (availabilitiesData) setAvailabilities(availabilitiesData);
+    setUnavailabilities(unavailabilitiesData);
 
-    const mokedOrderSettings = await base44.entities.AppSettings.filter({ setting_key: `moked_order_${dateString}` });
-    if (mokedOrderSettings.length > 0) {
-      setMokedOrder(JSON.parse(mokedOrderSettings[0].setting_value) || []);
-    } else {
-      setMokedOrder([]);
-    }
-
-    const columnOrderSettings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
-    if (columnOrderSettings.length > 0) {
-      setCustomColumnOrders(JSON.parse(columnOrderSettings[0].setting_value) || {});
-    } else {
-      setCustomColumnOrders({});
-    }
-
-    const dailyColumnsSettings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
-    if (dailyColumnsSettings.length > 0) {
-      setDailyCustomColumns(JSON.parse(dailyColumnsSettings[0].setting_value) || {});
-    } else {
-      setDailyCustomColumns({});
-    }
+    const processRows = (rows) => {
+      setTemplateRows(rows);
+      const uniqueTemplateIds = [...new Set(rows.map((row) => row.template_id))];
+      setTemplates(allTemplatesData.filter((t) => uniqueTemplateIds.includes(t.id)));
+    };
 
     if (templateRowsData.length === 0) {
       const defaultTemplates = allTemplatesData.filter((t) => t.is_default && t.active);
-      for (const template of defaultTemplates) {
-        const groupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-        const rowsToCreate = template.default_rows && template.default_rows.length > 0 ? template.default_rows : [{}];
-        for (const rowValues of rowsToCreate) {
-          await base44.entities.TemplateRow.create({
-            template_id: template.id,
-            template_name: template.name,
-            date: dateString,
-            values: rowValues,
-            group_id: groupId
-          });
-        }
+      if (defaultTemplates.length > 0) {
+        // Create default rows asynchronously without blocking UI
+        (async () => {
+          for (const template of defaultTemplates) {
+            const groupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+            const rowsToCreate = template.default_rows && template.default_rows.length > 0 ? template.default_rows : [{}];
+            for (const rowValues of rowsToCreate) {
+              await base44.entities.TemplateRow.create({
+                template_id: template.id,
+                template_name: template.name,
+                date: dateString,
+                values: rowValues,
+                group_id: groupId
+              });
+            }
+          }
+          const updatedRows = await base44.entities.TemplateRow.filter({ date: dateString });
+          processRows(updatedRows);
+        })();
+      } else {
+        processRows([]);
       }
-      const updatedTemplateRows = await base44.entities.TemplateRow.filter({ date: dateString });
-      setTemplateRows(updatedTemplateRows);
-      const updatedUniqueIds = [...new Set(updatedTemplateRows.map((row) => row.template_id))];
-      setTemplates(allTemplatesData.filter((t) => updatedUniqueIds.includes(t.id)));
     } else {
-      setTemplateRows(templateRowsData);
-      const uniqueTemplateIds = [...new Set(templateRowsData.map((row) => row.template_id))];
-      setTemplates(allTemplatesData.filter((t) => uniqueTemplateIds.includes(t.id)));
+      processRows(templateRowsData);
     }
+  };
 
-    setAllTemplates(allTemplatesData);
-    setWorkers(workersData);
-    setAvailabilities(availabilitiesData);
-    setUnavailabilities(unavailabilitiesData);
-    setLoading(false);
+  const loadData = async () => {
+    await loadDailyData(false);
   };
 
   const dateString = format(currentDate, "yyyy-MM-dd");
@@ -303,6 +349,8 @@ export default function Schedule() {
     );
   }
 
+  const isDailyLoading = dailyLoading;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-screen-2xl mx-auto">
@@ -311,7 +359,10 @@ export default function Schedule() {
             <div className="flex flex-col gap-3">
               {/* Top row: title + controls */}
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-wrap">
-                <CardTitle className="text-2xl" dir="rtl">לוח</CardTitle>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-2xl" dir="rtl">לוח</CardTitle>
+                  {isDailyLoading && <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-700 rounded-full animate-spin" />}
+                </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
                   <Popover>
