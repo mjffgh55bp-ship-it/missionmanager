@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { usePageState } from "@/hooks/usePageState";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -94,8 +95,17 @@ const percentageToTime = (percentage, viewMode = 'daily', zoomRange = { start: 0
 };
 
 export default function Matrix() {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState("daily"); // daily or weekly
+  const [currentDate, setCurrentDate] = usePageState("matrix", "currentDate", null);
+  // Restore date from string or use today
+  const resolvedDate = currentDate ? new Date(currentDate) : new Date();
+  const setCurrentDateWrapped = (d) => setCurrentDate(d instanceof Date ? d.toISOString() : d);
+
+  const [viewMode, setViewMode] = usePageState("matrix", "viewMode", "daily");
+  const [populationFilter, setPopulationFilter] = usePageState("matrix", "populationFilter", "__all__");
+  const [roleFilter, setRoleFilter] = usePageState("matrix", "roleFilter", "__all__");
+  const [statusFilter, setStatusFilter] = usePageState("matrix", "statusFilter", "__all__");
+  const [zoomRange, setZoomRange] = usePageState("matrix", "zoomRange", { start: 0, end: 100 });
+
   const [workers, setWorkers] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [availabilities, setAvailabilities] = useState([]);
@@ -113,15 +123,11 @@ export default function Matrix() {
   const [selectedWorkerForManual, setSelectedWorkerForManual] = useState(null);
   const [manualShiftData, setManualShiftData] = useState({ start_time: '', end_time: '', type: 'available' });
   const [editingShift, setEditingShift] = useState(null);
-  const [populationFilter, setPopulationFilter] = useState("__all__");
-  const [roleFilter, setRoleFilter] = useState("__all__");
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
-  const [zoomRange, setZoomRange] = useState({ start: 0, end: 100 });
   const timelineRefs = useRef({});
   const [isLoadingData, setIsLoadingData] = useState(false);
   const loadingTimeoutRef = useRef(null);
-  const [statusFilter, setStatusFilter] = useState("__all__");
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
@@ -132,6 +138,10 @@ export default function Matrix() {
   const [scheduleParams, setScheduleParams] = useState([]);
   const [trackers, setTrackers] = useState([]);
   const [trackerEntries, setTrackerEntries] = useState([]);
+
+  // Use resolvedDate as the actual date object throughout
+  const currentDate = resolvedDate;
+  const setCurrentDate = setCurrentDateWrapped;
 
   useEffect(() => { 
     loadStaticData();
