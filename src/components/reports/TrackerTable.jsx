@@ -288,12 +288,28 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       if (!startTime || !endTime) return 0;
 
       const timeToMinutes = (timeStr) => {
-        const [h, m] = timeStr.split(":").map(Number);
-        return h * 60 + (m || 0);
+        if (!timeStr) return NaN;
+        // Handle "+1 HH:MM" format (next day)
+        const nextDayMatch = timeStr.match(/^\+(\d+)\s+(\d{2}):(\d{2})$/);
+        if (nextDayMatch) {
+          const days = parseInt(nextDayMatch[1]);
+          const h = parseInt(nextDayMatch[2]);
+          const m = parseInt(nextDayMatch[3]);
+          return days * 1440 + h * 60 + m;
+        }
+        const parts = timeStr.split(":");
+        const h = parseInt(parts[0]);
+        const m = parseInt(parts[1] || "0");
+        if (isNaN(h)) return NaN;
+        return h * 60 + m;
       };
 
-      const shiftStart = timeToMinutes(startTime);
-      const shiftEnd = timeToMinutes(endTime);
+      let shiftStart = timeToMinutes(startTime);
+      let shiftEnd = timeToMinutes(endTime);
+      if (isNaN(shiftStart) || isNaN(shiftEnd)) return 0;
+      // Normalize next-day times to same-day (mod 1440)
+      shiftStart = shiftStart % 1440;
+      shiftEnd = shiftEnd % 1440;
       const shiftCrossesMidnight = shiftStart > shiftEnd; // e.g., 22:00 > 06:00
 
       let totalMinutes = 0;
@@ -586,37 +602,42 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       };
 
       const checkTimeRangeCriteria = (startTime, endTime) => {
-        if (!timeRangeCriteria || !timeRangeCriteria.include?.length) return true;
-        const hoursInRange = calculateHoursInRange(startTime, endTime, timeRangeCriteria.include);
-        return hoursInRange > 0;
-      };
+         if (!timeRangeCriteria || !timeRangeCriteria.include?.length) return true;
+         if (!startTime || !endTime) return false; // No time data = cannot match time range
+         const hoursInRange = calculateHoursInRange(startTime, endTime, timeRangeCriteria.include);
+         return hoursInRange > 0;
+       };
 
       // Check all criteria - quantitative items use criteriaLogic, time range is AND
-      filtered.forEach(a => {
-        if (!checkQuantCriteria(a.column_values)) return;
-        if (!checkTimeRangeCriteria(a.start_time, a.end_time)) return;
+       filtered.forEach(a => {
+         if (!checkQuantCriteria(a.column_values)) return;
+         if (!checkTimeRangeCriteria(a.start_time, a.end_time)) return;
 
-        const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
-        const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
-        opts.forEach(o => { counts[o] += parsed[o] || 0; });
-      });
+         const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
+         const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
+         opts.forEach(o => { counts[o] += parsed[o] || 0; });
+       });
 
       templateRows.forEach(row => {
-        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
-        const tmpl = allTemplates.find(t => t.id === row.template_id);
-        if (!tmpl) return;
-        if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
+         if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+         const tmpl = allTemplates.find(t => t.id === row.template_id);
+         if (!tmpl) return;
+         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
 
-        if (!checkQuantCriteria(row.values)) return;
+         if (!checkQuantCriteria(row.values)) return;
 
-        const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "";
-        const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || "";
-        if (!checkTimeRangeCriteria(startTime, endTime)) return;
+         // Find time columns dynamically from template
+         const tmplTimeCols = (tmpl.columns || []).filter(tc => tc.type === "time");
+         const startTimeCol = tmplTimeCols[0];
+         const endTimeCol = tmplTimeCols[1];
+         const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || (startTimeCol ? row.values?.[startTimeCol.name] : "") || "";
+         const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || (endTimeCol ? row.values?.[endTimeCol.name] : "") || "";
+         if (!checkTimeRangeCriteria(startTime, endTime)) return;
 
-        const raw = row.values?.[col.schedule_col_name];
-        const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
-        opts.forEach(o => { counts[o] += parsed[o] || 0; });
-      });
+         const raw = row.values?.[col.schedule_col_name];
+         const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
+         opts.forEach(o => { counts[o] += parsed[o] || 0; });
+       });
 
       return counts;
     }
