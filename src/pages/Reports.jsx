@@ -77,7 +77,7 @@ export default function Reports() {
     const [
       workersData, assignmentsData, templateRowsData, templatesData, trackersData,
       populationsSettings, workerRolesSettings, globalColSettings, cartColSettings, taskQualSettings,
-      qualificationsData, tasksListSettings
+      qualificationsData, tasksListSettings, chartsData, entriesData
     ] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
@@ -91,17 +91,21 @@ export default function Reports() {
       base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
       base44.entities.Qualification.filter({ active: true }),
       base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
+      base44.entities.ChartWidget.list("order"),
+      base44.entities.TrackerEntry.list(),
     ]);
+
     setWorkers(workersData);
     setAssignments(assignmentsData);
     setTemplateRows(templateRowsData);
     setAllTemplates(templatesData);
     setTrackers(trackersData);
-    
+    setCharts(chartsData);
+    setTrackerEntries(entriesData);
+
     // Load task qualifications from AppSettings
     const taskQuals = taskQualSettings.length > 0 ? JSON.parse(taskQualSettings[0].setting_value) || {} : {};
     setTaskQualifications(taskQuals);
-    // Build qualifications list from all task sources
     const taskQualNames = Object.keys(taskQuals);
     const taskListNames = tasksListSettings.length > 0 ? (JSON.parse(tasksListSettings[0].setting_value) || []) : [];
     const qualsFromEntity = qualificationsData.map(q => ({ id: q.id, name: q.name }));
@@ -114,13 +118,6 @@ export default function Reports() {
     setQualifications(merged);
     if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
-    // Load charts and all tracker entries
-    const [chartsData, entriesData] = await Promise.all([
-      base44.entities.ChartWidget.list("order"),
-      base44.entities.TrackerEntry.list(),
-    ]);
-    setCharts(chartsData);
-    setTrackerEntries(entriesData);
 
     // Collect all unique schedule columns from global + cart params
     const globalCols = globalColSettings.length > 0 ? (JSON.parse(globalColSettings[0].setting_value) || []) : [];
