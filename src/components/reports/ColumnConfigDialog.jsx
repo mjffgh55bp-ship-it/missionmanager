@@ -289,7 +289,14 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
         </div>
 
         <div className="px-4 py-3 space-y-3">
-          {/* Count mode toggle — compact, at top */}
+          <div className="bg-blue-500 rounded">
+            <input value={draft.description || ""} onChange={e => update("description", e.target.value)}
+              placeholder="תיאור"
+              className="w-full bg-transparent text-white placeholder-blue-200 text-center text-sm outline-none border-none px-3 py-2"
+              dir="rtl" />
+          </div>
+
+          {/* Count mode toggle — compact */}
           <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
             <span className="text-xs text-blue-700 font-medium whitespace-nowrap ml-auto">אופן ספירה:</span>
             <button
@@ -314,13 +321,6 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
             >
               לקריטריון
             </button>
-          </div>
-
-          <div className="bg-blue-500 rounded">
-            <input value={draft.description || ""} onChange={e => update("description", e.target.value)}
-              placeholder="תיאור"
-              className="w-full bg-transparent text-white placeholder-blue-200 text-center text-sm outline-none border-none px-3 py-2"
-              dir="rtl" />
           </div>
 
           {(draft.criteria || []).map((c, idx) => (
