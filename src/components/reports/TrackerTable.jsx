@@ -299,7 +299,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       let totalMinutes = 0;
 
       timeRanges.forEach(rangeStr => {
-        const [rangeStart, rangeEnd] = rangeStr.split("-");
+        const rangeMatch = rangeStr.match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
+        if (!rangeMatch) return;
+        const rangeStart = rangeMatch[1];
+        const rangeEnd = rangeMatch[2];
         const rangeStartMin = timeToMinutes(rangeStart);
         const rangeEndMin = timeToMinutes(rangeEnd);
         const rangeCrossesMidnight = rangeStartMin > rangeEndMin;

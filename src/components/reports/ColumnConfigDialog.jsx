@@ -8,11 +8,13 @@ const TASK_COL_NAME = "__משימה__";
 const TIME_RANGE_COL_NAME = "__טווח_שעות__";
 
 function TimeRangeSelector({ criterion, onUpdate }) {
-  // Store time ranges as strings like "00:00-23:59"
+  // Store time ranges as strings like "HH:MM-HH:MM"
   const parseTimeRanges = (include) => {
     return (include || []).map(str => {
-      const [start, end] = str.split("-");
-      return { start: start || "00:00", end: end || "23:59", id: str };
+      // Format is "HH:MM-HH:MM" — split on the dash between the two times
+      const match = str.match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
+      if (match) return { start: match[1], end: match[2], id: str };
+      return { start: "00:00", end: "23:59", id: str };
     });
   };
 
@@ -38,28 +40,39 @@ function TimeRangeSelector({ criterion, onUpdate }) {
   return (
     <div className="space-y-2">
       {timeRanges.map((range) => (
-        <div key={range.id} className="flex items-center gap-2">
-          <Input
-            type="time"
-            value={range.start}
-            onChange={(e) => updateTimeRange(range.id, e.target.value, range.end)}
-            className="h-7 text-xs flex-1"
-          />
-          <span className="text-xs text-gray-600">עד</span>
-          <Input
-            type="time"
-            value={range.end}
-            onChange={(e) => updateTimeRange(range.id, range.start, e.target.value)}
-            className="h-7 text-xs flex-1"
-          />
-          <button
-            type="button"
-            onClick={() => removeTimeRange(range.id)}
-            className="text-red-600 hover:text-red-800 p-0.5"
-            title="הסר טווח"
-          >
-            <X className="w-3 h-3" />
-          </button>
+        <div key={range.id} className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => removeTimeRange(range.id)}
+              className="text-red-600 hover:text-red-800 p-0.5"
+              title="הסר טווח"
+            >
+              <X className="w-3 h-3" />
+            </button>
+            <div className="flex flex-col flex-1">
+              <span className="text-[10px] text-gray-400 text-center mb-0.5">התחלה</span>
+              <Input
+                type="time"
+                value={range.start}
+                onChange={(e) => updateTimeRange(range.id, e.target.value, range.end)}
+                className="h-7 text-xs"
+              />
+            </div>
+            <span className="text-xs text-gray-600 mt-3">עד</span>
+            <div className="flex flex-col flex-1">
+              <span className="text-[10px] text-gray-400 text-center mb-0.5">סיום</span>
+              <Input
+                type="time"
+                value={range.end}
+                onChange={(e) => updateTimeRange(range.id, range.start, e.target.value)}
+                className="h-7 text-xs"
+              />
+            </div>
+          </div>
+          {range.start > range.end && (
+            <p className="text-xs text-blue-600 text-right pr-6">⟳ טווח חוצה חצות ({range.start}–00:00–{range.end})</p>
+          )}
         </div>
       ))}
       <button
