@@ -243,74 +243,34 @@ export default function Reports() {
                             <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}
-                              className="relative mb-6"
+                              className="relative mb-6 border border-gray-200 rounded-lg bg-white"
                               style={{
                                 ...provided.draggableProps.style,
-                                ...(isResizable ? {
-                                  width: `${size.width}px`,
-                                  height: `${size.height}px`,
-                                  overflow: 'auto',
-                                  border: '1px solid rgb(229, 231, 235)',
-                                  borderRadius: '0.5rem',
-                                  background: 'white'
-                                } : {})
+                                width: size ? `${size.width}px` : '100%',
+                                height: size ? `${size.height}px` : 'auto',
+                                minHeight: '120px',
+                                overflow: 'hidden',
                               }}
                             >
-                              <div className="sticky top-0 z-20 bg-white border-b flex items-center justify-between px-4 py-3" style={isResizable ? { borderBottom: '1px solid rgb(229, 231, 235)' } : {}}>
+                              {/* Header */}
+                              <div className="sticky top-0 z-20 bg-white border-b flex items-center justify-between px-4 py-3">
                                 <div className="text-sm font-semibold text-gray-700">{tracker.name}</div>
                                 <div className="flex items-center gap-2">
                                   <div className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing" {...provided.dragHandleProps}>
                                     <GripVertical className="w-4 h-4" />
                                   </div>
-                                  {isResizable && (
+                                  {size && (
                                     <button
-                                      onClick={() => setTrackerSizes(prev => {
-                                        const newSizes = { ...prev };
-                                        delete newSizes[tracker.id];
-                                        return newSizes;
-                                      })}
+                                      onClick={() => setTrackerSizes(prev => { const n = { ...prev }; delete n[tracker.id]; return n; })}
                                       className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700"
                                       title="חזור לגודל מלא"
-                                    >
-                                      ⛶
-                                    </button>
+                                    >⛶</button>
                                   )}
                                 </div>
                               </div>
 
-                              {isResizable && (
-                                <div
-                                  className="absolute -bottom-1 -right-1 w-4 h-4 cursor-nwse-resize bg-blue-400 rounded-tr-sm opacity-70 hover:opacity-100 transition-opacity"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    const startX = e.clientX;
-                                    const startY = e.clientY;
-                                    const startWidth = size.width;
-                                    const startHeight = size.height;
-
-                                    const handleMouseMove = (moveE) => {
-                                      const newWidth = Math.max(300, startWidth + (moveE.clientX - startX));
-                                      const newHeight = Math.max(200, startHeight + (moveE.clientY - startY));
-                                      setTrackerSizes(prev => ({
-                                        ...prev,
-                                        [tracker.id]: { width: newWidth, height: newHeight }
-                                      }));
-                                    };
-
-                                    const handleMouseUp = () => {
-                                      document.removeEventListener('mousemove', handleMouseMove);
-                                      document.removeEventListener('mouseup', handleMouseUp);
-                                    };
-
-                                    document.addEventListener('mousemove', handleMouseMove);
-                                    document.addEventListener('mouseup', handleMouseUp);
-                                  }}
-                                  title="גרור כדי לשנות גודל"
-                                />
-                              )}
-
-                              <div style={isResizable ? { height: `calc(${size.height}px - 53px)`, overflow: 'auto' } : {}}>
+                              {/* Scrollable content */}
+                              <div style={{ height: size ? `calc(${size.height}px - 53px)` : 'auto', overflow: size ? 'auto' : 'visible' }}>
                                 <TrackerTable
                                   tracker={tracker}
                                   workers={workers}
@@ -326,6 +286,67 @@ export default function Reports() {
                                   onResize={() => setTrackerSizes(prev => ({ ...prev, [tracker.id]: { width: 800, height: 500 } }))}
                                 />
                               </div>
+
+                              {/* Resize handles — always visible */}
+                              {/* Bottom-right corner */}
+                              <div
+                                className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-30"
+                                style={{ background: 'linear-gradient(135deg, transparent 50%, #93c5fd 50%)', borderBottomRightRadius: '0.5rem' }}
+                                onMouseDown={(e) => {
+                                  e.preventDefault(); e.stopPropagation();
+                                  const startX = e.clientX, startY = e.clientY;
+                                  const startW = size?.width ?? e.currentTarget.parentElement.offsetWidth;
+                                  const startH = size?.height ?? e.currentTarget.parentElement.offsetHeight;
+                                  const move = (me) => {
+                                    setTrackerSizes(prev => ({
+                                      ...prev,
+                                      [tracker.id]: {
+                                        width: Math.max(320, startW + (me.clientX - startX)),
+                                        height: Math.max(150, startH + (me.clientY - startY))
+                                      }
+                                    }));
+                                  };
+                                  const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+                                  document.addEventListener('mousemove', move);
+                                  document.addEventListener('mouseup', up);
+                                }}
+                              />
+                              {/* Bottom edge */}
+                              <div
+                                className="absolute bottom-0 left-4 right-4 h-2 cursor-s-resize z-30 hover:bg-blue-100 rounded opacity-0 hover:opacity-100 transition-opacity"
+                                onMouseDown={(e) => {
+                                  e.preventDefault(); e.stopPropagation();
+                                  const startY = e.clientY;
+                                  const startH = size?.height ?? e.currentTarget.parentElement.offsetHeight;
+                                  const move = (me) => {
+                                    setTrackerSizes(prev => ({
+                                      ...prev,
+                                      [tracker.id]: { width: prev[tracker.id]?.width ?? e.currentTarget?.parentElement?.offsetWidth ?? 800, height: Math.max(150, startH + (me.clientY - startY)) }
+                                    }));
+                                  };
+                                  const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+                                  document.addEventListener('mousemove', move);
+                                  document.addEventListener('mouseup', up);
+                                }}
+                              />
+                              {/* Right edge */}
+                              <div
+                                className="absolute top-14 bottom-4 right-0 w-2 cursor-e-resize z-30 hover:bg-blue-100 rounded opacity-0 hover:opacity-100 transition-opacity"
+                                onMouseDown={(e) => {
+                                  e.preventDefault(); e.stopPropagation();
+                                  const startX = e.clientX;
+                                  const startW = size?.width ?? e.currentTarget.parentElement.offsetWidth;
+                                  const move = (me) => {
+                                    setTrackerSizes(prev => ({
+                                      ...prev,
+                                      [tracker.id]: { width: Math.max(320, startW + (me.clientX - startX)), height: prev[tracker.id]?.height ?? e.currentTarget?.parentElement?.offsetHeight ?? 500 }
+                                    }));
+                                  };
+                                  const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+                                  document.addEventListener('mousemove', move);
+                                  document.addEventListener('mouseup', up);
+                                }}
+                              />
                             </div>
                           );
                         }}
