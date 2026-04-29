@@ -8,43 +8,35 @@ const TASK_COL_NAME = "__משימה__";
 const TIME_RANGE_COL_NAME = "__טווח_שעות__";
 
 function TimeRangeSelector({ criterion, onUpdate }) {
-  // Store time ranges as strings like "HH:MM-HH:MM"
-  const parseTimeRanges = (include) => {
-    return (include || []).map(str => {
-      // Format is "HH:MM-HH:MM" — split on the dash between the two times
-      const match = str.match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
-      if (match) return { start: match[1], end: match[2], id: str };
-      return { start: "00:00", end: "23:59", id: str };
-    });
-  };
-
-  const timeRanges = parseTimeRanges(criterion.include || []);
+  // Parse stored "HH:MM-HH:MM" strings into {start, end} objects
+  const timeRanges = (criterion.include || []).map(str => {
+    const match = str.match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
+    if (match) return { start: match[1], end: match[2] };
+    return { start: "00:00", end: "23:59" };
+  });
 
   const addTimeRange = () => {
-    const newRange = "00:00-23:59";
-    const newInclude = [...(criterion.include || []), newRange];
+    onUpdate({ ...criterion, include: [...(criterion.include || []), "00:00-23:59"] });
+  };
+
+  const updateTimeRange = (idx, newStart, newEnd) => {
+    const newInclude = (criterion.include || []).map((r, i) => i === idx ? `${newStart}-${newEnd}` : r);
     onUpdate({ ...criterion, include: newInclude });
   };
 
-  const updateTimeRange = (oldStr, newStart, newEnd) => {
-    const newStr = `${newStart}-${newEnd}`;
-    const newInclude = (criterion.include || []).map(r => r === oldStr ? newStr : r);
-    onUpdate({ ...criterion, include: newInclude });
-  };
-
-  const removeTimeRange = (str) => {
-    const newInclude = (criterion.include || []).filter(r => r !== str);
+  const removeTimeRange = (idx) => {
+    const newInclude = (criterion.include || []).filter((_, i) => i !== idx);
     onUpdate({ ...criterion, include: newInclude });
   };
 
   return (
     <div className="space-y-2">
-      {timeRanges.map((range) => (
-        <div key={range.id} className="flex flex-col gap-1">
+      {timeRanges.map((range, idx) => (
+        <div key={idx} className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => removeTimeRange(range.id)}
+              onClick={() => removeTimeRange(idx)}
               className="text-red-600 hover:text-red-800 p-0.5"
               title="הסר טווח"
             >
@@ -55,7 +47,7 @@ function TimeRangeSelector({ criterion, onUpdate }) {
               <Input
                 type="time"
                 value={range.start}
-                onChange={(e) => updateTimeRange(range.id, e.target.value, range.end)}
+                onChange={(e) => updateTimeRange(idx, e.target.value, range.end)}
                 className="h-7 text-xs"
               />
             </div>
@@ -65,7 +57,7 @@ function TimeRangeSelector({ criterion, onUpdate }) {
               <Input
                 type="time"
                 value={range.end}
-                onChange={(e) => updateTimeRange(range.id, range.start, e.target.value)}
+                onChange={(e) => updateTimeRange(idx, range.start, e.target.value)}
                 className="h-7 text-xs"
               />
             </div>
