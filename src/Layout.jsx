@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
-import { LayoutDashboard, Calendar, Users, Truck, BarChart3, ChefHat, Grid, Clock, Award, Settings, ExternalLink } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Truck, BarChart3, ChefHat, Grid, Clock, Award, Settings, ExternalLink, CalendarDays } from "lucide-react";
 
 
 const managerNavigationItems = [
@@ -11,7 +11,7 @@ const managerNavigationItems = [
   { title: "זמינות אישית", url: createPageUrl("Availability"), icon: Clock },
   { title: "עובדים", url: createPageUrl("Workers"), icon: Users },
   { title: "דוחות", url: createPageUrl("Reports"), icon: BarChart3 },
-  { title: "תקופתית", url: createPageUrl("Yearly"), icon: BarChart3 },
+  { title: "תקופתית", url: createPageUrl("Yearly"), icon: CalendarDays },
   { title: "מחשבון משמרות", url: createPageUrl("ShiftMaster"), icon: ChefHat },
   { title: "הגדרות", url: createPageUrl("Settings"), icon: Settings },
 ];
