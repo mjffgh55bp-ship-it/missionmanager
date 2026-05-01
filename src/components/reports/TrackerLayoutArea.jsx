@@ -61,15 +61,16 @@ export default function TrackerLayoutArea({
     };
 
     const onMove = (ev) => {
-      if (!dragging.current) return;
-      const dx = ev.clientX - dragging.current.startMouseX;
-      const dy = ev.clientY - dragging.current.startMouseY;
+      const d = dragging.current;
+      if (!d) return;
+      const dx = ev.clientX - d.startMouseX;
+      const dy = ev.clientY - d.startMouseY;
       setPositions(prev => ({
         ...prev,
-        [dragging.current.id]: {
-          ...prev[dragging.current.id],
-          x: Math.max(0, dragging.current.startX + dx),
-          y: Math.max(0, dragging.current.startY + dy),
+        [d.id]: {
+          ...prev[d.id],
+          x: Math.max(0, d.startX + dx),
+          y: Math.max(0, d.startY + dy),
         },
       }));
     };
