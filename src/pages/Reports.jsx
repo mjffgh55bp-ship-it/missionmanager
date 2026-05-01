@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Plus, BarChart2, Table2, GripVertical } from "lucide-react";
-import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
-import TrackerTable from "../components/reports/TrackerTable";
+import { Plus, BarChart2, Table2 } from "lucide-react";
 import TrackerEditor from "../components/reports/TrackerEditor";
 import ChartBuilder from "../components/reports/ChartBuilder";
 import ChartDisplay from "../components/reports/ChartDisplay";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import TrackerLayoutArea from "../components/reports/TrackerLayoutArea";
 
 export default function Reports() {
   const [workers, setWorkers] = useState([]);
@@ -30,7 +28,7 @@ export default function Reports() {
   const [qualifications, setQualifications] = useState([]);
   const [trackerEditorOpen, setTrackerEditorOpen] = useState(false);
   const [editingTracker, setEditingTracker] = useState(null);
-  const [trackerSizes, setTrackerSizes] = useState({});
+
 
   useEffect(() => {
     loadData();
@@ -252,71 +250,20 @@ export default function Reports() {
               </Button>
             </div>
           ) : (
-            <DragDropContext onDragEnd={handleReorderTrackers}>
-              <Droppable droppableId="trackers">
-                {(provided, snapshot) => (
-                  <div {...provided.droppableProps} ref={provided.innerRef} className={snapshot.isDraggingOver ? "bg-blue-50 rounded-lg" : ""}>
-                    {trackers.map((tracker, idx) => (
-                      <Draggable key={tracker.id} draggableId={tracker.id} index={idx}>
-                        {(provided, snapshot) => {
-                          const size = trackerSizes[tracker.id];
-                          const isResizable = !!size;
-                          return (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              className="relative mb-6 border border-gray-200 rounded-lg bg-white overflow-hidden"
-                              style={{
-                                ...provided.draggableProps.style,
-                                resize: 'both',
-                                overflow: 'auto',
-                                minWidth: '320px',
-                                minHeight: '150px',
-                                width: size ? `${size.width}px` : '100%',
-                                height: size ? `${size.height}px` : 'auto',
-                              }}
-                              onMouseUp={(e) => {
-                                const w = e.currentTarget?.offsetWidth;
-                                const h = e.currentTarget?.offsetHeight;
-                                if (w && h) {
-                                  setTrackerSizes(prev => ({ ...prev, [tracker.id]: { width: w, height: h } }));
-                                }
-                              }}
-                            >
-                              {/* Header */}
-                              <div className="sticky top-0 z-20 bg-white border-b flex items-center justify-between px-4 py-3">
-                                <div className="text-sm font-semibold text-gray-700">{tracker.name}</div>
-                                <div className="flex items-center gap-2">
-                                  <div className="text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing" {...provided.dragHandleProps}>
-                                    <GripVertical className="w-4 h-4" />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <TrackerTable
-                                tracker={tracker}
-                                workers={workers}
-                                assignments={assignments}
-                                templateRows={templateRows}
-                                allTemplates={allTemplates}
-                                populations={populations}
-                                workerRoles={workerRoles}
-                                scheduleColumns={scheduleColumns}
-                                qualifications={qualifications}
-                                onDelete={() => handleDeleteTracker(tracker.id)}
-                                onUpdated={handleTrackerUpdated}
-                                onResize={undefined}
-                              />
-                            </div>
-                          );
-                        }}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </DragDropContext>
+            <TrackerLayoutArea
+              trackers={trackers}
+              workers={workers}
+              assignments={assignments}
+              templateRows={templateRows}
+              allTemplates={allTemplates}
+              populations={populations}
+              workerRoles={workerRoles}
+              scheduleColumns={scheduleColumns}
+              qualifications={qualifications}
+              onDeleteTracker={handleDeleteTracker}
+              onUpdatedTracker={handleTrackerUpdated}
+              onReorderTrackers={handleReorderTrackers}
+            />
           )
         )}
 
