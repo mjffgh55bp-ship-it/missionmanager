@@ -98,23 +98,28 @@ export default function Yearly() {
 
   const loadData = async () => {
     setLoading(true);
-    const [rowsData, eventsData] = await Promise.all([
-      base44.entities.YearlyRow.list("order"),
-      base44.entities.YearlyEvent.list(),
-    ]);
-    const [workersData, unavailData, catSettings] = await Promise.all([
-      base44.entities.Worker.filter({ active: true }),
-      base44.entities.Unavailability.list(),
-      base44.entities.AppSettings.filter({ setting_key: "worker_category_names" })
-    ]);
-    const yearStart = `${currentYear}-01-01`;
-    const yearEnd = `${currentYear}-12-31`;
-    setRows(rowsData);
-    setEvents(eventsData.filter(e => (e.start_date >= yearStart && e.start_date <= yearEnd) || (e.end_date >= yearStart && e.end_date <= yearEnd)));
-    setWorkers(workersData);
-    setUnavailabilities(unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd));
-    if (catSettings.length > 0) setCategoryNames(JSON.parse(catSettings[0].setting_value));
-    setLoading(false);
+    try {
+      const [rowsData, eventsData] = await Promise.all([
+        base44.entities.YearlyRow.list("order"),
+        base44.entities.YearlyEvent.list(),
+      ]);
+      const [workersData, unavailData, catSettings] = await Promise.all([
+        base44.entities.Worker.filter({ active: true }),
+        base44.entities.Unavailability.list(),
+        base44.entities.AppSettings.filter({ setting_key: "worker_category_names" })
+      ]);
+      const yearStart = `${currentYear}-01-01`;
+      const yearEnd = `${currentYear}-12-31`;
+      setRows(rowsData);
+      setEvents(eventsData.filter(e => (e.start_date >= yearStart && e.start_date <= yearEnd) || (e.end_date >= yearStart && e.end_date <= yearEnd)));
+      setWorkers(workersData);
+      setUnavailabilities(unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd));
+      if (catSettings.length > 0) setCategoryNames(JSON.parse(catSettings[0].setting_value));
+    } catch (error) {
+      console.error('Error loading yearly data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddRow = async () => {
