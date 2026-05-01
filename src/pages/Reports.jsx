@@ -291,11 +291,15 @@ export default function Reports() {
                                   height: size ? `${size.height}px` : 'auto',
                                 }}
                                 onMouseUp={(e) => {
-                                  // Capture size after resize
-                                  setTrackerSizes(prev => ({
-                                    ...prev,
-                                    [tracker.id]: { width: e.currentTarget.offsetWidth, height: e.currentTarget.offsetHeight }
-                                  }));
+                                  // Capture size synchronously before state update (currentTarget is nullified async)
+                                  const w = e.currentTarget?.offsetWidth;
+                                  const h = e.currentTarget?.offsetHeight;
+                                  if (w && h) {
+                                    setTrackerSizes(prev => ({
+                                      ...prev,
+                                      [tracker.id]: { width: w, height: h }
+                                    }));
+                                  }
                                 }}
                               >
                                 <TrackerTable
