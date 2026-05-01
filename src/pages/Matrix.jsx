@@ -125,7 +125,7 @@ export default function Matrix() {
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
   const timelineRefs = useRef({});
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  const isLoadingDataRef = useRef(false);
   const loadingTimeoutRef = useRef(null);
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
@@ -161,6 +161,7 @@ export default function Matrix() {
   }, [currentDate, viewMode]);
 
   const loadStaticData = async () => {
+    try {
     // Batch 1: workers + trackers
     const [workersData, trackersData] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
@@ -188,11 +189,15 @@ export default function Matrix() {
     if (scheduleParamsSettings.length > 0) setScheduleParams(JSON.parse(scheduleParamsSettings[0].setting_value) || []);
     setTrackers(trackersData);
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
+    } catch (error) {
+      console.error('Error loading static matrix data:', error);
+      setLoading(false);
+    }
   };
 
   const loadDynamicData = async (silent = false) => {
-    if (isLoadingData) return;
-    setIsLoadingData(true);
+    if (isLoadingDataRef.current) return;
+    isLoadingDataRef.current = true;
     if (!silent) setLoading(true);
     
     try {
@@ -260,7 +265,7 @@ export default function Matrix() {
       console.error('Error loading matrix data:', error);
     } finally {
       setLoading(false);
-      setIsLoadingData(false);
+      isLoadingDataRef.current = false;
     }
   };
 
