@@ -1,19 +1,19 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import ChartDisplay from "./ChartDisplay";
 
 const DEFAULT_W = 420;
 const DEFAULT_H = 340;
-const HEADER_H = 40; // drag handle height
+const HANDLE_H = 36;
 
 export default function ChartCanvas({
   charts, workers, assignments, templateRows, allTemplates,
   trackers, trackerEntries,
   onEdit, onDelete,
 }) {
-  // positions: { [chartId]: { x, y, w, h } }
   const [positions, setPositions] = useState({});
   const containerRef = useRef(null);
-  const dragging = useRef(null); // { id, startMouseX, startMouseY, startX, startY }
+  const dragging = useRef(null);
+  const cardRefs = useRef({});
 
   // Initialize positions for new charts
   useEffect(() => {
@@ -26,12 +26,9 @@ export default function ChartCanvas({
           next[chart.id] = {
             x: col * (DEFAULT_W + 24) + 12,
             y: row * (DEFAULT_H + 24) + 12,
-            w: DEFAULT_W,
-            h: DEFAULT_H,
           };
         }
       });
-      // Remove stale positions
       Object.keys(next).forEach(id => {
         if (!charts.find(c => c.id === id)) delete next[id];
       });
@@ -39,38 +36,44 @@ export default function ChartCanvas({
     });
   }, [charts]);
 
-  // Canvas height: max bottom of all charts + padding
   const canvasHeight = Math.max(
     500,
     ...charts.map(c => {
       const p = positions[c.id];
-      return p ? p.y + p.h + 40 : 500;
+      const el = cardRefs.current[c.id];
+      const h = el ? el.offsetHeight : DEFAULT_H;
+      return p ? p.y + h + 40 : 500;
     })
   );
 
-  const onDragStart = useCallback((e, chartId) => {
+  const startDrag = useCallback((e, chartId) => {
     e.preventDefault();
+    const container = containerRef.current;
     const p = positions[chartId] || { x: 0, y: 0 };
+
+    // Capture scroll at drag start — this is the key fix
+    const scrollTopAtStart = container ? container.scrollTop : 0;
+
     dragging.current = {
       id: chartId,
       startMouseX: e.clientX,
       startMouseY: e.clientY,
       startX: p.x,
       startY: p.y,
+      scrollTopAtStart,
     };
 
-    const onMove = (e) => {
+    const onMove = (ev) => {
       if (!dragging.current) return;
-      const dx = e.clientX - dragging.current.startMouseX;
-      const dy = e.clientY - dragging.current.startMouseY;
-      const newX = Math.max(0, dragging.current.startX + dx);
-      const newY = Math.max(0, dragging.current.startY + dy);
+      const currentScrollTop = container ? container.scrollTop : 0;
+      const scrollDelta = currentScrollTop - dragging.current.scrollTopAtStart;
+      const dx = ev.clientX - dragging.current.startMouseX;
+      const dy = ev.clientY - dragging.current.startMouseY;
       setPositions(prev => ({
         ...prev,
         [dragging.current.id]: {
-          ...prev[dragging.current.id],
-          x: newX,
-          y: newY,
+          x: Math.max(0, dragging.current.startX + dx),
+          y: Math.max(0, dragging.current.startY + dy + scrollDelta),
         },
       }));
     };
@@ -89,27 +92,28 @@ export default function ChartCanvas({
     <div
       ref={containerRef}
       className="relative w-full overflow-auto"
-      style={{ minHeight: canvasHeight, background: "transparent" }}
+      style={{ minHeight: canvasHeight }}
     >
       {charts.map(chart => {
-        const p = positions[chart.id] || { x: 0, y: 0, w: DEFAULT_W, h: DEFAULT_H };
+        const p = positions[chart.id] || { x: 0, y: 0 };
         return (
           <div
             key={chart.id}
+            ref={el => { cardRefs.current[chart.id] = el; }}
             style={{
               position: "absolute",
               left: p.x,
               top: p.y,
-              width: p.w,
+              width: DEFAULT_W,
               zIndex: 10,
             }}
-            className="shadow-md rounded-xl"
+            className="shadow-md rounded-xl bg-white"
           >
-            {/* Drag handle bar */}
+            {/* Drag handle */}
             <div
               className="flex items-center justify-center bg-gray-100 rounded-t-xl border-b border-gray-200 cursor-grab active:cursor-grabbing select-none"
-              style={{ height: HEADER_H }}
-              onMouseDown={(e) => onDragStart(e, chart.id)}
+              style={{ height: HANDLE_H }}
+              onMouseDown={(e) => startDrag(e, chart.id)}
             >
               <div className="flex gap-1">
                 {[...Array(6)].map((_, i) => (

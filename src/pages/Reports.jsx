@@ -263,7 +263,6 @@ export default function Reports() {
               qualifications={qualifications}
               onDeleteTracker={handleDeleteTracker}
               onUpdatedTracker={handleTrackerUpdated}
-              onReorderTrackers={handleReorderTrackers}
             />
           )
         )}
