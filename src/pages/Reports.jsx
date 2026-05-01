@@ -265,9 +265,22 @@ export default function Reports() {
                             <div
                               ref={provided.innerRef}
                               {...provided.draggableProps}
-                              className="relative mb-6 border border-gray-200 rounded-lg bg-white"
+                              className="relative mb-6 border border-gray-200 rounded-lg bg-white overflow-hidden"
                               style={{
                                 ...provided.draggableProps.style,
+                                resize: 'both',
+                                overflow: 'auto',
+                                minWidth: '320px',
+                                minHeight: '150px',
+                                width: size ? `${size.width}px` : '100%',
+                                height: size ? `${size.height}px` : 'auto',
+                              }}
+                              onMouseUp={(e) => {
+                                const w = e.currentTarget?.offsetWidth;
+                                const h = e.currentTarget?.offsetHeight;
+                                if (w && h) {
+                                  setTrackerSizes(prev => ({ ...prev, [tracker.id]: { width: w, height: h } }));
+                                }
                               }}
                             >
                               {/* Header */}
@@ -280,40 +293,20 @@ export default function Reports() {
                                 </div>
                               </div>
 
-                              {/* Resizable + scrollable content box */}
-                              <div
-                                style={{
-                                  resize: 'both',
-                                  overflow: 'auto',
-                                  minWidth: '320px',
-                                  minHeight: '150px',
-                                  width: size ? `${size.width}px` : '100%',
-                                  height: size ? `${size.height}px` : 'auto',
-                                }}
-                                onMouseUp={(e) => {
-                                  // Capture size synchronously before React nullifies the event
-                                  const w = e.currentTarget?.offsetWidth;
-                                  const h = e.currentTarget?.offsetHeight;
-                                  if (w && h) {
-                                    setTrackerSizes(prev => ({ ...prev, [tracker.id]: { width: w, height: h } }));
-                                  }
-                                }}
-                              >
-                                <TrackerTable
-                                  tracker={tracker}
-                                  workers={workers}
-                                  assignments={assignments}
-                                  templateRows={templateRows}
-                                  allTemplates={allTemplates}
-                                  populations={populations}
-                                  workerRoles={workerRoles}
-                                  scheduleColumns={scheduleColumns}
-                                  qualifications={qualifications}
-                                  onDelete={() => handleDeleteTracker(tracker.id)}
-                                  onUpdated={handleTrackerUpdated}
-                                  onResize={undefined}
-                                />
-                              </div>
+                              <TrackerTable
+                                tracker={tracker}
+                                workers={workers}
+                                assignments={assignments}
+                                templateRows={templateRows}
+                                allTemplates={allTemplates}
+                                populations={populations}
+                                workerRoles={workerRoles}
+                                scheduleColumns={scheduleColumns}
+                                qualifications={qualifications}
+                                onDelete={() => handleDeleteTracker(tracker.id)}
+                                onUpdated={handleTrackerUpdated}
+                                onResize={undefined}
+                              />
                             </div>
                           );
                         }}
