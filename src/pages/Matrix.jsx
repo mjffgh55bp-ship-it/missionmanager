@@ -161,14 +161,23 @@ export default function Matrix() {
   }, [currentDate, viewMode]);
 
   const loadStaticData = async () => {
-    const [workersData, populationsSettings, workerRolesSettings, shiftStatusesSettings, summaryColsSettings, scheduleParamsSettings, trackersData] = await Promise.all([
+    // Batch 1: workers + trackers
+    const [workersData, trackersData] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
+      base44.entities.Tracker.list()
+    ]);
+
+    // Batch 2: settings
+    const [populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
+    ]);
+
+    // Batch 3: more settings
+    const [summaryColsSettings, scheduleParamsSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "matrix_summary_columns" }),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
-      base44.entities.Tracker.list()
     ]);
     if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     else setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
@@ -186,70 +195,73 @@ export default function Matrix() {
     setIsLoadingData(true);
     if (!silent) setLoading(true);
     
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekStartStr = format(weekStart, "yyyy-MM-dd");
-    
-    const dateStr = format(currentDate, "yyyy-MM-dd");
-
-    // Batch 1: assignments
-    const assignmentsData = viewMode === "daily"
-      ? await base44.entities.Assignment.filter({ date: dateStr })
-      : await base44.entities.Assignment.list();
-
-    // Batch 2: availability + unavailabilities
-    const [availabilitiesData, unavailabilitiesData] = await Promise.all([
-      base44.entities.Availability.list(),
-      viewMode === "daily"
-        ? base44.entities.Unavailability.filter({ date: dateStr })
-        : base44.entities.Unavailability.list(),
-    ]);
-
-    // Batch 3: template rows + templates
-    const [templateRowsData, allTemplatesData] = await Promise.all([
-      viewMode === "daily"
-        ? base44.entities.TemplateRow.filter({ date: dateStr })
-        : base44.entities.TemplateRow.list(),
-      base44.entities.Template.filter({ active: true })
-    ]);
-    
-    // Filter weekly assignments and template rows
-    let filteredAssignments = assignmentsData;
-    let filteredTemplateRows = templateRowsData;
-    if (viewMode === "weekly") {
-      const weekEndStr = format(weekEnd, "yyyy-MM-dd");
-      filteredAssignments = assignmentsData.filter(a => a.date >= weekStartStr && a.date <= weekEndStr);
-      filteredTemplateRows = templateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
-    }
-    
-    // For continuation rows in daily mode, also fetch their source rows
-    if (viewMode === "daily") {
-      const continuationRows = filteredTemplateRows.filter(r => r.values?.is_continuation && r.values?.continuation_source_row_id);
-      const sourceRowIds = continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean);
-      const uniqueSourceIds = [...new Set(sourceRowIds)];
+    try {
+      const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+      const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+      const weekStartStr = format(weekStart, "yyyy-MM-dd");
       
-      if (uniqueSourceIds.length > 0) {
-        // Fetch source rows that aren't already in the list
-        const missingSourceIds = uniqueSourceIds.filter(id => !filteredTemplateRows.some(r => r.id === id));
-        if (missingSourceIds.length > 0) {
-          const sourceRows = await Promise.all(
-            missingSourceIds.map(id => base44.entities.TemplateRow.get(id).catch(() => null))
-          );
-          // Add source rows to the list (they won't be displayed but will be available for lookup)
-          filteredTemplateRows = [...filteredTemplateRows, ...sourceRows.filter(Boolean)];
+      const dateStr = format(currentDate, "yyyy-MM-dd");
+
+      // Batch 1: assignments (sequential to reduce rate limit pressure)
+      const assignmentsData = viewMode === "daily"
+        ? await base44.entities.Assignment.filter({ date: dateStr })
+        : await base44.entities.Assignment.list();
+
+      // Batch 2: availability + unavailabilities
+      const [availabilitiesData, unavailabilitiesData] = await Promise.all([
+        base44.entities.Availability.list(),
+        viewMode === "daily"
+          ? base44.entities.Unavailability.filter({ date: dateStr })
+          : base44.entities.Unavailability.list(),
+      ]);
+
+      // Batch 3: template rows + templates
+      const [templateRowsData, allTemplatesData] = await Promise.all([
+        viewMode === "daily"
+          ? base44.entities.TemplateRow.filter({ date: dateStr })
+          : base44.entities.TemplateRow.list(),
+        base44.entities.Template.filter({ active: true })
+      ]);
+      
+      // Filter weekly assignments and template rows
+      let filteredAssignments = assignmentsData;
+      let filteredTemplateRows = templateRowsData;
+      if (viewMode === "weekly") {
+        const weekEndStr = format(weekEnd, "yyyy-MM-dd");
+        filteredAssignments = assignmentsData.filter(a => a.date >= weekStartStr && a.date <= weekEndStr);
+        filteredTemplateRows = templateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
+      }
+      
+      // For continuation rows in daily mode, also fetch their source rows
+      if (viewMode === "daily") {
+        const continuationRows = filteredTemplateRows.filter(r => r.values?.is_continuation && r.values?.continuation_source_row_id);
+        const sourceRowIds = continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean);
+        const uniqueSourceIds = [...new Set(sourceRowIds)];
+        
+        if (uniqueSourceIds.length > 0) {
+          const missingSourceIds = uniqueSourceIds.filter(id => !filteredTemplateRows.some(r => r.id === id));
+          if (missingSourceIds.length > 0) {
+            const sourceRows = await Promise.all(
+              missingSourceIds.map(id => base44.entities.TemplateRow.get(id).catch(() => null))
+            );
+            filteredTemplateRows = [...filteredTemplateRows, ...sourceRows.filter(Boolean)];
+          }
         }
       }
+      
+      const trackerEntriesData = await base44.entities.TrackerEntry.list();
+      setAssignments(filteredAssignments);
+      setAvailabilities(availabilitiesData);
+      setUnavailabilities(unavailabilitiesData);
+      setTemplateRows(filteredTemplateRows);
+      setAllTemplates(allTemplatesData);
+      setTrackerEntries(trackerEntriesData);
+    } catch (error) {
+      console.error('Error loading matrix data:', error);
+    } finally {
+      setLoading(false);
+      setIsLoadingData(false);
     }
-    
-    const trackerEntriesData = await base44.entities.TrackerEntry.list();
-    setAssignments(filteredAssignments);
-    setAvailabilities(availabilitiesData);
-    setUnavailabilities(unavailabilitiesData);
-    setTemplateRows(filteredTemplateRows);
-    setAllTemplates(allTemplatesData);
-    setTrackerEntries(trackerEntriesData);
-    setLoading(false);
-    setIsLoadingData(false);
   };
 
   const debouncedLoadData = (silent = false) => {
