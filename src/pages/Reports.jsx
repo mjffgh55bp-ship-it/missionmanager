@@ -74,33 +74,42 @@ export default function Reports() {
   }, []);
 
   const loadData = async () => {
-    // Batch 1: core entity data
-    const [workersData, assignmentsData, templateRowsData] = await Promise.all([
+    try {
+    // Batch 1: workers + assignments
+    const [workersData, assignmentsData] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Assignment.list("-date"),
-      base44.entities.TemplateRow.list(),
     ]);
 
-    // Batch 2: templates + trackers + charts
-    const [templatesData, trackersData, chartsData] = await Promise.all([
+    // Batch 2: template rows + templates
+    const [templateRowsData, templatesData] = await Promise.all([
+      base44.entities.TemplateRow.list(),
       base44.entities.Template.filter({ active: true }),
+    ]);
+
+    // Batch 3: trackers + charts
+    const [trackersData, chartsData] = await Promise.all([
       base44.entities.Tracker.list("order"),
       base44.entities.ChartWidget.list("order"),
     ]);
 
-    // Batch 3: settings (part 1) + qualifications
-    const [populationsSettings, workerRolesSettings, globalColSettings, qualificationsData] = await Promise.all([
+    // Batch 4: settings part 1
+    const [populationsSettings, workerRolesSettings, globalColSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
-      base44.entities.Qualification.filter({ active: true }),
     ]);
 
-    // Batch 4: settings (part 2) + tracker entries
-    const [cartColSettings, taskQualSettings, tasksListSettings, entriesData] = await Promise.all([
+    // Batch 5: settings part 2
+    const [cartColSettings, taskQualSettings, tasksListSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
       base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
       base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
+    ]);
+
+    // Batch 6: qualifications + tracker entries
+    const [qualificationsData, entriesData] = await Promise.all([
+      base44.entities.Qualification.filter({ active: true }),
       base44.entities.TrackerEntry.list(),
     ]);
 
@@ -134,7 +143,11 @@ export default function Reports() {
     const allCols = [...globalCols, ...cartCols];
     const uniqueCols = allCols.filter((col, idx, arr) => arr.findIndex(c => c.name === col.name) === idx);
     setScheduleColumns(uniqueCols);
-    setLoading(false);
+    } catch (error) {
+      console.error('Error loading reports data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const createNewTracker = () => {
