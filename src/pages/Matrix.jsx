@@ -192,19 +192,21 @@ export default function Matrix() {
     
     const dateStr = format(currentDate, "yyyy-MM-dd");
 
-    // Batch 1: assignments + availability
-    const [assignmentsData, availabilitiesData] = await Promise.all([
-      viewMode === "daily"
-        ? base44.entities.Assignment.filter({ date: dateStr })
-        : base44.entities.Assignment.list(),
-      base44.entities.Availability.list(),
-    ]);
+    // Batch 1: assignments
+    const assignmentsData = viewMode === "daily"
+      ? await base44.entities.Assignment.filter({ date: dateStr })
+      : await base44.entities.Assignment.list();
 
-    // Batch 2: unavailabilities + template rows + templates
-    const [unavailabilitiesData, templateRowsData, allTemplatesData] = await Promise.all([
+    // Batch 2: availability + unavailabilities
+    const [availabilitiesData, unavailabilitiesData] = await Promise.all([
+      base44.entities.Availability.list(),
       viewMode === "daily"
         ? base44.entities.Unavailability.filter({ date: dateStr })
         : base44.entities.Unavailability.list(),
+    ]);
+
+    // Batch 3: template rows + templates
+    const [templateRowsData, allTemplatesData] = await Promise.all([
       viewMode === "daily"
         ? base44.entities.TemplateRow.filter({ date: dateStr })
         : base44.entities.TemplateRow.list(),
