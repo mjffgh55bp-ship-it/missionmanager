@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2 } from "lucide-react";
+import { Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Gauge } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { base44 } from "@/api/base44Client";
 import ColumnConfigDialog from "./ColumnConfigDialog";
+import VisualAnalysisDialog, { getVisualColor } from "./VisualAnalysisDialog";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
 
 function MultiSelect({ options, selected, onChange, placeholder }) {
@@ -145,6 +146,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [editColumns, setEditColumns] = useState([]);
   const [configuringCol, setConfiguringCol] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Visual Analysis
+  const [visualConfigs, setVisualConfigs] = useState({}); // colId -> config
+  const [visualDialogCol, setVisualDialogCol] = useState(null); // col object
 
   // Sorting
   const [sortColId, setSortColId] = useState(null);
@@ -862,6 +867,20 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   };
 
 
+  // Collect all numeric values for a column (for avg computation in dialog)
+  const getColValues = (col) => {
+    if (!isAuto(col.type)) return [];
+    return filteredWorkers.map(w => {
+      const v = computeAutoValue(col, w.id);
+      if (typeof v === "number") return v;
+      if (typeof v === "object" && v !== null) {
+        if (col.quantitative_single_item) return v[col.quantitative_single_item] || 0;
+        return Object.values(v).reduce((s, x) => s + (x || 0), 0);
+      }
+      return 0;
+    });
+  };
+
   return (
     <Card className="border-none shadow-lg mb-6" dir="rtl">
       {/* Header */}
@@ -934,6 +953,20 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         )}
       </CardHeader>
 
+      {/* Visual Analysis Dialog */}
+      {visualDialogCol && (
+        <VisualAnalysisDialog
+          col={visualDialogCol}
+          values={getColValues(visualDialogCol)}
+          open={!!visualDialogCol}
+          onOpenChange={(o) => { if (!o) setVisualDialogCol(null); }}
+          config={visualConfigs[visualDialogCol.id] || null}
+          onConfigChange={(cfg) => {
+            setVisualConfigs(prev => ({ ...prev, [visualDialogCol.id]: cfg }));
+          }}
+        />
+      )}
+
       {/* Column config popup */}
       {configuringCol && (
         <ColumnConfigDialog
@@ -965,15 +998,26 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               {displayColumns.map((col, idx) => (
                 <TableHead key={col.id} dir="rtl" className="px-2 min-w-[140px]">
                   <div className="flex flex-col items-center gap-0.5 py-0.5">
-                    <button
-                      onClick={() => !editMode && handleSortClick(col.id)}
-                      className="font-medium flex items-center gap-1 hover:text-blue-700 transition-colors"
-                    >
-                      {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
-                      {!editMode && (sortColId === col.id
-                        ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
-                        : <ArrowUpDown className="w-3 h-3 text-gray-300" />)}
-                    </button>
+                    <div className="flex items-center gap-1">
+                     <button
+                       onClick={() => !editMode && handleSortClick(col.id)}
+                       className="font-medium flex items-center gap-1 hover:text-blue-700 transition-colors"
+                     >
+                       {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
+                       {!editMode && (sortColId === col.id
+                         ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
+                         : <ArrowUpDown className="w-3 h-3 text-gray-300" />)}
+                     </button>
+                     {!editMode && isAuto(col.type) && (
+                       <button
+                         onClick={() => setVisualDialogCol(col)}
+                         title="ניתוח ויזואלי"
+                         className={`p-0.5 rounded hover:bg-blue-100 transition-colors ${visualConfigs[col.id] ? "text-blue-600" : "text-gray-300 hover:text-blue-400"}`}
+                       >
+                         <Gauge className="w-3.5 h-3.5" />
+                       </button>
+                     )}
+                    </div>
                     {col.description && (
                       <span className="text-xs text-gray-400 font-normal text-center leading-tight">{col.description}</span>
                     )}
@@ -1037,8 +1081,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       return <TableCell key={col.id} className="px-2 py-0.5 text-gray-300 text-xs">אין משימות</TableCell>;
                     }
                     const grandTotal = Object.values(hours).reduce((sum, h) => sum + (h || 0), 0);
+                    const bgColorTask = visualConfigs[col.id] ? getVisualColor(grandTotal, visualConfigs[col.id]) : null;
                     return (
-                      <TableCell key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm">
+                      <TableCell key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm"
+                        style={bgColorTask ? { backgroundColor: bgColorTask } : {}}>
                         <span className={grandTotal > 0 ? "text-blue-900" : "text-gray-300"}>
                           {grandTotal > 0 ? `${Math.round(grandTotal * 10) / 10}h` : "-"}
                         </span>
@@ -1053,8 +1099,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     const counts = typeof value === "object" && value !== null ? value : {};
                     if (col.quantitative_single_item) {
                       const num = counts[col.quantitative_single_item] || 0;
+                      const bgColorQ = visualConfigs[col.id] ? getVisualColor(num, visualConfigs[col.id]) : null;
                       return (
-                        <TableCell key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm">
+                        <TableCell key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm"
+                          style={bgColorQ ? { backgroundColor: bgColorQ } : {}}>
                           <span className={num > 0 ? "text-blue-900" : "text-gray-300"}>{num > 0 ? num : "-"}</span>
                         </TableCell>
                       );
@@ -1085,8 +1133,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     const quantCriteriaCheck = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
                     const isQuantSumCol = col.type === "schedule_col" && quantCriteriaCheck.length > 0;
                     const showAsHours = col.type === "schedule_col" && !isQuantSumCol;
+                    const vCfg = visualConfigs[col.id];
+                    const bgColor = vCfg && typeof value === "number" ? getVisualColor(value, vCfg) : null;
                     return (
-                      <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2 py-0.5 text-sm">
+                      <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2 py-0.5 text-sm"
+                        style={bgColor ? { backgroundColor: bgColor } : {}}>
                         {value > 0 ? (showAsHours ? `${value}h` : value) : <span className="text-gray-300">-</span>}
                       </TableCell>
                     );
