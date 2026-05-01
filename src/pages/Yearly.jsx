@@ -98,9 +98,11 @@ export default function Yearly() {
 
   const loadData = async () => {
     setLoading(true);
-    const [rowsData, eventsData, workersData, unavailData, catSettings] = await Promise.all([
+    const [rowsData, eventsData] = await Promise.all([
       base44.entities.YearlyRow.list("order"),
       base44.entities.YearlyEvent.list(),
+    ]);
+    const [workersData, unavailData, catSettings] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.Unavailability.list(),
       base44.entities.AppSettings.filter({ setting_key: "worker_category_names" })
