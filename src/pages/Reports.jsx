@@ -5,6 +5,7 @@ import { Plus, BarChart2, Table2 } from "lucide-react";
 import TrackerEditor from "../components/reports/TrackerEditor";
 import ChartBuilder from "../components/reports/ChartBuilder";
 import ChartDisplay from "../components/reports/ChartDisplay";
+import ChartCanvas from "../components/reports/ChartCanvas";
 import TrackerLayoutArea from "../components/reports/TrackerLayoutArea";
 
 export default function Reports() {
@@ -293,22 +294,17 @@ export default function Reports() {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {charts.filter(chart => !selectedTrackerForCharts || chart.tracker_id === selectedTrackerForCharts).map(chart => (
-                  <ChartDisplay
-                    key={chart.id}
-                    chart={chart}
-                    workers={workers}
-                    assignments={assignments}
-                    templateRows={templateRows}
-                    allTemplates={allTemplates}
-                    trackers={trackers}
-                    trackerEntries={trackerEntries}
-                    onEdit={() => { setEditingChart(chart); setChartBuilderOpen(true); }}
-                    onDelete={() => handleDeleteChart(chart.id)}
-                  />
-                ))}
-              </div>
+              <ChartCanvas
+                charts={charts.filter(chart => !selectedTrackerForCharts || chart.tracker_id === selectedTrackerForCharts)}
+                workers={workers}
+                assignments={assignments}
+                templateRows={templateRows}
+                allTemplates={allTemplates}
+                trackers={trackers}
+                trackerEntries={trackerEntries}
+                onEdit={(chart) => { setEditingChart(chart); setChartBuilderOpen(true); }}
+                onDelete={handleDeleteChart}
+              />
             )}
           </>
         )}
