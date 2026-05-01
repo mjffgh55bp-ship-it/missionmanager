@@ -100,12 +100,16 @@ export default function Availability() {
 
     const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-    // Single batch for all initial data
-    const [workersData, eventsData, openRegSettings, userRolesSettings, settings, weekTipsSettings, yearlyEventsData] = await Promise.all([
+    // Batch 1: workers + settings (most critical)
+    const [workersData, openRegSettings, userRolesSettings] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
-      base44.entities.CompanyEvent.list("-date"),
       base44.entities.AppSettings.filter({ setting_key: "open_registrations" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
+    ]);
+
+    // Batch 2: events + tips
+    const [eventsData, settings, weekTipsSettings, yearlyEventsData] = await Promise.all([
+      base44.entities.CompanyEvent.list("-date"),
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: `availability_tips_${weekStartStr2}` }),
       base44.entities.YearlyEvent.list()
@@ -160,11 +164,15 @@ export default function Availability() {
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
-      // Single batch for all worker-specific data
-      const [availabilities, unavailabilitiesData, templatesData, assignmentsData, templateRowsData] = await Promise.all([
+      // Batch 3: worker availability + unavailability + templates
+      const [availabilities, unavailabilitiesData, templatesData] = await Promise.all([
         base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
         base44.entities.Unavailability.filter({ worker_id: worker.id }),
         base44.entities.Template.filter({ active: true }),
+      ]);
+
+      // Batch 4: large lists separately to avoid rate limit
+      const [assignmentsData, templateRowsData] = await Promise.all([
         base44.entities.Assignment.list("-date", 500),
         base44.entities.TemplateRow.list("-date", 500)
       ]);
