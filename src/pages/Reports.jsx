@@ -291,14 +291,11 @@ export default function Reports() {
                                   height: size ? `${size.height}px` : 'auto',
                                 }}
                                 onMouseUp={(e) => {
-                                  // Capture size synchronously before state update (currentTarget is nullified async)
+                                  // Capture size synchronously before React nullifies the event
                                   const w = e.currentTarget?.offsetWidth;
                                   const h = e.currentTarget?.offsetHeight;
                                   if (w && h) {
-                                    setTrackerSizes(prev => ({
-                                      ...prev,
-                                      [tracker.id]: { width: w, height: h }
-                                    }));
+                                    setTrackerSizes(prev => ({ ...prev, [tracker.id]: { width: w, height: h } }));
                                   }
                                 }}
                               >
