@@ -7,12 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, UserX, UserCheck, ChefHat, TrendingUp, Award, Trash2, Users, Save, Search, ChevronDown, Check } from "lucide-react";
+import { Plus, Pencil, UserX, UserCheck, ChefHat, Trash2, Users, Save, Search, ChevronDown, Check, Camera } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { getSeniorityInfo, calculateProgression } from "../components/utils/SeniorityUtils";
-import { Progress } from "@/components/ui/progress";
-import { Switch } from "@/components/ui/switch";
+import { getSeniorityInfo } from "../components/utils/SeniorityUtils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Workers() {
@@ -34,10 +32,10 @@ export default function Workers() {
     phone: "",
     email: "",
     hire_date: format(new Date(), "yyyy-MM-dd"),
-    is_guide: false,
     active: true,
     population: "",
-    training: ""
+    training: "",
+    photo_url: ""
   });
 
   useEffect(() => { loadData(); }, []);
@@ -87,8 +85,11 @@ export default function Workers() {
     else await base44.entities.AppSettings.create(data);
   };
 
-  const getWorkerTotalHours = (workerId) => {
-    return assignments.filter(a => a.chef_id === workerId || a.sous_chef_id === workerId || a.additional_chef_id === workerId).reduce((sum, a) => sum + (a.hours || 0), 0);
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    setFormData(prev => ({ ...prev, photo_url: file_url }));
   };
 
   const handleSubmit = async () => {
@@ -96,7 +97,7 @@ export default function Workers() {
     else await base44.entities.Worker.create(formData);
     setShowDialog(false);
     setEditingWorker(null);
-    setFormData({ nickname: "", birthday: "", role: [], phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), is_guide: false, active: true, population: "", training: "" });
+    setFormData({ nickname: "", birthday: "", role: [], phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), active: true, population: "", training: "", photo_url: "" });
     loadData();
   };
 
@@ -109,10 +110,10 @@ export default function Workers() {
       phone: worker.phone || "",
       email: worker.email || "",
       hire_date: worker.hire_date || format(new Date(), "yyyy-MM-dd"),
-      is_guide: worker.is_guide || false,
       active: worker.active,
       population: worker.population || "",
-      training: worker.training || ""
+      training: worker.training || "",
+      photo_url: worker.photo_url || ""
     });
     setShowDialog(true);
   };
@@ -126,14 +127,7 @@ export default function Workers() {
     loadData();
   };
 
-  const toggleGuide = async (worker) => {
-    await base44.entities.Worker.update(worker.id, { 
-      nickname: worker.nickname,
-      role: worker.role,
-      is_guide: !worker.is_guide 
-    });
-    loadData();
-  };
+
 
   const handleDeleteWorker = async (workerId) => {
     if (!confirm("האם אתה בטוח שברצונך למחוק עובד זה?")) return;
@@ -199,52 +193,31 @@ export default function Workers() {
                   worker.email?.toLowerCase().includes(query)
                 );
               }).map((worker) => {
-            const totalHours = getWorkerTotalHours(worker.id);
             const seniorityInfo = getSeniorityInfo(worker.seniority);
-            const progression = calculateProgression(totalHours, worker.seniority);
 
             return (
               <Card key={worker.id} className="border-none shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardHeader className="border-b bg-white">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${worker.role === 'chef' ? 'bg-blue-900' : 'bg-amber-500'}`}>
-                        <ChefHat className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg text-right" dir="rtl">{worker.nickname}</CardTitle>
-                        <div className="flex gap-2 mt-1 flex-wrap">
-                          {(Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).map(r => (
-                            <Badge key={r} className="bg-blue-100 text-blue-900" dir="rtl">{r}</Badge>
-                          ))}
-                          {!(Array.isArray(worker.role) ? worker.role.length : worker.role) && <Badge className="bg-blue-100 text-blue-900" dir="rtl">לא הוגדר</Badge>}
-                          <Badge className={seniorityInfo.color}>{seniorityInfo.label}</Badge>
-                          {worker.is_guide && <Badge className="bg-yellow-100 text-yellow-800" dir="rtl"><Award className="w-3 h-3 mr-1" />מדריך</Badge>}
-                        </div>
+                  <div className="flex items-center gap-3" dir="rtl">
+                    <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center bg-amber-500 shrink-0">
+                      {worker.photo_url
+                        ? <img src={worker.photo_url} alt={worker.nickname} className="w-full h-full object-cover" />
+                        : <ChefHat className="w-6 h-6 text-white" />}
+                    </div>
+                    <div className="flex-1 text-right">
+                      <CardTitle className="text-lg">{worker.nickname}</CardTitle>
+                      <div className="flex gap-2 mt-1 flex-wrap justify-end">
+                        {(Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).map(r => (
+                          <Badge key={r} className="bg-blue-100 text-blue-900">{r}</Badge>
+                        ))}
+                        {!(Array.isArray(worker.role) ? worker.role.length : worker.role) && <Badge className="bg-blue-100 text-blue-900">לא הוגדר</Badge>}
+                        <Badge className={seniorityInfo.color}>{seniorityInfo.label}</Badge>
                       </div>
                     </div>
-                    <Badge variant={worker.active ? "default" : "secondary"} dir="rtl">{worker.active ? "פעיל" : "לא פעיל"}</Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="space-y-4">
-                    <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700" dir="rtl">התקדמות ל-{progression.nextLevel ? getSeniorityInfo(progression.nextLevel).label : 'דרגה מקסימלית'}</span>
-                        <span className="text-xs text-gray-600" dir="rtl">{totalHours} שעות סה"כ</span>
-                      </div>
-                      {progression.nextLevel ? (
-                        <>
-                          <Progress value={progression.progress} className="h-2 mb-2" />
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <TrendingUp className="w-3 h-3" /><span dir="rtl">{progression.hoursRemaining} שעות עד הדרגה הבאה</span>
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-xs text-purple-600 font-medium" dir="rtl">הושגה הוותק המקסימלי! 🎉</p>
-                      )}
-                    </div>
-
+                <CardContent className="pt-4">
+                  <div className="space-y-3">
                     {/* פרטים אישיים */}
                     <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <h4 className="text-sm font-semibold text-blue-900 mb-2" dir="rtl">פרטים אישיים</h4>
@@ -263,7 +236,6 @@ export default function Workers() {
                         {worker.population && <p className="text-sm text-gray-700" dir="rtl">👥 אוכלוסיה: {worker.population}</p>}
                         <p className="text-sm text-gray-700" dir="rtl">🍳 תפקיד: {(Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).join(', ') || 'לא הוגדר'}</p>
                         <p className="text-sm text-gray-700" dir="rtl">⭐ כשירות: {seniorityInfo.label}</p>
-                        <p className="text-sm text-gray-700" dir="rtl">🏆 מדריך: {worker.is_guide ? 'כן' : 'לא'}</p>
                       </div>
                     </div>
 
@@ -342,11 +314,26 @@ export default function Workers() {
             <DialogHeader>
               <DialogTitle className="text-right w-full" dir="rtl">{editingWorker ? "ערוך עובד" : "הוסף עובד חדש"}</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto" dir="rtl">
+
+              {/* תמונה */}
+              <div className="flex justify-center">
+                <label className="cursor-pointer group relative">
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-amber-100 flex items-center justify-center border-2 border-dashed border-amber-300 group-hover:border-amber-500 transition-colors">
+                    {formData.photo_url
+                      ? <img src={formData.photo_url} alt="תמונה" className="w-full h-full object-cover" />
+                      : <Camera className="w-8 h-8 text-amber-400" />}
+                  </div>
+                  <div className="absolute inset-0 rounded-full bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                    <Camera className="w-6 h-6 text-white" />
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                </label>
+              </div>
               
               {/* פרטים אישיים */}
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="text-sm font-semibold text-blue-900 mb-3" dir="rtl">פרטים אישיים</h4>
+                <h4 className="text-sm font-semibold text-blue-900 mb-3 text-right" dir="rtl">פרטים אישיים</h4>
                 <div className="space-y-2" dir="rtl">
                   <div className="flex items-center gap-2">
                     <Label className="w-28 text-right shrink-0" dir="rtl">כינוי *</Label>
@@ -376,7 +363,7 @@ export default function Workers() {
 
               {/* כשירות */}
               <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                <h4 className="text-sm font-semibold text-green-900 mb-3" dir="rtl">כשירות</h4>
+                <h4 className="text-sm font-semibold text-green-900 mb-3 text-right" dir="rtl">כשירות</h4>
                 <div className="space-y-2" dir="rtl">
                   <div className="flex items-center gap-2">
                     <Label className="w-28 text-right shrink-0" dir="rtl">אוכלוסייה</Label>
@@ -438,59 +425,55 @@ export default function Workers() {
               </div>
 
               {/* כשירויות למשימות */}
-              {editingWorker && tasks.length > 0 && (() => {
-                const workerRoleList = Array.isArray(editingWorker.role) ? editingWorker.role : (editingWorker.role ? [editingWorker.role] : []);
-                if (workerRoleList.length === 0) return null;
-                return (
-                  <div className="p-3 bg-violet-50 rounded-lg border border-violet-200">
-                    <h4 className="text-sm font-semibold text-violet-900 mb-3" dir="rtl">כשירות למשימות</h4>
-                    <div className="space-y-2" dir="rtl">
-                      {workerRoleList.map(role => (
-                        <div key={role} className="flex items-start gap-2">
-                          <Label className="w-28 text-right shrink-0 mt-2 text-xs font-semibold text-gray-700" dir="rtl">{role}</Label>
-                          <div className="flex-1">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <button className="w-full flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-white hover:bg-gray-50 transition-colors" dir="rtl">
-                                  <span className="text-gray-500">בחר משימות...</span>
-                                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                                </button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-48 p-1" align="start">
-                                {tasks.map(task => {
-                                  const qualified = ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id);
-                                  return (
-                                    <button
-                                      key={task}
-                                      type="button"
-                                      onClick={() => handleToggleTaskQualification(task, role, editingWorker.id)}
-                                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 text-right"
-                                      dir="rtl"
-                                    >
-                                      <Check className={`w-4 h-4 shrink-0 ${qualified ? 'text-violet-600' : 'text-transparent'}`} />
-                                      {task}
-                                    </button>
-                                  );
-                                })}
-                              </PopoverContent>
-                            </Popover>
-                            {(() => {
-                              const qualTasks = tasks.filter(task => ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id));
-                              return qualTasks.length > 0 ? (
-                                <div className="flex flex-wrap gap-1 mt-2" dir="rtl">
-                                  {qualTasks.map(t => (
-                                    <Badge key={t} className="bg-violet-100 text-violet-800 text-xs">{t}</Badge>
-                                  ))}
-                                </div>
-                              ) : null;
-                            })()}
-                          </div>
+              {editingWorker && tasks.length > 0 && formData.role.length > 0 && (
+                <div className="p-3 bg-violet-50 rounded-lg border border-violet-200">
+                  <h4 className="text-sm font-semibold text-violet-900 mb-3 text-right" dir="rtl">כשירות למשימות</h4>
+                  <div className="space-y-2" dir="rtl">
+                    {formData.role.map(role => (
+                      <div key={role} className="flex items-start gap-2">
+                        <Label className="w-28 text-right shrink-0 mt-2 text-xs font-semibold text-gray-700" dir="rtl">{role}</Label>
+                        <div className="flex-1">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button className="w-full flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-white hover:bg-gray-50 transition-colors" dir="rtl">
+                                <span className="text-gray-500">בחר משימות...</span>
+                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48 p-1" align="start">
+                              {tasks.map(task => {
+                                const qualified = ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id);
+                                return (
+                                  <button
+                                    key={task}
+                                    type="button"
+                                    onClick={() => handleToggleTaskQualification(task, role, editingWorker.id)}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 text-right"
+                                    dir="rtl"
+                                  >
+                                    <Check className={`w-4 h-4 shrink-0 ${qualified ? 'text-violet-600' : 'text-transparent'}`} />
+                                    {task}
+                                  </button>
+                                );
+                              })}
+                            </PopoverContent>
+                          </Popover>
+                          {(() => {
+                            const qualTasks = tasks.filter(task => ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id));
+                            return qualTasks.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 mt-2" dir="rtl">
+                                {qualTasks.map(t => (
+                                  <Badge key={t} className="bg-violet-100 text-violet-800 text-xs">{t}</Badge>
+                                ))}
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                );
-              })()}
+                </div>
+              )}
 
               {/* פרטי קשר */}
               <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -507,16 +490,11 @@ export default function Workers() {
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter dir="rtl" className="flex-row-reverse sm:flex-row-reverse gap-2">
               {editingWorker && (
-                <>
-                  <Button variant="destructive" onClick={() => handleDeleteWorker(editingWorker.id)} dir="rtl">
-                    <Trash2 className="w-3 h-3 mr-2" />מחק עובד
-                  </Button>
-                  <Button variant={editingWorker.active ? "destructive" : "default"} onClick={() => { toggleActive(editingWorker); setShowDialog(false); }} dir="rtl">
-                    {editingWorker.active ? <><UserX className="w-3 h-3 mr-2" />השבת</> : <><UserCheck className="w-3 h-3 mr-2" />הפעל</>}
-                  </Button>
-                </>
+                <Button variant="destructive" onClick={() => handleDeleteWorker(editingWorker.id)} dir="rtl">
+                  <Trash2 className="w-3 h-3 ml-2" />מחק עובד
+                </Button>
               )}
               <Button variant="outline" onClick={() => { setShowDialog(false); setEditingWorker(null); }} dir="rtl">ביטול</Button>
               <Button onClick={handleSubmit} disabled={!formData.nickname || formData.role.length === 0} className="bg-blue-900 hover:bg-blue-800" dir="rtl">{editingWorker ? "עדכן" : "הוסף"} עובד</Button>

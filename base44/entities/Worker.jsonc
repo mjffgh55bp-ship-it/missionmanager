@@ -18,7 +18,7 @@
     },
     "training": {
       "type": "string",
-      "description": "Primary training/course"
+      "description": "Course number"
     },
     "population": {
       "type": "string",
@@ -31,11 +31,6 @@
       },
       "description": "Worker's role(s) in the kitchen"
     },
-    "is_guide": {
-      "type": "boolean",
-      "default": false,
-      "description": "Whether the worker is qualified as a guide to train trainees"
-    },
     "seniority": {
       "type": "string",
       "enum": [
@@ -45,10 +40,6 @@
       ],
       "default": "trainee",
       "description": "Worker's seniority level"
-    },
-    "additional_training": {
-      "type": "string",
-      "description": "Additional training"
     },
     "is_full_time": {
       "type": "boolean",
@@ -73,6 +64,10 @@
       "type": "boolean",
       "default": false,
       "description": "Whether the worker's availability is locked and cannot be edited"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "URL of the worker's profile photo"
     }
   },
   "required": [
