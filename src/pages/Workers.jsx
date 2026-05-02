@@ -42,15 +42,17 @@ export default function Workers() {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [workersData, assignmentsData, rolesSettings, populationsSettings, workerRolesSettings, tasksSettings, taskQualSettings] = await Promise.all([
+    // Batch 1: workers + settings (no heavy lists)
+    const [workersData, rolesSettings, populationsSettings, workerRolesSettings, tasksSettings, taskQualSettings] = await Promise.all([
       base44.entities.Worker.list("-created_date"),
-      base44.entities.Assignment.list(),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
       base44.entities.AppSettings.filter({ setting_key: "task_qualifications" })
     ]);
+    // Batch 2: assignments separately to avoid rate limit
+    const assignmentsData = await base44.entities.Assignment.list();
     setWorkers(workersData);
     setAssignments(assignmentsData);
     if (rolesSettings.length > 0) {
