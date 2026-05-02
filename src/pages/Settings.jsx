@@ -44,14 +44,18 @@ export default function Settings() {
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    const rolesSettings = await base44.entities.AppSettings.filter({ setting_key: "user_roles" });
+    const allSettings = await base44.entities.AppSettings.list();
     const workersData = await base44.entities.Worker.list();
-    const scheduleColsSettings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
-    const populationsSettings = await base44.entities.AppSettings.filter({ setting_key: "worker_populations" });
-    const workerRolesSettings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
-    const shiftStatusesSettings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
-    const tasksSettings = await base44.entities.AppSettings.filter({ setting_key: "tasks_list" });
-    const taskQualSettings = await base44.entities.AppSettings.filter({ setting_key: "task_qualifications" });
+
+    const getSetting = (key) => allSettings.find(s => s.setting_key === key);
+
+    const rolesSettings = getSetting("user_roles") ? [getSetting("user_roles")] : [];
+    const scheduleColsSettings = getSetting("custom_schedule_params") ? [getSetting("custom_schedule_params")] : [];
+    const populationsSettings = getSetting("worker_populations") ? [getSetting("worker_populations")] : [];
+    const workerRolesSettings = getSetting("worker_roles") ? [getSetting("worker_roles")] : [];
+    const shiftStatusesSettings = getSetting("shift_statuses") ? [getSetting("shift_statuses")] : [];
+    const tasksSettings = getSetting("tasks_list") ? [getSetting("tasks_list")] : [];
+    const taskQualSettings = getSetting("task_qualifications") ? [getSetting("task_qualifications")] : [];
     
 
     if (rolesSettings.length > 0) setUserRoles(JSON.parse(rolesSettings[0].setting_value));
