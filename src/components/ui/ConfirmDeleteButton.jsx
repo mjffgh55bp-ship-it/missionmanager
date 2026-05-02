@@ -24,10 +24,10 @@ export default function ConfirmDeleteButton({ onConfirm, variant = "icon", label
       return (
         <button
           onClick={e => { e.stopPropagation(); setPending(true); }}
-          className={`text-red-400 hover:text-red-600 transition-colors ${className}`}
+          className={`inline-flex items-center justify-center w-8 h-8 rounded-md border border-input bg-background text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors ${className}`}
           title="מחק"
         >
-          <X className="w-4 h-4" />
+          <Trash2 className="w-4 h-4" />
         </button>
       );
     }

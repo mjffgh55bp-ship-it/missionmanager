@@ -176,20 +176,6 @@ export default function TrackerLayoutArea({
             }}
             className={`bg-white rounded-xl shadow-sm border ${isActive ? "border-blue-400 shadow-md" : "border-gray-200"}`}
           >
-            {/* Drag handle */}
-            <div
-              className="flex items-center justify-between px-4 bg-gray-50 rounded-t-xl border-b border-gray-200 cursor-grab active:cursor-grabbing select-none"
-              style={{ height: HANDLE_H }}
-              onMouseDown={(e) => startDrag(e, tracker.id)}
-            >
-              <div className="text-sm font-semibold text-gray-700">{tracker.name}</div>
-              <div className="flex gap-1">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="w-1 h-1 rounded-full bg-gray-400" />
-                ))}
-              </div>
-            </div>
-
             <TrackerTable
               tracker={tracker}
               workers={workers}
@@ -203,6 +189,7 @@ export default function TrackerLayoutArea({
               workerQualifications={workerQualifications}
               onDelete={() => onDeleteTracker(tracker.id)}
               onUpdated={onUpdatedTracker}
+              onDragStart={(e) => startDrag(e, tracker.id)}
             />
 
             {/* Resize handle — sticky bottom-left, always visible even when scrolling */}

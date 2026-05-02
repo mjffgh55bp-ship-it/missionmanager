@@ -93,7 +93,7 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], workerQualifications = [], onDelete, onUpdated }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], workerQualifications = [], onDelete, onUpdated, onDragStart }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -923,10 +923,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   return (
     <Card className="border-none shadow-lg mb-6" dir="rtl" style={headerPinned ? { maxHeight: "70vh", overflowY: "auto", overflowX: "auto" } : {}}>
       {/* Header */}
-      <CardHeader ref={cardHeaderRef} className="border-b py-3 px-4" style={headerPinned ? { position: "sticky", top: 0, zIndex: 30, backgroundColor: "white", boxShadow: "0 2px 4px rgba(0,0,0,0.08)" } : {}}>
+      <CardHeader
+        ref={cardHeaderRef}
+        className="border-b py-3 px-4 cursor-grab active:cursor-grabbing select-none"
+        style={headerPinned ? { position: "sticky", top: 0, zIndex: 30, backgroundColor: "white", boxShadow: "0 2px 4px rgba(0,0,0,0.08)" } : {}}
+        onMouseDown={onDragStart}
+      >
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base">{tracker.name}</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex gap-2" onMouseDown={e => e.stopPropagation()}>
             <Button size="sm" variant={headerPinned ? "default" : "outline"}
               className={headerPinned ? "bg-blue-700 hover:bg-blue-800 w-8 px-0" : "w-8 px-0"}
               onClick={togglePin}
@@ -940,11 +945,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               <Filter className="w-4 h-4" />
             </Button>
             <Button size="sm" variant={editMode ? "default" : "outline"}
-              className={editMode ? "bg-purple-600 hover:bg-purple-700" : ""}
-              onClick={() => editMode ? saveAndExitEditMode() : openEditMode()}>
-              <Pencil className="w-4 h-4 ml-1" />{editMode ? "סיים עריכה" : "ערוך עמודות"}
+              className={`w-8 px-0 ${editMode ? "bg-purple-600 hover:bg-purple-700" : ""}`}
+              onClick={() => editMode ? saveAndExitEditMode() : openEditMode()}
+              title={editMode ? "סיים עריכה" : "ערוך עמודות"}>
+              <Pencil className="w-4 h-4" />
             </Button>
-            <ConfirmDeleteButton onConfirm={onDelete} variant="button" label="מחק טבלה" />
+            {editMode && (
+              <ConfirmDeleteButton onConfirm={onDelete} variant="icon" />
+            )}
           </div>
         </div>
 
