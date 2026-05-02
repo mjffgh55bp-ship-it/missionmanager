@@ -163,6 +163,15 @@ export default function Matrix() {
     };
   }, [currentDate, viewMode]);
 
+  const refreshWorkers = async () => {
+    try {
+      const workersData = await base44.entities.Worker.filter({ active: true });
+      setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
+    } catch (error) {
+      console.error('Error refreshing workers:', error);
+    }
+  };
+
   const loadStaticData = async () => {
     try {
       // Batch 1: workers + trackers
@@ -1495,7 +1504,7 @@ export default function Matrix() {
                         }
                       }}
                       sendingWhatsApp={sendingWhatsApp}
-                      onUpdate={loadStaticData}
+                      onUpdate={refreshWorkers}
                     />
                   </div>
                   {/* Summary columns headers - only in weekly mode */}
@@ -1540,7 +1549,10 @@ export default function Matrix() {
                   workers
                     .filter(w => {
                       if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
-                      if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
+                      if (roleFilter !== "__all__") {
+                        const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
+                        if (!roles.includes(roleFilter)) return false;
+                      }
                       return true;
                     })
                     .map((worker, index) => {
@@ -1553,7 +1565,7 @@ export default function Matrix() {
                       <React.Fragment key={worker.id}>
                       <div className={`flex border-b h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                         <div className="w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-8">
-                          <WorkerLockButton worker={worker} onUpdate={loadStaticData} />
+                          <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
                           {(() => {
                             const sendStatus = getWorkerSendStatus(worker);
                             const whatsappClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
