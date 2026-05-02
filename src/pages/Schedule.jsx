@@ -68,19 +68,24 @@ export default function Schedule() {
   const [taskQualifications, setTaskQualifications] = useState({});
   const staticDataLoaded = useRef(false);
   const lastWeekStart = useRef(null);
+  const initialLoadStarted = useRef(false);
 
   useEffect(() => {
+    if (!initialLoadStarted.current) {
+      initialLoadStarted.current = true;
+      const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+      const weekStartStr = format(weekStart, "yyyy-MM-dd");
+      lastWeekStart.current = weekStartStr;
+      staticDataLoaded.current = true;
+      loadAllData();
+      return;
+    }
+    
     localStorage.setItem('schedule_last_date', format(currentDate, 'yyyy-MM-dd'));
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekChanged = lastWeekStart.current !== weekStartStr;
-
-    if (!staticDataLoaded.current) {
-      staticDataLoaded.current = true;
-      loadAllData();
-    } else {
-      loadDailyData(weekChanged);
-    }
+    loadDailyData(weekChanged);
   }, [currentDate]);
 
   // Load everything on first render
