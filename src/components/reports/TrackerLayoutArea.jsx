@@ -14,6 +14,8 @@ export default function TrackerLayoutArea({
   populations, workerRoles, scheduleColumns, qualifications,
   onDeleteTracker, onUpdatedTracker,
 }) {
+  const STORAGE_KEY = "tracker_layout_positions";
+
   // posRef is the single source of truth; posState drives re-renders
   const posRef = useRef({});
   const [posState, setPosState] = useState({});
@@ -25,10 +27,18 @@ export default function TrackerLayoutArea({
   // Keep posRef in sync
   useEffect(() => { posRef.current = posState; }, [posState]);
 
-  // Initialize positions for new trackers
+  // Save to localStorage whenever positions change
   useEffect(() => {
+    if (Object.keys(posState).length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(posState));
+    }
+  }, [posState]);
+
+  // Initialize positions for new trackers (restoring from localStorage first)
+  useEffect(() => {
+    const saved = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; } })();
     setPosState(prev => {
-      const next = { ...prev };
+      const next = { ...saved, ...prev };
       trackers.forEach((tracker, i) => {
         if (!next[tracker.id]) {
           next[tracker.id] = { x: 12, y: i * 420 + 12, w: DEFAULT_W, h: null };

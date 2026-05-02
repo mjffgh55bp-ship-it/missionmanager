@@ -14,6 +14,8 @@ export default function ChartCanvas({
   trackers, trackerEntries,
   onEdit, onDelete,
 }) {
+  const STORAGE_KEY = "chart_canvas_positions";
+
   // posRef is the single source of truth; posState drives re-renders
   const posRef = useRef({});
   const [posState, setPosState] = useState({});
@@ -25,10 +27,18 @@ export default function ChartCanvas({
   // Sync posRef when posState changes (so event handlers always read fresh data)
   useEffect(() => { posRef.current = posState; }, [posState]);
 
-  // Initialize positions for new charts
+  // Save to localStorage whenever positions change
   useEffect(() => {
+    if (Object.keys(posState).length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(posState));
+    }
+  }, [posState]);
+
+  // Initialize positions for new charts (restoring from localStorage first)
+  useEffect(() => {
+    const saved = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; } })();
     setPosState(prev => {
-      const next = { ...prev };
+      const next = { ...saved, ...prev };
       charts.forEach((chart, i) => {
         if (!next[chart.id]) {
           const col = i % 2;
