@@ -32,16 +32,24 @@ export default function MasterControls({
     try {
       const targetLockState = !allLocked;
       
-      // Update all in parallel — only send the field we're changing
-      await Promise.all(
-        visibleWorkers.map(worker =>
-          base44.entities.Worker.update(worker.id, {
-            availability_locked: targetLockState
-          }).catch(err => {
-            console.error(`Failed to update worker ${worker.nickname}:`, err);
-          })
-        )
-      );
+      // Update in small sequential batches to avoid rate limit
+      const batchSize = 3;
+      for (let i = 0; i < visibleWorkers.length; i += batchSize) {
+        const batch = visibleWorkers.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(worker =>
+            base44.entities.Worker.update(worker.id, {
+              availability_locked: targetLockState
+            }).catch(err => {
+              console.error(`Failed to update worker ${worker.nickname}:`, err);
+            })
+          )
+        );
+        // Small delay between batches to respect rate limit
+        if (i + batchSize < visibleWorkers.length) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
       
       onUpdate();
     } catch (error) {
