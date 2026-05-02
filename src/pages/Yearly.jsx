@@ -125,7 +125,7 @@ export default function Yearly() {
       setWorkers(workersData);
       setUnavailabilities(unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd));
       setWorkerRoles(rolesS ? JSON.parse(rolesS.setting_value) : ["שף", "סו-שף"]);
-      setWorkerPopulations(popsS ? JSON.parse(popsS.setting_value) : []);
+      setWorkerPopulations(popsS ? JSON.parse(popsS.setting_value) : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
       setTasks(tasksS ? JSON.parse(tasksS.setting_value) : []);
       setTaskQualifications(taskQualS ? JSON.parse(taskQualS.setting_value) : {});
     } catch (error) {
