@@ -49,7 +49,9 @@ export default function Yearly() {
   const [selectedCell, setSelectedCell] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventForm, setEventForm] = useState({ title: "", start_time: "08:00", end_time: "16:00", worker_ids: [], start_date: "", end_date: "" });
-  const [workerGroupFilter, setWorkerGroupFilter] = useState(null);
+  const [filterRoles, setFilterRoles] = useState([]);
+  const [filterPopulations, setFilterPopulations] = useState([]);
+  const [filterTasks, setFilterTasks] = useState([]);
   const [dragging, setDragging] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [jumpDate, setJumpDate] = useState("");
@@ -166,7 +168,7 @@ export default function Yearly() {
     if (viewOnly) return;
     setSelectedCell({ rowId, date });
     setEditingEvent(null);
-    setWorkerGroupFilter(null);
+    setFilterRoles([]); setFilterPopulations([]); setFilterTasks([]);
     setEventForm({ title: "", start_time: "08:00", end_time: "16:00", worker_ids: [], start_date: date, end_date: date });
     setShowEventDialog(true);
   };
@@ -179,7 +181,7 @@ export default function Yearly() {
     } else {
       setEditingEvent(event);
       setSelectedCell({ rowId: event.row_id, date: event.start_date });
-      setWorkerGroupFilter(null);
+      setFilterRoles([]); setFilterPopulations([]); setFilterTasks([]);
       setEventForm({
         title: event.title || "",
         start_time: event.start_time || "08:00",
@@ -362,30 +364,34 @@ export default function Yearly() {
     return tracks;
   };
 
-  const getFilteredWorkers = () => {
-    if (!workerGroupFilter) return workers;
-    const [type, name] = workerGroupFilter.split(":");
-    if (type === "role") return workers.filter(w => Array.isArray(w.role) ? w.role.includes(name) : w.role === name);
-    if (type === "population") return workers.filter(w => w.population === name);
-    if (type === "task") {
-      const quals = taskQualifications[name] || {};
-      const qualifiedIds = Object.values(quals).flat();
-      return workers.filter(w => qualifiedIds.includes(w.id));
+  const filteredWorkersForDialog = workers.filter(w => {
+    if (filterRoles.length > 0) {
+      const workerRoleArr = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
+      if (!filterRoles.some(r => workerRoleArr.includes(r))) return false;
     }
-    return workers;
+    if (filterPopulations.length > 0) {
+      if (!filterPopulations.includes(w.population)) return false;
+    }
+    if (filterTasks.length > 0) {
+      const passesAll = filterTasks.every(task => {
+        const quals = taskQualifications[task] || {};
+        const qualifiedIds = Object.values(quals).flat();
+        return qualifiedIds.includes(w.id);
+      });
+      if (!passesAll) return false;
+    }
+    return true;
+  });
+
+  const addAllFiltered = () => {
+    const filteredIds = filteredWorkersForDialog.map(w => w.id);
+    const merged = [...new Set([...eventForm.worker_ids, ...filteredIds])];
+    setEventForm({ ...eventForm, worker_ids: merged });
   };
 
-  const filteredWorkersForDialog = getFilteredWorkers();
-
-  const toggleAllFiltered = () => {
+  const removeAllFiltered = () => {
     const filteredIds = filteredWorkersForDialog.map(w => w.id);
-    const allSelected = filteredIds.every(id => eventForm.worker_ids.includes(id));
-    if (allSelected) {
-      setEventForm({ ...eventForm, worker_ids: eventForm.worker_ids.filter(id => !filteredIds.includes(id)) });
-    } else {
-      const merged = [...new Set([...eventForm.worker_ids, ...filteredIds])];
-      setEventForm({ ...eventForm, worker_ids: merged });
-    }
+    setEventForm({ ...eventForm, worker_ids: eventForm.worker_ids.filter(id => !filteredIds.includes(id)) });
   };
 
   const EventBar = ({ event, row, trackIndex }) => {
@@ -769,29 +775,64 @@ export default function Yearly() {
             </div>
             <div>
               <Label className="block text-right mb-2">משתתפים ({eventForm.worker_ids.length})</Label>
-              <div className="flex flex-wrap gap-1 mb-2">
-                <button className={`text-xs px-2 py-1 rounded-full border transition-colors ${!workerGroupFilter ? 'bg-blue-900 text-white border-blue-900' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-500'}`} onClick={() => setWorkerGroupFilter(null)}>הכל</button>
-                {workerRoles.map(role => (
-                  <button key={`role:${role}`} className={`text-xs px-2 py-1 rounded-full border transition-colors ${workerGroupFilter === `role:${role}` ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`} onClick={() => setWorkerGroupFilter(workerGroupFilter === `role:${role}` ? null : `role:${role}`)}>
-                    {role}
-                  </button>
-                ))}
-                {workerPopulations.map(pop => (
-                  <button key={`population:${pop}`} className={`text-xs px-2 py-1 rounded-full border transition-colors ${workerGroupFilter === `population:${pop}` ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-300 hover:border-orange-400'}`} onClick={() => setWorkerGroupFilter(workerGroupFilter === `population:${pop}` ? null : `population:${pop}`)}>
-                    {pop}
-                  </button>
-                ))}
-                {tasks.map(task => (
-                  <button key={`task:${task}`} className={`text-xs px-2 py-1 rounded-full border transition-colors ${workerGroupFilter === `task:${task}` ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400'}`} onClick={() => setWorkerGroupFilter(workerGroupFilter === `task:${task}` ? null : `task:${task}`)}>
-                    {task}
-                  </button>
-                ))}
+
+              {/* Filters */}
+              <div className="space-y-2 mb-3 p-2 bg-gray-50 rounded-lg border">
+                {workerRoles.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-1">תפקיד</p>
+                    <div className="flex flex-wrap gap-1">
+                      {workerRoles.map(role => (
+                        <button key={role} type="button"
+                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filterRoles.includes(role) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
+                          onClick={() => setFilterRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role])}>
+                          {role}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {workerPopulations.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-1">אוכלוסייה</p>
+                    <div className="flex flex-wrap gap-1">
+                      {workerPopulations.map(pop => (
+                        <button key={pop} type="button"
+                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filterPopulations.includes(pop) ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-300 hover:border-orange-400'}`}
+                          onClick={() => setFilterPopulations(prev => prev.includes(pop) ? prev.filter(p => p !== pop) : [...prev, pop])}>
+                          {pop}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {tasks.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-1">כשירות למשימה</p>
+                    <div className="flex flex-wrap gap-1">
+                      {tasks.map(task => (
+                        <button key={task} type="button"
+                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filterTasks.includes(task) ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400'}`}
+                          onClick={() => setFilterTasks(prev => prev.includes(task) ? prev.filter(t => t !== task) : [...prev, task])}>
+                          {task}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              {filteredWorkersForDialog.length > 0 && (
-                <button className="text-xs text-blue-700 underline mb-1" onClick={toggleAllFiltered}>
-                  {filteredWorkersForDialog.every(w => eventForm.worker_ids.includes(w.id)) ? `הסר הכל (${filteredWorkersForDialog.length})` : `בחר הכל (${filteredWorkersForDialog.length})`}
+
+              {/* Add/Remove all buttons */}
+              <div className="flex gap-2 mb-2">
+                <button type="button" className="text-xs px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors" onClick={addAllFiltered}>
+                  הוסף הכל ({filteredWorkersForDialog.length})
                 </button>
-              )}
+                <button type="button" className="text-xs px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600 transition-colors" onClick={removeAllFiltered}>
+                  הסר הכל ({filteredWorkersForDialog.length})
+                </button>
+              </div>
+
+              {/* Worker list */}
               <div className="max-h-36 overflow-y-auto border rounded-lg p-2 space-y-1">
                 {filteredWorkersForDialog.map(w => (
                   <label key={w.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
@@ -803,7 +844,7 @@ export default function Yearly() {
                     {w.role && <span className="text-xs text-gray-400">{Array.isArray(w.role) ? w.role.join(", ") : w.role}</span>}
                   </label>
                 ))}
-                {filteredWorkersForDialog.length === 0 && <p className="text-xs text-gray-500 text-center py-2">אין עובדים בקבוצה זו</p>}
+                {filteredWorkersForDialog.length === 0 && <p className="text-xs text-gray-500 text-center py-2">אין עובדים התואמים את הסינון</p>}
               </div>
             </div>
           </div>
