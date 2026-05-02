@@ -125,7 +125,6 @@ export default function Matrix() {
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
   const timelineRefs = useRef({});
-  const isLoadingDataRef = useRef(false);
   const loadingTimeoutRef = useRef(null);
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
@@ -138,18 +137,13 @@ export default function Matrix() {
   const [trackers, setTrackers] = useState([]);
   const [trackerEntries, setTrackerEntries] = useState([]);
 
-  useEffect(() => { 
-    loadStaticData();
-  }, []);
+  useEffect(() => { loadStaticData(); }, []);
+  useEffect(() => { loadDynamicData(); }, [currentDate, viewMode]);
 
-  useEffect(() => { 
-    loadDynamicData(); 
-  }, [currentDate, viewMode]);
-
-  // Real-time subscriptions - refresh when assignments or template rows change
+  // Real-time subscriptions - silent refresh only (never show loading spinner)
   useEffect(() => {
     const unsubAssignment = base44.entities.Assignment.subscribe(() => {
-      debouncedLoadData(true);
+      debouncedLoadData(true); // always silent=true
     });
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
       debouncedLoadData(true);
@@ -162,7 +156,7 @@ export default function Matrix() {
 
   const loadStaticData = async () => {
     try {
-    // Batch 1: workers + trackers
+      // Batch 1: workers + trackers
     const [workersData, trackersData] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.Tracker.list()
@@ -191,13 +185,10 @@ export default function Matrix() {
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
     } catch (error) {
       console.error('Error loading static matrix data:', error);
-      setLoading(false);
     }
   };
 
   const loadDynamicData = async (silent = false) => {
-    if (isLoadingDataRef.current) return;
-    isLoadingDataRef.current = true;
     if (!silent) setLoading(true);
     
     try {
@@ -265,7 +256,6 @@ export default function Matrix() {
       console.error('Error loading matrix data:', error);
     } finally {
       setLoading(false);
-      isLoadingDataRef.current = false;
     }
   };
 
