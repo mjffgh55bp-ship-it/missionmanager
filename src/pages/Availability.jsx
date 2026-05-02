@@ -171,11 +171,9 @@ export default function Availability() {
         base44.entities.Template.filter({ active: true }),
       ]);
 
-      // Batch 4: large lists separately to avoid rate limit
-      const [assignmentsData, templateRowsData] = await Promise.all([
-        base44.entities.Assignment.list("-date", 500),
-        base44.entities.TemplateRow.list("-date", 500)
-      ]);
+      // Batch 4: large lists — sequential to avoid rate limit
+      const assignmentsData = await base44.entities.Assignment.list("-date", 200);
+      const templateRowsData = await base44.entities.TemplateRow.list("-date", 200);
 
       if (availabilities.length > 0) {
         setExistingAvailability(availabilities[0]);
