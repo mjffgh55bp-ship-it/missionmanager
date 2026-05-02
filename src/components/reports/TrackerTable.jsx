@@ -232,9 +232,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     onUpdated(updated);
   };
 
+  const loadingRef = useRef(false);
   const loadEntries = async () => {
-    const data = await base44.entities.TrackerEntry.filter({ tracker_id: tracker.id });
-    setEntries(data);
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    try {
+      const data = await base44.entities.TrackerEntry.filter({ tracker_id: tracker.id });
+      setEntries(data);
+    } finally {
+      loadingRef.current = false;
+    }
   };
 
   const getEntry = (workerId, colId) => entries.find(e => e.worker_id === workerId && e.column_id === colId);
