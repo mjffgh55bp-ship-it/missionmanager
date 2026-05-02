@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,8 +44,14 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState("schedule");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const loadedRef = useRef(false);
 
-  useEffect(() => { loadSettings(); }, []);
+  useEffect(() => {
+    if (!loadedRef.current) {
+      loadedRef.current = true;
+      loadSettings();
+    }
+  }, []);
 
   const loadSettings = async () => {
     const allSettings = await base44.entities.AppSettings.list();
