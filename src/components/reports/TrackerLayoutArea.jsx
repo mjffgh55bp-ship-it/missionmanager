@@ -204,11 +204,11 @@ export default function TrackerLayoutArea({
               onUpdated={onUpdatedTracker}
             />
 
-            {/* Resize handle — bottom-left corner */}
+            {/* Resize handle — sticky bottom-left, always visible even when scrolling */}
             <div
               onMouseDown={(e) => startResize(e, tracker.id)}
               style={{
-                position: "absolute",
+                position: "sticky",
                 left: 0,
                 bottom: 0,
                 width: 20,
@@ -219,6 +219,8 @@ export default function TrackerLayoutArea({
                 alignItems: "flex-end",
                 justifyContent: "flex-start",
                 padding: "3px",
+                marginTop: -20,
+                pointerEvents: "all",
               }}
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: "scaleX(-1)" }}>
