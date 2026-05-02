@@ -109,6 +109,7 @@ export default function Matrix() {
   const [assignments, setAssignments] = useState([]);
   const [availabilities, setAvailabilities] = useState([]);
   const [unavailabilities, setUnavailabilities] = useState([]);
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showNotificationDialog, setShowNotificationDialog] = useState(false);
   const [selectedWorkerForNotification, setSelectedWorkerForNotification] = useState(null);
@@ -126,6 +127,7 @@ export default function Matrix() {
   const [workerRoles, setWorkerRoles] = useState([]);
   const timelineRefs = useRef({});
   const loadingTimeoutRef = useRef(null);
+  const initialLoadDoneRef = useRef(false);
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
@@ -137,13 +139,20 @@ export default function Matrix() {
   const [trackers, setTrackers] = useState([]);
   const [trackerEntries, setTrackerEntries] = useState([]);
 
+  // Load static data once on mount
   useEffect(() => { loadStaticData(); }, []);
-  useEffect(() => { loadDynamicData(); }, [currentDate, viewMode]);
 
-  // Real-time subscriptions - silent refresh only (never show loading spinner)
+  // Load dynamic data when date/viewMode changes — but only after static data loaded
+  // We use a ref to avoid double-loading on mount
+  useEffect(() => {
+    if (!initialLoadDoneRef.current) return; // wait for static data to finish first
+    loadDynamicData(false);
+  }, [currentDate, viewMode]);
+
+  // Real-time subscriptions — never show loading spinner
   useEffect(() => {
     const unsubAssignment = base44.entities.Assignment.subscribe(() => {
-      debouncedLoadData(true); // always silent=true
+      debouncedLoadData(true);
     });
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
       debouncedLoadData(true);
@@ -186,10 +195,14 @@ export default function Matrix() {
     } catch (error) {
       console.error('Error loading static matrix data:', error);
     }
+    // After static data is done, trigger the first dynamic load
+    initialLoadDoneRef.current = true;
+    loadDynamicData(false);
   };
 
   const loadDynamicData = async (silent = false) => {
-    if (!silent) setLoading(true);
+    // Only show spinner on the very first load (before we have any data)
+    if (!silent && !initialLoaded) setLoading(true);
     
     try {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
@@ -252,6 +265,7 @@ export default function Matrix() {
       setTemplateRows(filteredTemplateRows);
       setAllTemplates(allTemplatesData);
       setTrackerEntries(trackerEntriesData);
+      setInitialLoaded(true);
     } catch (error) {
       console.error('Error loading matrix data:', error);
     } finally {
@@ -846,8 +860,6 @@ export default function Matrix() {
       shifts: updatedShifts,
       status: workerAvail?.status || "approved"
     };
-    
-    console.log('Saving availability with shifts:', JSON.stringify(updatedShifts));
     
     if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
     else await base44.entities.Availability.create(availData);
@@ -1520,7 +1532,7 @@ export default function Matrix() {
                   </div>
                 </div>
 
-                {loading ? (
+                {loading && !initialLoaded ? (
                   <div className="text-center p-8" dir="rtl">טוען...</div>
                 ) : workers.length === 0 ? (
                   <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
@@ -1577,7 +1589,6 @@ export default function Matrix() {
                           ref={el => {
                             if (el) {
                               timelineRefs.current[worker.id] = el;
-                              console.log(`Assigned ref for ${worker.nickname} (${worker.id}):`, el);
                             }
                           }}
                           className="flex-1 relative border-r cursor-crosshair h-8"
