@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import TrackerTable from "./TrackerTable";
 import SnapGuides from "./SnapGuides";
 import { snapPosition, snapResize } from "./snapEngine";
@@ -14,16 +14,20 @@ export default function TrackerLayoutArea({
   populations, workerRoles, scheduleColumns, qualifications,
   onDeleteTracker, onUpdatedTracker,
 }) {
-  const [positions, setPositions] = useState({}); // { [id]: { x, y, w, h } }
+  // posRef is the single source of truth; posState drives re-renders
+  const posRef = useRef({});
+  const [posState, setPosState] = useState({});
   const [snapGuides, setSnapGuides] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const containerRef = useRef(null);
   const cardRefs = useRef({});
-  const interacting = useRef(null); // { type: 'drag'|'resize', id, ... }
+
+  // Keep posRef in sync
+  useEffect(() => { posRef.current = posState; }, [posState]);
 
   // Initialize positions for new trackers
   useEffect(() => {
-    setPositions(prev => {
+    setPosState(prev => {
       const next = { ...prev };
       trackers.forEach((tracker, i) => {
         if (!next[tracker.id]) {
@@ -37,25 +41,23 @@ export default function TrackerLayoutArea({
     });
   }, [trackers]);
 
-  // Collect all rects from current positions + DOM heights
-  const getAllRects = useCallback((excludeId) => {
+  const getOtherRects = (excludeId) => {
     const rects = {};
-    for (const [id, p] of Object.entries(positions)) {
+    for (const [id, p] of Object.entries(posRef.current)) {
       if (id === excludeId) continue;
       const el = cardRefs.current[id];
       const h = p.h || (el ? el.offsetHeight : 400);
-      rects[id] = { x: p.x, y: p.y, w: p.w, h };
+      rects[id] = { x: p.x, y: p.y, w: p.w || DEFAULT_W, h };
     }
     return rects;
-  }, [positions]);
+  };
 
-  const containerW = () => containerRef.current?.offsetWidth || 1000;
+  const getContainerW = () => containerRef.current?.offsetWidth || 1000;
 
-  // Canvas height
   const canvasHeight = Math.max(
     500,
     ...trackers.map(t => {
-      const p = positions[t.id];
+      const p = posState[t.id];
       const el = cardRefs.current[t.id];
       const h = p?.h || (el ? el.offsetHeight : 400);
       return p ? p.y + h + 60 : 500;
@@ -63,40 +65,33 @@ export default function TrackerLayoutArea({
   );
 
   // ── DRAG ──
-  const startDrag = useCallback((e, trackerId) => {
+  const startDrag = (e, trackerId) => {
     e.preventDefault();
-    const p = positions[trackerId] || { x: 0, y: 0, w: DEFAULT_W, h: null };
-    interacting.current = {
-      type: "drag",
-      id: trackerId,
-      startMouseX: e.clientX,
-      startMouseY: e.clientY,
-      startX: p.x,
-      startY: p.y,
-    };
+    const p = posRef.current[trackerId] || { x: 0, y: 0, w: DEFAULT_W, h: null };
+    const startMouseX = e.clientX;
+    const startMouseY = e.clientY;
+    const startX = p.x;
+    const startY = p.y;
     setActiveId(trackerId);
 
     const onMove = (ev) => {
-      const d = interacting.current;
-      if (!d || d.type !== "drag") return;
-      const rawX = d.startX + (ev.clientX - d.startMouseX);
-      const rawY = d.startY + (ev.clientY - d.startMouseY);
-      const el = cardRefs.current[d.id];
-      const h = positions[d.id]?.h || (el ? el.offsetHeight : 400);
-      const w = positions[d.id]?.w || DEFAULT_W;
-      const others = getAllRects(d.id);
+      const cur = posRef.current[trackerId] || { w: DEFAULT_W, h: null };
+      const el = cardRefs.current[trackerId];
+      const h = cur.h || (el ? el.offsetHeight : 400);
+      const rawX = startX + (ev.clientX - startMouseX);
+      const rawY = startY + (ev.clientY - startMouseY);
       const { snappedX, snappedY, guides } = snapPosition(
-        { x: rawX, y: rawY, w, h }, others, containerW()
+        { x: rawX, y: rawY, w: cur.w || DEFAULT_W, h },
+        getOtherRects(trackerId),
+        getContainerW()
       );
       setSnapGuides(guides);
-      setPositions(prev => ({
-        ...prev,
-        [d.id]: { ...prev[d.id], x: snappedX, y: snappedY },
-      }));
+      const updated = { ...posRef.current[trackerId], x: snappedX, y: snappedY };
+      posRef.current = { ...posRef.current, [trackerId]: updated };
+      setPosState(prev => ({ ...prev, [trackerId]: updated }));
     };
 
     const onUp = () => {
-      interacting.current = null;
       setActiveId(null);
       setSnapGuides([]);
       window.removeEventListener("mousemove", onMove);
@@ -105,45 +100,36 @@ export default function TrackerLayoutArea({
 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [positions, getAllRects]);
+  };
 
   // ── RESIZE ──
-  const startResize = useCallback((e, trackerId) => {
+  const startResize = (e, trackerId) => {
     e.preventDefault();
     e.stopPropagation();
-    const p = positions[trackerId] || { x: 0, y: 0, w: DEFAULT_W, h: null };
+    const p = posRef.current[trackerId] || { x: 0, y: 0, w: DEFAULT_W, h: null };
     const el = cardRefs.current[trackerId];
+    const startMouseX = e.clientX;
+    const startMouseY = e.clientY;
+    const startW = p.w || DEFAULT_W;
     const startH = p.h || (el ? el.offsetHeight : 400);
-    interacting.current = {
-      type: "resize",
-      id: trackerId,
-      startMouseX: e.clientX,
-      startMouseY: e.clientY,
-      startW: p.w,
-      startH,
-      posX: p.x,
-      posY: p.y,
-    };
+    const posX = p.x;
+    const posY = p.y;
     setActiveId(trackerId);
 
     const onMove = (ev) => {
-      const d = interacting.current;
-      if (!d || d.type !== "resize") return;
-      const rawW = Math.max(MIN_W, d.startW + (ev.clientX - d.startMouseX));
-      const rawH = Math.max(MIN_H, d.startH + (ev.clientY - d.startMouseY));
-      const others = getAllRects(d.id);
+      const rawW = Math.max(MIN_W, startW + (ev.clientX - startMouseX));
+      const rawH = Math.max(MIN_H, startH + (ev.clientY - startMouseY));
       const { snappedW, snappedH, guides } = snapResize(
-        d.id, { x: d.posX, y: d.posY }, rawW, rawH, others, containerW()
+        trackerId, { x: posX, y: posY }, rawW, rawH,
+        getOtherRects(trackerId), getContainerW()
       );
       setSnapGuides(guides);
-      setPositions(prev => ({
-        ...prev,
-        [d.id]: { ...prev[d.id], w: snappedW, h: snappedH },
-      }));
+      const updated = { ...posRef.current[trackerId], w: snappedW, h: snappedH };
+      posRef.current = { ...posRef.current, [trackerId]: updated };
+      setPosState(prev => ({ ...prev, [trackerId]: updated }));
     };
 
     const onUp = () => {
-      interacting.current = null;
       setActiveId(null);
       setSnapGuides([]);
       window.removeEventListener("mousemove", onMove);
@@ -152,16 +138,14 @@ export default function TrackerLayoutArea({
 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [positions, getAllRects]);
-
-  const containerRect = containerRef.current?.getBoundingClientRect() || null;
+  };
 
   return (
     <div ref={containerRef} className="relative w-full" style={{ minHeight: canvasHeight }}>
-      <SnapGuides guides={snapGuides} containerRect={containerRect} />
+      <SnapGuides guides={snapGuides} />
 
       {trackers.map(tracker => {
-        const p = positions[tracker.id] || { x: 0, y: 0, w: DEFAULT_W, h: null };
+        const p = posState[tracker.id] || { x: 0, y: 0, w: DEFAULT_W, h: null };
         const isActive = activeId === tracker.id;
         return (
           <div
@@ -171,13 +155,13 @@ export default function TrackerLayoutArea({
               position: "absolute",
               left: p.x,
               top: p.y,
-              width: p.w,
+              width: p.w || DEFAULT_W,
               height: p.h || "auto",
               minWidth: MIN_W,
               zIndex: isActive ? 20 : 10,
               overflow: p.h ? "auto" : "visible",
             }}
-            className={`bg-white rounded-xl shadow-sm border ${isActive ? "border-blue-400 shadow-blue-100 shadow-md" : "border-gray-200"}`}
+            className={`bg-white rounded-xl shadow-sm border ${isActive ? "border-blue-400 shadow-md" : "border-gray-200"}`}
           >
             {/* Drag handle */}
             <div
@@ -207,22 +191,25 @@ export default function TrackerLayoutArea({
               onUpdated={onUpdatedTracker}
             />
 
-            {/* Resize handle */}
+            {/* Resize handle — bottom-right corner */}
             <div
               onMouseDown={(e) => startResize(e, tracker.id)}
               style={{
                 position: "absolute",
                 right: 0,
                 bottom: 0,
-                width: 18,
-                height: 18,
+                width: 20,
+                height: 20,
                 cursor: "nwse-resize",
                 zIndex: 30,
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "flex-end",
+                padding: "3px",
               }}
-              className="flex items-end justify-end pr-1 pb-1"
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M2 8L8 2M5 8L8 5M8 8L8 8" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round"/>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M1 11L11 1M5 11L11 5M9 11L11 9" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
             </div>
           </div>

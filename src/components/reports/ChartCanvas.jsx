@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import ChartDisplay from "./ChartDisplay";
 import SnapGuides from "./SnapGuides";
 import { snapPosition, snapResize } from "./snapEngine";
@@ -14,16 +14,20 @@ export default function ChartCanvas({
   trackers, trackerEntries,
   onEdit, onDelete,
 }) {
-  const [positions, setPositions] = useState({}); // { [id]: { x, y, w, h } }
+  // posRef is the single source of truth; posState drives re-renders
+  const posRef = useRef({});
+  const [posState, setPosState] = useState({});
   const [snapGuides, setSnapGuides] = useState([]);
   const [activeId, setActiveId] = useState(null);
   const containerRef = useRef(null);
   const cardRefs = useRef({});
-  const interacting = useRef(null);
+
+  // Sync posRef when posState changes (so event handlers always read fresh data)
+  useEffect(() => { posRef.current = posState; }, [posState]);
 
   // Initialize positions for new charts
   useEffect(() => {
-    setPositions(prev => {
+    setPosState(prev => {
       const next = { ...prev };
       charts.forEach((chart, i) => {
         if (!next[chart.id]) {
@@ -44,62 +48,51 @@ export default function ChartCanvas({
     });
   }, [charts]);
 
-  const getAllRects = useCallback((excludeId) => {
+  const getOtherRects = (excludeId) => {
     const rects = {};
-    for (const [id, p] of Object.entries(positions)) {
+    for (const [id, p] of Object.entries(posRef.current)) {
       if (id === excludeId) continue;
-      const el = cardRefs.current[id];
-      const h = p.h || (el ? el.offsetHeight : DEFAULT_H);
-      rects[id] = { x: p.x, y: p.y, w: p.w || DEFAULT_W, h };
+      rects[id] = { x: p.x, y: p.y, w: p.w || DEFAULT_W, h: p.h || DEFAULT_H };
     }
     return rects;
-  }, [positions]);
+  };
 
-  const containerW = () => containerRef.current?.offsetWidth || 1000;
+  const getContainerW = () => containerRef.current?.offsetWidth || 1000;
 
   const canvasHeight = Math.max(
     500,
     ...charts.map(c => {
-      const p = positions[c.id];
-      const h = p?.h || DEFAULT_H;
-      return p ? p.y + h + 60 : 500;
+      const p = posState[c.id];
+      return p ? p.y + (p.h || DEFAULT_H) + 60 : 500;
     })
   );
 
   // ── DRAG ──
-  const startDrag = useCallback((e, chartId) => {
+  const startDrag = (e, chartId) => {
     e.preventDefault();
-    const p = positions[chartId] || { x: 0, y: 0, w: DEFAULT_W, h: DEFAULT_H };
-    interacting.current = {
-      type: "drag",
-      id: chartId,
-      startMouseX: e.clientX,
-      startMouseY: e.clientY,
-      startX: p.x,
-      startY: p.y,
-    };
+    const p = posRef.current[chartId] || { x: 0, y: 0, w: DEFAULT_W, h: DEFAULT_H };
+    const startMouseX = e.clientX;
+    const startMouseY = e.clientY;
+    const startX = p.x;
+    const startY = p.y;
     setActiveId(chartId);
 
     const onMove = (ev) => {
-      const d = interacting.current;
-      if (!d || d.type !== "drag") return;
-      const rawX = d.startX + (ev.clientX - d.startMouseX);
-      const rawY = d.startY + (ev.clientY - d.startMouseY);
-      const cur = positions[d.id] || { w: DEFAULT_W, h: DEFAULT_H };
-      const others = getAllRects(d.id);
+      const cur = posRef.current[chartId] || { w: DEFAULT_W, h: DEFAULT_H };
+      const rawX = startX + (ev.clientX - startMouseX);
+      const rawY = startY + (ev.clientY - startMouseY);
       const { snappedX, snappedY, guides } = snapPosition(
-        { x: rawX, y: rawY, w: cur.w || DEFAULT_W, h: cur.h || DEFAULT_H },
-        others, containerW()
+        { x: rawX, y: rawY, w: cur.w, h: cur.h },
+        getOtherRects(chartId),
+        getContainerW()
       );
       setSnapGuides(guides);
-      setPositions(prev => ({
-        ...prev,
-        [d.id]: { ...prev[d.id], x: snappedX, y: snappedY },
-      }));
+      const updated = { ...posRef.current[chartId], x: snappedX, y: snappedY };
+      posRef.current = { ...posRef.current, [chartId]: updated };
+      setPosState(prev => ({ ...prev, [chartId]: updated }));
     };
 
     const onUp = () => {
-      interacting.current = null;
       setActiveId(null);
       setSnapGuides([]);
       window.removeEventListener("mousemove", onMove);
@@ -108,43 +101,35 @@ export default function ChartCanvas({
 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [positions, getAllRects]);
+  };
 
   // ── RESIZE ──
-  const startResize = useCallback((e, chartId) => {
+  const startResize = (e, chartId) => {
     e.preventDefault();
     e.stopPropagation();
-    const p = positions[chartId] || { x: 0, y: 0, w: DEFAULT_W, h: DEFAULT_H };
-    interacting.current = {
-      type: "resize",
-      id: chartId,
-      startMouseX: e.clientX,
-      startMouseY: e.clientY,
-      startW: p.w || DEFAULT_W,
-      startH: p.h || DEFAULT_H,
-      posX: p.x,
-      posY: p.y,
-    };
+    const p = posRef.current[chartId] || { x: 0, y: 0, w: DEFAULT_W, h: DEFAULT_H };
+    const startMouseX = e.clientX;
+    const startMouseY = e.clientY;
+    const startW = p.w || DEFAULT_W;
+    const startH = p.h || DEFAULT_H;
+    const posX = p.x;
+    const posY = p.y;
     setActiveId(chartId);
 
     const onMove = (ev) => {
-      const d = interacting.current;
-      if (!d || d.type !== "resize") return;
-      const rawW = Math.max(MIN_W, d.startW + (ev.clientX - d.startMouseX));
-      const rawH = Math.max(MIN_H, d.startH + (ev.clientY - d.startMouseY));
-      const others = getAllRects(d.id);
+      const rawW = Math.max(MIN_W, startW + (ev.clientX - startMouseX));
+      const rawH = Math.max(MIN_H, startH + (ev.clientY - startMouseY));
       const { snappedW, snappedH, guides } = snapResize(
-        d.id, { x: d.posX, y: d.posY }, rawW, rawH, others, containerW()
+        chartId, { x: posX, y: posY }, rawW, rawH,
+        getOtherRects(chartId), getContainerW()
       );
       setSnapGuides(guides);
-      setPositions(prev => ({
-        ...prev,
-        [d.id]: { ...prev[d.id], w: snappedW, h: snappedH },
-      }));
+      const updated = { ...posRef.current[chartId], w: snappedW, h: snappedH };
+      posRef.current = { ...posRef.current, [chartId]: updated };
+      setPosState(prev => ({ ...prev, [chartId]: updated }));
     };
 
     const onUp = () => {
-      interacting.current = null;
       setActiveId(null);
       setSnapGuides([]);
       window.removeEventListener("mousemove", onMove);
@@ -153,16 +138,14 @@ export default function ChartCanvas({
 
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [positions, getAllRects]);
-
-  const containerRect = containerRef.current?.getBoundingClientRect() || null;
+  };
 
   return (
     <div ref={containerRef} className="relative w-full" style={{ minHeight: canvasHeight }}>
-      <SnapGuides guides={snapGuides} containerRect={containerRect} />
+      <SnapGuides guides={snapGuides} />
 
       {charts.map(chart => {
-        const p = positions[chart.id] || { x: 0, y: 0, w: DEFAULT_W, h: DEFAULT_H };
+        const p = posState[chart.id] || { x: 0, y: 0, w: DEFAULT_W, h: DEFAULT_H };
         const isActive = activeId === chart.id;
         return (
           <div
@@ -177,11 +160,11 @@ export default function ChartCanvas({
               zIndex: isActive ? 20 : 10,
               overflow: "hidden",
             }}
-            className={`rounded-xl bg-white shadow-md border ${isActive ? "border-blue-400 shadow-blue-100 shadow-lg" : "border-gray-200"}`}
+            className={`rounded-xl bg-white shadow-md border ${isActive ? "border-blue-400 shadow-lg" : "border-gray-200"}`}
           >
             {/* Drag handle */}
             <div
-              className="flex items-center justify-center bg-gray-100 rounded-t-xl border-b border-gray-200 cursor-grab active:cursor-grabbing select-none flex-shrink-0"
+              className="flex items-center justify-center bg-gray-100 rounded-t-xl border-b border-gray-200 cursor-grab active:cursor-grabbing select-none"
               style={{ height: HANDLE_H }}
               onMouseDown={(e) => startDrag(e, chart.id)}
             >
@@ -206,22 +189,25 @@ export default function ChartCanvas({
               />
             </div>
 
-            {/* Resize handle */}
+            {/* Resize handle — bottom-right corner */}
             <div
               onMouseDown={(e) => startResize(e, chart.id)}
               style={{
                 position: "absolute",
                 right: 0,
                 bottom: 0,
-                width: 18,
-                height: 18,
+                width: 20,
+                height: 20,
                 cursor: "nwse-resize",
                 zIndex: 30,
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "flex-end",
+                padding: "3px",
               }}
-              className="flex items-end justify-end pr-1 pb-1"
             >
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <path d="M2 8L8 2M5 8L8 5M8 8L8 8" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round"/>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M1 11L11 1M5 11L11 5M9 11L11 9" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
             </div>
           </div>
