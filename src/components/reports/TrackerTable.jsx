@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Gauge, Pin, PinOff } from "lucide-react";
+import { Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Gauge, Pin, PinOff, Filter } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { base44 } from "@/api/base44Client";
 import ColumnConfigDialog from "./ColumnConfigDialog";
@@ -117,6 +117,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     try { return JSON.parse(localStorage.getItem(`tracker_colwidths_${initialTracker.id}`) || "{}"); } catch { return {}; }
   });
   const resizingRef = useRef(null);
+  const cardHeaderRef = useRef(null);
   const [editMode, setEditMode] = useState(false);
   const [editColumns, setEditColumns] = useState([]);
   const [configuringCol, setConfiguringCol] = useState(null);
@@ -920,22 +921,23 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   );
 
   return (
-    <Card className="border-none shadow-lg mb-6 overflow-visible" dir="rtl">
+    <Card className="border-none shadow-lg mb-6" dir="rtl" style={headerPinned ? { maxHeight: "70vh", overflowY: "auto", overflowX: "auto" } : {}}>
       {/* Header */}
-      <CardHeader className="border-b py-3 px-4">
+      <CardHeader ref={cardHeaderRef} className="border-b py-3 px-4" style={headerPinned ? { position: "sticky", top: 0, zIndex: 30, backgroundColor: "white", boxShadow: "0 2px 4px rgba(0,0,0,0.08)" } : {}}>
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base">{tracker.name}</CardTitle>
           <div className="flex gap-2">
             <Button size="sm" variant={headerPinned ? "default" : "outline"}
-              className={headerPinned ? "bg-blue-700 hover:bg-blue-800" : ""}
+              className={headerPinned ? "bg-blue-700 hover:bg-blue-800 w-8 px-0" : "w-8 px-0"}
               onClick={togglePin}
               title={headerPinned ? "בטל נעיצת כותרת" : "נעץ כותרת"}>
-              {headerPinned ? <Pin className="w-4 h-4 ml-1 fill-current" /> : <Pin className="w-4 h-4 ml-1" />}
-              {headerPinned ? "נעוץ" : "נעץ"}
+              {headerPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setShowFilters(!showFilters)}>
-              {showFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
-              סינון
+            <Button size="sm" variant={showFilters ? "default" : "outline"}
+              className={`w-8 px-0 ${showFilters ? "bg-gray-700 hover:bg-gray-800" : ""}`}
+              onClick={() => setShowFilters(!showFilters)}
+              title="סינון">
+              <Filter className="w-4 h-4" />
             </Button>
             <Button size="sm" variant={editMode ? "default" : "outline"}
               className={editMode ? "bg-purple-600 hover:bg-purple-700" : ""}
@@ -1041,12 +1043,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
 
       {/* Table */}
-      <CardContent className="pt-0 px-0 overflow-visible">
-        <div
-          style={headerPinned ? { maxHeight: "60vh", overflowY: "auto", overflowX: "auto", position: "relative" } : { overflowX: "auto" }}
-        >
+      <CardContent className="pt-0 px-0">
+        <div style={{ overflowX: "auto" }}>
         <Table style={{ tableLayout: "fixed" }}>
-          <TableHeader style={headerPinned ? { position: "sticky", top: 0, zIndex: 20, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
+          <TableHeader style={headerPinned ? { position: "sticky", top: cardHeaderRef.current ? cardHeaderRef.current.offsetHeight : 0, zIndex: 20, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
             <TableRow className="bg-gray-50">
               <TableHead dir="rtl" className="font-bold px-4 relative"
                 style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
