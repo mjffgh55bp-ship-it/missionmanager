@@ -63,6 +63,7 @@ export default function Yearly() {
   useEffect(() => {
     if (!loading && scrollContainerRef.current) {
       setTimeout(() => {
+        if (!scrollContainerRef.current) return;
         const jumpTarget = localStorage.getItem('yearly_jump_date');
         if (jumpTarget && jumpTarget.startsWith(`${currentYear}-`)) {
           localStorage.removeItem('yearly_jump_date');
@@ -71,7 +72,7 @@ export default function Yearly() {
         }
         const savedScrollPosition = localStorage.getItem(`yearly_scroll_${currentYear}`);
         if (savedScrollPosition !== null) {
-          scrollContainerRef.current.scrollLeft = parseInt(savedScrollPosition, 10);
+          if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = parseInt(savedScrollPosition, 10);
         } else {
           scrollToToday();
         }
