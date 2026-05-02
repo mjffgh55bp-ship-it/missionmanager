@@ -37,13 +37,16 @@ export default function MasterControls({
       for (let i = 0; i < visibleWorkers.length; i += batchSize) {
         const batch = visibleWorkers.slice(i, i + batchSize);
         await Promise.all(
-          batch.map(worker =>
-            base44.entities.Worker.update(worker.id, {
-              availability_locked: targetLockState
+          batch.map(worker => {
+            // Ensure role is always an array (some old records have it as a string)
+            const role = Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : []);
+            return base44.entities.Worker.update(worker.id, {
+              availability_locked: targetLockState,
+              role
             }).catch(err => {
               console.error(`Failed to update worker ${worker.nickname}:`, err);
-            })
-          )
+            });
+          })
         );
         // Small delay between batches to respect rate limit
         if (i + batchSize < visibleWorkers.length) {

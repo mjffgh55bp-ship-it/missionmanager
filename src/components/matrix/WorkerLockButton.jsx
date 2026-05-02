@@ -16,8 +16,11 @@ export default function WorkerLockButton({ worker, onUpdate }) {
     setLocalLocked(newValue); // optimistic update
     setLoading(true);
     try {
+      // Ensure role is always an array (some old records have it as a string)
+      const role = Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : []);
       await base44.entities.Worker.update(worker.id, {
-        availability_locked: newValue
+        availability_locked: newValue,
+        role
       });
       onUpdate();
     } catch (error) {
