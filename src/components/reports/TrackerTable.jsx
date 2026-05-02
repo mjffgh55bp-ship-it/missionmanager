@@ -1,78 +1,37 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Gauge } from "lucide-react";
+import { Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Gauge, Pin, PinOff } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { base44 } from "@/api/base44Client";
 import ColumnConfigDialog from "./ColumnConfigDialog";
 import VisualAnalysisDialog, { getVisualColor } from "./VisualAnalysisDialog";
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 
-function MultiSelect({ options, selected, onChange, placeholder }) {
-  const [open, setOpen] = useState(false);
-  const [dropPos, setDropPos] = useState({ top: 0, right: 0 });
-  const btnRef = useRef(null);
-  const toggle = (val) => onChange(selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val]);
-
-  const handleOpen = () => {
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setDropPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-    }
-    setOpen(!open);
+// Pill-style worker filter — same pattern as Yearly participant filter
+function WorkerPillFilter({ label, options, selected, onChange, color }) {
+  const colorMap = {
+    orange: { active: "bg-orange-500 text-white border-orange-500", inactive: "bg-white text-gray-600 border-gray-300 hover:border-orange-400" },
+    indigo: { active: "bg-indigo-600 text-white border-indigo-600", inactive: "bg-white text-gray-600 border-gray-300 hover:border-indigo-400" },
   };
-
+  const cls = colorMap[color] || colorMap.indigo;
+  if (!options || options.length === 0) return null;
   return (
-    <div className="relative">
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={handleOpen}
-        className="h-8 min-w-[140px] max-w-[200px] border border-input rounded-md px-2 text-sm text-right flex items-center justify-between gap-2 bg-white hover:bg-gray-50"
-        dir="rtl"
-      >
-        <span className="truncate text-right">
-          {selected.length === 0 ? placeholder : selected.join(", ")}
-        </span>
-        <ChevronDown className="w-3 h-3 flex-shrink-0 text-gray-400" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-[999]" onClick={() => setOpen(false)} />
-          <div
-            className="fixed z-[1000] bg-white border border-gray-200 rounded-md shadow-lg min-w-[160px] py-1"
-            style={{ top: dropPos.top, right: dropPos.right }}
-            dir="rtl"
-          >
-            {options.map(opt => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => toggle(opt)}
-                className={`w-full text-right px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-gray-50 ${
-                  selected.includes(opt) ? "font-semibold text-blue-700" : ""
-                }`}
-              >
-                <span className={`w-4 h-4 border-2 rounded flex-shrink-0 flex items-center justify-center ${
-                  selected.includes(opt) ? "bg-blue-600 border-blue-600" : "border-gray-300"
-                }`}>
-                  {selected.includes(opt) && <Check className="w-2.5 h-2.5 text-white" />}
-                </span>
-                {opt}
-              </button>
-            ))}
-            {selected.length > 0 && (
-              <button onClick={() => onChange([])} className="w-full text-right px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50 border-t mt-1">
-                נקה בחירה
-              </button>
-            )}
-          </div>
-        </>
-      )}
+    <div>
+      <p className="text-xs font-semibold text-gray-500 mb-1">{label}</p>
+      <div className="flex flex-wrap gap-1">
+        {options.map(opt => (
+          <button key={opt} type="button"
+            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${selected.includes(opt) ? cls.active : cls.inactive}`}
+            onClick={() => onChange(selected.includes(opt) ? selected.filter(v => v !== opt) : [...selected, opt])}>
+            {opt}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -106,6 +65,7 @@ const getDateRange = (mode, startDate, endDate) => {
   if (mode === "daily") { const d = format(today, "yyyy-MM-dd"); return { start: d, end: d }; }
   if (mode === "week") return { start: format(startOfWeek(today, { weekStartsOn: 0 }), "yyyy-MM-dd"), end: format(endOfWeek(today, { weekStartsOn: 0 }), "yyyy-MM-dd") };
   if (mode === "month") return { start: format(startOfMonth(today), "yyyy-MM-dd"), end: format(endOfMonth(today), "yyyy-MM-dd") };
+  if (mode === "last_30_days") { return { start: format(subDays(today, 30), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }; }
   if (mode === "half_year") { const s = new Date(today); s.setMonth(s.getMonth() - 6); return { start: format(s, "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }; }
   if (mode === "half_year_start") {
     const m = today.getMonth();
@@ -122,6 +82,7 @@ const DATE_MODES = [
   { value: "daily", label: "היום" },
   { value: "week", label: "השבוע" },
   { value: "month", label: "החודש" },
+  { value: "last_30_days", label: "30 יום אחרונים" },
   { value: "half_year", label: "חצי שנה" },
   { value: "half_year_start", label: "מתחילת חציון" },
   { value: "year_start", label: "מתחילת שנה" },
@@ -140,8 +101,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [endDate, setEndDate] = useState("");
   const [selectedPopulations, setSelectedPopulations] = useState([]);
   const [selectedRoles, setSelectedRoles] = useState([]);
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState([]);
+  const [workerSearch, setWorkerSearch] = useState("");
   const [guide, setGuide] = useState("__all__");
   const [showFilters, setShowFilters] = useState(false);
+  const [headerPinned, setHeaderPinned] = useState(() => {
+    try { return localStorage.getItem(`tracker_pin_${initialTracker.id}`) === "true"; } catch { return false; }
+  });
+  const [colWidths, setColWidths] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`tracker_colwidths_${initialTracker.id}`) || "{}"); } catch { return {}; }
+  });
+  const resizingRef = useRef(null);
   const [editMode, setEditMode] = useState(false);
   const [editColumns, setEditColumns] = useState([]);
   const [configuringCol, setConfiguringCol] = useState(null);
@@ -163,6 +133,36 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       setSortDir("asc");
     }
   };
+
+  const togglePin = () => {
+    const next = !headerPinned;
+    setHeaderPinned(next);
+    try { localStorage.setItem(`tracker_pin_${tracker.id}`, String(next)); } catch {}
+  };
+
+  const startColResize = useCallback((e, colKey) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = colWidths[colKey] || 140;
+    resizingRef.current = { colKey, startX, startWidth };
+
+    const onMove = (me) => {
+      const delta = startX - me.clientX; // RTL: drag left = wider
+      const newWidth = Math.max(60, startWidth + delta);
+      setColWidths(prev => {
+        const next = { ...prev, [colKey]: newWidth };
+        try { localStorage.setItem(`tracker_colwidths_${tracker.id}`, JSON.stringify(next)); } catch {}
+        return next;
+      });
+    };
+    const onUp = () => {
+      resizingRef.current = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [colWidths, tracker.id]);
 
   useEffect(() => { loadEntries(); }, [tracker.id]);
   useEffect(() => { setTracker(initialTracker); }, [initialTracker]);
@@ -825,7 +825,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const filteredWorkers = workers.filter(w => {
     if (!w.active) return false;
     if (selectedPopulations.length > 0 && !selectedPopulations.includes(w.population)) return false;
-    if (selectedRoles.length > 0 && !selectedRoles.includes(w.role)) return false;
+    if (selectedRoles.length > 0) {
+      const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
+      if (!selectedRoles.some(r => roles.includes(r))) return false;
+    }
+    if (selectedWorkerIds.length > 0 && !selectedWorkerIds.includes(w.id)) return false;
     if (guide === "yes" && !w.is_guide) return false;
     if (guide === "no" && w.is_guide) return false;
     return true;
@@ -888,6 +892,20 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     });
   };
 
+  // Workers visible after population/role filter (for the worker picker)
+  const preFilteredWorkers = workers.filter(w => {
+    if (!w.active) return false;
+    if (selectedPopulations.length > 0 && !selectedPopulations.includes(w.population)) return false;
+    if (selectedRoles.length > 0) {
+      const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
+      if (!selectedRoles.some(r => roles.includes(r))) return false;
+    }
+    return true;
+  });
+  const searchedWorkers = preFilteredWorkers.filter(w =>
+    !workerSearch || (w.nickname || "").includes(workerSearch)
+  );
+
   return (
     <Card className="border-none shadow-lg mb-6" dir="rtl">
       {/* Header */}
@@ -895,6 +913,13 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base">{tracker.name}</CardTitle>
           <div className="flex gap-2">
+            <Button size="sm" variant={headerPinned ? "default" : "outline"}
+              className={headerPinned ? "bg-blue-700 hover:bg-blue-800" : ""}
+              onClick={togglePin}
+              title={headerPinned ? "בטל נעיצת כותרת" : "נעץ כותרת"}>
+              {headerPinned ? <Pin className="w-4 h-4 ml-1 fill-current" /> : <Pin className="w-4 h-4 ml-1" />}
+              {headerPinned ? "נעוץ" : "נעץ"}
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setShowFilters(!showFilters)}>
               {showFilters ? <ChevronUp className="w-4 h-4 ml-1" /> : <ChevronDown className="w-4 h-4 ml-1" />}
               סינון
@@ -910,9 +935,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
         {/* Filters panel */}
         {showFilters && (
-          <div className="pt-3 mt-3 border-t flex flex-wrap gap-3 items-end">
+          <div className="pt-3 mt-3 border-t space-y-3">
+            {/* Time filter */}
             <div>
-              <Label className="text-xs block mb-1">תקופה</Label>
+              <Label className="text-xs block mb-1 font-semibold text-gray-500">תקופה</Label>
               <div className="flex flex-wrap gap-1">
                 {DATE_MODES.map(m => (
                   <Button key={m.value} variant={dateFilterMode === m.value ? "default" : "outline"} size="sm"
@@ -927,34 +953,49 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 <div><Label className="text-xs block mb-1">עד</Label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 w-36" /></div>
               </div>
             )}
-            <div>
-              <Label className="text-xs block mb-1">אוכלוסייה</Label>
-              <MultiSelect
-                options={populations}
-                selected={selectedPopulations}
-                onChange={setSelectedPopulations}
-                placeholder="כל האוכלוסיות"
-              />
-            </div>
-            <div>
-              <Label className="text-xs block mb-1">תפקיד</Label>
-              <MultiSelect
-                options={workerRoles}
-                selected={selectedRoles}
-                onChange={setSelectedRoles}
-                placeholder="כל התפקידים"
-              />
-            </div>
-            <div>
-              <Label className="text-xs block mb-1">מדריך</Label>
-              <Select value={guide} onValueChange={setGuide}>
-                <SelectTrigger className="h-8 w-28 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent dir="rtl">
-                  <SelectItem value="__all__">כולם</SelectItem>
-                  <SelectItem value="yes">מדריכים</SelectItem>
-                  <SelectItem value="no">לא מדריכים</SelectItem>
-                </SelectContent>
-              </Select>
+
+            {/* Worker filter — pill style like Yearly */}
+            <div className="p-3 bg-gray-50 rounded-lg border space-y-2">
+              <WorkerPillFilter label="אוכלוסייה" options={populations} selected={selectedPopulations} onChange={setSelectedPopulations} color="orange" />
+              <WorkerPillFilter label="תפקיד" options={workerRoles} selected={selectedRoles} onChange={setSelectedRoles} color="indigo" />
+
+              {/* Worker search + list */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-1">עובדים ({selectedWorkerIds.length > 0 ? `${selectedWorkerIds.length} נבחרו` : "כולם"})</p>
+                <Input
+                  value={workerSearch}
+                  onChange={e => setWorkerSearch(e.target.value)}
+                  placeholder="חיפוש עובד..."
+                  className="h-7 text-xs mb-1"
+                  dir="rtl"
+                />
+                <div className="flex gap-2 mb-1">
+                  <button type="button" className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                    onClick={() => setSelectedWorkerIds(searchedWorkers.map(w => w.id))}>
+                    בחר הכל ({searchedWorkers.length})
+                  </button>
+                  <button type="button" className="text-xs px-2 py-0.5 rounded bg-gray-400 text-white hover:bg-gray-500 transition-colors"
+                    onClick={() => setSelectedWorkerIds([])}>
+                    נקה
+                  </button>
+                </div>
+                <div className="max-h-32 overflow-y-auto border rounded bg-white space-y-0.5 p-1">
+                  {searchedWorkers.map(w => (
+                    <label key={w.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-0.5 rounded">
+                      <input type="checkbox" checked={selectedWorkerIds.length === 0 || selectedWorkerIds.includes(w.id)}
+                        onChange={e => {
+                          if (e.target.checked) setSelectedWorkerIds(prev => prev.length === 0 ? [] : [...prev, w.id]);
+                          else setSelectedWorkerIds(prev => {
+                            const all = prev.length === 0 ? preFilteredWorkers.map(pw => pw.id) : prev;
+                            return all.filter(id => id !== w.id);
+                          });
+                        }} className="rounded" />
+                      <span className="text-xs">{w.nickname}</span>
+                    </label>
+                  ))}
+                  {searchedWorkers.length === 0 && <p className="text-xs text-gray-400 text-center py-1">אין תוצאות</p>}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -986,11 +1027,13 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
 
       {/* Table */}
-      <CardContent className="pt-0 px-0 overflow-x-auto">
-        <Table>
-          <TableHeader>
+      <CardContent className="pt-0 px-0">
+        <div className={headerPinned ? "max-h-[60vh] overflow-y-auto overflow-x-auto" : "overflow-x-auto"}>
+        <Table style={{ tableLayout: "fixed" }}>
+          <TableHeader className={headerPinned ? "sticky top-0 z-20 bg-gray-50 shadow-sm" : ""}>
             <TableRow className="bg-gray-50">
-              <TableHead dir="rtl" className="font-bold px-4 min-w-[100px]">
+              <TableHead dir="rtl" className="font-bold px-4 relative"
+                style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
                 <button
                   onClick={() => handleSortClick(null)}
                   className="flex items-center gap-1 hover:text-blue-700 transition-colors"
@@ -1001,9 +1044,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
                     : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
                 </button>
+                {/* Resize handle */}
+                <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors group"
+                  onMouseDown={e => startColResize(e, "__worker__")}
+                  style={{ userSelect: "none" }} />
               </TableHead>
               {displayColumns.map((col, idx) => (
-                <TableHead key={col.id} dir="rtl" className="px-2 min-w-[140px]">
+                <TableHead key={col.id} dir="rtl" className="px-2 relative"
+                  style={{ width: colWidths[col.id] || 140, minWidth: 60 }}>
                   <div className="flex flex-col items-center gap-0.5 py-0.5">
                     <div className="flex items-center gap-1">
                      <button
@@ -1057,6 +1105,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                       </div>
                     )}
                   </div>
+                  {/* Resize handle */}
+                  <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors"
+                    onMouseDown={e => startColResize(e, col.id)}
+                    style={{ userSelect: "none" }} />
                 </TableHead>
               ))}
               {editMode && (
@@ -1253,6 +1305,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             )}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
     </Card>
   );
