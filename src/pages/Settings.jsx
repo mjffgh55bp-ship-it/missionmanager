@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check } from "lucide-react";
+import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check, Calendar, UserCog } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -38,6 +38,10 @@ export default function Settings() {
   const [newQuantItem, setNewQuantItem] = useState(""); // for new column quant item
   const [renamingQuantItem, setRenamingQuantItem] = useState(null); // { colIdx, itemIdx, value }
   const [renamingSubOption, setRenamingSubOption] = useState(null); // { colIdx, subIdx, field, value }
+  const [renamingWorkerRole, setRenamingWorkerRole] = useState(null); // { idx, value }
+  const [renamingShiftStatus, setRenamingShiftStatus] = useState(null); // { idx, value }
+  const [renamingPopulation, setRenamingPopulation] = useState(null); // { idx, value }
+  const [activeTab, setActiveTab] = useState("schedule");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -299,7 +303,38 @@ export default function Settings() {
     setShiftStatuses(updated);
   };
 
+  const handleRenameWorkerRole = async (idx, oldName, newName) => {
+    if (!newName.trim() || newName.trim() === oldName) return;
+    const updated = workerRoles.map((r, i) => i === idx ? newName.trim() : r);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
+    const data = { setting_key: "worker_roles", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setWorkerRoles(updated);
+    setRenamingWorkerRole(null);
+  };
 
+  const handleRenameShiftStatus = async (idx, oldName, newName) => {
+    if (!newName.trim() || newName.trim() === oldName) return;
+    const updated = shiftStatuses.map((s, i) => i === idx ? newName.trim() : s);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
+    const data = { setting_key: "shift_statuses", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setShiftStatuses(updated);
+    setRenamingShiftStatus(null);
+  };
+
+  const handleRenamePopulation = async (idx, oldName, newName) => {
+    if (!newName.trim() || newName.trim() === oldName) return;
+    const updated = populations.map((p, i) => i === idx ? newName.trim() : p);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_populations" });
+    const data = { setting_key: "worker_populations", setting_value: JSON.stringify(updated) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+    setPopulations(updated);
+    setRenamingPopulation(null);
+  };
 
   const saveTaskQualifications = async (updated) => {
     const settings = await base44.entities.AppSettings.filter({ setting_key: "task_qualifications" });
@@ -340,13 +375,43 @@ export default function Settings() {
     await saveTaskQualifications(updated);
   };
 
+  const tabs = [
+    { key: "schedule", label: "לוח ודוחות", icon: Calendar },
+    { key: "workers", label: "עובדים", icon: UserCog },
+    { key: "users", label: "משתמשים", icon: Users },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">הגדרות</h1>
           <p className="text-gray-600" dir="rtl">הגדר הגדרות כלל מערכת</p>
         </div>
+
+        {/* Tab Toggle */}
+        <div className="flex gap-2 mb-6 bg-white border rounded-xl p-1 shadow-sm w-fit" dir="rtl">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === tab.key
+                    ? "bg-blue-900 text-white shadow"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* === TAB: לוח ודוחות === */}
+        {activeTab === "schedule" && <>
 
         {/* Unified Schedule Columns */}
         <Card className="border-none shadow-lg mb-6">
@@ -595,29 +660,6 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* Worker Roles */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-indigo-600" />תפקידי עובדים</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר תפקידים שניתן לבחור בהם בעת הוספת/עריכת עובדים</p>
-            <div className="flex gap-2 mb-4">
-              <Input value={newWorkerRole} onChange={(e) => setNewWorkerRole(e.target.value)} placeholder="שם תפקיד חדש..." dir="rtl" />
-              <Button onClick={handleAddWorkerRole}><Plus className="w-4 h-4" /></Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {workerRoles.map(role => (
-                <Badge key={role} className="bg-indigo-100 text-indigo-800 pr-1 flex items-center gap-1">
-                  {role}
-                  <ConfirmDeleteButton onConfirm={() => handleRemoveWorkerRole(role)} className="ml-1" />
-                </Badge>
-              ))}
-              {workerRoles.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו תפקידים</p>}
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Shift Statuses */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
@@ -626,77 +668,43 @@ export default function Settings() {
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סטטוסים שניתן להקצות למשמרות בלוח</p>
             <div className="flex gap-2 mb-4">
-              <Input value={newShiftStatus} onChange={(e) => setNewShiftStatus(e.target.value)} placeholder="שם סטטוס חדש..." dir="rtl" />
+              <Input value={newShiftStatus} onChange={(e) => setNewShiftStatus(e.target.value)} placeholder="שם סטטוס חדש..." dir="rtl" onKeyDown={e => e.key === 'Enter' && handleAddShiftStatus()} />
               <Button onClick={handleAddShiftStatus}><Plus className="w-4 h-4" /></Button>
             </div>
             <div className="flex flex-wrap gap-2">
-              {shiftStatuses.map(status => (
-                <Badge key={status} className="bg-teal-100 text-teal-800 pr-1 flex items-center gap-1">
-                  {status}
-                  <ConfirmDeleteButton onConfirm={() => handleRemoveShiftStatus(status)} className="ml-1" />
-                </Badge>
+              {shiftStatuses.map((status, idx) => (
+                <div key={idx} className="flex items-center gap-1 bg-teal-100 text-teal-800 rounded-full px-2 py-1">
+                  {renamingShiftStatus?.idx === idx ? (
+                    <>
+                      <Input
+                        autoFocus
+                        value={renamingShiftStatus.value}
+                        onChange={e => setRenamingShiftStatus(prev => ({ ...prev, value: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') handleRenameShiftStatus(idx, status, renamingShiftStatus.value); if (e.key === 'Escape') setRenamingShiftStatus(null); }}
+                        className="h-6 text-xs w-28 bg-white"
+                        dir="rtl"
+                      />
+                      <button onClick={() => handleRenameShiftStatus(idx, status, renamingShiftStatus.value)} className="text-green-600 hover:text-green-700"><Check className="w-3 h-3" /></button>
+                      <button onClick={() => setRenamingShiftStatus(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm">{status}</span>
+                      <button onClick={() => setRenamingShiftStatus({ idx, value: status })} className="text-teal-500 hover:text-teal-700"><Pencil className="w-3 h-3" /></button>
+                      <ConfirmDeleteButton onConfirm={() => handleRemoveShiftStatus(status)} />
+                    </>
+                  )}
+                </div>
               ))}
               {shiftStatuses.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סטטוסים</p>}
             </div>
           </CardContent>
         </Card>
 
-        {/* Worker Populations */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-orange-600" />אוכלוסיות עובדים</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר אוכלוסיות שניתן לבחור בהן בעת הוספת/עריכת עובדים</p>
-            <div className="flex gap-2 mb-4">
-              <Input value={newPopulation} onChange={(e) => setNewPopulation(e.target.value)} placeholder="שם אוכלוסייה חדשה..." dir="rtl" />
-              <Button onClick={handleAddPopulation}><Plus className="w-4 h-4" /></Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {populations.map(pop => (
-                <Badge key={pop} className="bg-orange-100 text-orange-800 pr-1 flex items-center gap-1">
-                  {pop}
-                  <ConfirmDeleteButton onConfirm={() => handleRemovePopulation(pop)} className="ml-1" />
-                </Badge>
-              ))}
-              {populations.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו אוכלוסיות</p>}
-            </div>
-          </CardContent>
-        </Card>
+        </> /* end schedule tab */}
 
-        {/* User Roles */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-blue-600" />ניהול תפקידי משתמש</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-gray-700" dir="rtl"><strong>מנהל:</strong> גישה מלאה<br /><strong>משתמש:</strong> זמינות בלבד</p>
-              </div>
-              <div className="space-y-3">
-                {workers.filter(w => w.email).map((worker) => (
-                  <div key={worker.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{worker.nickname}</p>
-                      <p className="text-sm text-gray-600">{worker.email}</p>
-                    </div>
-                    <Select value={userRoles[worker.email] || "user"} onValueChange={(value) => handleRoleChange(worker.email, value)}>
-                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="user" dir="rtl">משתמש</SelectItem>
-                        <SelectItem value="manager" dir="rtl">מנהל</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-              </div>
-              <Button onClick={handleSaveRoles} disabled={saving} className="bg-blue-900 hover:bg-blue-800" dir="rtl">
-                <Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור תפקידי משתמש"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* === TAB: עובדים === */}
+        {activeTab === "workers" && <>
 
         {/* Tasks & Qualifications */}
         <Card className="border-none shadow-lg mb-6">
@@ -769,6 +777,46 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        </> /* end workers tab */}
+
+        {/* === TAB: משתמשים === */}
+        {activeTab === "users" && <>
+
+        {/* User Roles */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-blue-600" />ניהול תפקידי משתמש</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-gray-700" dir="rtl"><strong>מנהל:</strong> גישה מלאה<br /><strong>משתמש:</strong> זמינות בלבד</p>
+              </div>
+              <div className="space-y-3">
+                {workers.filter(w => w.email).map((worker) => (
+                  <div key={worker.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900">{worker.nickname}</p>
+                      <p className="text-sm text-gray-600">{worker.email}</p>
+                    </div>
+                    <Select value={userRoles[worker.email] || "user"} onValueChange={(value) => handleRoleChange(worker.email, value)}>
+                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user" dir="rtl">משתמש</SelectItem>
+                        <SelectItem value="manager" dir="rtl">מנהל</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+              <Button onClick={handleSaveRoles} disabled={saving} className="bg-blue-900 hover:bg-blue-800" dir="rtl">
+                <Save className="w-4 h-4 mr-2" />{saving ? "שומר..." : "שמור תפקידי משתמש"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        </> /* end users tab */}
 
       </div>
     </div>
