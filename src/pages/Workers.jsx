@@ -40,8 +40,12 @@ export default function Workers() {
 
   useEffect(() => { loadData(); }, []);
 
+  const loadWorkers = async () => {
+    const workersData = await base44.entities.Worker.list("-created_date");
+    setWorkers(workersData);
+  };
+
   const loadData = async () => {
-    // Single call to get all settings + workers in parallel (2 requests instead of 7)
     const [workersData, allSettings] = await Promise.all([
       base44.entities.Worker.list("-created_date"),
       base44.entities.AppSettings.list()
@@ -91,7 +95,7 @@ export default function Workers() {
     setShowDialog(false);
     setEditingWorker(null);
     setFormData({ nickname: "", birthday: "", role: [], phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), active: true, population: "", training: "", photo_url: "" });
-    loadData();
+    loadWorkers();
   };
 
   const handleEdit = (worker) => {
@@ -117,7 +121,7 @@ export default function Workers() {
       role: worker.role,
       active: !worker.active 
     });
-    loadData();
+    loadWorkers();
   };
 
 
@@ -125,7 +129,7 @@ export default function Workers() {
   const handleDeleteWorker = async (workerId) => {
     if (!confirm("האם אתה בטוח שברצונך למחוק עובד זה?")) return;
     await base44.entities.Worker.delete(workerId);
-    loadData();
+    loadWorkers();
   };
 
 
