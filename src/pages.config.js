@@ -55,7 +55,7 @@ import Schedule from './pages/Schedule';
 import Settings from './pages/Settings';
 import ShiftMaster from './pages/ShiftMaster';
 import Workers from './pages/Workers';
-import Yearly from './pages/Yearly';
+import Yearly from './pages/Yearly.jsx';
 import __Layout from './Layout.jsx';
 
 
