@@ -76,6 +76,7 @@ export default function Schedule() {
     const weekChanged = lastWeekStart.current !== weekStartStr;
 
     if (!staticDataLoaded.current) {
+      staticDataLoaded.current = true;
       loadAllData();
     } else {
       loadDailyData(weekChanged);
