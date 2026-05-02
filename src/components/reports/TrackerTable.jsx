@@ -1106,7 +1106,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         />
         <div style={headerPinned ? { overflowX: "auto", overflowY: "auto", flex: 1 } : { overflowX: "auto", overflowY: "auto" }}>
         <Table style={{ tableLayout: "fixed" }}>
-          <TableHeader style={headerPinned ? { position: "sticky", top: cardHeaderH, zIndex: 25, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
+          <TableHeader style={headerPinned ? { position: "sticky", top: `${cardHeaderH}px`, zIndex: 25, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
             <TableRow className="bg-gray-50">
               <TableHead dir="rtl" className="font-bold px-4 relative"
                 style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
