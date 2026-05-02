@@ -13,22 +13,26 @@ import VisualAnalysisDialog, { getVisualColor } from "./VisualAnalysisDialog";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
 
 // Pill-style worker filter — same pattern as Yearly participant filter
+// options: array of strings OR array of {value, label} objects
 function WorkerPillFilter({ label, options, selected, onChange, color }) {
   const colorMap = {
     orange: { active: "bg-orange-500 text-white border-orange-500", inactive: "bg-white text-gray-600 border-gray-300 hover:border-orange-400" },
     indigo: { active: "bg-indigo-600 text-white border-indigo-600", inactive: "bg-white text-gray-600 border-gray-300 hover:border-indigo-400" },
+    teal: { active: "bg-teal-600 text-white border-teal-600", inactive: "bg-white text-gray-600 border-gray-300 hover:border-teal-400" },
   };
   const cls = colorMap[color] || colorMap.indigo;
   if (!options || options.length === 0) return null;
+  // Normalize options to {value, label}
+  const normalized = options.map(o => typeof o === "string" ? { value: o, label: o } : o);
   return (
     <div>
       <p className="text-xs font-semibold text-gray-500 mb-1">{label}</p>
       <div className="flex flex-wrap gap-1">
-        {options.map(opt => (
-          <button key={opt} type="button"
-            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${selected.includes(opt) ? cls.active : cls.inactive}`}
-            onClick={() => onChange(selected.includes(opt) ? selected.filter(v => v !== opt) : [...selected, opt])}>
-            {opt}
+        {normalized.map(opt => (
+          <button key={opt.value} type="button"
+            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${selected.includes(opt.value) ? cls.active : cls.inactive}`}
+            onClick={() => onChange(selected.includes(opt.value) ? selected.filter(v => v !== opt.value) : [...selected, opt.value])}>
+            {opt.label}
           </button>
         ))}
       </div>
@@ -89,7 +93,7 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], onDelete, onUpdated }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], workerQualifications = [], onDelete, onUpdated }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -101,6 +105,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [endDate, setEndDate] = useState("");
   const [selectedPopulations, setSelectedPopulations] = useState([]);
   const [selectedRoles, setSelectedRoles] = useState([]);
+  const [selectedQualifications, setSelectedQualifications] = useState([]);
   const [selectedWorkerIds, setSelectedWorkerIds] = useState([]);
   const [workerSearch, setWorkerSearch] = useState("");
   const [guide, setGuide] = useState("__all__");
@@ -829,6 +834,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
       if (!selectedRoles.some(r => roles.includes(r))) return false;
     }
+    if (selectedQualifications.length > 0) {
+      const wqIds = workerQualifications.filter(wq => wq.worker_id === w.id).map(wq => wq.qualification_id);
+      if (!selectedQualifications.some(qid => wqIds.includes(qid))) return false;
+    }
     if (selectedWorkerIds.length > 0 && !selectedWorkerIds.includes(w.id)) return false;
     if (guide === "yes" && !w.is_guide) return false;
     if (guide === "no" && w.is_guide) return false;
@@ -892,13 +901,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     });
   };
 
-  // Workers visible after population/role filter (for the worker picker)
+  // Workers visible after population/role/qualification filter (for the worker picker)
   const preFilteredWorkers = workers.filter(w => {
     if (!w.active) return false;
     if (selectedPopulations.length > 0 && !selectedPopulations.includes(w.population)) return false;
     if (selectedRoles.length > 0) {
       const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
       if (!selectedRoles.some(r => roles.includes(r))) return false;
+    }
+    if (selectedQualifications.length > 0) {
+      const wqIds = workerQualifications.filter(wq => wq.worker_id === w.id).map(wq => wq.qualification_id);
+      if (!selectedQualifications.some(qid => wqIds.includes(qid))) return false;
     }
     return true;
   });
@@ -907,7 +920,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   );
 
   return (
-    <Card className="border-none shadow-lg mb-6" dir="rtl">
+    <Card className="border-none shadow-lg mb-6 overflow-visible" dir="rtl">
       {/* Header */}
       <CardHeader className="border-b py-3 px-4">
         <div className="flex items-center justify-between gap-2">
@@ -958,6 +971,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             <div className="p-3 bg-gray-50 rounded-lg border space-y-2">
               <WorkerPillFilter label="אוכלוסייה" options={populations} selected={selectedPopulations} onChange={setSelectedPopulations} color="orange" />
               <WorkerPillFilter label="תפקיד" options={workerRoles} selected={selectedRoles} onChange={setSelectedRoles} color="indigo" />
+              <WorkerPillFilter label="כשירות" options={qualifications.map(q => ({ value: q.id, label: q.name }))} selected={selectedQualifications} onChange={setSelectedQualifications} color="teal" />
 
               {/* Worker search + list */}
               <div>
@@ -1027,10 +1041,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
 
       {/* Table */}
-      <CardContent className="pt-0 px-0">
-        <div className={headerPinned ? "max-h-[60vh] overflow-y-auto overflow-x-auto" : "overflow-x-auto"}>
+      <CardContent className="pt-0 px-0 overflow-visible">
+        <div
+          style={headerPinned ? { maxHeight: "60vh", overflowY: "auto", overflowX: "auto", position: "relative" } : { overflowX: "auto" }}
+        >
         <Table style={{ tableLayout: "fixed" }}>
-          <TableHeader className={headerPinned ? "sticky top-0 z-20 bg-gray-50 shadow-sm" : ""}>
+          <TableHeader style={headerPinned ? { position: "sticky", top: 0, zIndex: 20, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
             <TableRow className="bg-gray-50">
               <TableHead dir="rtl" className="font-bold px-4 relative"
                 style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>

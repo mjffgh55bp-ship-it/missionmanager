@@ -27,6 +27,7 @@ export default function Reports() {
   const [selectedTrackerForCharts, setSelectedTrackerForCharts] = useState(null);
   const [taskQualifications, setTaskQualifications] = useState({});
   const [qualifications, setQualifications] = useState([]);
+  const [workerQualifications, setWorkerQualifications] = useState([]);
   const [trackerEditorOpen, setTrackerEditorOpen] = useState(false);
   const [editingTracker, setEditingTracker] = useState(null);
 
@@ -106,10 +107,11 @@ export default function Reports() {
       base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
     ]);
 
-    // Batch 6: qualifications + tracker entries
-    const [qualificationsData, entriesData] = await Promise.all([
+    // Batch 6: qualifications + tracker entries + worker qualifications
+    const [qualificationsData, entriesData, workerQualsData] = await Promise.all([
       base44.entities.Qualification.filter({ active: true }),
       base44.entities.TrackerEntry.list(),
+      base44.entities.WorkerQualification.list(),
     ]);
 
     setWorkers(workersData);
@@ -133,6 +135,7 @@ export default function Reports() {
       ...allTaskNames.filter(name => !entityNameSet.has(name)).map(name => ({ id: name, name }))
     ];
     setQualifications(merged);
+    setWorkerQualifications(workerQualsData);
     if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
     if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
 
@@ -261,6 +264,7 @@ export default function Reports() {
               workerRoles={workerRoles}
               scheduleColumns={scheduleColumns}
               qualifications={qualifications}
+              workerQualifications={workerQualifications}
               onDeleteTracker={handleDeleteTracker}
               onUpdatedTracker={handleTrackerUpdated}
             />
