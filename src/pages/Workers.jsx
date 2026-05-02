@@ -41,34 +41,27 @@ export default function Workers() {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    // Batch 1: workers + settings (no heavy lists)
-    const [workersData, rolesSettings, populationsSettings, workerRolesSettings, tasksSettings, taskQualSettings] = await Promise.all([
+    // Single call to get all settings + workers in parallel (2 requests instead of 7)
+    const [workersData, allSettings] = await Promise.all([
       base44.entities.Worker.list("-created_date"),
-      base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
-      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" })
+      base44.entities.AppSettings.list()
     ]);
-    // Batch 2: assignments separately to avoid rate limit
-    const assignmentsData = await base44.entities.Assignment.list();
+
     setWorkers(workersData);
-    setAssignments(assignmentsData);
-    if (rolesSettings.length > 0) {
-      setUserRoles(JSON.parse(rolesSettings[0].setting_value));
-    }
-    if (populationsSettings.length > 0) {
-      setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
-    } else {
-      setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
-    }
-    if (workerRolesSettings.length > 0) {
-      setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
-    } else {
-      setWorkerRoles(["שף", "סו-שף"]);
-    }
-    if (tasksSettings.length > 0) setTasks(JSON.parse(tasksSettings[0].setting_value) || []);
-    if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
+
+    const getSetting = (key) => allSettings.find(s => s.setting_key === key);
+
+    const rolesSettings = getSetting("user_roles");
+    const populationsSettings = getSetting("worker_populations");
+    const workerRolesSettings = getSetting("worker_roles");
+    const tasksSettings = getSetting("tasks_list");
+    const taskQualSettings = getSetting("task_qualifications");
+
+    if (rolesSettings) setUserRoles(JSON.parse(rolesSettings.setting_value));
+    setPopulations(populationsSettings ? (JSON.parse(populationsSettings.setting_value) || []) : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
+    setWorkerRoles(workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : ["שף", "סו-שף"]);
+    if (tasksSettings) setTasks(JSON.parse(tasksSettings.setting_value) || []);
+    if (taskQualSettings) setTaskQualifications(JSON.parse(taskQualSettings.setting_value) || {});
   };
 
   const handleToggleTaskQualification = async (taskName, role, workerId) => {
