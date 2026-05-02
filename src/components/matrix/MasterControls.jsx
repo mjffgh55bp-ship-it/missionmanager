@@ -14,15 +14,15 @@ export default function MasterControls({
 }) {
   const [isLocking, setIsLocking] = React.useState(false);
   
-  const getVisibleWorkers = () => {
-    return workers.filter(w => {
-      if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
-      if (roleFilter !== "__all__" && w.role !== roleFilter) return false;
-      return true;
-    });
-  };
+  const visibleWorkers = workers.filter(w => {
+    if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+    if (roleFilter !== "__all__") {
+      const roles = Array.isArray(w.role) ? w.role : [w.role];
+      if (!roles.includes(roleFilter)) return false;
+    }
+    return true;
+  });
 
-  const visibleWorkers = getVisibleWorkers();
   const allLocked = visibleWorkers.length > 0 && visibleWorkers.every(w => w.availability_locked);
 
   const handleMasterLockToggle = async () => {
@@ -32,33 +32,18 @@ export default function MasterControls({
     try {
       const targetLockState = !allLocked;
       
-      // Filter out workers missing required fields
-      const validWorkers = visibleWorkers.filter(w => w.nickname && w.role);
-      if (validWorkers.length === 0) {
-        console.error('No valid workers to update - missing nickname or role');
-        setIsLocking(false);
-        return;
-      }
+      // Update all in parallel — only send the field we're changing
+      await Promise.all(
+        visibleWorkers.map(worker =>
+          base44.entities.Worker.update(worker.id, {
+            availability_locked: targetLockState
+          }).catch(err => {
+            console.error(`Failed to update worker ${worker.nickname}:`, err);
+          })
+        )
+      );
       
-      // Update in batches of 5 for better responsiveness
-      const batchSize = 5;
-      for (let i = 0; i < validWorkers.length; i += batchSize) {
-        const batch = validWorkers.slice(i, i + batchSize);
-        await Promise.all(
-          batch.map(worker =>
-            base44.entities.Worker.update(worker.id, {
-              nickname: worker.nickname,
-              role: worker.role,
-              availability_locked: targetLockState
-            }).catch(err => {
-              console.error(`Failed to update worker ${worker.nickname}:`, err);
-              return null;
-            })
-          )
-        );
-      }
-      
-      await onUpdate();
+      onUpdate();
     } catch (error) {
       console.error('Error in master lock toggle:', error);
     } finally {
