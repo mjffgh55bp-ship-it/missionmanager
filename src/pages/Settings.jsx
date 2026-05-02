@@ -777,6 +777,80 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {/* Worker Roles */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-indigo-600" />תפקידי עובדים</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר תפקידים שניתן לבחור בהם בעת הוספת/עריכת עובדים</p>
+            <div className="flex gap-2 mb-4">
+              <Input value={newWorkerRole} onChange={(e) => setNewWorkerRole(e.target.value)} placeholder="שם תפקיד חדש..." dir="rtl" onKeyDown={e => e.key === 'Enter' && handleAddWorkerRole()} />
+              <Button onClick={handleAddWorkerRole}><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {workerRoles.map((role, idx) => (
+                <div key={idx} className="flex items-center gap-1 bg-indigo-100 text-indigo-800 rounded-full px-2 py-1">
+                  {renamingWorkerRole?.idx === idx ? (
+                    <>
+                      <Input autoFocus value={renamingWorkerRole.value}
+                        onChange={e => setRenamingWorkerRole(prev => ({ ...prev, value: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') handleRenameWorkerRole(idx, role, renamingWorkerRole.value); if (e.key === 'Escape') setRenamingWorkerRole(null); }}
+                        className="h-6 text-xs w-28 bg-white" dir="rtl" />
+                      <button onClick={() => handleRenameWorkerRole(idx, role, renamingWorkerRole.value)} className="text-green-600 hover:text-green-700"><Check className="w-3 h-3" /></button>
+                      <button onClick={() => setRenamingWorkerRole(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm">{role}</span>
+                      <button onClick={() => setRenamingWorkerRole({ idx, value: role })} className="text-indigo-500 hover:text-indigo-700"><Pencil className="w-3 h-3" /></button>
+                      <ConfirmDeleteButton onConfirm={() => handleRemoveWorkerRole(role)} />
+                    </>
+                  )}
+                </div>
+              ))}
+              {workerRoles.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו תפקידים</p>}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Worker Populations */}
+        <Card className="border-none shadow-lg mb-6">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-orange-600" />אוכלוסיות עובדים</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר אוכלוסיות שניתן לבחור בהן בעת הוספת/עריכת עובדים</p>
+            <div className="flex gap-2 mb-4">
+              <Input value={newPopulation} onChange={(e) => setNewPopulation(e.target.value)} placeholder="שם אוכלוסייה חדשה..." dir="rtl" onKeyDown={e => e.key === 'Enter' && handleAddPopulation()} />
+              <Button onClick={handleAddPopulation}><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {populations.map((pop, idx) => (
+                <div key={idx} className="flex items-center gap-1 bg-orange-100 text-orange-800 rounded-full px-2 py-1">
+                  {renamingPopulation?.idx === idx ? (
+                    <>
+                      <Input autoFocus value={renamingPopulation.value}
+                        onChange={e => setRenamingPopulation(prev => ({ ...prev, value: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') handleRenamePopulation(idx, pop, renamingPopulation.value); if (e.key === 'Escape') setRenamingPopulation(null); }}
+                        className="h-6 text-xs w-28 bg-white" dir="rtl" />
+                      <button onClick={() => handleRenamePopulation(idx, pop, renamingPopulation.value)} className="text-green-600 hover:text-green-700"><Check className="w-3 h-3" /></button>
+                      <button onClick={() => setRenamingPopulation(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm">{pop}</span>
+                      <button onClick={() => setRenamingPopulation({ idx, value: pop })} className="text-orange-500 hover:text-orange-700"><Pencil className="w-3 h-3" /></button>
+                      <ConfirmDeleteButton onConfirm={() => handleRemovePopulation(pop)} />
+                    </>
+                  )}
+                </div>
+              ))}
+              {populations.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו אוכלוסיות</p>}
+            </div>
+          </CardContent>
+        </Card>
+
         </> /* end workers tab */}
 
         {/* === TAB: משתמשים === */}
