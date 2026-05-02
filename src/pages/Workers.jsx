@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, UserX, UserCheck, ChefHat, TrendingUp, Award, Trash2, Users, Save, Search } from "lucide-react";
+import { Plus, Pencil, UserX, UserCheck, ChefHat, TrendingUp, Award, Trash2, Users, Save, Search, ChevronDown, Check } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { getSeniorityInfo, calculateProgression } from "../components/utils/SeniorityUtils";
 import { Progress } from "@/components/ui/progress";
@@ -338,26 +339,35 @@ export default function Workers() {
         {/* Worker Dialog */}
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">{editingWorker ? "ערוך עובד" : "הוסף עובד חדש"}</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle className="text-right w-full" dir="rtl">{editingWorker ? "ערוך עובד" : "הוסף עובד חדש"}</DialogTitle>
+            </DialogHeader>
             <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
               
               {/* פרטים אישיים */}
               <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                 <h4 className="text-sm font-semibold text-blue-900 mb-3" dir="rtl">פרטים אישיים</h4>
-                <div className="space-y-3">
-                  <div><Label htmlFor="nickname" className="block text-right" dir="rtl">כינוי *</Label><Input id="nickname" value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="כינוי" dir="rtl" /></div>
-                  <div><Label htmlFor="birthday" className="block text-right" dir="rtl">תאריך יום הולדת</Label><Input id="birthday" type="date" value={formData.birthday} onChange={(e) => setFormData({ ...formData, birthday: e.target.value })} /></div>
-                  <div><Label htmlFor="hire_date" className="block text-right" dir="rtl">תאריך גיוס</Label><Input id="hire_date" type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} /></div>
-                  <div>
-                    <Label className="block text-right" dir="rtl">קורס</Label>
+                <div className="space-y-2" dir="rtl">
+                  <div className="flex items-center gap-2">
+                    <Label className="w-28 text-right shrink-0" dir="rtl">כינוי *</Label>
+                    <Input value={formData.nickname} onChange={(e) => setFormData({ ...formData, nickname: e.target.value })} placeholder="כינוי" dir="rtl" className="flex-1" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="w-28 text-right shrink-0" dir="rtl">יום הולדת</Label>
+                    <Input type="date" value={formData.birthday} onChange={(e) => setFormData({ ...formData, birthday: e.target.value })} className="flex-1" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="w-28 text-right shrink-0" dir="rtl">תאריך גיוס</Label>
+                    <Input type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} className="flex-1" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="w-28 text-right shrink-0" dir="rtl">קורס</Label>
                     <Select value={formData.training} onValueChange={(value) => setFormData({ ...formData, training: value })}>
-                      <SelectTrigger><SelectValue placeholder="בחר קורס..." /></SelectTrigger>
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="בחר מספר קורס..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="שף">שף</SelectItem>
-                        <SelectItem value="שף 2">שף 2</SelectItem>
-                        <SelectItem value="סו שף">סו שף</SelectItem>
-                        <SelectItem value="מארחת">מארחת</SelectItem>
-                        <SelectItem value="מאיישת סידור עבודה">מאיישת סידור עבודה</SelectItem>
+                        {Array.from({ length: 100 }, (_, i) => String(i + 1)).map(num => (
+                          <SelectItem key={num} value={num}>{num}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -367,47 +377,63 @@ export default function Workers() {
               {/* כשירות */}
               <div className="p-3 bg-green-50 rounded-lg border border-green-200">
                 <h4 className="text-sm font-semibold text-green-900 mb-3" dir="rtl">כשירות</h4>
-                <div className="space-y-3">
-                  <div>
-                    <Label className="block text-right" dir="rtl">אוכלוסייה</Label>
+                <div className="space-y-2" dir="rtl">
+                  <div className="flex items-center gap-2">
+                    <Label className="w-28 text-right shrink-0" dir="rtl">אוכלוסייה</Label>
                     <Select value={formData.population} onValueChange={(value) => setFormData({ ...formData, population: value })}>
-                      <SelectTrigger><SelectValue placeholder="בחר אוכלוסייה..." /></SelectTrigger>
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="בחר אוכלוסייה..." /></SelectTrigger>
                       <SelectContent>
                         {populations.map(pop => (
                           <SelectItem key={pop} value={pop}>{pop}</SelectItem>
                         ))}
-                        {populations.length === 0 && <SelectItem value={null} disabled>לא הוגדרו אוכלוסיות</SelectItem>}
+                        {populations.length === 0 && <SelectItem value="none" disabled>לא הוגדרו אוכלוסיות</SelectItem>}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div>
-                    <Label className="block text-right" dir="rtl">תפקיד *</Label>
-                    <div className="flex flex-wrap gap-2 mt-1" dir="rtl">
-                      {workerRoles.map(role => {
-                        const selected = formData.role.includes(role);
-                        return (
-                          <Badge
-                            key={role}
-                            onClick={() => {
-                              const newRoles = selected
-                                ? formData.role.filter(r => r !== role)
-                                : [...formData.role, role];
-                              setFormData({ ...formData, role: newRoles });
-                            }}
-                            className={`cursor-pointer select-none px-3 py-1 text-sm ${selected ? 'bg-blue-700 text-white hover:bg-blue-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                          >
-                            {role}
-                          </Badge>
-                        );
-                      })}
-                      {workerRoles.length === 0 && <span className="text-sm text-gray-500">לא הוגדרו תפקידים</span>}
+                  <div className="flex items-start gap-2">
+                    <Label className="w-28 text-right shrink-0 mt-2" dir="rtl">תפקיד *</Label>
+                    <div className="flex-1">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="w-full flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-white hover:bg-gray-50 transition-colors" dir="rtl">
+                            <span className="text-gray-500">{formData.role.length === 0 ? "בחר תפקידים..." : "תפקידים נבחרו"}</span>
+                            <ChevronDown className="w-4 h-4 text-gray-400" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-1" align="start">
+                          {workerRoles.length === 0 && <p className="text-sm text-gray-500 px-2 py-1">לא הוגדרו תפקידים</p>}
+                          {workerRoles.map(role => {
+                            const selected = formData.role.includes(role);
+                            return (
+                              <button
+                                key={role}
+                                type="button"
+                                onClick={() => {
+                                  const newRoles = selected
+                                    ? formData.role.filter(r => r !== role)
+                                    : [...formData.role, role];
+                                  setFormData({ ...formData, role: newRoles });
+                                }}
+                                className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 text-right"
+                                dir="rtl"
+                              >
+                                <Check className={`w-4 h-4 shrink-0 ${selected ? 'text-blue-600' : 'text-transparent'}`} />
+                                {role}
+                              </button>
+                            );
+                          })}
+                        </PopoverContent>
+                      </Popover>
+                      {formData.role.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2" dir="rtl">
+                          {formData.role.map(r => (
+                            <Badge key={r} className="bg-blue-100 text-blue-800 text-xs">{r}</Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-
-
-
-
                 </div>
               </div>
 
@@ -418,24 +444,46 @@ export default function Workers() {
                 return (
                   <div className="p-3 bg-violet-50 rounded-lg border border-violet-200">
                     <h4 className="text-sm font-semibold text-violet-900 mb-3" dir="rtl">כשירות למשימות</h4>
-                    <div className="space-y-3">
+                    <div className="space-y-2" dir="rtl">
                       {workerRoleList.map(role => (
-                        <div key={role}>
-                          <p className="text-xs font-semibold text-gray-700 mb-1" dir="rtl">{role}</p>
-                          <div className="flex flex-wrap gap-2" dir="rtl">
-                            {tasks.map(task => {
-                              const qualified = ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id);
-                              return (
-                                <button
-                                  key={task}
-                                  type="button"
-                                  onClick={() => handleToggleTaskQualification(task, role, editingWorker.id)}
-                                  className={`px-3 py-1 rounded text-xs border transition-colors ${qualified ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400'}`}
-                                >
-                                  {task}
+                        <div key={role} className="flex items-start gap-2">
+                          <Label className="w-28 text-right shrink-0 mt-2 text-xs font-semibold text-gray-700" dir="rtl">{role}</Label>
+                          <div className="flex-1">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <button className="w-full flex items-center justify-between border rounded-md px-3 py-2 text-sm bg-white hover:bg-gray-50 transition-colors" dir="rtl">
+                                  <span className="text-gray-500">בחר משימות...</span>
+                                  <ChevronDown className="w-4 h-4 text-gray-400" />
                                 </button>
-                              );
-                            })}
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-1" align="start">
+                                {tasks.map(task => {
+                                  const qualified = ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id);
+                                  return (
+                                    <button
+                                      key={task}
+                                      type="button"
+                                      onClick={() => handleToggleTaskQualification(task, role, editingWorker.id)}
+                                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 text-right"
+                                      dir="rtl"
+                                    >
+                                      <Check className={`w-4 h-4 shrink-0 ${qualified ? 'text-violet-600' : 'text-transparent'}`} />
+                                      {task}
+                                    </button>
+                                  );
+                                })}
+                              </PopoverContent>
+                            </Popover>
+                            {(() => {
+                              const qualTasks = tasks.filter(task => ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id));
+                              return qualTasks.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 mt-2" dir="rtl">
+                                  {qualTasks.map(t => (
+                                    <Badge key={t} className="bg-violet-100 text-violet-800 text-xs">{t}</Badge>
+                                  ))}
+                                </div>
+                              ) : null;
+                            })()}
                           </div>
                         </div>
                       ))}
@@ -447,9 +495,15 @@ export default function Workers() {
               {/* פרטי קשר */}
               <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                 <h4 className="text-sm font-semibold text-gray-900 mb-3" dir="rtl">פרטי קשר</h4>
-                <div className="space-y-3">
-                  <div><Label htmlFor="email" className="block text-right" dir="rtl">אימייל</Label><Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@mail.com" dir="rtl" /></div>
-                  <div><Label htmlFor="phone" className="block text-right" dir="rtl">טלפון</Label><Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="05x-xxxxxxx" dir="rtl" /></div>
+                <div className="space-y-2" dir="rtl">
+                  <div className="flex items-center gap-2">
+                    <Label className="w-28 text-right shrink-0" dir="rtl">אימייל</Label>
+                    <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="example@mail.com" dir="rtl" className="flex-1" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label className="w-28 text-right shrink-0" dir="rtl">טלפון</Label>
+                    <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="05x-xxxxxxx" dir="rtl" className="flex-1" />
+                  </div>
                 </div>
               </div>
             </div>
