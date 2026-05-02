@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,8 @@ export default function Workers() {
     photo_url: ""
   });
 
+  const loadingRef = useRef(false);
+
   useEffect(() => { loadData(); }, []);
 
   const loadWorkers = async () => {
@@ -46,6 +48,8 @@ export default function Workers() {
   };
 
   const loadData = async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     const [workersData, allSettings] = await Promise.all([
       base44.entities.Worker.list("-created_date"),
       base44.entities.AppSettings.list()
@@ -66,6 +70,7 @@ export default function Workers() {
     setWorkerRoles(workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : ["שף", "סו-שף"]);
     if (tasksSettings) setTasks(JSON.parse(tasksSettings.setting_value) || []);
     if (taskQualSettings) setTaskQualifications(JSON.parse(taskQualSettings.setting_value) || {});
+    loadingRef.current = false;
   };
 
   const handleToggleTaskQualification = async (taskName, role, workerId) => {
