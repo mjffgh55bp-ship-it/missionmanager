@@ -778,20 +778,6 @@ export default function Yearly() {
 
               {/* Filters */}
               <div className="space-y-2 mb-3 p-2 bg-gray-50 rounded-lg border">
-                {workerRoles.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 mb-1">תפקיד</p>
-                    <div className="flex flex-wrap gap-1">
-                      {workerRoles.map(role => (
-                        <button key={role} type="button"
-                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filterRoles.includes(role) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
-                          onClick={() => setFilterRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role])}>
-                          {role}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 {workerPopulations.length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-gray-500 mb-1">אוכלוסייה</p>
@@ -801,6 +787,20 @@ export default function Yearly() {
                           className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filterPopulations.includes(pop) ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-300 hover:border-orange-400'}`}
                           onClick={() => setFilterPopulations(prev => prev.includes(pop) ? prev.filter(p => p !== pop) : [...prev, pop])}>
                           {pop}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {workerRoles.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-1">תפקיד</p>
+                    <div className="flex flex-wrap gap-1">
+                      {workerRoles.map(role => (
+                        <button key={role} type="button"
+                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filterRoles.includes(role) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
+                          onClick={() => setFilterRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role])}>
+                          {role}
                         </button>
                       ))}
                     </div>
