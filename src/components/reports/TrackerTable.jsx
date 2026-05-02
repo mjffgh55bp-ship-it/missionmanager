@@ -99,14 +99,28 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [editingCell, setEditingCell] = useState(null);
   const [cellDraft, setCellDraft] = useState("");
 
-  // Filters
-  const [dateFilterMode, setDateFilterMode] = useState("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [selectedPopulations, setSelectedPopulations] = useState([]);
-  const [selectedRoles, setSelectedRoles] = useState([]);
-  const [selectedQualifications, setSelectedQualifications] = useState([]);
-  const [selectedWorkerIds, setSelectedWorkerIds] = useState([]);
+  // Filters — persist to localStorage
+  const [dateFilterMode, setDateFilterMode] = useState(() => {
+    try { return localStorage.getItem(`tracker_filter_dateMode_${initialTracker.id}`) || "all"; } catch { return "all"; }
+  });
+  const [startDate, setStartDate] = useState(() => {
+    try { return localStorage.getItem(`tracker_filter_startDate_${initialTracker.id}`) || ""; } catch { return ""; }
+  });
+  const [endDate, setEndDate] = useState(() => {
+    try { return localStorage.getItem(`tracker_filter_endDate_${initialTracker.id}`) || ""; } catch { return ""; }
+  });
+  const [selectedPopulations, setSelectedPopulations] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`tracker_filter_pops_${initialTracker.id}`) || "[]"); } catch { return []; }
+  });
+  const [selectedRoles, setSelectedRoles] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`tracker_filter_roles_${initialTracker.id}`) || "[]"); } catch { return []; }
+  });
+  const [selectedQualifications, setSelectedQualifications] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`tracker_filter_quals_${initialTracker.id}`) || "[]"); } catch { return []; }
+  });
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`tracker_filter_workers_${initialTracker.id}`) || "[]"); } catch { return []; }
+  });
   const [workerSearch, setWorkerSearch] = useState("");
   const [guide, setGuide] = useState("__all__");
   const [showFilters, setShowFilters] = useState(false);
@@ -179,6 +193,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
   }, [colWidths, tracker.id]);
+
+  // Persist filter changes to localStorage
+  useEffect(() => { try { localStorage.setItem(`tracker_filter_dateMode_${tracker.id}`, dateFilterMode); } catch {} }, [dateFilterMode, tracker.id]);
+  useEffect(() => { try { localStorage.setItem(`tracker_filter_startDate_${tracker.id}`, startDate); } catch {} }, [startDate, tracker.id]);
+  useEffect(() => { try { localStorage.setItem(`tracker_filter_endDate_${tracker.id}`, endDate); } catch {} }, [endDate, tracker.id]);
+  useEffect(() => { try { localStorage.setItem(`tracker_filter_pops_${tracker.id}`, JSON.stringify(selectedPopulations)); } catch {} }, [selectedPopulations, tracker.id]);
+  useEffect(() => { try { localStorage.setItem(`tracker_filter_roles_${tracker.id}`, JSON.stringify(selectedRoles)); } catch {} }, [selectedRoles, tracker.id]);
+  useEffect(() => { try { localStorage.setItem(`tracker_filter_quals_${tracker.id}`, JSON.stringify(selectedQualifications)); } catch {} }, [selectedQualifications, tracker.id]);
+  useEffect(() => { try { localStorage.setItem(`tracker_filter_workers_${tracker.id}`, JSON.stringify(selectedWorkerIds)); } catch {} }, [selectedWorkerIds, tracker.id]);
 
   useEffect(() => { loadEntries(); }, [tracker.id]);
   useEffect(() => { setTracker(initialTracker); }, [initialTracker]);
@@ -1073,10 +1096,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
 
       {/* Table */}
-      <CardContent className="pt-0 px-0">
-        <div style={headerPinned ? {} : { overflowX: "auto" }}>
+      <CardContent className="pt-0 px-0 relative" style={headerPinned ? { height: "calc(100% - 48px)", display: "flex", flexDirection: "column" } : {}}>
+        {/* Resize handle (fixed to bottom-left of card) */}
+        {!headerPinned && (
+          <div
+            className="absolute bottom-0 left-0 w-4 h-4 cursor-col-resize hover:bg-blue-400 transition-colors rounded-tr-sm z-50"
+            onMouseDown={e => startColResize(e, "__worker__")}
+            style={{ userSelect: "none", background: "rgba(59, 130, 246, 0.3)" }}
+            title="גרור לשינוי גודל"
+          />
+        )}
+        <div style={headerPinned ? { overflowX: "auto", overflowY: "auto", flex: 1 } : { overflowX: "auto" }}>
         <Table style={{ tableLayout: "fixed" }}>
-          <TableHeader style={headerPinned ? { position: "sticky", top: cardHeaderH, zIndex: 20, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
+          <TableHeader style={headerPinned ? { position: "sticky", top: 0, zIndex: 20, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
             <TableRow className="bg-gray-50">
               <TableHead dir="rtl" className="font-bold px-4 relative"
                 style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
@@ -1090,10 +1122,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
                     : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
                 </button>
-                {/* Resize handle */}
-                <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors group"
-                  onMouseDown={e => startColResize(e, "__worker__")}
-                  style={{ userSelect: "none" }} />
+                {/* Resize handle (sticky to column header) */}
+                {headerPinned && (
+                  <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors group"
+                    onMouseDown={e => startColResize(e, "__worker__")}
+                    style={{ userSelect: "none" }} />
+                )}
               </TableHead>
               {displayColumns.map((col, idx) => (
                 <TableHead key={col.id} dir="rtl" className="px-2 relative"
@@ -1352,7 +1386,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           </TableBody>
         </Table>
         </div>
-      </CardContent>
-    </Card>
-  );
-}
+        </CardContent>
+        </Card>
+        );
+        }
