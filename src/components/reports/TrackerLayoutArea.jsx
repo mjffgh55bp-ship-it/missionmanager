@@ -112,7 +112,7 @@ export default function TrackerLayoutArea({
     window.addEventListener("mouseup", onUp);
   };
 
-  // ── RESIZE ──
+  // ── RESIZE (from bottom-left: dragging left changes x+w, dragging down changes h) ──
   const startResize = (e, trackerId) => {
     e.preventDefault();
     e.stopPropagation();
@@ -122,19 +122,22 @@ export default function TrackerLayoutArea({
     const startMouseY = e.clientY;
     const startW = p.w || DEFAULT_W;
     const startH = p.h || (el ? el.offsetHeight : 400);
-    const posX = p.x;
+    const startX = p.x;
     const posY = p.y;
     setActiveId(trackerId);
 
     const onMove = (ev) => {
-      const rawW = Math.max(MIN_W, startW + (ev.clientX - startMouseX));
+      const dx = ev.clientX - startMouseX;
+      // Resizing from left: moving left increases width and decreases x
+      const rawW = Math.max(MIN_W, startW - dx);
+      const newX = startX + (startW - rawW);
       const rawH = Math.max(MIN_H, startH + (ev.clientY - startMouseY));
       const { snappedW, snappedH, guides } = snapResize(
-        trackerId, { x: posX, y: posY }, rawW, rawH,
+        trackerId, { x: newX, y: posY }, rawW, rawH,
         getOtherRects(trackerId), getContainerW()
       );
       setSnapGuides(guides);
-      const updated = { ...posRef.current[trackerId], w: snappedW, h: snappedH };
+      const updated = { ...posRef.current[trackerId], x: newX, w: snappedW, h: snappedH };
       posRef.current = { ...posRef.current, [trackerId]: updated };
       setPosState(prev => ({ ...prev, [trackerId]: updated }));
     };
@@ -201,24 +204,24 @@ export default function TrackerLayoutArea({
               onUpdated={onUpdatedTracker}
             />
 
-            {/* Resize handle — bottom-right corner */}
+            {/* Resize handle — bottom-left corner */}
             <div
               onMouseDown={(e) => startResize(e, tracker.id)}
               style={{
                 position: "absolute",
-                right: 0,
+                left: 0,
                 bottom: 0,
                 width: 20,
                 height: 20,
-                cursor: "nwse-resize",
+                cursor: "nesw-resize",
                 zIndex: 30,
                 display: "flex",
                 alignItems: "flex-end",
-                justifyContent: "flex-end",
+                justifyContent: "flex-start",
                 padding: "3px",
               }}
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: "scaleX(-1)" }}>
                 <path d="M1 11L11 1M5 11L11 5M9 11L11 9" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
             </div>
