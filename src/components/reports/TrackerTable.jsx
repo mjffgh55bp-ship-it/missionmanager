@@ -1096,7 +1096,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
 
       {/* Table */}
-      <CardContent className="pt-0 px-0 relative" style={headerPinned ? { flex: 1, overflow: "auto" } : {}}>
+      <CardContent className="pt-0 px-0 relative" style={headerPinned ? { flex: 1, overflowX: "auto" } : { overflowX: "auto" }}>
         {/* Resize handle (absolute, always docked to bottom-left) */}
         <div
           className="absolute bottom-0 left-0 w-4 h-4 cursor-col-resize hover:bg-blue-400 transition-colors rounded-tr-sm z-50"
