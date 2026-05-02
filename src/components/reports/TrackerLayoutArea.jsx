@@ -192,11 +192,11 @@ export default function TrackerLayoutArea({
               onDragStart={(e) => startDrag(e, tracker.id)}
             />
 
-            {/* Resize handle — sticky bottom-left, always visible even when scrolling */}
+            {/* Resize handle — absolute bottom-left corner */}
             <div
               onMouseDown={(e) => startResize(e, tracker.id)}
               style={{
-                position: "sticky",
+                position: "absolute",
                 left: 0,
                 bottom: 0,
                 width: 20,
@@ -207,7 +207,6 @@ export default function TrackerLayoutArea({
                 alignItems: "flex-end",
                 justifyContent: "flex-start",
                 padding: "3px",
-                marginTop: -20,
                 pointerEvents: "all",
               }}
             >

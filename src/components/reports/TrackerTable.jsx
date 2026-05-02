@@ -110,8 +110,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [workerSearch, setWorkerSearch] = useState("");
   const [guide, setGuide] = useState("__all__");
   const [showFilters, setShowFilters] = useState(false);
+  // Pin is ON by default unless user explicitly turned it off
   const [headerPinned, setHeaderPinned] = useState(() => {
-    try { return localStorage.getItem(`tracker_pin_${initialTracker.id}`) === "true"; } catch { return false; }
+    try {
+      const stored = localStorage.getItem(`tracker_pin_${initialTracker.id}`);
+      // null = never changed by user = default ON; "false" = user turned off; "true" = user turned on
+      return stored === null ? true : stored === "true";
+    } catch { return true; }
+  });
+  // Track whether the user has explicitly changed the pin state
+  const [pinUserModified, setPinUserModified] = useState(() => {
+    try { return localStorage.getItem(`tracker_pin_${initialTracker.id}`) !== null; } catch { return false; }
   });
   const [colWidths, setColWidths] = useState(() => {
     try { return JSON.parse(localStorage.getItem(`tracker_colwidths_${initialTracker.id}`) || "{}"); } catch { return {}; }
@@ -143,6 +152,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const togglePin = () => {
     const next = !headerPinned;
     setHeaderPinned(next);
+    setPinUserModified(true);
     try { localStorage.setItem(`tracker_pin_${tracker.id}`, String(next)); } catch {}
   };
 
@@ -920,23 +930,35 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     !workerSearch || (w.nickname || "").includes(workerSearch)
   );
 
+  const [cardHeaderH, setCardHeaderH] = useState(0);
+  useEffect(() => {
+    if (!cardHeaderRef.current) return;
+    const obs = new ResizeObserver(() => {
+      setCardHeaderH(cardHeaderRef.current?.offsetHeight || 0);
+    });
+    obs.observe(cardHeaderRef.current);
+    return () => obs.disconnect();
+  }, [showFilters]);
+
   return (
-    <Card className="border-none shadow-lg mb-6" dir="rtl" style={headerPinned ? { maxHeight: "70vh", overflowY: "auto", overflowX: "auto" } : {}}>
+    <Card className="border-none shadow-lg mb-6" dir="rtl" style={headerPinned ? { maxHeight: "70vh", overflow: "auto" } : {}}>
       {/* Header */}
       <CardHeader
         ref={cardHeaderRef}
-        className="border-b py-3 px-4 cursor-grab active:cursor-grabbing select-none"
-        style={headerPinned ? { position: "sticky", top: 0, zIndex: 30, backgroundColor: "white", boxShadow: "0 2px 4px rgba(0,0,0,0.08)" } : {}}
+        className="border-b py-3 px-4 cursor-grab active:cursor-grabbing select-none bg-white"
+        style={headerPinned ? { position: "sticky", top: 0, zIndex: 30, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" } : {}}
         onMouseDown={onDragStart}
       >
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base">{tracker.name}</CardTitle>
           <div className="flex gap-2" onMouseDown={e => e.stopPropagation()}>
-            <Button size="sm" variant={headerPinned ? "default" : "outline"}
-              className={headerPinned ? "bg-blue-700 hover:bg-blue-800 w-8 px-0" : "w-8 px-0"}
+            {/* Pin button: neutral when pinned (default), blue+X only when user explicitly unpinned */}
+            <Button size="sm"
+              variant={pinUserModified && !headerPinned ? "default" : "outline"}
+              className={`w-8 px-0 ${pinUserModified && !headerPinned ? "bg-blue-700 hover:bg-blue-800" : ""}`}
               onClick={togglePin}
               title={headerPinned ? "בטל נעיצת כותרת" : "נעץ כותרת"}>
-              {headerPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+              {pinUserModified && !headerPinned ? <X className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
             </Button>
             <Button size="sm" variant={showFilters ? "default" : "outline"}
               className={`w-8 px-0 ${showFilters ? "bg-gray-700 hover:bg-gray-800" : ""}`}
@@ -1052,9 +1074,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
       {/* Table */}
       <CardContent className="pt-0 px-0">
-        <div style={{ overflowX: "auto" }}>
+        <div style={headerPinned ? {} : { overflowX: "auto" }}>
         <Table style={{ tableLayout: "fixed" }}>
-          <TableHeader style={headerPinned ? { position: "sticky", top: cardHeaderRef.current ? cardHeaderRef.current.offsetHeight : 0, zIndex: 20, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
+          <TableHeader style={headerPinned ? { position: "sticky", top: cardHeaderH, zIndex: 20, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
             <TableRow className="bg-gray-50">
               <TableHead dir="rtl" className="font-bold px-4 relative"
                 style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
