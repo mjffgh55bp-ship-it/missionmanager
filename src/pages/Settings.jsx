@@ -44,17 +44,19 @@ export default function Settings() {
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
-    // Batch 1
-    const [rolesSettings, workersData, scheduleColsSettings, populationsSettings] = await Promise.all([
+    const [rolesSettings, workersData] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.Worker.list(),
+    ]);
+    const [scheduleColsSettings, populationsSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
     ]);
-    // Batch 2
-    const [workerRolesSettings, shiftStatusesSettings, tasksSettings, taskQualSettings] = await Promise.all([
+    const [workerRolesSettings, shiftStatusesSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
+    ]);
+    const [tasksSettings, taskQualSettings] = await Promise.all([
       base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
       base44.entities.AppSettings.filter({ setting_key: "task_qualifications" })
     ]);
