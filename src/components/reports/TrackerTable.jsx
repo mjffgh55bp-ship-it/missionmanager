@@ -1096,17 +1096,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
 
       {/* Table */}
-      <CardContent className="pt-0 px-0 relative" style={headerPinned ? { height: "calc(100% - 48px)", display: "flex", flexDirection: "column" } : {}}>
-        {/* Resize handle (sticky to bottom-left, always visible) */}
+      <CardContent className="pt-0 px-0 relative overflow-hidden" style={headerPinned ? { height: "calc(100% - 48px)", display: "flex", flexDirection: "column" } : {}}>
+        {/* Resize handle (absolute, always docked to bottom-left) */}
         <div
-          className="sticky bottom-0 left-0 w-4 h-4 cursor-col-resize hover:bg-blue-400 transition-colors rounded-tr-sm z-50"
+          className="absolute bottom-0 left-0 w-4 h-4 cursor-col-resize hover:bg-blue-400 transition-colors rounded-tr-sm z-50"
           onMouseDown={e => startColResize(e, "__worker__")}
           style={{ userSelect: "none", background: "rgba(59, 130, 246, 0.3)" }}
           title="גרור לשינוי גודל"
         />
-        <div style={headerPinned ? { overflowX: "auto", overflowY: "auto", flex: 1 } : { overflowX: "auto" }}>
+        <div style={headerPinned ? { overflowX: "auto", overflowY: "auto", flex: 1 } : { overflowX: "auto", overflowY: "auto" }}>
         <Table style={{ tableLayout: "fixed" }}>
-          <TableHeader style={headerPinned ? { position: "sticky", top: 0, zIndex: 25, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
+          <TableHeader style={headerPinned ? { position: "sticky", top: cardHeaderH, zIndex: 25, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
             <TableRow className="bg-gray-50">
               <TableHead dir="rtl" className="font-bold px-4 relative"
                 style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
