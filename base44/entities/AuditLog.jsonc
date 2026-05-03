@@ -1,0 +1,62 @@
+{
+  "name": "AuditLog",
+  "type": "object",
+  "properties": {
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "export",
+        "import"
+      ],
+      "description": "Type of action performed"
+    },
+    "file_name": {
+      "type": "string",
+      "description": "Name of the exported/imported file"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email of the user who performed the action"
+    },
+    "user_name": {
+      "type": "string",
+      "description": "Name of the user who performed the action"
+    },
+    "row_count": {
+      "type": "number",
+      "description": "Total number of rows processed"
+    },
+    "imported_count": {
+      "type": "number",
+      "description": "Number of rows imported/created"
+    },
+    "updated_count": {
+      "type": "number",
+      "description": "Number of rows updated"
+    },
+    "skipped_count": {
+      "type": "number",
+      "description": "Number of rows skipped"
+    },
+    "error_count": {
+      "type": "number",
+      "description": "Number of rows with errors"
+    },
+    "date_range_start": {
+      "type": "string",
+      "description": "Start date of exported/imported data range"
+    },
+    "date_range_end": {
+      "type": "string",
+      "description": "End date of exported/imported data range"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes"
+    }
+  },
+  "required": [
+    "action_type",
+    "user_email"
+  ]
+}

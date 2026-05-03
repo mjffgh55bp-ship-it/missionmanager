@@ -56,6 +56,7 @@ import Settings from './pages/Settings';
 import ShiftMaster from './pages/ShiftMaster';
 import Workers from './pages/Workers';
 import Yearly from './pages/Yearly.jsx';
+import DataTransfer from './pages/DataTransfer.jsx';
 import __Layout from './Layout.jsx';
 
 
@@ -69,6 +70,7 @@ export const PAGES = {
     "ShiftMaster": ShiftMaster,
     "Workers": Workers,
     "Yearly": Yearly,
+    "DataTransfer": DataTransfer,
 }
 
 export const pagesConfig = {
