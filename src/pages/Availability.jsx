@@ -112,14 +112,15 @@ export default function Availability() {
     const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
     // Single batch: all global data in parallel
-    const [workersData, openRegSettings, userRolesSettings, eventsData, settings, weekTipsSettings, yearlyEventsData] = await Promise.all([
+    const [workersData, openRegSettings, userRolesSettings, eventsData, settings, weekTipsSettings, yearlyEventsData, acknowledgedSettings] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.AppSettings.filter({ setting_key: "open_registrations" }),
       base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.CompanyEvent.list("-date"),
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: `availability_tips_${weekStartStr2}` }),
-      base44.entities.YearlyEvent.list()
+      base44.entities.YearlyEvent.list(),
+      base44.entities.AppSettings.filter({ setting_key: `tips_acknowledged_${user.email}` }),
     ]);
 
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
@@ -152,11 +153,8 @@ export default function Availability() {
       setTipsEditValue(tipsData.message || "");
       setShowTipsAsPopup(tipsData.showAsPopup || false);
       if (tipsData.message && tipsData.message.trim() && tipsData.showAsPopup) {
-        const acknowledgedSettings = await base44.entities.AppSettings.filter({ 
-          setting_key: `tips_acknowledged_${user.email}` 
-        });
-        const acknowledgedVersion = acknowledgedSettings.length > 0 
-          ? acknowledgedSettings[0].setting_value 
+        const acknowledgedVersion = acknowledgedSettings.length > 0
+          ? acknowledgedSettings[0].setting_value
           : null;
         if (acknowledgedVersion !== tipsData.message) {
           setShowTipsPopup(true);
