@@ -7,10 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, UserX, UserCheck, ChefHat, Trash2, Users, Save, Search, ChevronDown, Check, Camera } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Save, Search, ChevronDown, Check, Camera, User, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { getSeniorityInfo } from "../components/utils/SeniorityUtils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Workers() {
@@ -176,7 +175,7 @@ export default function Workers() {
 
         <Tabs defaultValue="workers" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="workers" className="gap-2"><ChefHat className="w-4 h-4" />עובדים</TabsTrigger>
+            <TabsTrigger value="workers" className="gap-2"><Users className="w-4 h-4" />עובדים</TabsTrigger>
             <TabsTrigger value="roles" className="gap-2"><Users className="w-4 h-4" />תפקידי משתמשים</TabsTrigger>
           </TabsList>
 
@@ -185,26 +184,22 @@ export default function Workers() {
               {workers.filter(worker => {
                 if (!searchQuery.trim()) return true;
                 const query = searchQuery.toLowerCase();
-                const seniorityInfo = getSeniorityInfo(worker.seniority);
                 return (
                   worker.nickname?.toLowerCase().includes(query) ||
                   worker.role?.toLowerCase().includes(query) ||
                   worker.population?.toLowerCase().includes(query) ||
-                  seniorityInfo.label.toLowerCase().includes(query) ||
                   worker.training?.toLowerCase().includes(query) ||
                   worker.email?.toLowerCase().includes(query)
                 );
               }).map((worker) => {
-            const seniorityInfo = getSeniorityInfo(worker.seniority);
-
             return (
               <Card key={worker.id} className="border-none shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardHeader className="border-b bg-white">
                   <div className="flex items-center gap-3" dir="rtl">
-                    <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center bg-amber-500 shrink-0">
+                    <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center bg-gray-200 shrink-0">
                       {worker.photo_url
                         ? <img src={worker.photo_url} alt={worker.nickname} className="w-full h-full object-cover" />
-                        : <ChefHat className="w-6 h-6 text-white" />}
+                        : <User className="w-6 h-6 text-gray-500" />}
                     </div>
                     <div className="flex-1 text-right">
                       <CardTitle className="text-lg">{worker.nickname}</CardTitle>
@@ -213,7 +208,6 @@ export default function Workers() {
                           <Badge key={r} className="bg-blue-100 text-blue-900">{r}</Badge>
                         ))}
                         {!(Array.isArray(worker.role) ? worker.role.length : worker.role) && <Badge className="bg-blue-100 text-blue-900">לא הוגדר</Badge>}
-                        <Badge className={seniorityInfo.color}>{seniorityInfo.label}</Badge>
                       </div>
                     </div>
                   </div>
@@ -236,8 +230,7 @@ export default function Workers() {
                       <h4 className="text-sm font-semibold text-green-900 mb-2" dir="rtl">כשירות</h4>
                       <div className="space-y-1">
                         {worker.population && <p className="text-sm text-gray-700" dir="rtl">👥 אוכלוסיה: {worker.population}</p>}
-                        <p className="text-sm text-gray-700" dir="rtl">🍳 תפקיד: {(Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).join(', ') || 'לא הוגדר'}</p>
-                        <p className="text-sm text-gray-700" dir="rtl">⭐ כשירות: {seniorityInfo.label}</p>
+                        <p className="text-sm text-gray-700" dir="rtl">👤 תפקיד: {(Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).join(', ') || 'לא הוגדר'}</p>
                       </div>
                     </div>
 
@@ -265,7 +258,7 @@ export default function Workers() {
             {workers.length === 0 && (
           <Card className="border-none shadow-lg">
             <CardContent className="py-16 text-center">
-              <ChefHat className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <User className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2" dir="rtl">עדיין אין עובדים</h3>
               <p className="text-gray-600 mb-6" dir="rtl">התחל בהוספת חבר הצוות הראשון שלך</p>
               <Button onClick={() => setShowDialog(true)} className="bg-blue-900 hover:bg-blue-800" dir="rtl"><Plus className="w-4 h-4 mr-2" />הוסף עובד ראשון</Button>
@@ -319,18 +312,24 @@ export default function Workers() {
             <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto" dir="rtl">
 
               {/* תמונה */}
-              <div className="flex justify-center">
+              <div className="flex flex-col items-center gap-2">
                 <label className="cursor-pointer group relative">
-                  <div className="w-20 h-20 rounded-full overflow-hidden bg-amber-100 flex items-center justify-center border-2 border-dashed border-amber-300 group-hover:border-amber-500 transition-colors">
+                  <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300 group-hover:border-blue-400 transition-colors">
                     {formData.photo_url
                       ? <img src={formData.photo_url} alt="תמונה" className="w-full h-full object-cover" />
-                      : <Camera className="w-8 h-8 text-amber-400" />}
+                      : <User className="w-10 h-10 text-gray-400" />}
                   </div>
                   <div className="absolute inset-0 rounded-full bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                     <Camera className="w-6 h-6 text-white" />
                   </div>
                   <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
                 </label>
+                {formData.photo_url && (
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev, photo_url: "" }))}
+                    className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1" dir="rtl">
+                    <X className="w-3 h-3" />הסר תמונה
+                  </button>
+                )}
               </div>
               
               {/* פרטים אישיים */}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
-import { LayoutDashboard, Calendar, Users, Truck, BarChart3, ChefHat, Grid, Clock, Award, Settings, ExternalLink, CalendarDays, Calculator } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Truck, BarChart3, Grid, Clock, Award, Settings, ExternalLink, CalendarDays, Calculator, Briefcase } from "lucide-react";
 
 
 const managerNavigationItems = [
@@ -144,7 +144,7 @@ export default function Layout({ children }) {
         >
           {/* Logo icon */}
           <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex items-center justify-center shadow mb-3 flex-shrink-0">
-            <ChefHat className="w-4 h-4 text-white" />
+            <Briefcase className="w-4 h-4 text-white" />
           </div>
 
           {navigationItems.map((item) => {

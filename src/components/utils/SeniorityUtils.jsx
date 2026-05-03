@@ -1,7 +1,7 @@
 // Seniority progression rules
 export const SENIORITY_LEVELS = {
   trainee: {
-    label: "Trainee",
+    label: "מתחיל",
     color: "bg-orange-100 text-orange-800",
     borderColor: "border-orange-300",
     hoursRequired: 0,
@@ -9,7 +9,7 @@ export const SENIORITY_LEVELS = {
     hoursToNext: 50
   },
   newbie: {
-    label: "Newbie",
+    label: "מתמחה",
     color: "bg-blue-100 text-blue-800",
     borderColor: "border-blue-300",
     hoursRequired: 50,
@@ -17,7 +17,7 @@ export const SENIORITY_LEVELS = {
     hoursToNext: 150
   },
   experienced_chef: {
-    label: "Experienced Chef",
+    label: "מנוסה",
     color: "bg-purple-100 text-purple-800",
     borderColor: "border-purple-300",
     hoursRequired: 200,
