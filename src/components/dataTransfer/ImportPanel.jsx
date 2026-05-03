@@ -98,12 +98,25 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     if (!preview) return;
     setApplying(true);
 
-    const [allTemplates, existingRows, workers, existingAvailabilities] = await Promise.all([
+    // Collect all unique dates from the schedule rows to filter queries
+    const importDates = [...new Set(preview.scheduleRows.map(r => r["תאריך"]).filter(Boolean))];
+
+    const [allTemplates, workers] = await Promise.all([
       base44.entities.Template.list(),
-      base44.entities.TemplateRow.list(),
       base44.entities.Worker.list(),
-      base44.entities.Availability.list(),
     ]);
+
+    // Fetch TemplateRows for each date in the import file
+    const existingRowsArrays = await Promise.all(
+      importDates.map(date => base44.entities.TemplateRow.filter({ date }))
+    );
+    const existingRows = existingRowsArrays.flat();
+
+    // Fetch availabilities for the weeks in the import file
+    const importWeeks = [...new Set(preview.availRows.map(r => r["שבוע"]).filter(Boolean))];
+    const existingAvailabilities = importWeeks.length > 0
+      ? (await Promise.all(importWeeks.map(w => base44.entities.Availability.filter({ week_start_date: w })))).flat()
+      : [];
 
     // Build lookup maps
     const templateByName = {};
