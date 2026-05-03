@@ -473,7 +473,11 @@ export default function Schedule() {
                 key,
                 template_id: rows[0].template_id,
                 group_id: rows[0].group_id,
-                rows: rows.sort((a, b) => new Date(a.created_date) - new Date(b.created_date))
+                rows: rows.sort((a, b) => {
+                    const aO = a.values?._order ?? new Date(a.created_date).getTime();
+                    const bO = b.values?._order ?? new Date(b.created_date).getTime();
+                    return aO - bO;
+                  })
               }));
 
               if (mokedOrder.length > 0) {
@@ -736,24 +740,32 @@ export default function Schedule() {
                                   {editMode && (
                                     <TableCell className="w-[60px] p-0">
                                       <div className="flex flex-col gap-0 items-center">
-                                        <Button size="icon" variant="ghost" className="h-4 w-4" disabled={rowIndex === 0}
-                                          onClick={async () => {
-                                            const prevRow = templateRowsForTemplate[rowIndex - 1];
-                                            await base44.entities.TemplateRow.update(row.id, { created_date: prevRow.created_date });
-                                            await base44.entities.TemplateRow.update(prevRow.id, { created_date: row.created_date });
-                                            loadData();
-                                          }}>
-                                          <ChevronUp className="w-3 h-3" />
-                                        </Button>
-                                        <Button size="icon" variant="ghost" className="h-4 w-4" disabled={rowIndex === templateRowsForTemplate.length - 1}
-                                          onClick={async () => {
-                                            const nextRow = templateRowsForTemplate[rowIndex + 1];
-                                            await base44.entities.TemplateRow.update(row.id, { created_date: nextRow.created_date });
-                                            await base44.entities.TemplateRow.update(nextRow.id, { created_date: row.created_date });
-                                            loadData();
-                                          }}>
-                                          <ChevronDown className="w-3 h-3" />
-                                        </Button>
+                                       <Button size="icon" variant="ghost" className="h-4 w-4" disabled={rowIndex === 0}
+                                         onClick={async () => {
+                                           const rows = [...templateRowsForTemplate];
+                                           const a = rows[rowIndex];
+                                           const b = rows[rowIndex - 1];
+                                           const aOrder = a.values?._order ?? rowIndex;
+                                           const bOrder = b.values?._order ?? (rowIndex - 1);
+                                           await base44.entities.TemplateRow.update(a.id, { values: { ...a.values, _order: bOrder } });
+                                           await base44.entities.TemplateRow.update(b.id, { values: { ...b.values, _order: aOrder } });
+                                           loadData();
+                                         }}>
+                                         <ChevronUp className="w-3 h-3" />
+                                       </Button>
+                                       <Button size="icon" variant="ghost" className="h-4 w-4" disabled={rowIndex === templateRowsForTemplate.length - 1}
+                                         onClick={async () => {
+                                           const rows = [...templateRowsForTemplate];
+                                           const a = rows[rowIndex];
+                                           const b = rows[rowIndex + 1];
+                                           const aOrder = a.values?._order ?? rowIndex;
+                                           const bOrder = b.values?._order ?? (rowIndex + 1);
+                                           await base44.entities.TemplateRow.update(a.id, { values: { ...a.values, _order: bOrder } });
+                                           await base44.entities.TemplateRow.update(b.id, { values: { ...b.values, _order: aOrder } });
+                                           loadData();
+                                         }}>
+                                         <ChevronDown className="w-3 h-3" />
+                                       </Button>
                                       </div>
                                     </TableCell>
                                   )}
