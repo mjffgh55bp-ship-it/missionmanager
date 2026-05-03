@@ -1,66 +1,13 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import * as XLSX from "xlsx";
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
+import { format, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Download, CheckCircle2, Loader2 } from "lucide-react";
-import {
-  EXPORT_SOURCE_NAME,
-  ASSIGNMENT_SCHEMA,
-  AVAILABILITY_SCHEMA,
-  SHEET_ASSIGNMENTS,
-  SHEET_AVAILABILITY,
-  SHEET_META,
-  sanitizeText,
-} from "@/lib/dataTransferSchema";
+import { sanitizeText } from "@/lib/dataTransferSchema";
 
 const HEBREW_MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
-
-function buildHeaderRow(schema) {
-  return Object.values(schema).map(d => d.label);
-}
-
-function assignmentToRow(a, workers) {
-  const worker = workers.find(w => w.id === a.chef_id || w.id === a.sous_chef_id || w.id === a.additional_chef_id);
-  // We export one row per worker-assignment combination
-  const rows = [];
-  const pushRow = (wid, role) => {
-    const w = workers.find(x => x.id === wid);
-    if (!w) return;
-    rows.push([
-      sanitizeText(w.id),
-      sanitizeText(w.nickname || ""),
-      sanitizeText(a.date),
-      sanitizeText(a.start_time),
-      sanitizeText(a.end_time),
-      a.hours ?? "",
-      sanitizeText(role),
-      sanitizeText(a.status || ""),
-      sanitizeText(a.notes || ""),
-    ]);
-  };
-  if (a.chef_id)            pushRow(a.chef_id, a.chef_seniority || "שף");
-  if (a.sous_chef_id)       pushRow(a.sous_chef_id, a.sous_chef_seniority || "סו-שף");
-  if (a.additional_chef_id) pushRow(a.additional_chef_id, a.additional_chef_role || "נוסף");
-  return rows;
-}
-
-function availabilityToRows(av, workers) {
-  const worker = workers.find(w => w.id === av.worker_id);
-  if (!worker) return [];
-  return (av.shifts || []).map(s => [
-    sanitizeText(worker.id),
-    sanitizeText(worker.nickname || ""),
-    sanitizeText(av.week_start_date),
-    sanitizeText(s.date),
-    sanitizeText(s.start_time),
-    sanitizeText(s.end_time),
-    sanitizeText(s.type || ""),
-    sanitizeText(av.status || ""),
-  ]);
-}
 
 export default function ExportPanel({ currentUser, onAuditLog }) {
   const [calMonth, setCalMonth] = useState(new Date());
@@ -81,8 +28,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
   };
 
   const selectMonth = () => {
-    const keys = calDays.map(d => format(d, "yyyy-MM-dd"));
-    setSelectedDates(new Set(keys));
+    setSelectedDates(new Set(calDays.map(d => format(d, "yyyy-MM-dd"))));
     setDone(false);
   };
 
@@ -96,58 +42,121 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     const dates = [...selectedDates].sort();
     const dateStart = dates[0];
     const dateEnd = dates[dates.length - 1];
+    const dateSet = new Set(dates);
 
-    const [workers, assignments, availabilities] = await Promise.all([
+    // Load all needed data in parallel
+    const [workers, allTemplates, templateRows, availabilities] = await Promise.all([
       base44.entities.Worker.list(),
-      base44.entities.Assignment.list(),
+      base44.entities.Template.list(),
+      base44.entities.TemplateRow.list(),
       base44.entities.Availability.list(),
     ]);
 
-    const dateSet = new Set(dates);
+    // Build a map of worker id -> nickname
+    const workerMap = {};
+    workers.forEach(w => { workerMap[w.id] = w.nickname || w.id; });
 
-    // Filter assignments to selected dates
-    const filteredAssignments = assignments.filter(a => dateSet.has(a.date));
-    // Filter availabilities: any that overlap selected dates
+    // Build a map of template id -> template
+    const templateMap = {};
+    allTemplates.forEach(t => { templateMap[t.id] = t; });
+
+    // Filter rows to selected dates
+    const filteredRows = templateRows.filter(r => dateSet.has(r.date));
+
+    // Build schedule sheet: one row per TemplateRow
+    // Columns: תאריך, שם מוקד, + all column names that appear, + סטטוס
+    // First pass: collect all column names across filtered rows
+    const colNamesSet = new Set();
+    filteredRows.forEach(row => {
+      const template = templateMap[row.template_id];
+      if (!template) return;
+      const allCols = [...(template.columns || [])];
+      allCols.forEach(col => colNamesSet.add(col.name));
+      // Also include keys from values that aren't internal
+      Object.keys(row.values || {}).forEach(k => {
+        if (!["is_continuation", "continuation_from_date", "continuation_source_row_id", "status"].includes(k)
+            && !k.endsWith("_subTypes")) {
+          colNamesSet.add(k);
+        }
+      });
+    });
+    const colNames = [...colNamesSet];
+
+    // Build header row
+    const scheduleHeader = ["תאריך", "מוקד", ...colNames, "סטטוס"];
+
+    // Build data rows
+    const scheduleRows = filteredRows.map(row => {
+      const template = templateMap[row.template_id];
+      const mokedName = sanitizeText(template?.name || row.template_name || "");
+      const values = row.values || {};
+
+      const cells = colNames.map(colName => {
+        let val = values[colName];
+        if (val === undefined || val === null) return "";
+        // If value is a worker ID, resolve to name
+        if (typeof val === "string" && workerMap[val]) return sanitizeText(workerMap[val]);
+        return sanitizeText(String(val));
+      });
+
+      return [
+        sanitizeText(row.date),
+        mokedName,
+        ...cells,
+        sanitizeText(values.status || ""),
+      ];
+    });
+
+    // Build availability sheet
     const filteredAvailabilities = availabilities.filter(av =>
       (av.shifts || []).some(s => dateSet.has(s.date))
     );
+    const availHeader = ["מזהה עובד", "שם עובד", "שבוע", "תאריך משמרת", "שעת התחלה", "שעת סיום", "סוג זמינות", "סטטוס הגשה"];
+    const availRows = filteredAvailabilities.flatMap(av => {
+      const worker = workers.find(w => w.id === av.worker_id);
+      if (!worker) return [];
+      return (av.shifts || [])
+        .filter(s => dateSet.has(s.date))
+        .map(s => [
+          sanitizeText(worker.id),
+          sanitizeText(worker.nickname || ""),
+          sanitizeText(av.week_start_date),
+          sanitizeText(s.date),
+          sanitizeText(s.start_time || ""),
+          sanitizeText(s.end_time || ""),
+          sanitizeText(s.type || ""),
+          sanitizeText(av.status || ""),
+        ]);
+    });
 
-    const wb = XLSX.utils.book_new();
-
-    // --- Sheet: Assignments ---
-    const aHeader = buildHeaderRow(ASSIGNMENT_SCHEMA);
-    const aRows = filteredAssignments.flatMap(a => assignmentToRow(a, workers));
-    const aSheet = XLSX.utils.aoa_to_sheet([aHeader, ...aRows]);
-    XLSX.utils.book_append_sheet(wb, aSheet, SHEET_ASSIGNMENTS);
-
-    // --- Sheet: Availability ---
-    const vHeader = buildHeaderRow(AVAILABILITY_SCHEMA);
-    const vRows = filteredAvailabilities.flatMap(av => availabilityToRows(av, workers));
-    const vSheet = XLSX.utils.aoa_to_sheet([vHeader, ...vRows]);
-    XLSX.utils.book_append_sheet(wb, vSheet, SHEET_AVAILABILITY);
-
-    // --- Sheet: Metadata ---
-    const exportedAt = format(new Date(), "yyyy-MM-dd HH:mm");
-    const metaRows = [
-      ["מקור", sanitizeText(EXPORT_SOURCE_NAME)],
-      ["תאריך ייצוא", exportedAt],
-      ["תאריך התחלה", dateStart],
-      ["תאריך סיום", dateEnd],
-      ["מספר ימים", dates.length],
-      ["שורות משמרות", aRows.length],
-      ["שורות זמינות", vRows.length],
-      ["מייצא", sanitizeText(currentUser?.email || "")],
-    ];
-    const metaSheet = XLSX.utils.aoa_to_sheet(metaRows);
-    XLSX.utils.book_append_sheet(wb, metaSheet, SHEET_META);
-
-    // Validate at least one sheet has data
-    const totalRows = aRows.length + vRows.length;
+    const totalRows = scheduleRows.length + availRows.length;
     if (totalRows === 0) {
       setExporting(false);
       alert("לא נמצאו נתונים לטווח התאריכים שנבחר.");
       return;
     }
+
+    // Build workbook
+    const wb = XLSX.utils.book_new();
+
+    const scheduleSheet = XLSX.utils.aoa_to_sheet([scheduleHeader, ...scheduleRows]);
+    XLSX.utils.book_append_sheet(wb, scheduleSheet, "לוח משמרות");
+
+    const availSheet = XLSX.utils.aoa_to_sheet([availHeader, ...availRows]);
+    XLSX.utils.book_append_sheet(wb, availSheet, "זמינות");
+
+    const exportedAt = format(new Date(), "yyyy-MM-dd HH:mm");
+    const metaSheet = XLSX.utils.aoa_to_sheet([
+      ["מקור", "מערכת ניהול כוח אדם"],
+      ["תאריך ייצוא", exportedAt],
+      ["תאריך התחלה", dateStart],
+      ["תאריך סיום", dateEnd],
+      ["מספר ימים", dates.length],
+      ["שורות לוח משמרות", scheduleRows.length],
+      ["שורות זמינות", availRows.length],
+      ["מייצא", sanitizeText(currentUser?.email || "")],
+    ]);
+    XLSX.utils.book_append_sheet(wb, metaSheet, "מטא-נתונים");
 
     const fileName = `export_${dateStart}_${dateEnd}.xlsx`;
     XLSX.writeFile(wb, fileName);
@@ -170,7 +179,6 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
 
   return (
     <div className="space-y-4" dir="rtl">
-      {/* Calendar date picker */}
       <Card className="border shadow-sm">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
@@ -200,7 +208,6 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
               <div key={i} className="font-semibold text-gray-500 py-1">{d}</div>
             ))}
           </div>
-          {/* Pad first row */}
           <div className="grid grid-cols-7 gap-1">
             {Array.from({ length: calDays[0].getDay() }).map((_, i) => (
               <div key={`pad-${i}`} />
@@ -214,9 +221,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
                   key={key}
                   onClick={() => toggleDate(day)}
                   className={`h-8 w-full rounded text-xs font-medium transition-all border
-                    ${selected
-                      ? "bg-blue-900 text-white border-blue-900"
-                      : "bg-white hover:bg-blue-50 border-gray-200 text-gray-700"}
+                    ${selected ? "bg-blue-900 text-white border-blue-900" : "bg-white hover:bg-blue-50 border-gray-200 text-gray-700"}
                     ${today ? "ring-2 ring-blue-400" : ""}
                   `}
                 >
@@ -231,7 +236,6 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
         </CardContent>
       </Card>
 
-      {/* Export button */}
       <Button
         onClick={handleExport}
         disabled={selectedDates.size === 0 || exporting}
@@ -247,7 +251,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       </Button>
 
       {done && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800" dir="rtl">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
           ✓ הקובץ הורד בהצלחה ונרשם ביומן הביקורת.
         </div>
       )}
