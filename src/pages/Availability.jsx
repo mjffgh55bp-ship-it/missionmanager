@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,8 +89,19 @@ export default function Availability() {
   const [editingTips, setEditingTips] = useState(false);
   const [tipsEditValue, setTipsEditValue] = useState("");
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
+  const initialLoadStarted = useRef(false);
+  const lastWeekStart = useRef(null);
 
   useEffect(() => {
+    const weekKey = weekStart.toISOString();
+    if (!initialLoadStarted.current) {
+      initialLoadStarted.current = true;
+      lastWeekStart.current = weekKey;
+      loadData();
+      return;
+    }
+    if (lastWeekStart.current === weekKey) return;
+    lastWeekStart.current = weekKey;
     loadData();
   }, [weekStart]);
 
