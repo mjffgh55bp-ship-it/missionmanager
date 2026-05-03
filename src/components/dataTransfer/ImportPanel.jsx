@@ -151,7 +151,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       );
 
       if (existingTemplateRow) {
-        // Only update the status field — all other data stays intact
+        // Update status if changed
         if (status && existingTemplateRow.values?.status !== status) {
           const newValues = { ...existingTemplateRow.values, status };
           await base44.entities.TemplateRow.update(existingTemplateRow.id, { values: newValues });
@@ -162,8 +162,37 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           resultRows.push({ ...row, _type: "schedule", _finalStatus: "דולג", _reason: "אין שינוי" });
         }
       } else {
-        skipped++;
-        resultRows.push({ ...row, _type: "schedule", _finalStatus: "דולג", _reason: "שורה לא קיימת (ייצירה לא מורשית)" });
+        // Create new TemplateRow from the exported data
+        const values = {};
+        // Copy all columns except meta fields
+        const skipCols = new Set(["תאריך", "מוקד", "_rowNum", "_status", "_errors", "_type"]);
+        Object.entries(row).forEach(([k, v]) => {
+          if (!skipCols.has(k) && !k.startsWith("_") && v !== "" && v !== null && v !== undefined) {
+            values[k] = v;
+          }
+        });
+
+        // Resolve worker name back to worker ID for known worker columns
+        const workerColNames = new Set();
+        (template.columns || []).forEach(col => {
+          if (col.type === "worker") workerColNames.add(col.name);
+        });
+        workerColNames.forEach(colName => {
+          if (values[colName]) {
+            const matched = workers.find(w => w.nickname === values[colName]);
+            if (matched) values[colName] = matched.id;
+          }
+        });
+
+        await base44.entities.TemplateRow.create({
+          template_id: template.id,
+          template_name: mokedName,
+          date,
+          values,
+          group_id: Date.now().toString() + Math.random().toString(36).substr(2, 6),
+        });
+        imported++;
+        resultRows.push({ ...row, _type: "schedule", _finalStatus: "יובא", _reason: "שורה חדשה נוצרה" });
       }
     }
 
