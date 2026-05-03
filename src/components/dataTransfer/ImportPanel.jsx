@@ -124,6 +124,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
     let imported = 0, updated = 0, skipped = 0, errors = 0;
     const resultRows = [];
+    const groupIdCache = {}; // key: "date__mokedName" -> generated group_id
 
     // --- Apply schedule rows ---
     for (const row of preview.scheduleRows) {
@@ -165,7 +166,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         // Create new TemplateRow from the exported data
         const values = {};
         // Copy all columns except meta fields
-        const skipCols = new Set(["תאריך", "מוקד", "_rowNum", "_status", "_errors", "_type"]);
+        const skipCols = new Set(["תאריך", "מוקד", "_group_id", "_rowNum", "_status", "_errors", "_type"]);
         Object.entries(row).forEach(([k, v]) => {
           if (!skipCols.has(k) && !k.startsWith("_") && v !== "" && v !== null && v !== undefined) {
             values[k] = v;
@@ -184,12 +185,19 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           }
         });
 
+        // Use group_id from file if present, otherwise generate one per (date+moked) group
+        const fileGroupId = sanitizeText(row["_group_id"] || "");
+        const groupId = fileGroupId || groupIdCache[`${date}__${mokedName}`] || (Date.now().toString() + Math.random().toString(36).substr(2, 6));
+        if (!fileGroupId && !groupIdCache[`${date}__${mokedName}`]) {
+          groupIdCache[`${date}__${mokedName}`] = groupId;
+        }
+
         await base44.entities.TemplateRow.create({
           template_id: template.id,
           template_name: mokedName,
           date,
           values,
-          group_id: Date.now().toString() + Math.random().toString(36).substr(2, 6),
+          group_id: groupId,
         });
         imported++;
         resultRows.push({ ...row, _type: "schedule", _finalStatus: "יובא", _reason: "שורה חדשה נוצרה" });

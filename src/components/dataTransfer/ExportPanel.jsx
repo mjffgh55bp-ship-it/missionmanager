@@ -83,7 +83,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     const colNames = [...colNamesSet];
 
     // Build header row
-    const scheduleHeader = ["תאריך", "מוקד", ...colNames, "סטטוס"];
+    const scheduleHeader = ["תאריך", "מוקד", "_group_id", ...colNames, "סטטוס"];
 
     // Build data rows
     const scheduleRows = filteredRows.map(row => {
@@ -102,6 +102,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       return [
         sanitizeText(row.date),
         mokedName,
+        sanitizeText(row.group_id || ""),
         ...cells,
         sanitizeText(values.status || ""),
       ];
