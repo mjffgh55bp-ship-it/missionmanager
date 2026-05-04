@@ -964,7 +964,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   }, [showFilters]);
 
   return (
-    <Card className="border-none shadow-lg mb-6" dir="rtl" style={headerPinned ? { maxHeight: "70vh", overflowY: "auto", display: "flex", flexDirection: "column" } : {}}>
+    <Card className="border-none shadow-lg mb-6" dir="rtl">
       {/* Header */}
       <CardHeader
         ref={cardHeaderRef}
@@ -1096,7 +1096,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
 
       {/* Table */}
-      <CardContent className="pt-0 px-0 relative" style={headerPinned ? { flex: 1, overflowX: "auto" } : { overflowX: "auto" }}>
+      <CardContent className="pt-0 px-0 relative" style={headerPinned ? { overflowY: "auto", overflowX: "auto", maxHeight: `calc(70vh - ${cardHeaderH}px)` } : { overflowX: "auto" }}>
         {/* Resize handle (absolute, always docked to bottom-left) */}
         <div
           className="absolute bottom-0 left-0 w-4 h-4 cursor-col-resize hover:bg-blue-400 transition-colors rounded-tr-sm z-50"
@@ -1105,7 +1105,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           title="גרור לשינוי גודל"
         />
         <Table style={{ tableLayout: "fixed" }}>
-          <TableHeader style={headerPinned ? { position: "sticky", top: cardHeaderH, zIndex: 25, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
+          <TableHeader style={headerPinned ? { position: "sticky", top: 0, zIndex: 25, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
             <TableRow className="bg-gray-50">
               <TableHead dir="rtl" className="font-bold px-4 relative"
                 style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
