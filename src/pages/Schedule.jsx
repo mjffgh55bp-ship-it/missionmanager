@@ -96,27 +96,29 @@ export default function Schedule() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     lastWeekStart.current = weekStartStr;
 
+    // Batch: fetch workers, templates, rows, availabilities + ALL settings in one call
     const [
       workersData, availabilitiesData, unavailabilitiesData,
-      colTypesSettings, allTemplatesData, templateRowsData,
-      shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings,
-      openRegSettings, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings
+      allTemplatesData, templateRowsData, allSettings
     ] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
       base44.entities.Availability.filter({ week_start_date: weekStartStr }),
       base44.entities.Unavailability.filter({ date: dateString }),
-      base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
       base44.entities.Template.filter({ active: true }),
       base44.entities.TemplateRow.filter({ date: dateString }),
-      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
-      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
-      base44.entities.AppSettings.filter({ setting_key: "open_registrations" }),
-      base44.entities.AppSettings.filter({ setting_key: `moked_order_${dateString}` }),
-      base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` }),
-      base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` }),
+      base44.entities.AppSettings.list(), // single call for all settings
     ]);
+
+    // Filter settings client-side
+    const colTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
+    const shiftStatusesSettings = allSettings.filter(s => s.setting_key === "shift_statuses");
+    const workerRolesSettings = allSettings.filter(s => s.setting_key === "worker_roles");
+    const tasksSettings = allSettings.filter(s => s.setting_key === "tasks_list");
+    const taskQualSettings = allSettings.filter(s => s.setting_key === "task_qualifications");
+    const openRegSettings = allSettings.filter(s => s.setting_key === "open_registrations");
+    const mokedOrderSettings = allSettings.filter(s => s.setting_key === `moked_order_${dateString}`);
+    const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
+    const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
 
     applyStaticData({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData });
     applyDailyData({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
@@ -131,12 +133,12 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
 
+    // Fetch daily AppSettings in one batch by fetching all settings with date suffix
+    // then filter client-side — avoids 3 separate rate-limited calls
     const promises = [
       base44.entities.TemplateRow.filter({ date: dateString }),
       base44.entities.Unavailability.filter({ date: dateString }),
-      base44.entities.AppSettings.filter({ setting_key: `moked_order_${dateString}` }),
-      base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` }),
-      base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` }),
+      base44.entities.AppSettings.list(), // fetch all settings once, filter below
     ];
     if (weekChanged) {
       promises.push(base44.entities.Availability.filter({ week_start_date: weekStartStr }));
@@ -144,8 +146,12 @@ export default function Schedule() {
     }
 
     const results = await Promise.all(promises);
-    const [templateRowsData, unavailabilitiesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings] = results;
-    const availabilitiesData = weekChanged ? results[5] : null;
+    const [templateRowsData, unavailabilitiesData, allSettings] = results;
+    const availabilitiesData = weekChanged ? results[3] : null;
+
+    const mokedOrderSettings = allSettings.filter(s => s.setting_key === `moked_order_${dateString}`);
+    const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
+    const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
 
     applyDailyData({ dateString, templateRowsData, allTemplatesData: allTemplates, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     setDailyLoading(false);
