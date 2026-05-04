@@ -92,11 +92,20 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       const mokedName = sanitizeText(template?.name || row.template_name || "");
       const values = row.values || {};
 
+      // Build a set of worker-type column names for this template
+      const templateWorkerCols = new Set(
+        (templateMap[row.template_id]?.columns || [])
+          .filter(c => c.type === "worker")
+          .map(c => c.name)
+      );
+
       const cells = colNames.map(colName => {
         let val = values[colName];
         if (val === undefined || val === null || val === "" || val === "None") return "";
-        // If value is a worker ID, resolve to name
-        if (typeof val === "string" && workerMap[val]) return sanitizeText(workerMap[val]);
+        // If this is a worker-type column, always resolve ID -> name
+        if (templateWorkerCols.has(colName)) {
+          return workerMap[val] ? sanitizeText(workerMap[val]) : "";
+        }
         // If value is an object (e.g. סילבוס counts), serialize to JSON string
         if (typeof val === "object") return sanitizeText(JSON.stringify(val));
         return sanitizeText(String(val));

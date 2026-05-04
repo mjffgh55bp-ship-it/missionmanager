@@ -177,9 +177,19 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
         // If this is a worker-type column, resolve name -> ID
         if (workerColNames.has(k)) {
-          const matched = workers.find(w => w.nickname === String(v).trim());
-          if (matched) finalVal = matched.id;
-          // If no match found, keep the raw value (might already be an ID)
+          const nameToMatch = String(v).trim();
+          // Try exact nickname match first
+          let matched = workers.find(w => w.nickname === nameToMatch);
+          // Also try stripping any leading ' added by sanitizeText (formula-injection protection)
+          if (!matched && nameToMatch.startsWith("'")) {
+            matched = workers.find(w => w.nickname === nameToMatch.slice(1));
+          }
+          if (matched) {
+            finalVal = matched.id;
+          } else {
+            // Can't resolve name -> skip this field so existing DB value is preserved
+            return;
+          }
         } else {
           // Try to parse JSON strings back to objects (e.g. סילבוס: '{"סילבוס 1":1}')
           if (typeof v === "string" && v.startsWith("{") && v.endsWith("}")) {
