@@ -964,12 +964,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   }, [showFilters]);
 
   return (
-    <Card className="border-none shadow-lg mb-6" dir="rtl">
+    <Card className="border-none shadow-lg mb-6" dir="rtl" style={headerPinned ? { position: "sticky", top: 0, zIndex: 20 } : {}}>
       {/* Header */}
       <CardHeader
         ref={cardHeaderRef}
         className="border-b py-3 px-4 cursor-grab active:cursor-grabbing select-none bg-white"
-        style={headerPinned ? { position: "sticky", top: 0, zIndex: 30, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" } : {}}
+        style={{ borderRadius: "inherit" }}
         onMouseDown={onDragStart}
       >
         <div className="flex items-center justify-between gap-2">
@@ -1096,7 +1096,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
 
       {/* Table */}
-      <CardContent className="pt-0 px-0 relative" style={headerPinned ? { overflowY: "auto", overflowX: "auto", maxHeight: `calc(70vh - ${cardHeaderH}px)` } : { overflowX: "auto" }}>
+      <CardContent className="pt-0 px-0 relative" style={{ overflowX: "auto", ...(headerPinned ? { overflowY: "auto", maxHeight: `calc(60vh - ${cardHeaderH}px)` } : {}) }}>
         {/* Resize handle (absolute, always docked to bottom-left) */}
         <div
           className="absolute bottom-0 left-0 w-4 h-4 cursor-col-resize hover:bg-blue-400 transition-colors rounded-tr-sm z-50"
