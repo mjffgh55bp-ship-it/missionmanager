@@ -74,7 +74,8 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       allCols.forEach(col => colNamesSet.add(col.name));
       // Also include keys from values that aren't internal
       Object.keys(row.values || {}).forEach(k => {
-        if (!["is_continuation", "continuation_from_date", "continuation_source_row_id", "status"].includes(k)
+        if (!["is_continuation", "continuation_from_date", "continuation_source_row_id", "status", "_order"].includes(k)
+            && !k.startsWith("_")
             && !k.endsWith("_subTypes")) {
           colNamesSet.add(k);
         }

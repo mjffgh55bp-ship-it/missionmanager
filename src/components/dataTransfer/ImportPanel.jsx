@@ -151,40 +151,38 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         r.date === date && r.template_id === template.id
       );
 
-      if (existingTemplateRow) {
-        // Update status if changed
-        if (status && existingTemplateRow.values?.status !== status) {
-          const newValues = { ...existingTemplateRow.values, status };
-          await base44.entities.TemplateRow.update(existingTemplateRow.id, { values: newValues });
-          updated++;
-          resultRows.push({ ...row, _type: "schedule", _finalStatus: "עודכן", _reason: "סטטוס עודכן" });
-        } else {
-          skipped++;
-          resultRows.push({ ...row, _type: "schedule", _finalStatus: "דולג", _reason: "אין שינוי" });
+      // Build values object from the row (shared between create and update paths)
+      const skipCols = new Set(["תאריך", "מוקד", "_group_id", "_rowNum", "_status", "_errors", "_type", "סטטוס"]);
+      const importedValues = {};
+      Object.entries(row).forEach(([k, v]) => {
+        if (!skipCols.has(k) && !k.startsWith("_") && v !== "" && v !== null && v !== undefined) {
+          importedValues[k] = v;
         }
+      });
+      // Add status back explicitly
+      if (status) importedValues.status = status;
+
+      // Resolve worker names -> IDs for worker-type columns
+      const workerColNames = new Set();
+      (template.columns || []).forEach(col => {
+        if (col.type === "worker") workerColNames.add(col.name);
+      });
+      workerColNames.forEach(colName => {
+        if (importedValues[colName]) {
+          const matched = workers.find(w => w.nickname === importedValues[colName]);
+          if (matched) importedValues[colName] = matched.id;
+        }
+      });
+
+      if (existingTemplateRow) {
+        // Merge imported values over existing values (preserve _order and internal fields)
+        const preserved = {};
+        if (existingTemplateRow.values?._order !== undefined) preserved._order = existingTemplateRow.values._order;
+        const newValues = { ...existingTemplateRow.values, ...importedValues, ...preserved };
+        await base44.entities.TemplateRow.update(existingTemplateRow.id, { values: newValues });
+        updated++;
+        resultRows.push({ ...row, _type: "schedule", _finalStatus: "עודכן", _reason: "ערכי שורה עודכנו" });
       } else {
-        // Create new TemplateRow from the exported data
-        const values = {};
-        // Copy all columns except meta fields
-        const skipCols = new Set(["תאריך", "מוקד", "_group_id", "_rowNum", "_status", "_errors", "_type"]);
-        Object.entries(row).forEach(([k, v]) => {
-          if (!skipCols.has(k) && !k.startsWith("_") && v !== "" && v !== null && v !== undefined) {
-            values[k] = v;
-          }
-        });
-
-        // Resolve worker name back to worker ID for known worker columns
-        const workerColNames = new Set();
-        (template.columns || []).forEach(col => {
-          if (col.type === "worker") workerColNames.add(col.name);
-        });
-        workerColNames.forEach(colName => {
-          if (values[colName]) {
-            const matched = workers.find(w => w.nickname === values[colName]);
-            if (matched) values[colName] = matched.id;
-          }
-        });
-
         // Use group_id from file if present, otherwise generate one per (date+moked) group
         const fileGroupId = sanitizeText(row["_group_id"] || "");
         const groupId = fileGroupId || groupIdCache[`${date}__${mokedName}`] || (Date.now().toString() + Math.random().toString(36).substr(2, 6));
@@ -196,7 +194,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           template_id: template.id,
           template_name: mokedName,
           date,
-          values,
+          values: importedValues,
           group_id: groupId,
         });
         imported++;
