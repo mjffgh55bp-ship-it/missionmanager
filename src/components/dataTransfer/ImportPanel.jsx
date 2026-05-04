@@ -162,26 +162,35 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       // Build values object from the row (shared between create and update paths)
       const skipCols = new Set(["תאריך", "מוקד", "_group_id", "_rowNum", "_status", "_errors", "_type", "סטטוס"]);
       const importedValues = {};
-      Object.entries(row).forEach(([k, v]) => {
-        // Skip meta cols, underscore-prefixed, empty, null, undefined, and literal "None" string from xlsx export
-        if (!skipCols.has(k) && !k.startsWith("_") && v !== "" && v !== null && v !== undefined && v !== "None") {
-          importedValues[k] = v;
-        }
-      });
-      // Add status back explicitly
-      if (status) importedValues.status = status;
 
-      // Resolve worker names -> IDs for worker-type columns
+      // Build a set of worker-type column names from the template
       const workerColNames = new Set();
       (template.columns || []).forEach(col => {
         if (col.type === "worker") workerColNames.add(col.name);
       });
-      workerColNames.forEach(colName => {
-        if (importedValues[colName]) {
-          const matched = workers.find(w => w.nickname === importedValues[colName]);
-          if (matched) importedValues[colName] = matched.id;
+
+      Object.entries(row).forEach(([k, v]) => {
+        // Skip meta cols, underscore-prefixed, empty, null, undefined, and literal "None" string from xlsx export
+        if (skipCols.has(k) || k.startsWith("_") || v === "" || v === null || v === undefined || v === "None") return;
+
+        let finalVal = v;
+
+        // If this is a worker-type column, resolve name -> ID
+        if (workerColNames.has(k)) {
+          const matched = workers.find(w => w.nickname === String(v).trim());
+          if (matched) finalVal = matched.id;
+          // If no match found, keep the raw value (might already be an ID)
+        } else {
+          // Try to parse JSON strings back to objects (e.g. סילבוס: '{"סילבוס 1":1}')
+          if (typeof v === "string" && v.startsWith("{") && v.endsWith("}")) {
+            try { finalVal = JSON.parse(v); } catch { finalVal = v; }
+          }
         }
+
+        importedValues[k] = finalVal;
       });
+      // Add status back explicitly
+      if (status) importedValues.status = status;
 
       if (existingTemplateRow) {
         // Merge imported values over existing values (preserve _order and internal fields)
