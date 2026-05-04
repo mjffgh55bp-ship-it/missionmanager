@@ -965,7 +965,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   }, [showFilters, headerPinned]);
 
   return (
-    <div style={headerPinned ? { overflowY: "auto", maxHeight: "70vh" } : {}}>
     <Card className="border-none shadow-lg mb-6" dir="rtl">
       {/* Header */}
       <CardHeader
@@ -1386,6 +1385,5 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         </Table>
         </CardContent>
         </Card>
-        </div>
         );
         }
