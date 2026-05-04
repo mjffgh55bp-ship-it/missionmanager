@@ -954,22 +954,24 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   );
 
   const [cardHeaderH, setCardHeaderH] = useState(0);
+  // Re-measure whenever filters panel opens/closes (which changes header height)
   useEffect(() => {
-    if (!cardHeaderRef.current) return;
-    const obs = new ResizeObserver(() => {
-      setCardHeaderH(cardHeaderRef.current?.offsetHeight || 0);
-    });
-    obs.observe(cardHeaderRef.current);
+    const el = cardHeaderRef.current;
+    if (!el) return;
+    setCardHeaderH(el.offsetHeight || 0);
+    const obs = new ResizeObserver(() => setCardHeaderH(el.offsetHeight || 0));
+    obs.observe(el);
     return () => obs.disconnect();
-  }, [showFilters]);
+  }, [showFilters, headerPinned]);
 
   return (
-    <Card className="border-none shadow-lg mb-6" dir="rtl" style={headerPinned ? { position: "sticky", top: 0, zIndex: 20 } : {}}>
+    <div style={headerPinned ? { overflowY: "auto", maxHeight: "70vh" } : {}}>
+    <Card className="border-none shadow-lg mb-6" dir="rtl">
       {/* Header */}
       <CardHeader
         ref={cardHeaderRef}
         className="border-b py-3 px-4 cursor-grab active:cursor-grabbing select-none bg-white"
-        style={{ borderRadius: "inherit" }}
+        style={headerPinned ? { position: "sticky", top: 0, zIndex: 30, backgroundColor: "white", boxShadow: "0 2px 4px rgba(0,0,0,0.08)" } : {}}
         onMouseDown={onDragStart}
       >
         <div className="flex items-center justify-between gap-2">
@@ -1096,7 +1098,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
 
       {/* Table */}
-      <CardContent className="pt-0 px-0 relative" style={{ overflowX: "auto", ...(headerPinned ? { overflowY: "auto", maxHeight: `calc(60vh - ${cardHeaderH}px)` } : {}) }}>
+      <CardContent className="pt-0 px-0 relative" style={{ overflowX: "auto" }}>
         {/* Resize handle (absolute, always docked to bottom-left) */}
         <div
           className="absolute bottom-0 left-0 w-4 h-4 cursor-col-resize hover:bg-blue-400 transition-colors rounded-tr-sm z-50"
@@ -1105,7 +1107,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           title="גרור לשינוי גודל"
         />
         <Table style={{ tableLayout: "fixed" }}>
-          <TableHeader style={headerPinned ? { position: "sticky", top: 0, zIndex: 25, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
+          <TableHeader style={headerPinned ? { position: "sticky", top: cardHeaderH, zIndex: 25, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
             <TableRow className="bg-gray-50">
               <TableHead dir="rtl" className="font-bold px-4 relative"
                 style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
@@ -1384,5 +1386,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         </Table>
         </CardContent>
         </Card>
+        </div>
         );
         }
