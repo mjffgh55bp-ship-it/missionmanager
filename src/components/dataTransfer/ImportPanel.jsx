@@ -146,16 +146,25 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         continue;
       }
 
-      // Find existing TemplateRow for this date + template
-      const existingTemplateRow = existingRows.find(r =>
-        r.date === date && r.template_id === template.id
-      );
+      // Find existing TemplateRow for this date + template using group_id + row index within group
+      const fileGroupId = sanitizeText(row["_group_id"] || "");
+      // Count how many rows with this same group_id we've already processed (0-based index)
+      const groupProcessedKey = `processed__${fileGroupId}`;
+      const rowIndexInGroup = groupIdCache[groupProcessedKey] || 0;
+      groupIdCache[groupProcessedKey] = rowIndexInGroup + 1;
+
+      // Get all existing rows for this group_id, sorted by their _order or created_date
+      const existingGroupRows = existingRows
+        .filter(r => r.group_id === fileGroupId)
+        .sort((a, b) => (a.values?._order ?? 0) - (b.values?._order ?? 0));
+      const existingTemplateRow = existingGroupRows[rowIndexInGroup] || null;
 
       // Build values object from the row (shared between create and update paths)
       const skipCols = new Set(["תאריך", "מוקד", "_group_id", "_rowNum", "_status", "_errors", "_type", "סטטוס"]);
       const importedValues = {};
       Object.entries(row).forEach(([k, v]) => {
-        if (!skipCols.has(k) && !k.startsWith("_") && v !== "" && v !== null && v !== undefined) {
+        // Skip meta cols, underscore-prefixed, empty, null, undefined, and literal "None" string from xlsx export
+        if (!skipCols.has(k) && !k.startsWith("_") && v !== "" && v !== null && v !== undefined && v !== "None") {
           importedValues[k] = v;
         }
       });
@@ -184,7 +193,6 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         resultRows.push({ ...row, _type: "schedule", _finalStatus: "עודכן", _reason: "ערכי שורה עודכנו" });
       } else {
         // Use group_id from file if present, otherwise generate one per (date+moked) group
-        const fileGroupId = sanitizeText(row["_group_id"] || "");
         const groupId = fileGroupId || groupIdCache[`${date}__${mokedName}`] || (Date.now().toString() + Math.random().toString(36).substr(2, 6));
         if (!fileGroupId && !groupIdCache[`${date}__${mokedName}`]) {
           groupIdCache[`${date}__${mokedName}`] = groupId;

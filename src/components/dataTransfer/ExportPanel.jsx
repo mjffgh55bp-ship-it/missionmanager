@@ -94,9 +94,11 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
 
       const cells = colNames.map(colName => {
         let val = values[colName];
-        if (val === undefined || val === null) return "";
+        if (val === undefined || val === null || val === "" || val === "None") return "";
         // If value is a worker ID, resolve to name
         if (typeof val === "string" && workerMap[val]) return sanitizeText(workerMap[val]);
+        // If value is an object (e.g. סילבוס counts), serialize to JSON string
+        if (typeof val === "object") return sanitizeText(JSON.stringify(val));
         return sanitizeText(String(val));
       });
 
