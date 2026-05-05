@@ -953,123 +953,209 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     !workerSearch || (w.nickname || "").includes(workerSearch)
   );
 
-  const [cardHeaderH, setCardHeaderH] = useState(0);
-  // Re-measure whenever filters panel opens/closes (which changes header height)
-  useEffect(() => {
-    const el = cardHeaderRef.current;
-    if (!el) return;
-    setCardHeaderH(el.offsetHeight || 0);
-    const obs = new ResizeObserver(() => setCardHeaderH(el.offsetHeight || 0));
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [showFilters, headerPinned]);
+  // Helper: render the column header row (used in both frozen block and normal table)
+  const renderColHeaderRow = () => (
+    <TableRow className="bg-gray-50">
+      <TableHead dir="rtl" className="font-bold px-4 relative"
+        style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
+        <button
+          onClick={() => handleSortClick(null)}
+          className="flex items-center gap-1 hover:text-blue-700 transition-colors"
+          title="מיון לפי שם"
+        >
+          עובד
+          {sortColId === null
+            ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
+            : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
+        </button>
+        <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors"
+          onMouseDown={e => startColResize(e, "__worker__")}
+          style={{ userSelect: "none" }} />
+      </TableHead>
+      {displayColumns.map((col, idx) => (
+        <TableHead key={col.id} dir="rtl" className="px-2 relative"
+          style={{ width: colWidths[col.id] || 140, minWidth: 60 }}>
+          <div className="flex flex-col items-center gap-0.5 py-0.5">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => !editMode && handleSortClick(col.id)}
+                className="font-medium flex items-center gap-1 hover:text-blue-700 transition-colors"
+              >
+                {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
+                {!editMode && (sortColId === col.id
+                  ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
+                  : <ArrowUpDown className="w-3 h-3 text-gray-300" />)}
+              </button>
+              {!editMode && isAuto(col.type) && (
+                <button
+                  onClick={() => setVisualDialogCol(col)}
+                  title="ניתוח ויזואלי"
+                  className={`p-0.5 rounded hover:bg-blue-100 transition-colors ${visualConfigs[col.id] ? "text-blue-600" : "text-gray-300 hover:text-blue-400"}`}
+                >
+                  <Gauge className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            {col.description && (
+              <span className="text-xs text-gray-400 font-normal text-center leading-tight">{col.description}</span>
+            )}
+            {editMode && (
+              <div className="flex gap-0.5 items-center">
+                <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === 0}
+                  onClick={() => {
+                    const next = [...editColumns];
+                    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                    setEditColumns(next);
+                  }}>
+                  <ChevronRight className="w-3 h-3" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === displayColumns.length - 1}
+                  onClick={() => {
+                    const next = [...editColumns];
+                    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                    setEditColumns(next);
+                  }}>
+                  <ChevronLeft className="w-3 h-3" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-blue-500 hover:text-blue-700"
+                  onClick={() => setConfiguringCol({ ...editColumns.find(c => c.id === col.id) })}>
+                  <Pencil className="w-3 h-3" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
+                  onClick={() => removeEditColumn(col.id)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+          <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors"
+            onMouseDown={e => startColResize(e, col.id)}
+            style={{ userSelect: "none" }} />
+        </TableHead>
+      ))}
+      {editMode && (
+        <TableHead className="w-[40px] p-0 text-center">
+          <button
+            onClick={addNewEditColumn}
+            className="flex items-center justify-center w-full h-full px-2 py-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors rounded"
+            title="הוסף עמודה">
+            <Plus className="w-4 h-4" />
+          </button>
+        </TableHead>
+      )}
+    </TableRow>
+  );
 
   return (
-    <Card className="border-none shadow-lg mb-6" dir="rtl">
-      {/* Header */}
-      <CardHeader
+    <Card className="border-none shadow-lg mb-6" dir="rtl" style={{ display: "flex", flexDirection: "column" }}>
+
+      {/* ── FrozenHeaderBlock (sticky when pin is active) ── */}
+      <div
         ref={cardHeaderRef}
-        className="border-b py-3 px-4 cursor-grab active:cursor-grabbing select-none bg-white"
-        style={headerPinned ? { position: "sticky", top: 0, zIndex: 30, backgroundColor: "white", boxShadow: "0 2px 4px rgba(0,0,0,0.08)" } : {}}
-        onMouseDown={onDragStart}
+        style={headerPinned ? { position: "sticky", top: 0, zIndex: 30, backgroundColor: "white", boxShadow: "0 2px 6px rgba(0,0,0,0.10)" } : { backgroundColor: "white" }}
       >
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base">{tracker.name}</CardTitle>
-          <div className="flex gap-2" onMouseDown={e => e.stopPropagation()}>
-            {/* Pin button: neutral when pinned (default), blue+X only when user explicitly unpinned */}
-            <Button size="sm"
-              variant={pinUserModified && !headerPinned ? "default" : "outline"}
-              className={`w-8 px-0 ${pinUserModified && !headerPinned ? "bg-blue-700 hover:bg-blue-800" : ""}`}
-              onClick={togglePin}
-              title={headerPinned ? "בטל נעיצת כותרת" : "נעץ כותרת"}>
-              {pinUserModified && !headerPinned ? <X className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
-            </Button>
-            <Button size="sm" variant={showFilters ? "default" : "outline"}
-              className={`w-8 px-0 ${showFilters ? "bg-gray-700 hover:bg-gray-800" : ""}`}
-              onClick={() => setShowFilters(!showFilters)}
-              title="סינון">
-              <Filter className="w-4 h-4" />
-            </Button>
-            <Button size="sm" variant={editMode ? "default" : "outline"}
-              className={`w-8 px-0 ${editMode ? "bg-purple-600 hover:bg-purple-700" : ""}`}
-              onClick={() => editMode ? saveAndExitEditMode() : openEditMode()}
-              title={editMode ? "סיים עריכה" : "ערוך עמודות"}>
-              <Pencil className="w-4 h-4" />
-            </Button>
-            {editMode && (
-              <ConfirmDeleteButton onConfirm={onDelete} variant="icon" />
-            )}
+        {/* General report header */}
+        <div
+          className="border-b py-3 px-4 cursor-grab active:cursor-grabbing select-none"
+          onMouseDown={onDragStart}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">{tracker.name}</CardTitle>
+            <div className="flex gap-2" onMouseDown={e => e.stopPropagation()}>
+              <Button size="sm"
+                variant={pinUserModified && !headerPinned ? "default" : "outline"}
+                className={`w-8 px-0 ${pinUserModified && !headerPinned ? "bg-blue-700 hover:bg-blue-800" : ""}`}
+                onClick={togglePin}
+                title={headerPinned ? "בטל נעיצת כותרת" : "נעץ כותרת"}>
+                {pinUserModified && !headerPinned ? <X className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+              </Button>
+              <Button size="sm" variant={showFilters ? "default" : "outline"}
+                className={`w-8 px-0 ${showFilters ? "bg-gray-700 hover:bg-gray-800" : ""}`}
+                onClick={() => setShowFilters(!showFilters)}
+                title="סינון">
+                <Filter className="w-4 h-4" />
+              </Button>
+              <Button size="sm" variant={editMode ? "default" : "outline"}
+                className={`w-8 px-0 ${editMode ? "bg-purple-600 hover:bg-purple-700" : ""}`}
+                onClick={() => editMode ? saveAndExitEditMode() : openEditMode()}
+                title={editMode ? "סיים עריכה" : "ערוך עמודות"}>
+                <Pencil className="w-4 h-4" />
+              </Button>
+              {editMode && (
+                <ConfirmDeleteButton onConfirm={onDelete} variant="icon" />
+              )}
+            </div>
           </div>
+
+          {/* Filters panel */}
+          {showFilters && (
+            <div className="pt-3 mt-3 border-t space-y-3">
+              <div>
+                <Label className="text-xs block mb-1 font-semibold text-gray-500">תקופה</Label>
+                <div className="flex flex-wrap gap-1">
+                  {DATE_MODES.map(m => (
+                    <Button key={m.value} variant={dateFilterMode === m.value ? "default" : "outline"} size="sm"
+                      className={`h-7 px-2 text-xs ${dateFilterMode === m.value ? "bg-blue-900 text-white" : ""}`}
+                      onClick={() => setDateFilterMode(m.value)}>{m.label}</Button>
+                  ))}
+                </div>
+              </div>
+              {dateFilterMode === "custom" && (
+                <div className="flex gap-2">
+                  <div><Label className="text-xs block mb-1">מ-</Label><Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 w-36" /></div>
+                  <div><Label className="text-xs block mb-1">עד</Label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 w-36" /></div>
+                </div>
+              )}
+              <div className="p-3 bg-gray-50 rounded-lg border space-y-2">
+                <WorkerPillFilter label="אוכלוסייה" options={populations} selected={selectedPopulations} onChange={setSelectedPopulations} color="orange" />
+                <WorkerPillFilter label="תפקיד" options={workerRoles} selected={selectedRoles} onChange={setSelectedRoles} color="indigo" />
+                <WorkerPillFilter label="כשירות" options={qualifications.map(q => ({ value: q.id, label: q.name }))} selected={selectedQualifications} onChange={setSelectedQualifications} color="teal" />
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-1">עובדים ({selectedWorkerIds.length > 0 ? `${selectedWorkerIds.length} נבחרו` : "כולם"})</p>
+                  <Input value={workerSearch} onChange={e => setWorkerSearch(e.target.value)} placeholder="חיפוש עובד..." className="h-7 text-xs mb-1" dir="rtl" />
+                  <div className="flex gap-2 mb-1">
+                    <button type="button" className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                      onClick={() => setSelectedWorkerIds(searchedWorkers.map(w => w.id))}>
+                      בחר הכל ({searchedWorkers.length})
+                    </button>
+                    <button type="button" className="text-xs px-2 py-0.5 rounded bg-gray-400 text-white hover:bg-gray-500 transition-colors"
+                      onClick={() => setSelectedWorkerIds([])}>
+                      נקה
+                    </button>
+                  </div>
+                  <div className="max-h-32 overflow-y-auto border rounded bg-white space-y-0.5 p-1">
+                    {searchedWorkers.map(w => (
+                      <label key={w.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-0.5 rounded">
+                        <input type="checkbox" checked={selectedWorkerIds.length === 0 || selectedWorkerIds.includes(w.id)}
+                          onChange={e => {
+                            if (e.target.checked) setSelectedWorkerIds(prev => prev.length === 0 ? [] : [...prev, w.id]);
+                            else setSelectedWorkerIds(prev => {
+                              const all = prev.length === 0 ? preFilteredWorkers.map(pw => pw.id) : prev;
+                              return all.filter(id => id !== w.id);
+                            });
+                          }} className="rounded" />
+                        <span className="text-xs">{w.nickname}</span>
+                      </label>
+                    ))}
+                    {searchedWorkers.length === 0 && <p className="text-xs text-gray-400 text-center py-1">אין תוצאות</p>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Filters panel */}
-        {showFilters && (
-          <div className="pt-3 mt-3 border-t space-y-3">
-            {/* Time filter */}
-            <div>
-              <Label className="text-xs block mb-1 font-semibold text-gray-500">תקופה</Label>
-              <div className="flex flex-wrap gap-1">
-                {DATE_MODES.map(m => (
-                  <Button key={m.value} variant={dateFilterMode === m.value ? "default" : "outline"} size="sm"
-                    className={`h-7 px-2 text-xs ${dateFilterMode === m.value ? "bg-blue-900 text-white" : ""}`}
-                    onClick={() => setDateFilterMode(m.value)}>{m.label}</Button>
-                ))}
-              </div>
-            </div>
-            {dateFilterMode === "custom" && (
-              <div className="flex gap-2">
-                <div><Label className="text-xs block mb-1">מ-</Label><Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="h-8 w-36" /></div>
-                <div><Label className="text-xs block mb-1">עד</Label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="h-8 w-36" /></div>
-              </div>
-            )}
-
-            {/* Worker filter — pill style like Yearly */}
-            <div className="p-3 bg-gray-50 rounded-lg border space-y-2">
-              <WorkerPillFilter label="אוכלוסייה" options={populations} selected={selectedPopulations} onChange={setSelectedPopulations} color="orange" />
-              <WorkerPillFilter label="תפקיד" options={workerRoles} selected={selectedRoles} onChange={setSelectedRoles} color="indigo" />
-              <WorkerPillFilter label="כשירות" options={qualifications.map(q => ({ value: q.id, label: q.name }))} selected={selectedQualifications} onChange={setSelectedQualifications} color="teal" />
-
-              {/* Worker search + list */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 mb-1">עובדים ({selectedWorkerIds.length > 0 ? `${selectedWorkerIds.length} נבחרו` : "כולם"})</p>
-                <Input
-                  value={workerSearch}
-                  onChange={e => setWorkerSearch(e.target.value)}
-                  placeholder="חיפוש עובד..."
-                  className="h-7 text-xs mb-1"
-                  dir="rtl"
-                />
-                <div className="flex gap-2 mb-1">
-                  <button type="button" className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                    onClick={() => setSelectedWorkerIds(searchedWorkers.map(w => w.id))}>
-                    בחר הכל ({searchedWorkers.length})
-                  </button>
-                  <button type="button" className="text-xs px-2 py-0.5 rounded bg-gray-400 text-white hover:bg-gray-500 transition-colors"
-                    onClick={() => setSelectedWorkerIds([])}>
-                    נקה
-                  </button>
-                </div>
-                <div className="max-h-32 overflow-y-auto border rounded bg-white space-y-0.5 p-1">
-                  {searchedWorkers.map(w => (
-                    <label key={w.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-0.5 rounded">
-                      <input type="checkbox" checked={selectedWorkerIds.length === 0 || selectedWorkerIds.includes(w.id)}
-                        onChange={e => {
-                          if (e.target.checked) setSelectedWorkerIds(prev => prev.length === 0 ? [] : [...prev, w.id]);
-                          else setSelectedWorkerIds(prev => {
-                            const all = prev.length === 0 ? preFilteredWorkers.map(pw => pw.id) : prev;
-                            return all.filter(id => id !== w.id);
-                          });
-                        }} className="rounded" />
-                      <span className="text-xs">{w.nickname}</span>
-                    </label>
-                  ))}
-                  {searchedWorkers.length === 0 && <p className="text-xs text-gray-400 text-center py-1">אין תוצאות</p>}
-                </div>
-              </div>
-            </div>
+        {/* Frozen column header row — only shown when pinned */}
+        {headerPinned && (
+          <div style={{ overflowX: "auto", overflowY: "hidden" }}>
+            <Table style={{ tableLayout: "fixed" }}>
+              <TableHeader>
+                {renderColHeaderRow()}
+              </TableHeader>
+            </Table>
           </div>
         )}
-      </CardHeader>
+      </div>
 
       {/* Visual Analysis Dialog */}
       {visualDialogCol && (
@@ -1096,9 +1182,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         />
       )}
 
-      {/* Table — no overflow here so sticky works in the outer scroll container */}
-      <div className="relative" style={{ padding: 0, margin: 0 }}>
-        {/* Resize handle (absolute, always docked to bottom-left) */}
+      {/* Scrollable table body */}
+      <div style={{ overflowX: "auto", position: "relative" }}>
+        {/* Resize handle docked to bottom-left */}
         <div
           className="absolute bottom-0 left-0 w-4 h-4 cursor-col-resize hover:bg-blue-400 transition-colors rounded-tr-sm z-50"
           onMouseDown={e => startColResize(e, "__worker__")}
@@ -1106,101 +1192,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           title="גרור לשינוי גודל"
         />
         <Table style={{ tableLayout: "fixed" }}>
-          <TableHeader style={headerPinned ? { position: "sticky", top: cardHeaderH, zIndex: 25, backgroundColor: "#f9fafb", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" } : {}}>
-            <TableRow className="bg-gray-50">
-              <TableHead dir="rtl" className="font-bold px-4 relative"
-                style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
-                <button
-                  onClick={() => handleSortClick(null)}
-                  className="flex items-center gap-1 hover:text-blue-700 transition-colors"
-                  title="מיון לפי שם"
-                >
-                  עובד
-                  {sortColId === null
-                    ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
-                    : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
-                </button>
-                {/* Resize handle (sticky to column header) */}
-                {headerPinned && (
-                  <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors group"
-                    onMouseDown={e => startColResize(e, "__worker__")}
-                    style={{ userSelect: "none" }} />
-                )}
-              </TableHead>
-              {displayColumns.map((col, idx) => (
-                <TableHead key={col.id} dir="rtl" className="px-2 relative"
-                  style={{ width: colWidths[col.id] || 140, minWidth: 60 }}>
-                  <div className="flex flex-col items-center gap-0.5 py-0.5">
-                    <div className="flex items-center gap-1">
-                     <button
-                       onClick={() => !editMode && handleSortClick(col.id)}
-                       className="font-medium flex items-center gap-1 hover:text-blue-700 transition-colors"
-                     >
-                       {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
-                       {!editMode && (sortColId === col.id
-                         ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
-                         : <ArrowUpDown className="w-3 h-3 text-gray-300" />)}
-                     </button>
-                     {!editMode && isAuto(col.type) && (
-                       <button
-                         onClick={() => setVisualDialogCol(col)}
-                         title="ניתוח ויזואלי"
-                         className={`p-0.5 rounded hover:bg-blue-100 transition-colors ${visualConfigs[col.id] ? "text-blue-600" : "text-gray-300 hover:text-blue-400"}`}
-                       >
-                         <Gauge className="w-3.5 h-3.5" />
-                       </button>
-                     )}
-                    </div>
-                    {col.description && (
-                      <span className="text-xs text-gray-400 font-normal text-center leading-tight">{col.description}</span>
-                    )}
-                    {editMode && (
-                      <div className="flex gap-0.5 items-center">
-                        <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === 0}
-                          onClick={() => {
-                            const next = [...editColumns];
-                            [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-                            setEditColumns(next);
-                          }}>
-                          <ChevronRight className="w-3 h-3" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === displayColumns.length - 1}
-                          onClick={() => {
-                            const next = [...editColumns];
-                            [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-                            setEditColumns(next);
-                          }}>
-                          <ChevronLeft className="w-3 h-3" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-blue-500 hover:text-blue-700"
-                          onClick={() => setConfiguringCol({ ...editColumns.find(c => c.id === col.id) })}>
-                          <Pencil className="w-3 h-3" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
-                          onClick={() => removeEditColumn(col.id)}>
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  {/* Resize handle */}
-                  <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors"
-                    onMouseDown={e => startColResize(e, col.id)}
-                    style={{ userSelect: "none" }} />
-                </TableHead>
-              ))}
-              {editMode && (
-                <TableHead className="w-[40px] p-0 text-center">
-                  <button
-                    onClick={addNewEditColumn}
-                    className="flex items-center justify-center w-full h-full px-2 py-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors rounded"
-                    title="הוסף עמודה">
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
+          {/* When NOT pinned, show the normal thead inside the table */}
+          {!headerPinned && (
+            <TableHeader>
+              {renderColHeaderRow()}
+            </TableHeader>
+          )}
           <TableBody>
             {filteredWorkers.map(worker => (
               <TableRow key={worker.id} className="hover:bg-gray-50 h-6">
@@ -1385,5 +1382,5 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         </Table>
       </div>
     </Card>
-        );
-        }
+  );
+}
