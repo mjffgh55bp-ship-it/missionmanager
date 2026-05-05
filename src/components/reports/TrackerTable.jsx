@@ -93,10 +93,7 @@ const DATE_MODES = [
   { value: "custom", label: "מותאם" },
 ];
 
-// Hide scrollbar helper style (injected once)
-const frozenHeaderStyle = `
-  .tracker-frozen-header::-webkit-scrollbar { display: none; }
-`;
+
 
 export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], workerQualifications = [], onDelete, onUpdated, onDragStart }) {
   const [tracker, setTracker] = useState(initialTracker);
@@ -146,6 +143,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   });
   const resizingRef = useRef(null);
   const cardHeaderRef = useRef(null);
+  // redHeaderHeight is measured for sticky blue header offset
+
   const [editMode, setEditMode] = useState(false);
   const [editColumns, setEditColumns] = useState([]);
   const [configuringCol, setConfiguringCol] = useState(null);
@@ -960,7 +959,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   // Helper: render the column header row (used in both frozen block and normal table)
   const renderColHeaderRow = () => (
-    <TableRow className="bg-gray-50">
+    <TableRow style={{ backgroundColor: "#f9fafb" }}>
       <TableHead dir="rtl" className="font-bold px-4 relative"
         style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
         <button
@@ -1054,30 +1053,21 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   // Compute total table width (worker col + all data cols)
   const totalTableWidth = (colWidths["__worker__"] || 120) + displayColumns.reduce((sum, col) => sum + (colWidths[col.id] || 140), 0) + (editMode ? 40 : 0);
 
-  // Sync horizontal scroll between frozen blue header and body
-  const frozenHeaderScrollRef = useRef(null);
-  const bodyScrollRef = useRef(null);
-  const syncingRef = useRef(false);
-
-  const handleBodyScroll = (e) => {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
-    if (frozenHeaderScrollRef.current) frozenHeaderScrollRef.current.scrollLeft = e.target.scrollLeft;
-    syncingRef.current = false;
-  };
-
-  const handleHeaderScroll = (e) => {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
-    if (bodyScrollRef.current) bodyScrollRef.current.scrollLeft = e.target.scrollLeft;
-    syncingRef.current = false;
-  };
+  // Track red header height so blue header can sticky just below it
+  const [redHeaderHeight, setRedHeaderHeight] = useState(0);
+  useEffect(() => {
+    if (!cardHeaderRef.current) return;
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) setRedHeaderHeight(entry.contentRect.height);
+    });
+    ro.observe(cardHeaderRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   return (
     <Card className="border-none shadow-lg mb-6" dir="rtl" style={{ display: "flex", flexDirection: "column" }}>
-      <style>{frozenHeaderStyle}</style>
 
-      {/* ── Red report header — sticky, does NOT scroll horizontally ── */}
+      {/* ── Red report header — sticky top:0, outside horizontal scroll ── */}
       <div
         ref={cardHeaderRef}
         style={headerPinned ? { position: "sticky", top: 0, zIndex: 30, backgroundColor: "white", boxShadow: "0 2px 4px rgba(0,0,0,0.08)" } : { backgroundColor: "white" }}
@@ -1199,52 +1189,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         />
       )}
 
-      {/* ── Frozen blue column header — scrolls horizontally in sync with body, but NOT vertically ── */}
-      {headerPinned && (
-        <div
-          ref={frozenHeaderScrollRef}
-          onScroll={handleHeaderScroll}
-          className="tracker-frozen-header"
-          style={{
-            overflowX: "auto",
-            overflowY: "hidden",
-            position: headerPinned ? "sticky" : "relative",
-            top: headerPinned ? 0 : undefined,
+      {/* ── Single horizontal scroll container: blue header + body move together ── */}
+      <div style={{ overflowX: "auto", overflowY: "visible", position: "relative" }}>
+        <Table style={{ tableLayout: "fixed", width: totalTableWidth, minWidth: totalTableWidth }}>
+          {/* Blue column header — sticky just below the red header when pinned */}
+          <TableHeader style={headerPinned ? {
+            position: "sticky",
+            top: redHeaderHeight,
             zIndex: 20,
             backgroundColor: "#f9fafb",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-          }}
-        >
-          <Table style={{ tableLayout: "fixed", width: totalTableWidth, minWidth: totalTableWidth }}>
-            <TableHeader>
-              {renderColHeaderRow()}
-            </TableHeader>
-          </Table>
-        </div>
-      )}
-
-      {/* ── Body scroll container ── */}
-      <div
-        ref={bodyScrollRef}
-        onScroll={handleBodyScroll}
-        style={{ overflowX: "auto", overflowY: "visible", position: "relative" }}
-      >
-        {/* Resize handle docked to bottom-left */}
-        <div
-          className="absolute bottom-0 left-0 w-4 h-4 cursor-col-resize hover:bg-blue-400 transition-colors rounded-tr-sm z-50"
-          onMouseDown={e => startColResize(e, "__worker__")}
-          style={{ userSelect: "none", background: "rgba(59, 130, 246, 0.3)" }}
-          title="גרור לשינוי גודל"
-        />
-        <Table style={{ tableLayout: "fixed", width: totalTableWidth, minWidth: totalTableWidth }}>
-          {/* When NOT pinned, show the normal thead inside the table */}
-          {!headerPinned && (
-            <TableHeader>
-              {renderColHeaderRow()}
-            </TableHeader>
-          )}
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          } : {}}>
+            {renderColHeaderRow()}
+          </TableHeader>
           <TableBody>
             {filteredWorkers.map(worker => (
               <TableRow key={worker.id} className="hover:bg-gray-50 h-6">
