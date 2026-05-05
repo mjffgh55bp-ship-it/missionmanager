@@ -119,7 +119,7 @@ export default function Availability() {
       base44.entities.CompanyEvent.list("-date"),
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: `availability_tips_${weekStartStr2}` }),
-      base44.entities.YearlyEvent.list(),
+      base44.entities.YearlyEvent.list("-start_date", 500),
       base44.entities.AppSettings.filter({ setting_key: `tips_acknowledged_${user.email}` }),
     ]);
 
@@ -174,8 +174,8 @@ export default function Availability() {
         base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
         base44.entities.Unavailability.filter({ worker_id: worker.id }),
         base44.entities.Template.filter({ active: true }),
-        base44.entities.Assignment.list("-date", 200),
-        base44.entities.TemplateRow.list("-date", 200),
+        base44.entities.Assignment.list("-date", 100),
+        base44.entities.TemplateRow.list("-date", 100),
       ]);
 
       if (availabilities.length > 0) {
