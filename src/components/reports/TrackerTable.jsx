@@ -1096,8 +1096,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         />
       )}
 
-      {/* Table */}
-      <CardContent className="pt-0 px-0 relative" style={{ overflowX: "auto" }}>
+      {/* Table — no overflow here so sticky works in the outer scroll container */}
+      <div className="relative" style={{ padding: 0, margin: 0 }}>
         {/* Resize handle (absolute, always docked to bottom-left) */}
         <div
           className="absolute bottom-0 left-0 w-4 h-4 cursor-col-resize hover:bg-blue-400 transition-colors rounded-tr-sm z-50"
@@ -1383,7 +1383,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             )}
           </TableBody>
         </Table>
-        </CardContent>
-        </Card>
+      </div>
+    </Card>
         );
         }

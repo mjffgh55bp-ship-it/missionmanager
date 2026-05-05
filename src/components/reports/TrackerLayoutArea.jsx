@@ -172,7 +172,7 @@ export default function TrackerLayoutArea({
               height: p.h || "auto",
               minWidth: MIN_W,
               zIndex: isActive ? 20 : 10,
-              overflow: p.h ? "auto" : "visible",
+              overflow: "auto",
             }}
             className={`bg-white rounded-xl shadow-sm border ${isActive ? "border-blue-400 shadow-md" : "border-gray-200"}`}
           >
