@@ -14,8 +14,17 @@ import {
   SCHEDULE_SHEET,
   AVAIL_SHEET,
   SCHEDULE_META_COLS,
-  INTERNAL_SKIP_KEYS,
 } from "@/lib/dataTransferSchema";
+
+// ── Column alias map ──────────────────────────────────────────────────────────
+// Maps XLSX column header names → canonical internal key used in TemplateRow.values
+// This lets us accept legacy/English column names without writing them to the DB.
+const COLUMN_ALIAS_MAP = {
+  "task":   "משימה",
+  "status": "סטטוס",
+  "start":  "התחלה",
+  "end":    "סיום",
+};
 
 const STATUS_STYLES = {
   תקין:   "bg-green-100 text-green-800",
@@ -51,58 +60,149 @@ function parseSheet(ws) {
 }
 
 /**
- * Given a parsed XLSX schedule row, resolve all its data fields:
- * - worker fields: nickname → worker ID (using workerNameToId map)
- * - JSON fields: parse back to objects
- * - empty values: skip
- * Returns: { values, warnings }
+ * Build a settings context from AppSettings — used for value validation.
+ * Returns:
+ *   scheduleColumns: array of { name, options, sub_options, quantitative_items, free_text }
+ *   tasksList: string[]
+ *   shiftStatuses: string[]
+ *   colAllowedValues: Map<colName, Set<string> | null>
+ *     null = free-text (any value allowed)
+ *     Set = only these values are valid
  */
-function resolveRowValues(rawRow, workerColNames, workerNameToId) {
+async function loadAppSettingsContext() {
+  const allSettings = await base44.entities.AppSettings.list();
+  const getSetting = (key) => {
+    const s = allSettings.find(s => s.setting_key === key);
+    return s ? JSON.parse(s.setting_value) : null;
+  };
+
+  const scheduleColumns = getSetting("custom_schedule_params") || [];
+  const tasksList       = getSetting("tasks_list") || [];
+  const shiftStatuses   = getSetting("shift_statuses") || [];
+
+  // Build per-column allowed-values map
+  const colAllowedValues = new Map(); // colName → Set<string> | null (null = free text)
+  for (const col of scheduleColumns) {
+    if (col.free_text) {
+      colAllowedValues.set(col.name, null); // any value OK
+    } else {
+      const allowed = new Set();
+      // options (legacy simple options array)
+      (col.options || []).forEach(o => allowed.add(String(o)));
+      // sub_options — the criterion is what gets stored in the DB
+      (col.sub_options || []).forEach(so => {
+        if (so.criterion) allowed.add(String(so.criterion));
+        if (so.name)      allowed.add(String(so.name));
+      });
+      // quantitative_items — stored as JSON keys, so any value key is valid
+      // We allow the whole JSON object through (validated later by structure)
+      if (col.report_type === "count_quantitative") {
+        colAllowedValues.set(col.name, null); // JSON blob — validated structurally
+      } else {
+        colAllowedValues.set(col.name, allowed.size > 0 ? allowed : null);
+      }
+    }
+  }
+
+  // "משימה" column: allowed values are the tasks list
+  colAllowedValues.set("משימה", tasksList.length > 0 ? new Set(tasksList) : null);
+
+  // "סטטוס" column: allowed values are the shift statuses
+  colAllowedValues.set("סטטוס", shiftStatuses.length > 0 ? new Set(shiftStatuses) : null);
+
+  return { scheduleColumns, tasksList, shiftStatuses, colAllowedValues };
+}
+
+/**
+ * Resolve and validate all fields in one raw XLSX row.
+ * - Applies COLUMN_ALIAS_MAP to normalize header names
+ * - Worker cols: nickname → ID (warn if not found, skip field)
+ * - Schedule cols: validate against allowed values (reject + warn if invalid)
+ * - Time cols ("התחלה","סיום","תדריך"): always pass through (time strings)
+ * - Status col: validate against shiftStatuses
+ * Returns: { values, warnings, rejectedFields }
+ *   rejectedFields: [{ col, value, reason }]
+ */
+function resolveAndValidateRow(rawRow, workerColNames, workerNameToId, colAllowedValues, shiftStatuses) {
   const skipCols = new Set([...SCHEDULE_META_COLS, "סטטוס", "_rowNum", "_status", "_errors"]);
   const values = {};
   const warnings = [];
+  const rejectedFields = [];
 
-  Object.entries(rawRow).forEach(([k, rawVal]) => {
+  // Time column names (always pass through without validation)
+  const TIME_COL_NAMES = new Set(["התחלה", "שעת התחלה", "סיום", "שעת סיום", "תדריך"]);
+
+  Object.entries(rawRow).forEach(([rawKey, rawVal]) => {
+    // Apply alias mapping first
+    const k = COLUMN_ALIAS_MAP[rawKey] ?? rawKey;
+
     if (skipCols.has(k)) return;
-    if (k.startsWith("_")) return; // internal meta keys
+    if (k.startsWith("_")) return;
     if (k.endsWith("_subTypes")) return;
 
     const strVal = String(rawVal ?? "").trim();
     if (!strVal || strVal === "None") return; // skip empty
 
+    // ── Worker columns ────────────────────────────────────────────────────────
     if (workerColNames.has(k)) {
-      // Worker field: resolve nickname → ID
-      const workerId = workerNameToId[strVal];
+      const stripped = strVal.startsWith("'") ? strVal.slice(1) : strVal;
+      const workerId = workerNameToId[strVal] || workerNameToId[stripped];
       if (workerId) {
         values[k] = workerId;
       } else {
-        // Try stripping sanitizeText's leading ' (formula-injection protection)
-        const stripped = strVal.startsWith("'") ? strVal.slice(1) : strVal;
-        const workerIdStripped = workerNameToId[stripped];
-        if (workerIdStripped) {
-          values[k] = workerIdStripped;
-        } else {
-          warnings.push(`שם עובד "${strVal}" בעמודה "${k}" לא נמצא — השדה לא יעודכן`);
-          // Do not set this key — preserve existing DB value
-        }
+        warnings.push(`שם עובד "${strVal}" בעמודה "${k}" לא נמצא — השדה לא יעודכן`);
+        rejectedFields.push({ col: k, value: strVal, reason: "עובד לא נמצא" });
       }
-    } else {
-      // Regular field: deserialize (JSON parse if needed)
-      const deserialized = deserializeFromImport(strVal);
-      if (deserialized !== null && deserialized !== undefined) {
-        values[k] = deserialized;
+      return;
+    }
+
+    // ── Time columns — always pass through ────────────────────────────────────
+    if (TIME_COL_NAMES.has(k)) {
+      values[k] = strVal;
+      return;
+    }
+
+    // ── Status ("סטטוס") — handled in caller via rawRow["סטטוס"] ────────────
+    // (already in skipCols, handled separately)
+
+    // ── Validate against allowed values ───────────────────────────────────────
+    const deserialized = deserializeFromImport(strVal);
+
+    // JSON quantitative objects — pass through (structure is valid by construction)
+    if (typeof deserialized === "object" && deserialized !== null) {
+      values[k] = deserialized;
+      return;
+    }
+
+    if (colAllowedValues.has(k)) {
+      const allowed = colAllowedValues.get(k);
+      if (allowed === null) {
+        // free-text column: any value OK
+        values[k] = deserialized ?? strVal;
+      } else if (allowed.has(strVal)) {
+        values[k] = deserialized ?? strVal;
+      } else {
+        // Value not in settings — REJECT
+        rejectedFields.push({ col: k, value: strVal, reason: `הערך "${strVal}" לא קיים בהגדרות עבור העמודה "${k}"` });
+        warnings.push(`הערך "${strVal}" לא קיים בהגדרות עבור העמודה "${k}" — השדה לא יעודכן`);
       }
+      return;
+    }
+
+    // Column not in settings at all — pass through (may be a time/text template column)
+    if (deserialized !== null && deserialized !== undefined) {
+      values[k] = deserialized;
     }
   });
 
-  return { values, warnings };
+  return { values, warnings, rejectedFields };
 }
 
 export default function ImportPanel({ currentUser, onAuditLog }) {
   const fileRef = useRef();
   const [fileName, setFileName] = useState("");
-  const [parsedData, setParsedData] = useState(null); // raw parsed rows before DB enrichment
-  const [preview, setPreview] = useState(null);       // enriched preview after loading workers/templates
+  const [parsedData, setParsedData] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState(null);
@@ -138,24 +238,26 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
       const rawSchedule = wsS ? parseSheet(wsS) : [];
       const rawAvail    = wsA ? parseSheet(wsA) : [];
-
       setParsedData({ rawSchedule, rawAvail });
     };
     reader.readAsArrayBuffer(file);
   };
 
-  // Step 2: Load DB data and build enriched preview
+  // Step 2: Load DB data + app settings, build enriched & validated preview
   const handleBuildPreview = async () => {
     if (!parsedData) return;
     setLoadingPreview(true);
 
     const { rawSchedule, rawAvail } = parsedData;
 
-    // Load workers and templates
-    const [allTemplates, workers] = await Promise.all([
+    // Load everything in parallel
+    const [allTemplates, workers, settingsCtx] = await Promise.all([
       base44.entities.Template.list(),
       base44.entities.Worker.list(),
+      loadAppSettingsContext(),
     ]);
+
+    const { colAllowedValues, shiftStatuses } = settingsCtx;
 
     const templateByName = {};
     allTemplates.forEach(t => { templateByName[t.name] = t; });
@@ -165,18 +267,13 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
     // Load existing TemplateRows for the dates in the import
     const importDates = [...new Set(rawSchedule.map(r => r["תאריך"]).filter(Boolean))];
-    const existingRowsArrays = importDates.length > 0
-      ? await Promise.all(importDates.map(d => base44.entities.TemplateRow.filter({ date: d })))
+    const existingRows = importDates.length > 0
+      ? (await Promise.all(importDates.map(d => base44.entities.TemplateRow.filter({ date: d })))).flat()
       : [];
-    const existingRows = existingRowsArrays.flat();
 
-    // Build lookups for row matching:
-    // Primary: "date|group_id|_order" (for rows that have _order set)
-    // Fallback: "date|group_id|rowIndexInGroup" (sorted by _order then created_date)
+    // Build row-matching lookups (by _order primary, by index fallback)
     const existingRowByOrder = {};
-    const existingRowByIndex = {}; // "date|group_id|index" → row
-
-    // Group existing rows by date+group_id, sorted stably
+    const existingRowByIndex = {};
     const existingByGroup = {};
     existingRows.forEach(row => {
       const gKey = `${row.date}|${row.group_id || ""}`;
@@ -191,55 +288,44 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         return new Date(a.created_date) - new Date(b.created_date);
       });
       rows.forEach((row, idx) => {
-        // Primary key: by stored _order value
         if (row.values?._order !== undefined && row.values?._order !== null) {
-          const key = `${row.date}|${row.group_id || ""}|${row.values._order}`;
-          existingRowByOrder[key] = row;
+          existingRowByOrder[`${gKey}|${row.values._order}`] = row;
         }
-        // Fallback key: by position index
-        const idxKey = `${gKey}|idx:${idx}`;
-        existingRowByIndex[idxKey] = row;
+        existingRowByIndex[`${gKey}|idx:${idx}`] = row;
       });
     });
 
-    // Combined lookup: try _order first, then index
     const lookupExistingRow = (date, groupId, order, rowIndexInGroup) => {
       const gKey = `${date}|${groupId}`;
-      // Try by _order value (matches rows where _order was explicitly set)
       if (order !== "" && order !== undefined) {
-        const key = `${gKey}|${order}`;
-        if (existingRowByOrder[key]) return existingRowByOrder[key];
+        const found = existingRowByOrder[`${gKey}|${order}`];
+        if (found) return found;
       }
-      // Fallback: match by stable index within group
-      const idxKey = `${gKey}|idx:${rowIndexInGroup}`;
-      return existingRowByIndex[idxKey] || null;
+      return existingRowByIndex[`${gKey}|idx:${rowIndexInGroup}`] || null;
     };
 
-    // Track row index per group for fallback matching
-    const groupRowCounter = {}; // "date|group_id" → counter
+    const groupRowCounter = {};
 
-    // Enrich schedule rows
+    // Enrich + validate schedule rows
     const scheduleRows = rawSchedule.map((rawRow, i) => {
       const rowNum = i + 2;
       const errors = validateScheduleRow(rawRow);
-
       if (errors.length > 0) {
         return {
           _rowNum: rowNum, _status: "שגיאה", _errors: errors,
           תאריך: rawRow["תאריך"] || "", מוקד: rawRow["מוקד"] || "",
           _group_id: rawRow["_group_id"] || "", _order: rawRow["_order"] || "",
-          _warnings: [], _parsedValues: {}, _action: "skip",
-          _fieldsUpdated: [], _fieldsSkipped: [],
+          _warnings: [], _parsedValues: {}, _rejectedFields: [], _action: "skip",
+          _fieldsUpdated: [], _fieldsSkipped: [], _aliasedCols: [],
         };
       }
 
-      const date       = rawRow["תאריך"];
-      const mokedName  = rawRow["מוקד"];
-      const groupId    = rawRow["_group_id"] || "";
-      const order      = rawRow["_order"] !== undefined ? String(rawRow["_order"]).trim() : "";
-      const status     = rawRow["סטטוס"] || "";
+      const date      = rawRow["תאריך"];
+      const mokedName = rawRow["מוקד"];
+      const groupId   = rawRow["_group_id"] || "";
+      const order     = rawRow["_order"] !== undefined ? String(rawRow["_order"]).trim() : "";
+      const statusRaw = rawRow["סטטוס"] || "";
 
-      // Track row index within this group (for fallback matching)
       const gKey = `${date}|${groupId}`;
       const rowIndexInGroup = groupRowCounter[gKey] ?? 0;
       groupRowCounter[gKey] = rowIndexInGroup + 1;
@@ -247,10 +333,11 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       const template = templateByName[mokedName];
       if (!template) {
         return {
-          _rowNum: rowNum, _status: "שגיאה", _errors: [`מוקד "${mokedName}" לא קיים במערכת`],
+          _rowNum: rowNum, _status: "שגיאה",
+          _errors: [`מוקד "${mokedName}" לא קיים במערכת`],
           תאריך: date, מוקד: mokedName, _group_id: groupId, _order: order,
-          _warnings: [], _parsedValues: {}, _action: "skip",
-          _fieldsUpdated: [], _fieldsSkipped: [],
+          _warnings: [], _parsedValues: {}, _rejectedFields: [], _action: "skip",
+          _fieldsUpdated: [], _fieldsSkipped: [], _aliasedCols: [],
           _rowIndexInGroup: rowIndexInGroup,
         };
       }
@@ -259,22 +346,33 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         (template.columns || []).filter(c => c.type === "worker").map(c => c.name)
       );
 
-      const { values: parsedValues, warnings } = resolveRowValues(rawRow, workerColNames, workerNameToId);
-      if (status) parsedValues.status = status;
+      // Detect which raw columns were aliased (for preview display)
+      const aliasedCols = Object.keys(rawRow)
+        .filter(k => COLUMN_ALIAS_MAP[k])
+        .map(k => `${k} → ${COLUMN_ALIAS_MAP[k]}`);
 
-      // Check if row exists: try _order match first, then index fallback
+      const { values: parsedValues, warnings, rejectedFields } =
+        resolveAndValidateRow(rawRow, workerColNames, workerNameToId, colAllowedValues, shiftStatuses);
+
+      // Handle status separately: validate against shiftStatuses
+      if (statusRaw) {
+        const statusAllowed = colAllowedValues.get("סטטוס");
+        if (!statusAllowed || statusAllowed.has(statusRaw)) {
+          parsedValues.status = statusRaw;
+        } else {
+          warnings.push(`הסטטוס "${statusRaw}" לא קיים בהגדרות — הסטטוס לא יעודכן`);
+          rejectedFields.push({ col: "סטטוס", value: statusRaw, reason: `הסטטוס "${statusRaw}" לא קיים בהגדרות` });
+        }
+      }
+
       const existingRow = lookupExistingRow(date, groupId, order, rowIndexInGroup);
 
-      // Determine which fields will be updated vs skipped (already same value)
       const fieldsUpdated = [];
       const fieldsSkipped = [];
-
       if (existingRow) {
         Object.entries(parsedValues).forEach(([k, v]) => {
           const existing = existingRow.values?.[k];
-          const existingStr = existing !== undefined ? JSON.stringify(existing) : undefined;
-          const newStr = JSON.stringify(v);
-          if (existingStr === newStr) {
+          if (JSON.stringify(existing) === JSON.stringify(v)) {
             fieldsSkipped.push(`${k} (ללא שינוי)`);
           } else {
             fieldsUpdated.push(k);
@@ -284,13 +382,15 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         Object.keys(parsedValues).forEach(k => fieldsUpdated.push(k));
       }
 
+      const hasRejections = rejectedFields.length > 0;
+      const status = warnings.length > 0 || hasRejections ? "אזהרה" : "תקין";
+
       return {
-        _rowNum: rowNum,
-        _status: warnings.length > 0 ? "אזהרה" : "תקין",
-        _errors: [],
-        _warnings: warnings,
+        _rowNum: rowNum, _status: status, _errors: [], _warnings: warnings,
         תאריך: date, מוקד: mokedName, _group_id: groupId, _order: order,
         _parsedValues: parsedValues,
+        _rejectedFields: rejectedFields,
+        _aliasedCols: aliasedCols,
         _action: existingRow ? "update" : "create",
         _existingRowId: existingRow?.id || null,
         _existingValues: existingRow?.values || null,
@@ -301,24 +401,8 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       };
     });
 
-    // Enrich availability rows (simpler — no change here)
-    const importWeeks = [...new Set(rawAvail.map(r => r["שבוע"]).filter(Boolean))];
-    const existingAvailabilities = importWeeks.length > 0
-      ? (await Promise.all(importWeeks.map(w => base44.entities.Availability.filter({ week_start_date: w })))).flat()
-      : [];
-
-    const availRows = rawAvail.map((rawRow, i) => {
-      const errors = validateAvailRow(rawRow);
-      return {
-        ...rawRow,
-        _rowNum: i + 2,
-        _status: errors.length > 0 ? "שגיאה" : "תקין",
-        _errors: errors,
-      };
-    });
-
-    // Compute which columns will be added to templates (for preview display)
-    const templateColsToAdd = {}; // templateName → [colName, ...]
+    // Compute which NEW columns will be added to templates (for display)
+    const templateColsToAdd = {};
     for (const row of scheduleRows) {
       if (row._status === "שגיאה" || row._action === "skip") continue;
       const template = Object.values(templateByName).find(t => t.id === row._templateId);
@@ -332,15 +416,25 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         }
       });
     }
-    // Convert sets to arrays for serialization
     const templateColsToAddArr = {};
     Object.entries(templateColsToAdd).forEach(([k, v]) => { templateColsToAddArr[k] = [...v]; });
+
+    // Availability rows
+    const importWeeks = [...new Set(rawAvail.map(r => r["שבוע"]).filter(Boolean))];
+    const existingAvailabilities = importWeeks.length > 0
+      ? (await Promise.all(importWeeks.map(w => base44.entities.Availability.filter({ week_start_date: w })))).flat()
+      : [];
+
+    const availRows = rawAvail.map((rawRow, i) => {
+      const errors = validateAvailRow(rawRow);
+      return { ...rawRow, _rowNum: i + 2, _status: errors.length > 0 ? "שגיאה" : "תקין", _errors: errors };
+    });
 
     setPreview({ scheduleRows, availRows, workers, existingAvailabilities, templateColsToAdd: templateColsToAddArr });
     setLoadingPreview(false);
   };
 
-  // Step 3: Apply
+  // Step 3: Apply — only valid/warned rows (not errored), only validated fields
   const handleApply = async () => {
     if (!preview) return;
     setApplying(true);
@@ -352,79 +446,45 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     let imported = 0, updated = 0, skipped = 0, errors = 0;
     const resultRows = [];
 
-    // ── STEP 0: Sync template columns ─────────────────────────────────────────
-    // For each template referenced in the import, ensure every column that appears
-    // in the XLSX header exists in Template.columns. This mirrors what the UI does
-    // when a user manually adds a column via the "Add column" dialog.
-    //
-    // We do NOT touch daily/AppSettings columns — those are date-scoped.
-    // We only add to Template.columns (permanent schema).
-
-    // Collect which columns each template needs
-    const templateColumnsNeeded = {}; // templateId → Set<colName>
+    // ── STEP 0: Sync missing columns into Template.columns ────────────────────
+    // Only add columns that are in parsedValues (already validated)
+    // Never add aliased names like "task" — those are already mapped to "משימה"
+    const templateColumnsNeeded = {};
     for (const row of scheduleRows) {
       if (row._status === "שגיאה" || row._action === "skip") continue;
-      const templateId = row._templateId;
-      if (!templateColumnsNeeded[templateId]) templateColumnsNeeded[templateId] = new Set();
-      // Every key in parsedValues (minus internal) is a column that needs to exist
+      if (!templateColumnsNeeded[row._templateId]) templateColumnsNeeded[row._templateId] = new Set();
       Object.keys(row._parsedValues || {}).forEach(k => {
         if (k === "status" || k.startsWith("_")) return;
-        templateColumnsNeeded[templateId].add(k);
+        templateColumnsNeeded[row._templateId].add(k);
       });
     }
 
-    // Load fresh template data and sync columns
     const templateIds = Object.keys(templateColumnsNeeded);
     if (templateIds.length > 0) {
-      const freshTemplates = await Promise.all(
-        templateIds.map(id => base44.entities.Template.filter({ id }))
-      );
+      const freshTemplates = (await Promise.all(templateIds.map(id => base44.entities.Template.filter({ id })))).flat();
       const templateMap = {};
-      freshTemplates.flat().forEach(t => { templateMap[t.id] = t; });
+      freshTemplates.forEach(t => { templateMap[t.id] = t; });
 
       for (const templateId of templateIds) {
         const template = templateMap[templateId];
         if (!template) continue;
-
         const existingCols = template.columns || [];
         const existingColNames = new Set(existingCols.map(c => c.name));
-        const needed = templateColumnsNeeded[templateId];
+        const missing = [...templateColumnsNeeded[templateId]].filter(n => !existingColNames.has(n));
+        if (missing.length === 0) continue;
 
-        // Find which columns are missing
-        const missingColNames = [...needed].filter(name => !existingColNames.has(name));
-
-        if (missingColNames.length === 0) {
-          console.log(`[Import] Template "${template.name}": all ${needed.size} columns already exist`);
-          continue;
-        }
-
-        console.log(`[Import] Template "${template.name}": adding ${missingColNames.length} missing columns:`, missingColNames);
-
-        // Build column definitions for missing columns.
-        // We try to infer the type from existing columns with same name pattern,
-        // otherwise default to "text" with width 120.
-        const newCols = missingColNames.map(name => {
-          // Check if an existing column on ANY template has this name and we can reuse its type
+        const newCols = missing.map(name => {
           const existingMatch = existingCols.find(c =>
-            c.name === name && (c.type === "worker" || c.type === "time" || c.type === "task")
+            c.name === name && ["worker", "time", "task"].includes(c.type)
           );
-          if (existingMatch) {
-            return { ...existingMatch }; // same definition
-          }
-          // Heuristic: worker columns typically have role-like names
-          // Use "text" as default — safe and always renderable
-          return { name, type: "text", width: 120 };
+          return existingMatch ? { ...existingMatch } : { name, type: "text", width: 120 };
         });
-
-        const updatedColumns = [...existingCols, ...newCols];
-        await base44.entities.Template.update(templateId, { columns: updatedColumns });
-
-        console.log(`[Import] Template "${template.name}": columns after sync:`, updatedColumns.map(c => c.name));
+        await base44.entities.Template.update(templateId, { columns: [...existingCols, ...newCols] });
       }
     }
     // ── END STEP 0 ────────────────────────────────────────────────────────────
 
-    // --- Apply schedule rows ---
+    // Apply schedule rows
     for (const row of scheduleRows) {
       if (row._status === "שגיאה" || row._action === "skip") {
         errors++;
@@ -433,24 +493,16 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       }
 
       if (row._action === "update" && row._existingRowId) {
-        // Merge: existing values + new parsed values (preserve _order and internal fields)
         const preserved = {};
         if (row._existingValues?._order !== undefined) preserved._order = row._existingValues._order;
-
-        const newValues = {
-          ...(row._existingValues || {}),
-          ...row._parsedValues,
-          ...preserved,
-        };
-
+        const newValues = { ...(row._existingValues || {}), ...row._parsedValues, ...preserved };
         await base44.entities.TemplateRow.update(row._existingRowId, { values: newValues });
         updated++;
-        resultRows.push({
-          ...row, _finalStatus: "עודכן",
-          _reason: `עודכנו: ${row._fieldsUpdated.join(", ") || "ללא שינויים"}`,
-        });
+        const rejSummary = row._rejectedFields?.length > 0
+          ? ` | נדחו: ${row._rejectedFields.map(r => r.col).join(", ")}`
+          : "";
+        resultRows.push({ ...row, _finalStatus: "עודכן", _reason: `עודכנו: ${row._fieldsUpdated.join(", ") || "ללא שינויים"}${rejSummary}` });
       } else {
-        // Create new row
         const groupId = row._group_id || (Date.now().toString() + Math.random().toString(36).substr(2, 6));
         await base44.entities.TemplateRow.create({
           template_id: row._templateId,
@@ -460,18 +512,20 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           group_id: groupId,
         });
         imported++;
-        resultRows.push({ ...row, _finalStatus: "יובא", _reason: "שורה חדשה נוצרה" });
+        const rejSummary = row._rejectedFields?.length > 0
+          ? ` | נדחו: ${row._rejectedFields.map(r => r.col).join(", ")}`
+          : "";
+        resultRows.push({ ...row, _finalStatus: "יובא", _reason: `שורה חדשה נוצרה${rejSummary}` });
       }
     }
 
-    // --- Apply availability rows ---
+    // Apply availability rows
     for (const row of availRows) {
       if (row._status === "שגיאה") {
         errors++;
         resultRows.push({ ...row, _type: "avail", _finalStatus: "שגיאה", _reason: row._errors.join("; ") });
         continue;
       }
-
       const workerId  = sanitizeText(row["מזהה עובד"]);
       const weekStart = sanitizeText(row["שבוע"] || "");
       const date      = sanitizeText(row["תאריך משמרת"]);
@@ -486,11 +540,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         resultRows.push({ ...row, _type: "avail", _finalStatus: "דולג", _reason: "מזהה עובד לא נמצא" });
         continue;
       }
-
-      const existing = existingAvailabilities.find(a =>
-        a.worker_id === workerId && a.week_start_date === weekStart
-      );
-
+      const existing = existingAvailabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStart);
       if (existing) {
         const shifts = [...(existing.shifts || [])];
         const idx = shifts.findIndex(s => s.date === date && s.start_time === startTime && s.end_time === endTime);
@@ -506,9 +556,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           continue;
         }
         await base44.entities.Availability.create({
-          worker_id: workerId,
-          worker_name: worker.nickname,
-          week_start_date: weekStart,
+          worker_id: workerId, worker_name: worker.nickname, week_start_date: weekStart,
           shifts: [{ date, start_time: startTime, end_time: endTime, type: shiftType, priority: 1 }],
           status: avStatus,
         });
@@ -518,15 +566,10 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     }
 
     await base44.entities.AuditLog.create({
-      action_type: "import",
-      file_name: fileName,
-      user_email: currentUser?.email || "",
-      user_name: currentUser?.full_name || "",
-      row_count: resultRows.length,
-      imported_count: imported,
-      updated_count: updated,
-      skipped_count: skipped,
-      error_count: errors,
+      action_type: "import", file_name: fileName,
+      user_email: currentUser?.email || "", user_name: currentUser?.full_name || "",
+      row_count: resultRows.length, imported_count: imported, updated_count: updated,
+      skipped_count: skipped, error_count: errors,
     });
     if (onAuditLog) onAuditLog();
 
@@ -559,7 +602,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         </Card>
       )}
 
-      {/* Step 1b: File loaded, need to build preview */}
+      {/* Step 1b: File loaded */}
       {parsedData && !preview && !result && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -570,11 +613,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
             נמצאו {parsedData.rawSchedule.length} שורות לוח משמרות ו-{parsedData.rawAvail.length} שורות זמינות.
             לחץ על "בדוק ייבוא" לניתוח מפורט לפני האישור.
           </div>
-          <Button
-            onClick={handleBuildPreview}
-            disabled={loadingPreview}
-            className="w-full bg-blue-900 hover:bg-blue-800"
-          >
+          <Button onClick={handleBuildPreview} disabled={loadingPreview} className="w-full bg-blue-900 hover:bg-blue-800">
             {loadingPreview
               ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />בודק נתונים...</>
               : "בדוק ייבוא — הצג תצוגה מקדימה"}
@@ -605,7 +644,18 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
             <Button variant="ghost" size="sm" onClick={reset}><X className="w-4 h-4" /></Button>
           </div>
 
-          {/* Column sync warning */}
+          {/* Aliased columns notice */}
+          {(() => {
+            const allAliased = [...new Set(preview.scheduleRows.flatMap(r => r._aliasedCols || []))];
+            return allAliased.length > 0 ? (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800 space-y-1">
+                <div className="font-semibold">מיפוי עמודות:</div>
+                {allAliased.map(a => <div key={a} className="text-xs">{a}</div>)}
+              </div>
+            ) : null;
+          })()}
+
+          {/* New columns to be created */}
           {Object.keys(preview.templateColsToAdd || {}).length > 0 && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 space-y-1">
               <div className="font-semibold">עמודות חדשות שייווצרו בתבניות:</div>
@@ -617,25 +667,35 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
             </div>
           )}
 
+          {/* Rejected fields summary */}
+          {preview.scheduleRows.some(r => (r._rejectedFields || []).length > 0) && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 space-y-1">
+              <div className="font-semibold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                שדות שנדחו (לא קיימים בהגדרות):
+              </div>
+              {preview.scheduleRows.flatMap(r => r._rejectedFields || []).slice(0, 10).map((rf, i) => (
+                <div key={i} className="text-xs">{rf.reason}</div>
+              ))}
+              {preview.scheduleRows.flatMap(r => r._rejectedFields || []).length > 10 && (
+                <div className="text-xs text-red-500">...ועוד</div>
+              )}
+            </div>
+          )}
+
           <DiagnosticPreviewTable rows={preview.scheduleRows} />
 
           {preview.scheduleRows.some(r => r._status === "שגיאה") && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 flex gap-2">
               <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              שורות עם שגיאות יידלגו בעת הייבוא.
+              שורות עם שגיאות יידלגו בעת הייבוא. שורות עם אזהרות ייובאו עם השדות התקפים בלבד.
             </div>
           )}
 
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={reset}>ביטול</Button>
-            <Button
-              onClick={handleApply}
-              disabled={applying}
-              className="bg-blue-900 hover:bg-blue-800"
-            >
-              {applying
-                ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />מייבא...</>
-                : `אישור וייבוא`}
+            <Button onClick={handleApply} disabled={applying} className="bg-blue-900 hover:bg-blue-800">
+              {applying ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />מייבא...</> : "אישור וייבוא"}
             </Button>
           </div>
         </div>
@@ -686,11 +746,10 @@ function DiagnosticPreviewTable({ rows }) {
                 <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">שורה</th>
                 <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">תאריך</th>
                 <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">מוקד</th>
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">group_id</th>
                 <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">סדר</th>
                 <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">פעולה</th>
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">עמודות לעדכן</th>
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">אזהרות</th>
+                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">שדות תקינים</th>
+                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">שדות שנדחו</th>
                 <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">סטטוס</th>
               </tr>
             </thead>
@@ -698,15 +757,15 @@ function DiagnosticPreviewTable({ rows }) {
               {displayRows.map((row, i) => {
                 const actionLabel = row._action === "create" ? "יצירה" : row._action === "update" ? "עדכון" : "דילוג";
                 const actionColor = row._action === "create" ? "text-emerald-700" : row._action === "update" ? "text-blue-700" : "text-gray-400";
+                const rejected = row._rejectedFields || [];
                 return (
                   <tr key={i} className="border-b hover:bg-gray-50">
                     <td className="px-2 py-1.5 text-gray-400">{row._rowNum}</td>
                     <td className="px-2 py-1.5 text-gray-700 whitespace-nowrap">{row["תאריך"] || "-"}</td>
                     <td className="px-2 py-1.5 text-gray-700 max-w-[100px] truncate" title={row["מוקד"]}>{row["מוקד"] || "-"}</td>
-                    <td className="px-2 py-1.5 text-gray-400 max-w-[80px] truncate font-mono text-[10px]" title={row._group_id}>{row._group_id ? row._group_id.slice(0, 8) + "…" : "-"}</td>
                     <td className="px-2 py-1.5 text-gray-500 text-center">{row._order !== undefined && row._order !== "" ? row._order : "-"}</td>
                     <td className={`px-2 py-1.5 font-semibold ${actionColor}`}>{actionLabel}</td>
-                    <td className="px-2 py-1.5 text-gray-600 max-w-[180px]">
+                    <td className="px-2 py-1.5 text-gray-600 max-w-[160px]">
                       {row._status === "שגיאה"
                         ? <span className="text-red-600">{row._errors.join("; ")}</span>
                         : row._fieldsUpdated?.length > 0
@@ -715,9 +774,13 @@ function DiagnosticPreviewTable({ rows }) {
                       }
                     </td>
                     <td className="px-2 py-1.5 max-w-[160px]">
-                      {row._warnings?.length > 0
-                        ? <span className="text-orange-600 truncate block" title={row._warnings.join("; ")}>{row._warnings.join("; ")}</span>
-                        : <span className="text-gray-300">-</span>
+                      {rejected.length > 0
+                        ? <span className="text-red-600 truncate block" title={rejected.map(r => r.reason).join("; ")}>
+                            {rejected.map(r => r.col).join(", ")}
+                          </span>
+                        : row._warnings?.length > 0
+                          ? <span className="text-orange-600 truncate block" title={row._warnings.join("; ")}>{row._warnings.join("; ")}</span>
+                          : <span className="text-gray-300">-</span>
                       }
                     </td>
                     <td className="px-2 py-1.5">
@@ -770,7 +833,7 @@ function ResultTable({ rows }) {
                   <td className="px-2 py-1.5 text-gray-700">{row["תאריך"] || "-"}</td>
                   <td className="px-2 py-1.5 text-gray-700 max-w-[100px] truncate" title={row["מוקד"]}>{row["מוקד"] || "-"}</td>
                   <td className="px-2 py-1.5"><StatusBadge status={row._finalStatus} /></td>
-                  <td className="px-2 py-1.5 text-gray-500 max-w-[200px] truncate" title={row._reason}>{row._reason || "-"}</td>
+                  <td className="px-2 py-1.5 text-gray-500 max-w-[220px] truncate" title={row._reason}>{row._reason || "-"}</td>
                 </tr>
               ))}
             </tbody>
