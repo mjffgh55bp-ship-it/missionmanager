@@ -14,7 +14,7 @@ import {
   SCHEDULE_SHEET,
   AVAIL_SHEET,
   SCHEDULE_META_COLS,
-  KNOWN_WORKER_COL_NAMES,
+  isKnownWorkerCol,
 } from "@/lib/dataTransferSchema";
 
 // ── Column alias map ──────────────────────────────────────────────────────────
@@ -47,14 +47,17 @@ function StatusBadge({ status, tooltip }) {
   );
 }
 
-/** Parse a worksheet into array-of-objects using first row as headers */
+/** Parse a worksheet into array-of-objects using first row as headers.
+ *  Column names are normalized: Hebrew maqaf (־) → ASCII hyphen (-). */
 function parseSheet(ws) {
   if (!ws) return [];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
   return rows.map(row => {
     const clean = {};
     Object.entries(row).forEach(([k, v]) => {
-      clean[String(k).trim()] = v === null || v === undefined ? "" : String(v).trim();
+      // Normalize column name: replace Hebrew maqaf with ASCII hyphen
+      const normalizedKey = String(k).trim().replace(/[־]/g, "-");
+      clean[normalizedKey] = v === null || v === undefined ? "" : String(v).trim();
     });
     return clean;
   }).filter(row => Object.values(row).some(v => v !== ""));
@@ -135,7 +138,7 @@ function resolveAndValidateRow(rawRow, workerColNames, workerNameToId, workerIdS
   const TIME_COL_NAMES = new Set(["התחלה", "שעת התחלה", "סיום", "שעת סיום", "תדריך"]);
 
   Object.entries(rawRow).forEach(([rawKey, rawVal]) => {
-    // Apply alias mapping first
+    // Apply alias mapping (keys already normalized by parseSheet)
     const k = COLUMN_ALIAS_MAP[rawKey] ?? rawKey;
 
     if (skipCols.has(k)) return;
@@ -152,7 +155,7 @@ function resolveAndValidateRow(rawRow, workerColNames, workerNameToId, workerIdS
     // A column is a worker column if:
     //   (a) the template defines it as type "worker", OR
     //   (b) it's in the known worker column names list (שף, סו-שף, מנהל, etc.)
-    const isWorkerCol = workerColNames.has(k) || KNOWN_WORKER_COL_NAMES.has(k);
+    const isWorkerCol = workerColNames.has(k) || isKnownWorkerCol(k);
 
     if (isWorkerCol) {
       // Try: nickname → worker ID
@@ -362,11 +365,10 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         };
       }
 
-      // Worker columns: template type === "worker" OR known worker col names
-      const workerColNames = new Set([
-        ...(template.columns || []).filter(c => c.type === "worker").map(c => c.name),
-        ...KNOWN_WORKER_COL_NAMES,
-      ]);
+      // Worker columns: template type === "worker" OR known worker col names (normalized)
+      const workerColNames = new Set(
+        (template.columns || []).filter(c => c.type === "worker").map(c => c.name)
+      );
 
       // Detect which raw columns were aliased (for preview display)
       const aliasedCols = Object.keys(rawRow)
@@ -499,8 +501,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         // Fix existing columns that have wrong type (e.g. worker column stored as "text")
         let colsChanged = false;
         existingCols = existingCols.map(col => {
-          const shouldBeWorker = KNOWN_WORKER_COL_NAMES.has(col.name) || (
-            // Check if any parsedValue for this column is a valid worker ID
+          const shouldBeWorker = isKnownWorkerCol(col.name) || (
             scheduleRows.some(r => r._parsedValues?.[col.name] && workerIdSet.has(r._parsedValues[col.name]))
           );
           if (shouldBeWorker && col.type !== "worker") {
@@ -512,7 +513,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
         // Add missing columns with correct type inference
         const newCols = missing.map(name => {
-          const isWorker = KNOWN_WORKER_COL_NAMES.has(name) || (
+          const isWorker = isKnownWorkerCol(name) || (
             scheduleRows.some(r => r._parsedValues?.[name] && workerIdSet.has(r._parsedValues[name]))
           );
           return { name, type: isWorker ? "worker" : "text", width: isWorker ? 150 : 120 };

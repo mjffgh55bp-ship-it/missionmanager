@@ -15,7 +15,7 @@ import {
   META_SHEET,
   INTERNAL_SKIP_KEYS,
   EXPORT_SOURCE_NAME,
-  KNOWN_WORKER_COL_NAMES,
+  isKnownWorkerCol,
 } from "@/lib/dataTransferSchema";
 
 const HEBREW_MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
@@ -141,7 +141,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       const tmplWorkerCols = new Set(
         (tmpl?.columns || []).filter(c => c.type === "worker").map(c => c.name)
       );
-      const isWorkerCol = (colName) => tmplWorkerCols.has(colName) || KNOWN_WORKER_COL_NAMES.has(colName);
+      const isWorkerCol = (colName) => tmplWorkerCols.has(colName) || isKnownWorkerCol(colName);
 
       // Fixed meta cells — always use _exportOrder for stable matching
       const metaCells = [
@@ -151,6 +151,20 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
         String(row._exportOrder ?? ""),
       ];
 
+      // Diagnostic: log raw values vs what will be exported
+      const missingFields = dynamicCols.filter(colName => {
+        const val = values[colName];
+        if (isEmpty(val)) return false; // genuinely empty, not missing
+        // It has a value — check if export will produce empty
+        if (isWorkerCol(colName)) {
+          return !workerIdToName[val]; // worker ID not found → will export empty
+        }
+        return false;
+      });
+      if (missingFields.length > 0) {
+        console.warn("[Export diag] Row", row.date, mokedName, "| raw values:", JSON.stringify(values), "| missing/unresolved fields:", missingFields);
+      }
+
       // Dynamic data cells
       const dataCells = dynamicCols.map(colName => {
         const val = values[colName];
@@ -159,6 +173,9 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
         if (isWorkerCol(colName)) {
           // Worker fields: export as nickname (or empty if unknown ID)
           const name = workerIdToName[val];
+          if (!name) {
+            console.warn("[Export diag] Worker ID not found for column", colName, "value:", val);
+          }
           return name ? sanitizeText(name) : "";
         }
 

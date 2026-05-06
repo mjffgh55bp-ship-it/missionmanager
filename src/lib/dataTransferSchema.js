@@ -27,9 +27,27 @@ export const INTERNAL_SKIP_KEYS = new Set([
 
 // Well-known worker column names — used as fallback detection in export/import
 // when the template column type may have been incorrectly set (e.g. "text" instead of "worker")
+// NOTE: "צרכן" intentionally excluded — it may be a text/select column in some templates
 export const KNOWN_WORKER_COL_NAMES = new Set([
-  "שף", "סו-שף", "מנהל", 'מנל"ח', "מנל״ח", "עובד", "צרכן",
+  "שף", "סו-שף", "סו־שף", "מנהל", 'מנל"ח', "מנל״ח", "עובד",
 ]);
+
+// Normalize a column name for worker-type matching
+// Handles ASCII hyphen vs Hebrew maqaf (־) variants
+export function normalizeColName(name) {
+  return String(name ?? "").replace(/[־\-]/g, "-").trim();
+}
+
+// Normalized version of KNOWN_WORKER_COL_NAMES for safe lookup
+export const KNOWN_WORKER_COL_NAMES_NORMALIZED = new Set(
+  [...KNOWN_WORKER_COL_NAMES].map(normalizeColName)
+);
+
+/** Check if a column name is a known worker column (with normalization) */
+export function isKnownWorkerCol(colName) {
+  return KNOWN_WORKER_COL_NAMES.has(colName) ||
+    KNOWN_WORKER_COL_NAMES_NORMALIZED.has(normalizeColName(colName));
+}
 
 /** Strip a text value from formula-injection attempts */
 export function sanitizeText(val) {
