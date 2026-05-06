@@ -132,6 +132,9 @@ function resolveAndValidateRow(rawRow, workerColNames, workerNameToId, colAllowe
   // Time column names (always pass through without validation)
   const TIME_COL_NAMES = new Set(["התחלה", "שעת התחלה", "סיום", "שעת סיום", "תדריך"]);
 
+  // Build reverse map: workerId → nickname (for detecting if a stored value is already an ID)
+  const workerIdSet = new Set(Object.values(workerNameToId));
+
   Object.entries(rawRow).forEach(([rawKey, rawVal]) => {
     // Apply alias mapping first
     const k = COLUMN_ALIAS_MAP[rawKey] ?? rawKey;
@@ -144,14 +147,24 @@ function resolveAndValidateRow(rawRow, workerColNames, workerNameToId, colAllowe
     if (!strVal || strVal === "None") return; // skip empty
 
     // ── Worker columns ────────────────────────────────────────────────────────
-    if (workerColNames.has(k)) {
-      const stripped = strVal.startsWith("'") ? strVal.slice(1) : strVal;
-      const workerId = workerNameToId[strVal] || workerNameToId[stripped];
-      if (workerId) {
-        values[k] = workerId;
-      } else {
-        warnings.push(`שם עובד "${strVal}" בעמודה "${k}" לא נמצא — השדה לא יעודכן`);
-        rejectedFields.push({ col: k, value: strVal, reason: "עובד לא נמצא" });
+    // A column is treated as a worker column if:
+    //   (a) the template explicitly marks it as type "worker" (workerColNames), OR
+    //   (b) the cell value resolves to a known worker nickname (nickname→ID lookup succeeds)
+    //       This handles columns that were previously imported with type "text" instead of "worker"
+    const stripped = strVal.startsWith("'") ? strVal.slice(1) : strVal;
+    const resolvedWorkerId = workerNameToId[strVal] || workerNameToId[stripped];
+
+    if (workerColNames.has(k) || resolvedWorkerId || workerIdSet.has(strVal)) {
+      if (resolvedWorkerId) {
+        // Resolved nickname → worker ID
+        values[k] = resolvedWorkerId;
+      } else if (workerIdSet.has(strVal)) {
+        // Already a worker ID (e.g. re-import of already-resolved data)
+        values[k] = strVal;
+      } else if (workerColNames.has(k)) {
+        // Explicitly a worker column but nickname not found — warn and skip field
+        warnings.push(`העובד "${strVal}" לא נמצא עבור העמודה "${k}" — השדה לא יעודכן`);
+        rejectedFields.push({ col: k, value: strVal, reason: `העובד "${strVal}" לא נמצא עבור העמודה "${k}"` });
       }
       return;
     }
@@ -473,11 +486,25 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         const missing = [...templateColumnsNeeded[templateId]].filter(n => !existingColNames.has(n));
         if (missing.length === 0) continue;
 
+        // Build worker ID set for type inference
+        const allWorkerIds = new Set(workers.map(w => w.id).filter(Boolean));
+
         const newCols = missing.map(name => {
+          // Check if any existing col on this template has this name with a known type
           const existingMatch = existingCols.find(c =>
             c.name === name && ["worker", "time", "task"].includes(c.type)
           );
-          return existingMatch ? { ...existingMatch } : { name, type: "text", width: 120 };
+          if (existingMatch) return { ...existingMatch };
+
+          // Infer type from actual values written to parsedValues for this column:
+          // if the value is a worker ID, mark as worker type
+          const sampleValue = scheduleRows
+            .filter(r => r._parsedValues?.[name] !== undefined)
+            .map(r => r._parsedValues[name])[0];
+          if (sampleValue && allWorkerIds.has(sampleValue)) {
+            return { name, type: "worker", width: 150 };
+          }
+          return { name, type: "text", width: 120 };
         });
         await base44.entities.Template.update(templateId, { columns: [...existingCols, ...newCols] });
       }
