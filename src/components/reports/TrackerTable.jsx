@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -955,14 +954,35 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     !workerSearch || (w.nickname || "").includes(workerSearch)
   );
 
-  // Helper: render the column header row (used in both frozen block and normal table)
-  const renderColHeaderRow = () => (
-    <TableRow style={{ backgroundColor: "#f9fafb", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }}>
-      <TableHead dir="rtl" className="font-bold px-4 relative"
-        style={{ width: colWidths["__worker__"] || 120, minWidth: 80 }}>
+  // Compute total table width (worker col + all data cols)
+  const totalTableWidth = (colWidths["__worker__"] || 120) + displayColumns.reduce((sum, col) => sum + (colWidths[col.id] || 140), 0) + (editMode ? 40 : 0);
+
+  // Build gridTemplateColumns string — shared by header row and every body row
+  const colTemplate = [
+    `${colWidths["__worker__"] || 120}px`,
+    ...displayColumns.map(col => `${colWidths[col.id] || 140}px`),
+    ...(editMode ? ["40px"] : []),
+  ].join(" ");
+
+  // Render a single header row as a CSS-grid div (not a <table>)
+  const renderGridHeaderRow = () => (
+    <div
+      dir="rtl"
+      style={{
+        display: "grid",
+        gridTemplateColumns: colTemplate,
+        flexShrink: 0,
+        backgroundColor: "#f9fafb",
+        borderBottom: "1px solid #e5e7eb",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+        zIndex: 40,
+      }}
+    >
+      {/* Worker column header */}
+      <div className="font-bold px-4 py-2 relative flex items-center">
         <button
           onClick={() => handleSortClick(null)}
-          className="flex items-center gap-1 hover:text-blue-700 transition-colors"
+          className="flex items-center gap-1 hover:text-blue-700 transition-colors text-sm"
           title="מיון לפי שם"
         >
           עובד
@@ -973,15 +993,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors"
           onMouseDown={e => startColResize(e, "__worker__")}
           style={{ userSelect: "none" }} />
-      </TableHead>
+      </div>
+
+      {/* Data column headers */}
       {displayColumns.map((col, idx) => (
-        <TableHead key={col.id} dir="rtl" className="px-2 relative"
-          style={{ width: colWidths[col.id] || 140, minWidth: 60 }}>
-          <div className="flex flex-col items-center gap-0.5 py-0.5">
+        <div key={col.id} className="px-2 py-1 relative flex items-start justify-center">
+          <div className="flex flex-col items-center gap-0.5 py-0.5 w-full">
             <div className="flex items-center gap-1">
               <button
                 onClick={() => !editMode && handleSortClick(col.id)}
-                className="font-medium flex items-center gap-1 hover:text-blue-700 transition-colors"
+                className="font-medium flex items-center gap-1 hover:text-blue-700 transition-colors text-sm"
               >
                 {col.name || <span className="text-gray-300 italic text-xs">ללא שם</span>}
                 {!editMode && (sortColId === col.id
@@ -1033,35 +1054,233 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors"
             onMouseDown={e => startColResize(e, col.id)}
             style={{ userSelect: "none" }} />
-        </TableHead>
+        </div>
       ))}
+
+      {/* Add column button (edit mode) */}
       {editMode && (
-        <TableHead className="w-[40px] p-0 text-center">
+        <div className="flex items-center justify-center w-full h-full">
           <button
             onClick={addNewEditColumn}
             className="flex items-center justify-center w-full h-full px-2 py-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors rounded"
             title="הוסף עמודה">
             <Plus className="w-4 h-4" />
           </button>
-        </TableHead>
+        </div>
       )}
-    </TableRow>
+    </div>
   );
 
-  // Compute total table width (worker col + all data cols)
-  const totalTableWidth = (colWidths["__worker__"] || 120) + displayColumns.reduce((sum, col) => sum + (colWidths[col.id] || 140), 0) + (editMode ? 40 : 0);
+  // Render a single body data row as a CSS-grid div
+  const renderGridBodyRow = (worker) => {
+    return (
+      <div
+        key={worker.id}
+        dir="rtl"
+        className="hover:bg-gray-50"
+        style={{
+          display: "grid",
+          gridTemplateColumns: colTemplate,
+          borderBottom: "1px solid #f3f4f6",
+          minHeight: 32,
+        }}
+      >
+        <div className="font-medium whitespace-nowrap px-4 py-0.5 text-sm flex items-center">{worker.nickname}</div>
+        {displayColumns.map(col => {
+          const auto = isAuto(col.type);
+          const entryValue = getEntry(worker.id, col.id)?.value || "";
+          const value = auto ? computeAutoValue(col, worker.id) : entryValue;
+          const isEditing = editingCell?.workerId === worker.id && editingCell?.colId === col.id;
 
-  // No scroll sync needed — single shared horizontal scroll container
+          if (col.type === "count_by_task") {
+            const tasks = col.task_list || [];
+            const hours = typeof value === "object" && value !== null ? value : {};
+            if (tasks.length === 0) {
+              return <div key={col.id} className="px-2 py-0.5 text-gray-300 text-xs flex items-center justify-center">אין משימות</div>;
+            }
+            const grandTotal = Object.values(hours).reduce((sum, h) => sum + (h || 0), 0);
+            const bgColorTask = visualConfigs[col.id] ? getVisualColor(grandTotal, visualConfigs[col.id]) : null;
+            return (
+              <div key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm flex items-center justify-center"
+                style={bgColorTask ? { backgroundColor: bgColorTask } : {}}>
+                <span className={grandTotal > 0 ? "text-blue-900" : "text-gray-300"}>
+                  {grandTotal > 0 ? `${Math.round(grandTotal * 10) / 10}h` : "-"}
+                </span>
+              </div>
+            );
+          }
+          if (col.type === "count_quantitative") {
+            const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+            const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
+              ? col.quantitative_options
+              : (sc?.quantitative_items || []);
+            const counts = typeof value === "object" && value !== null ? value : {};
+            if (col.quantitative_single_item) {
+              const num = counts[col.quantitative_single_item] || 0;
+              const bgColorQ = visualConfigs[col.id] ? getVisualColor(num, visualConfigs[col.id]) : null;
+              return (
+                <div key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm flex items-center justify-center"
+                  style={bgColorQ ? { backgroundColor: bgColorQ } : {}}>
+                  <span className={num > 0 ? "text-blue-900" : "text-gray-300"}>{num > 0 ? num : "-"}</span>
+                </div>
+              );
+            }
+            return (
+              <div key={col.id} className="px-2 py-0.5 flex flex-col justify-center">
+                <div className="space-y-0">
+                  {allOpts.map(opt => (
+                    <div key={opt} className="flex items-center justify-between gap-1 text-xs">
+                      <span className="text-gray-600 truncate">{opt}</span>
+                      <span className={`font-semibold ${(counts[opt] || 0) > 0 ? "text-blue-900" : "text-gray-300"}`}>{counts[opt] || 0}</span>
+                    </div>
+                  ))}
+                  {allOpts.length === 0 && <span className="text-gray-300 text-xs">אין פריטים</span>}
+                </div>
+              </div>
+            );
+          }
+          if (auto) {
+            if (col.count_mode === "per_shift") {
+              return (
+                <div key={col.id} className="text-center px-2 py-0.5 text-sm flex items-center justify-center">
+                  <span className="text-gray-300">-</span>
+                </div>
+              );
+            }
+            const quantCriteriaCheck = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
+            const isQuantSumCol = col.type === "schedule_col" && quantCriteriaCheck.length > 0;
+            const showAsHours = col.type === "schedule_col" && !isQuantSumCol;
+            const vCfg = visualConfigs[col.id];
+            const bgColor = vCfg && typeof value === "number" ? getVisualColor(value, vCfg) : null;
+            return (
+              <div key={col.id} className="text-center font-semibold text-blue-900 px-2 py-0.5 text-sm flex items-center justify-center"
+                style={bgColor ? { backgroundColor: bgColor } : {}}>
+                {value > 0 ? (showAsHours ? `${value}h` : value) : <span className="text-gray-300">-</span>}
+              </div>
+            );
+          }
+          return (
+            <div key={col.id} className="px-2 py-0.5 flex items-center">
+              {isEditing ? (
+                <div className="flex items-center gap-1">
+                  <Input autoFocus value={cellDraft} onChange={e => setCellDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") saveCell(); if (e.key === "Escape") setEditingCell(null); }}
+                    className="h-7 text-sm w-24" dir="rtl" />
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={saveCell}><Check className="w-3 h-3" /></Button>
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-400" onClick={() => setEditingCell(null)}><X className="w-3 h-3" /></Button>
+                </div>
+              ) : (
+                <div onClick={() => startCellEdit(worker.id, col.id)}
+                  className="min-w-[60px] min-h-[24px] px-1 rounded cursor-pointer hover:bg-blue-50 text-sm w-full" dir="rtl">
+                  {entryValue || <span className="text-gray-300 text-xs">לחץ לעריכה</span>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Render summary row as a CSS-grid div
+  const renderGridSummaryRow = () => {
+    if (!displayColumns.some(c => c.type === "count_quantitative" || c.type === "count_by_task" || isAuto(c.type))) return null;
+    return (
+      <div
+        dir="rtl"
+        style={{
+          display: "grid",
+          gridTemplateColumns: colTemplate,
+          backgroundColor: "#eff6ff",
+          borderTop: "2px solid #bfdbfe",
+          fontWeight: 600,
+        }}
+      >
+        <div className="px-4 py-1 text-blue-900 font-bold text-sm flex items-center">סה"כ</div>
+        {displayColumns.map(col => {
+          if (col.type === "count_by_task") {
+            const grandTotal = filteredWorkers.reduce((sum, w) => {
+              const taskHours = computeAutoValue(col, w.id);
+              return sum + (typeof taskHours === "object" && taskHours !== null
+                ? Object.values(taskHours).reduce((s, h) => s + (h || 0), 0)
+                : 0);
+            }, 0);
+            return (
+              <div key={col.id} className="text-center font-bold text-blue-900 px-2 py-1 flex items-center justify-center text-sm">
+                {grandTotal > 0 ? `${Math.round(grandTotal * 10) / 10}h` : "-"}
+              </div>
+            );
+          }
+          if (col.type === "count_quantitative") {
+            const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
+            const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
+              ? col.quantitative_options
+              : (sc?.quantitative_items || []);
+            if (col.quantitative_single_item) {
+              const total = filteredWorkers.reduce((sum, w) => {
+                const counts = computeAutoValue(col, w.id);
+                return sum + ((typeof counts === "object" && counts !== null) ? (counts[col.quantitative_single_item] || 0) : 0);
+              }, 0);
+              return (
+                <div key={col.id} className="text-center font-bold text-blue-900 px-2 py-1 flex items-center justify-center text-sm">
+                  {total > 0 ? total : <span className="text-gray-300">-</span>}
+                </div>
+              );
+            }
+            const totals = {};
+            allOpts.forEach(opt => {
+              totals[opt] = filteredWorkers.reduce((sum, w) => {
+                const counts = computeAutoValue(col, w.id);
+                return sum + ((typeof counts === "object" && counts !== null) ? (counts[opt] || 0) : 0);
+              }, 0);
+            });
+            return (
+              <div key={col.id} className="px-2 py-1 flex flex-col justify-center">
+                <div className="space-y-0.5">
+                  {allOpts.map(opt => (
+                    <div key={opt} className="flex items-center justify-between gap-1 text-xs">
+                      <span className="text-blue-800 truncate font-medium">{opt}</span>
+                      <span className="font-bold text-blue-900">{totals[opt]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+          if (isAuto(col.type)) {
+            if (col.count_mode === "per_shift") {
+              const total = computeShiftTotal(col);
+              return (
+                <div key={col.id} className="text-center font-bold text-blue-900 px-2 py-1 flex items-center justify-center text-sm">
+                  {total > 0 ? `${total}h` : <span className="text-gray-300">-</span>}
+                </div>
+              );
+            }
+            const total = filteredWorkers.reduce((sum, w) => {
+              const v = computeAutoValue(col, w.id);
+              return sum + (typeof v === "number" ? v : 0);
+            }, 0);
+            const quantCriteriaCheckTotal = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
+            const isQuantSumTotal = col.type === "schedule_col" && quantCriteriaCheckTotal.length > 0;
+            const showAsHours = col.type === "schedule_col" && !isQuantSumTotal;
+            return (
+              <div key={col.id} className="text-center font-bold text-blue-900 px-2 py-1 flex items-center justify-center text-sm">
+                {total > 0 ? (showAsHours ? `${total}h` : total) : <span className="text-gray-300">-</span>}
+              </div>
+            );
+          }
+          return <div key={col.id} />;
+        })}
+      </div>
+    );
+  };
 
   return (
-    <Card className="border-none shadow-lg mb-6" dir="rtl" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    // ReportCard: flex column, clips overflow
+    <div className="border rounded-xl shadow-lg mb-6 bg-white" dir="rtl" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
-      {/* ── RedHeaderContainer: sticky at top, never scrolls horizontally ── */}
-      <div
-        style={headerPinned
-          ? { position: "sticky", top: 0, zIndex: 30, flexShrink: 0, backgroundColor: "white", boxShadow: "0 2px 4px rgba(0,0,0,0.08)" }
-          : { flexShrink: 0, backgroundColor: "white" }}
-      >
+      {/* ── RedHeader: outside HorizontalScrollContainer, never scrolls horizontally ── */}
+      <div style={{ flexShrink: 0, zIndex: 50, backgroundColor: "white" }}>
         <div
           className="border-b py-3 px-4 cursor-grab active:cursor-grabbing select-none"
           onMouseDown={onDragStart}
@@ -1151,7 +1370,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             </div>
           )}
         </div>
-
       </div>
 
       {/* Visual Analysis Dialog */}
@@ -1179,210 +1397,29 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         />
       )}
 
-      {/* ── ONE shared HorizontalScrollContainer: clips horizontal overflow for both header+body ── */}
-      <div style={{ overflowX: "auto", overflowY: "hidden", flexShrink: 0, minHeight: 0 }}>
+      {/* ── HorizontalScrollContainer: THE ONLY element with overflow-x:auto ── */}
+      <div style={{ overflowX: "auto", overflowY: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
 
-        {/* ── BlueColumnHeader: inside horizontal scroll, outside vertical scroll ── */}
-        {headerPinned && (
-          <Table style={{ tableLayout: "fixed", width: totalTableWidth, minWidth: totalTableWidth, marginBottom: 0 }}>
-            <TableHeader>
-              {renderColHeaderRow()}
-            </TableHeader>
-          </Table>
-        )}
+        {/* ── WideTableGrid: width = totalColumnWidth, contains BlueHeaderRow + BodyVerticalScrollArea ── */}
+        <div style={{ width: totalTableWidth, minWidth: totalTableWidth, display: "flex", flexDirection: "column" }}>
 
-        {/* ── BodyVerticalScrollArea: scrolls only rows vertically ── */}
-        <div style={{ overflowX: "visible", overflowY: "auto", maxHeight: "60vh", minHeight: 0 }}>
-          <Table style={{ tableLayout: "fixed", width: totalTableWidth, minWidth: totalTableWidth }}>
-            {!headerPinned && (
-              <TableHeader>
-                {renderColHeaderRow()}
-              </TableHeader>
-            )}
-          <TableBody>
-            {filteredWorkers.map(worker => (
-              <TableRow key={worker.id} className="hover:bg-gray-50 h-6">
-                <TableCell className="font-medium whitespace-nowrap px-4 py-0.5 text-sm">{worker.nickname}</TableCell>
-                {displayColumns.map(col => {
-                   const auto = isAuto(col.type);
-                   const entryValue = getEntry(worker.id, col.id)?.value || "";
-                   const value = auto ? computeAutoValue(col, worker.id) : entryValue;
-                  const isEditing = editingCell?.workerId === worker.id && editingCell?.colId === col.id;
+          {/* ── BlueHeaderRow: always visible, outside BodyVerticalScrollArea ── */}
+          {headerPinned && renderGridHeaderRow()}
 
-                  if (col.type === "count_by_task") {
-                    const tasks = col.task_list || [];
-                    const hours = typeof value === "object" && value !== null ? value : {};
-                    if (tasks.length === 0) {
-                      return <TableCell key={col.id} className="px-2 py-0.5 text-gray-300 text-xs">אין משימות</TableCell>;
-                    }
-                    const grandTotal = Object.values(hours).reduce((sum, h) => sum + (h || 0), 0);
-                    const bgColorTask = visualConfigs[col.id] ? getVisualColor(grandTotal, visualConfigs[col.id]) : null;
-                    return (
-                      <TableCell key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm"
-                        style={bgColorTask ? { backgroundColor: bgColorTask } : {}}>
-                        <span className={grandTotal > 0 ? "text-blue-900" : "text-gray-300"}>
-                          {grandTotal > 0 ? `${Math.round(grandTotal * 10) / 10}h` : "-"}
-                        </span>
-                      </TableCell>
-                    );
-                  }
-                  if (col.type === "count_quantitative") {
-                    const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                    const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
-                      ? col.quantitative_options
-                      : (sc?.quantitative_items || []);
-                    const counts = typeof value === "object" && value !== null ? value : {};
-                    if (col.quantitative_single_item) {
-                      const num = counts[col.quantitative_single_item] || 0;
-                      const bgColorQ = visualConfigs[col.id] ? getVisualColor(num, visualConfigs[col.id]) : null;
-                      return (
-                        <TableCell key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm"
-                          style={bgColorQ ? { backgroundColor: bgColorQ } : {}}>
-                          <span className={num > 0 ? "text-blue-900" : "text-gray-300"}>{num > 0 ? num : "-"}</span>
-                        </TableCell>
-                      );
-                    }
-                    return (
-                      <TableCell key={col.id} className="px-2 py-0.5 min-w-[120px]">
-                        <div className="space-y-0">
-                          {allOpts.map(opt => (
-                            <div key={opt} className="flex items-center justify-between gap-1 text-xs">
-                              <span className="text-gray-600 truncate">{opt}</span>
-                              <span className={`font-semibold ${(counts[opt] || 0) > 0 ? "text-blue-900" : "text-gray-300"}`}>{counts[opt] || 0}</span>
-                            </div>
-                          ))}
-                          {allOpts.length === 0 && <span className="text-gray-300 text-xs">אין פריטים</span>}
-                        </div>
-                      </TableCell>
-                    );
-                  }
-                  if (auto) {
-                    // per_shift columns show "-" per worker row (org-level only)
-                    if (col.count_mode === "per_shift") {
-                      return (
-                        <TableCell key={col.id} className="text-center px-2 py-0.5 text-sm">
-                          <span className="text-gray-300">-</span>
-                        </TableCell>
-                      );
-                    }
-                    const quantCriteriaCheck = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
-                    const isQuantSumCol = col.type === "schedule_col" && quantCriteriaCheck.length > 0;
-                    const showAsHours = col.type === "schedule_col" && !isQuantSumCol;
-                    const vCfg = visualConfigs[col.id];
-                    const bgColor = vCfg && typeof value === "number" ? getVisualColor(value, vCfg) : null;
-                    return (
-                      <TableCell key={col.id} className="text-center font-semibold text-blue-900 px-2 py-0.5 text-sm"
-                        style={bgColor ? { backgroundColor: bgColor } : {}}>
-                        {value > 0 ? (showAsHours ? `${value}h` : value) : <span className="text-gray-300">-</span>}
-                      </TableCell>
-                    );
-                  }
-                  return (
-                   <TableCell key={col.id} className="px-2 py-0.5">
-                     {isEditing ? (
-                       <div className="flex items-center gap-1">
-                         <Input autoFocus value={cellDraft} onChange={e => setCellDraft(e.target.value)}
-                           onKeyDown={e => { if (e.key === "Enter") saveCell(); if (e.key === "Escape") setEditingCell(null); }}
-                           className="h-7 text-sm w-24" dir="rtl" />
-                         <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600" onClick={saveCell}><Check className="w-3 h-3" /></Button>
-                         <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-400" onClick={() => setEditingCell(null)}><X className="w-3 h-3" /></Button>
-                       </div>
-                     ) : (
-                       <div onClick={() => startCellEdit(worker.id, col.id)}
-                         className="min-w-[60px] min-h-[24px] px-1 rounded cursor-pointer hover:bg-blue-50 text-sm" dir="rtl">
-                         {entryValue || <span className="text-gray-300 text-xs">לחץ לעריכה</span>}
-                       </div>
-                     )}
-                   </TableCell>
-                  );
-                  })}
-                  </TableRow>
-                  ))}
-                  {/* Summary row */}
-                  {displayColumns.some(c => c.type === "count_quantitative" || c.type === "count_by_task" || isAuto(c.type)) && (
-               <TableRow className="bg-blue-50 border-t-2 border-blue-200 font-semibold">
-                 <TableCell className="px-4 text-blue-900 font-bold">סה"כ</TableCell>
-                 {displayColumns.map(col => {
-                   if (col.type === "count_by_task") {
-                      const grandTotal = filteredWorkers.reduce((sum, w) => {
-                        const taskHours = computeAutoValue(col, w.id);
-                        return sum + (typeof taskHours === "object" && taskHours !== null
-                          ? Object.values(taskHours).reduce((s, h) => s + (h || 0), 0)
-                          : 0);
-                      }, 0);
-                      return (
-                        <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
-                          {grandTotal > 0 ? `${Math.round(grandTotal * 10) / 10}h` : "-"}
-                        </TableCell>
-                      );
-                    }
-                   if (col.type === "count_quantitative") {
-                    const sc = scheduleColumns.find(c => c.name === col.schedule_col_name);
-                    const allOpts = (col.quantitative_options && col.quantitative_options.length > 0)
-                      ? col.quantitative_options
-                      : (sc?.quantitative_items || []);
-                    if (col.quantitative_single_item) {
-                      const total = filteredWorkers.reduce((sum, w) => {
-                        const counts = computeAutoValue(col, w.id);
-                        return sum + ((typeof counts === "object" && counts !== null) ? (counts[col.quantitative_single_item] || 0) : 0);
-                      }, 0);
-                      return (
-                        <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
-                          {total > 0 ? total : <span className="text-gray-300">-</span>}
-                        </TableCell>
-                      );
-                    }
-                    const totals = {};
-                    allOpts.forEach(opt => {
-                      totals[opt] = filteredWorkers.reduce((sum, w) => {
-                        const counts = computeAutoValue(col, w.id);
-                        return sum + ((typeof counts === "object" && counts !== null) ? (counts[opt] || 0) : 0);
-                      }, 0);
-                    });
-                    return (
-                      <TableCell key={col.id} className="px-2 min-w-[120px]">
-                        <div className="space-y-0.5">
-                          {allOpts.map(opt => (
-                            <div key={opt} className="flex items-center justify-between gap-1 text-xs">
-                              <span className="text-blue-800 truncate font-medium">{opt}</span>
-                              <span className="font-bold text-blue-900">{totals[opt]}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                    );
-                  }
-                  if (isAuto(col.type)) {
-                    // per_shift: use org-level computation instead of sum of workers
-                    if (col.count_mode === "per_shift") {
-                      const total = computeShiftTotal(col);
-                      return (
-                        <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
-                          {total > 0 ? `${total}h` : <span className="text-gray-300">-</span>}
-                        </TableCell>
-                      );
-                    }
-                    const total = filteredWorkers.reduce((sum, w) => {
-                      const v = computeAutoValue(col, w.id);
-                      return sum + (typeof v === "number" ? v : 0);
-                    }, 0);
-                    const quantCriteriaCheckTotal = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
-                    const isQuantSumTotal = col.type === "schedule_col" && quantCriteriaCheckTotal.length > 0;
-                    const showAsHours = col.type === "schedule_col" && !isQuantSumTotal;
-                    return (
-                      <TableCell key={col.id} className="text-center font-bold text-blue-900 px-2">
-                        {total > 0 ? (showAsHours ? `${total}h` : total) : <span className="text-gray-300">-</span>}
-                      </TableCell>
-                    );
-                  }
-                  return <TableCell key={col.id} />;
-                })}
-              </TableRow>
-            )}
-          </TableBody>
-          </Table>
-        </div>{/* end BodyVerticalScrollArea */}
+          {/* ── BodyVerticalScrollArea: THE ONLY element with overflow-y:auto ── */}
+          <div style={{ overflowY: "auto", overflowX: "visible", maxHeight: "60vh", minHeight: 0 }}>
+            {/* Header row when not pinned */}
+            {!headerPinned && renderGridHeaderRow()}
+
+            {/* Body rows */}
+            {filteredWorkers.map(worker => renderGridBodyRow(worker))}
+
+            {/* Summary row */}
+            {renderGridSummaryRow()}
+          </div>
+
+        </div>{/* end WideTableGrid */}
       </div>{/* end HorizontalScrollContainer */}
-    </Card>
+    </div>
   );
 }
