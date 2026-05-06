@@ -25,8 +25,11 @@ export const INTERNAL_SKIP_KEYS = new Set([
   "_order",          // exported separately as a meta col
 ]);
 
-// Keys whose values are always exported/imported as-is (not treated as worker fields by default)
-// Worker fields are detected dynamically from the template definition.
+// Well-known worker column names — used as fallback detection in export/import
+// when the template column type may have been incorrectly set (e.g. "text" instead of "worker")
+export const KNOWN_WORKER_COL_NAMES = new Set([
+  "שף", "סו-שף", "מנהל", 'מנל"ח', "מנל״ח", "עובד", "צרכן",
+]);
 
 /** Strip a text value from formula-injection attempts */
 export function sanitizeText(val) {

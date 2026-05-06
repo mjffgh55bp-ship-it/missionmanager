@@ -15,6 +15,7 @@ import {
   META_SHEET,
   INTERNAL_SKIP_KEYS,
   EXPORT_SOURCE_NAME,
+  KNOWN_WORKER_COL_NAMES,
 } from "@/lib/dataTransferSchema";
 
 const HEBREW_MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
@@ -136,9 +137,11 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       const values = row.values || {};
 
       // Build set of worker-type column names for this specific template
-      const workerColNames = new Set(
+      // Use BOTH: template column type === "worker" AND known worker column names as fallback
+      const tmplWorkerCols = new Set(
         (tmpl?.columns || []).filter(c => c.type === "worker").map(c => c.name)
       );
+      const isWorkerCol = (colName) => tmplWorkerCols.has(colName) || KNOWN_WORKER_COL_NAMES.has(colName);
 
       // Fixed meta cells — always use _exportOrder for stable matching
       const metaCells = [
@@ -153,7 +156,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
         const val = values[colName];
         if (isEmpty(val)) return "";
 
-        if (workerColNames.has(colName)) {
+        if (isWorkerCol(colName)) {
           // Worker fields: export as nickname (or empty if unknown ID)
           const name = workerIdToName[val];
           return name ? sanitizeText(name) : "";

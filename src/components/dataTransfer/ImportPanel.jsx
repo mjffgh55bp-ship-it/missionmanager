@@ -14,6 +14,7 @@ import {
   SCHEDULE_SHEET,
   AVAIL_SHEET,
   SCHEDULE_META_COLS,
+  KNOWN_WORKER_COL_NAMES,
 } from "@/lib/dataTransferSchema";
 
 // ── Column alias map ──────────────────────────────────────────────────────────
@@ -123,17 +124,15 @@ async function loadAppSettingsContext() {
  * Returns: { values, warnings, rejectedFields }
  *   rejectedFields: [{ col, value, reason }]
  */
-function resolveAndValidateRow(rawRow, workerColNames, workerNameToId, colAllowedValues, shiftStatuses) {
+function resolveAndValidateRow(rawRow, workerColNames, workerNameToId, workerIdSet, colAllowedValues) {
   const skipCols = new Set([...SCHEDULE_META_COLS, "סטטוס", "_rowNum", "_status", "_errors"]);
   const values = {};
   const warnings = [];
   const rejectedFields = [];
+  const workerDiagnostics = []; // [{col, rawValue, resolvedId, status}]
 
   // Time column names (always pass through without validation)
   const TIME_COL_NAMES = new Set(["התחלה", "שעת התחלה", "סיום", "שעת סיום", "תדריך"]);
-
-  // Build reverse map: workerId → nickname (for detecting if a stored value is already an ID)
-  const workerIdSet = new Set(Object.values(workerNameToId));
 
   Object.entries(rawRow).forEach(([rawKey, rawVal]) => {
     // Apply alias mapping first
@@ -144,27 +143,34 @@ function resolveAndValidateRow(rawRow, workerColNames, workerNameToId, colAllowe
     if (k.endsWith("_subTypes")) return;
 
     const strVal = String(rawVal ?? "").trim();
-    if (!strVal || strVal === "None") return; // skip empty
+    if (!strVal || strVal === "None") return; // skip empty — never overwrite existing
 
-    // ── Worker columns ────────────────────────────────────────────────────────
-    // A column is treated as a worker column if:
-    //   (a) the template explicitly marks it as type "worker" (workerColNames), OR
-    //   (b) the cell value resolves to a known worker nickname (nickname→ID lookup succeeds)
-    //       This handles columns that were previously imported with type "text" instead of "worker"
+    // Strip leading ' that sanitizeText may have added to prevent formula injection
     const stripped = strVal.startsWith("'") ? strVal.slice(1) : strVal;
-    const resolvedWorkerId = workerNameToId[strVal] || workerNameToId[stripped];
 
-    if (workerColNames.has(k) || resolvedWorkerId || workerIdSet.has(strVal)) {
-      if (resolvedWorkerId) {
-        // Resolved nickname → worker ID
-        values[k] = resolvedWorkerId;
-      } else if (workerIdSet.has(strVal)) {
-        // Already a worker ID (e.g. re-import of already-resolved data)
-        values[k] = strVal;
-      } else if (workerColNames.has(k)) {
-        // Explicitly a worker column but nickname not found — warn and skip field
-        warnings.push(`העובד "${strVal}" לא נמצא עבור העמודה "${k}" — השדה לא יעודכן`);
-        rejectedFields.push({ col: k, value: strVal, reason: `העובד "${strVal}" לא נמצא עבור העמודה "${k}"` });
+    // ── Detect if this is a worker column ─────────────────────────────────────
+    // A column is a worker column if:
+    //   (a) the template defines it as type "worker", OR
+    //   (b) it's in the known worker column names list (שף, סו-שף, מנהל, etc.)
+    const isWorkerCol = workerColNames.has(k) || KNOWN_WORKER_COL_NAMES.has(k);
+
+    if (isWorkerCol) {
+      // Try: nickname → worker ID
+      const byNickname = workerNameToId[strVal] || workerNameToId[stripped];
+      // Try: already a valid worker ID
+      const byId = !byNickname && (workerIdSet.has(strVal) ? strVal : null);
+
+      if (byNickname) {
+        values[k] = byNickname;
+        workerDiagnostics.push({ col: k, rawValue: strVal, resolvedId: byNickname, status: "resolved" });
+      } else if (byId) {
+        values[k] = byId;
+        workerDiagnostics.push({ col: k, rawValue: strVal, resolvedId: byId, status: "resolved" });
+      } else {
+        // Could not resolve — REJECT, do not write to values
+        warnings.push(`העובד "${stripped || strVal}" לא נמצא עבור העמודה "${k}" — השדה לא יעודכן`);
+        rejectedFields.push({ col: k, value: stripped || strVal, reason: `העובד "${stripped || strVal}" לא נמצא עבור העמודה "${k}"` });
+        workerDiagnostics.push({ col: k, rawValue: strVal, resolvedId: null, status: "unresolved" });
       }
       return;
     }
@@ -208,7 +214,7 @@ function resolveAndValidateRow(rawRow, workerColNames, workerNameToId, colAllowe
     }
   });
 
-  return { values, warnings, rejectedFields };
+  return { values, warnings, rejectedFields, workerDiagnostics };
 }
 
 export default function ImportPanel({ currentUser, onAuditLog }) {
@@ -277,6 +283,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
     const workerNameToId = {};
     workers.forEach(w => { if (w.nickname) workerNameToId[w.nickname] = w.id; });
+    const workerIdSet = new Set(workers.map(w => w.id).filter(Boolean));
 
     // Load existing TemplateRows for the dates in the import
     const importDates = [...new Set(rawSchedule.map(r => r["תאריך"]).filter(Boolean))];
@@ -355,17 +362,19 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         };
       }
 
-      const workerColNames = new Set(
-        (template.columns || []).filter(c => c.type === "worker").map(c => c.name)
-      );
+      // Worker columns: template type === "worker" OR known worker col names
+      const workerColNames = new Set([
+        ...(template.columns || []).filter(c => c.type === "worker").map(c => c.name),
+        ...KNOWN_WORKER_COL_NAMES,
+      ]);
 
       // Detect which raw columns were aliased (for preview display)
       const aliasedCols = Object.keys(rawRow)
         .filter(k => COLUMN_ALIAS_MAP[k])
         .map(k => `${k} → ${COLUMN_ALIAS_MAP[k]}`);
 
-      const { values: parsedValues, warnings, rejectedFields } =
-        resolveAndValidateRow(rawRow, workerColNames, workerNameToId, colAllowedValues, shiftStatuses);
+      const { values: parsedValues, warnings, rejectedFields, workerDiagnostics } =
+        resolveAndValidateRow(rawRow, workerColNames, workerNameToId, workerIdSet, colAllowedValues);
 
       // Handle status separately: validate against shiftStatuses
       if (statusRaw) {
@@ -403,6 +412,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         תאריך: date, מוקד: mokedName, _group_id: groupId, _order: order,
         _parsedValues: parsedValues,
         _rejectedFields: rejectedFields,
+        _workerDiagnostics: workerDiagnostics || [],
         _aliasedCols: aliasedCols,
         _action: existingRow ? "update" : "create",
         _existingRowId: existingRow?.id || null,
@@ -455,6 +465,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     const { scheduleRows, availRows, workers, existingAvailabilities } = preview;
     const workerNameToId = {};
     workers.forEach(w => { if (w.nickname) workerNameToId[w.nickname] = w.id; });
+    const workerIdSet = new Set(workers.map(w => w.id).filter(Boolean));
 
     let imported = 0, updated = 0, skipped = 0, errors = 0;
     const resultRows = [];
@@ -481,32 +492,35 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       for (const templateId of templateIds) {
         const template = templateMap[templateId];
         if (!template) continue;
-        const existingCols = template.columns || [];
+        let existingCols = template.columns || [];
         const existingColNames = new Set(existingCols.map(c => c.name));
         const missing = [...templateColumnsNeeded[templateId]].filter(n => !existingColNames.has(n));
-        if (missing.length === 0) continue;
 
-        // Build worker ID set for type inference
-        const allWorkerIds = new Set(workers.map(w => w.id).filter(Boolean));
-
-        const newCols = missing.map(name => {
-          // Check if any existing col on this template has this name with a known type
-          const existingMatch = existingCols.find(c =>
-            c.name === name && ["worker", "time", "task"].includes(c.type)
+        // Fix existing columns that have wrong type (e.g. worker column stored as "text")
+        let colsChanged = false;
+        existingCols = existingCols.map(col => {
+          const shouldBeWorker = KNOWN_WORKER_COL_NAMES.has(col.name) || (
+            // Check if any parsedValue for this column is a valid worker ID
+            scheduleRows.some(r => r._parsedValues?.[col.name] && workerIdSet.has(r._parsedValues[col.name]))
           );
-          if (existingMatch) return { ...existingMatch };
-
-          // Infer type from actual values written to parsedValues for this column:
-          // if the value is a worker ID, mark as worker type
-          const sampleValue = scheduleRows
-            .filter(r => r._parsedValues?.[name] !== undefined)
-            .map(r => r._parsedValues[name])[0];
-          if (sampleValue && allWorkerIds.has(sampleValue)) {
-            return { name, type: "worker", width: 150 };
+          if (shouldBeWorker && col.type !== "worker") {
+            colsChanged = true;
+            return { ...col, type: "worker", width: col.width || 150 };
           }
-          return { name, type: "text", width: 120 };
+          return col;
         });
-        await base44.entities.Template.update(templateId, { columns: [...existingCols, ...newCols] });
+
+        // Add missing columns with correct type inference
+        const newCols = missing.map(name => {
+          const isWorker = KNOWN_WORKER_COL_NAMES.has(name) || (
+            scheduleRows.some(r => r._parsedValues?.[name] && workerIdSet.has(r._parsedValues[name]))
+          );
+          return { name, type: isWorker ? "worker" : "text", width: isWorker ? 150 : 120 };
+        });
+
+        if (missing.length > 0 || colsChanged) {
+          await base44.entities.Template.update(templateId, { columns: [...existingCols, ...newCols] });
+        }
       }
     }
     // ── END STEP 0 ────────────────────────────────────────────────────────────
@@ -693,6 +707,44 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
               ))}
             </div>
           )}
+
+          {/* Worker field diagnostics */}
+          {(() => {
+            const allDiag = preview.scheduleRows.flatMap(r => r._workerDiagnostics || []);
+            if (allDiag.length === 0) return null;
+            const unresolved = allDiag.filter(d => d.status === "unresolved");
+            const resolved = allDiag.filter(d => d.status === "resolved");
+            return (
+              <div className={`border rounded-lg p-3 text-sm space-y-1 ${unresolved.length > 0 ? "bg-orange-50 border-orange-200 text-orange-900" : "bg-green-50 border-green-200 text-green-900"}`}>
+                <div className="font-semibold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  אבחון עמודות עובדים ({resolved.length} פוענחו, {unresolved.length} לא נמצאו):
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs mt-1">
+                    <thead><tr className="border-b">
+                      <th className="text-right py-1 px-1">עמודה</th>
+                      <th className="text-right py-1 px-1">ערך XLSX</th>
+                      <th className="text-right py-1 px-1">מזהה שפוענח</th>
+                      <th className="text-right py-1 px-1">סטטוס</th>
+                    </tr></thead>
+                    <tbody>
+                      {[...new Map(allDiag.map(d => [`${d.col}|${d.rawValue}`, d])).values()].slice(0, 15).map((d, i) => (
+                        <tr key={i} className="border-b border-dashed">
+                          <td className="py-0.5 px-1 font-medium">{d.col}</td>
+                          <td className="py-0.5 px-1">{d.rawValue}</td>
+                          <td className="py-0.5 px-1 font-mono text-xs">{d.resolvedId || "—"}</td>
+                          <td className={`py-0.5 px-1 font-semibold ${d.status === "resolved" ? "text-green-700" : "text-red-600"}`}>
+                            {d.status === "resolved" ? "✓ פוענח" : "✗ לא נמצא"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Rejected fields summary */}
           {preview.scheduleRows.some(r => (r._rejectedFields || []).length > 0) && (
