@@ -317,7 +317,26 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       };
     });
 
-    setPreview({ scheduleRows, availRows, workers, existingAvailabilities });
+    // Compute which columns will be added to templates (for preview display)
+    const templateColsToAdd = {}; // templateName → [colName, ...]
+    for (const row of scheduleRows) {
+      if (row._status === "שגיאה" || row._action === "skip") continue;
+      const template = Object.values(templateByName).find(t => t.id === row._templateId);
+      if (!template) continue;
+      const existingColNames = new Set((template.columns || []).map(c => c.name));
+      Object.keys(row._parsedValues || {}).forEach(k => {
+        if (k === "status" || k.startsWith("_")) return;
+        if (!existingColNames.has(k)) {
+          if (!templateColsToAdd[template.name]) templateColsToAdd[template.name] = new Set();
+          templateColsToAdd[template.name].add(k);
+        }
+      });
+    }
+    // Convert sets to arrays for serialization
+    const templateColsToAddArr = {};
+    Object.entries(templateColsToAdd).forEach(([k, v]) => { templateColsToAddArr[k] = [...v]; });
+
+    setPreview({ scheduleRows, availRows, workers, existingAvailabilities, templateColsToAdd: templateColsToAddArr });
     setLoadingPreview(false);
   };
 
@@ -332,6 +351,78 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
     let imported = 0, updated = 0, skipped = 0, errors = 0;
     const resultRows = [];
+
+    // ── STEP 0: Sync template columns ─────────────────────────────────────────
+    // For each template referenced in the import, ensure every column that appears
+    // in the XLSX header exists in Template.columns. This mirrors what the UI does
+    // when a user manually adds a column via the "Add column" dialog.
+    //
+    // We do NOT touch daily/AppSettings columns — those are date-scoped.
+    // We only add to Template.columns (permanent schema).
+
+    // Collect which columns each template needs
+    const templateColumnsNeeded = {}; // templateId → Set<colName>
+    for (const row of scheduleRows) {
+      if (row._status === "שגיאה" || row._action === "skip") continue;
+      const templateId = row._templateId;
+      if (!templateColumnsNeeded[templateId]) templateColumnsNeeded[templateId] = new Set();
+      // Every key in parsedValues (minus internal) is a column that needs to exist
+      Object.keys(row._parsedValues || {}).forEach(k => {
+        if (k === "status" || k.startsWith("_")) return;
+        templateColumnsNeeded[templateId].add(k);
+      });
+    }
+
+    // Load fresh template data and sync columns
+    const templateIds = Object.keys(templateColumnsNeeded);
+    if (templateIds.length > 0) {
+      const freshTemplates = await Promise.all(
+        templateIds.map(id => base44.entities.Template.filter({ id }))
+      );
+      const templateMap = {};
+      freshTemplates.flat().forEach(t => { templateMap[t.id] = t; });
+
+      for (const templateId of templateIds) {
+        const template = templateMap[templateId];
+        if (!template) continue;
+
+        const existingCols = template.columns || [];
+        const existingColNames = new Set(existingCols.map(c => c.name));
+        const needed = templateColumnsNeeded[templateId];
+
+        // Find which columns are missing
+        const missingColNames = [...needed].filter(name => !existingColNames.has(name));
+
+        if (missingColNames.length === 0) {
+          console.log(`[Import] Template "${template.name}": all ${needed.size} columns already exist`);
+          continue;
+        }
+
+        console.log(`[Import] Template "${template.name}": adding ${missingColNames.length} missing columns:`, missingColNames);
+
+        // Build column definitions for missing columns.
+        // We try to infer the type from existing columns with same name pattern,
+        // otherwise default to "text" with width 120.
+        const newCols = missingColNames.map(name => {
+          // Check if an existing column on ANY template has this name and we can reuse its type
+          const existingMatch = existingCols.find(c =>
+            c.name === name && (c.type === "worker" || c.type === "time" || c.type === "task")
+          );
+          if (existingMatch) {
+            return { ...existingMatch }; // same definition
+          }
+          // Heuristic: worker columns typically have role-like names
+          // Use "text" as default — safe and always renderable
+          return { name, type: "text", width: 120 };
+        });
+
+        const updatedColumns = [...existingCols, ...newCols];
+        await base44.entities.Template.update(templateId, { columns: updatedColumns });
+
+        console.log(`[Import] Template "${template.name}": columns after sync:`, updatedColumns.map(c => c.name));
+      }
+    }
+    // ── END STEP 0 ────────────────────────────────────────────────────────────
 
     // --- Apply schedule rows ---
     for (const row of scheduleRows) {
@@ -513,6 +604,18 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
             </div>
             <Button variant="ghost" size="sm" onClick={reset}><X className="w-4 h-4" /></Button>
           </div>
+
+          {/* Column sync warning */}
+          {Object.keys(preview.templateColsToAdd || {}).length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 space-y-1">
+              <div className="font-semibold">עמודות חדשות שייווצרו בתבניות:</div>
+              {Object.entries(preview.templateColsToAdd).map(([tmplName, cols]) => (
+                <div key={tmplName} className="text-xs">
+                  <span className="font-medium">{tmplName}:</span> {cols.join(", ")}
+                </div>
+              ))}
+            </div>
+          )}
 
           <DiagnosticPreviewTable rows={preview.scheduleRows} />
 
