@@ -1,76 +1,86 @@
 // =============================================================
-// APPROVED SCHEMA — only these fields are exported / imported.
-// Any field NOT listed here is stripped silently.
-// DO NOT add fields here unless explicitly approved.
+// Data Transfer Schema — round-trip safe
+// Export and import use the exact same field set.
+// ALL TemplateRow.values fields are included dynamically.
+// Internal fields (starting with _) are NOT exported as data columns,
+// EXCEPT _group_id and _order which are needed for row matching.
 // =============================================================
 
 export const EXPORT_SOURCE_NAME = "מערכת ניהול כוח אדם";
 
-// Approved fields for Assignment rows
-export const ASSIGNMENT_SCHEMA = {
-  employee_id:   { col: "A", label: "מזהה עובד",      required: true,  type: "string" },
-  employee_name: { col: "B", label: "שם עובד",        required: false, type: "string" },
-  date:          { col: "C", label: "תאריך",          required: true,  type: "date" },
-  start_time:    { col: "D", label: "שעת התחלה",      required: true,  type: "time" },
-  end_time:      { col: "E", label: "שעת סיום",       required: true,  type: "time" },
-  hours:         { col: "F", label: "שעות",           required: false, type: "number" },
-  role:          { col: "G", label: "תפקיד",          required: false, type: "string" },
-  status:        { col: "H", label: "סטטוס",          required: false, type: "string" },
-  notes:         { col: "I", label: "הערות",          required: false, type: "string" },
-};
+// Fixed meta-columns that always appear at the start of every exported row
+export const SCHEDULE_META_COLS = ["תאריך", "מוקד", "_group_id", "_order"];
 
-// Approved fields for Availability rows
-export const AVAILABILITY_SCHEMA = {
-  employee_id:   { col: "A", label: "מזהה עובד",      required: true,  type: "string" },
-  employee_name: { col: "B", label: "שם עובד",        required: false, type: "string" },
-  week_start:    { col: "C", label: "שבוע (יום ראשון)",required: true, type: "date" },
-  date:          { col: "D", label: "תאריך משמרת",    required: true,  type: "date" },
-  start_time:    { col: "E", label: "שעת התחלה",      required: true,  type: "time" },
-  end_time:      { col: "F", label: "שעת סיום",       required: true,  type: "time" },
-  shift_type:    { col: "G", label: "סוג זמינות",     required: false, type: "string" }, // wanted/available/unavailable
-  status:        { col: "H", label: "סטטוס הגשה",    required: false, type: "string" },
-};
+// Sheet names
+export const SCHEDULE_SHEET = "לוח משמרות";
+export const AVAIL_SHEET    = "זמינות";
+export const META_SHEET     = "מטא-נתונים";
 
-export const SHEET_ASSIGNMENTS  = "משמרות";
-export const SHEET_AVAILABILITY = "זמינות";
-export const SHEET_META         = "מטא-נתונים";
+// Internal keys that must never be exported as data columns
+export const INTERNAL_SKIP_KEYS = new Set([
+  "is_continuation",
+  "continuation_from_date",
+  "continuation_source_row_id",
+  "status",
+  "_order",          // exported separately as a meta col
+]);
+
+// Keys whose values are always exported/imported as-is (not treated as worker fields by default)
+// Worker fields are detected dynamically from the template definition.
 
 /** Strip a text value from formula-injection attempts */
 export function sanitizeText(val) {
   if (val === null || val === undefined) return "";
   const s = String(val).trim();
-  // Prevent Excel formula injection
   if (/^[=+\-@|]/.test(s)) return "'" + s;
   return s;
 }
 
-/** Pick only approved fields from an object, sanitize strings */
-export function stripToSchema(obj, schema) {
-  const result = {};
-  for (const [key, def] of Object.entries(schema)) {
-    if (key in obj) {
-      const raw = obj[key];
-      result[key] = def.type === "string" ? sanitizeText(raw) : raw;
-    }
-  }
-  return result;
+/** Is a value considered "empty" for export/import purposes? */
+export function isEmpty(v) {
+  if (v === null || v === undefined) return true;
+  if (v === "" || v === "None" || v === "none") return true;
+  return false;
 }
 
-/** Validate a row against a schema; returns array of error strings */
-export function validateRow(row, schema) {
+/** Serialize a value for export to XLSX cell */
+export function serializeForExport(val) {
+  if (isEmpty(val)) return "";
+  if (typeof val === "object") return sanitizeText(JSON.stringify(val));
+  return sanitizeText(String(val));
+}
+
+/** Deserialize a cell value from XLSX back into the correct type.
+ *  JSON strings are parsed back into objects. */
+export function deserializeFromImport(rawStr) {
+  const s = String(rawStr ?? "").trim();
+  if (!s || s === "None") return null;
+  // Try to parse JSON objects/arrays
+  if ((s.startsWith("{") && s.endsWith("}")) || (s.startsWith("[") && s.endsWith("]"))) {
+    try { return JSON.parse(s); } catch { /* fall through */ }
+  }
+  return s;
+}
+
+/** Validate a parsed schedule row (before applying to DB).
+ *  Returns array of error strings (empty = valid). */
+export function validateScheduleRow(row) {
   const errors = [];
-  for (const [key, def] of Object.entries(schema)) {
-    if (def.required && (row[key] === undefined || row[key] === null || row[key] === "")) {
-      errors.push(`שדה חובה חסר: ${def.label}`);
-    }
-    if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
-      if (def.type === "date" && !/^\d{4}-\d{2}-\d{2}$/.test(String(row[key]))) {
-        errors.push(`פורמט תאריך שגוי בשדה "${def.label}" (נדרש YYYY-MM-DD)`);
-      }
-      if (def.type === "time" && !/^\d{2}:\d{2}$/.test(String(row[key]))) {
-        errors.push(`פורמט שעה שגוי בשדה "${def.label}" (נדרש HH:MM)`);
-      }
-    }
+  if (!row["תאריך"] || !/^\d{4}-\d{2}-\d{2}$/.test(row["תאריך"])) {
+    errors.push("תאריך חסר או בפורמט שגוי (נדרש YYYY-MM-DD)");
+  }
+  if (!row["מוקד"]) {
+    errors.push("שם מוקד חסר");
+  }
+  return errors;
+}
+
+/** Validate a parsed availability row. Returns array of error strings. */
+export function validateAvailRow(row) {
+  const errors = [];
+  if (!row["מזהה עובד"]) errors.push("מזהה עובד חסר");
+  if (!row["תאריך משמרת"] || !/^\d{4}-\d{2}-\d{2}$/.test(row["תאריך משמרת"])) {
+    errors.push("תאריך משמרת חסר או בפורמט שגוי");
   }
   return errors;
 }
