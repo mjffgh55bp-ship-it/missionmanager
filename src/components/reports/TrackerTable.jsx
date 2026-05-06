@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Gauge, Pin, PinOff, Filter } from "lucide-react";
+import { Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Plus, Trash2, Gauge, Pin, PinOff, Filter, BarChart2, Target, Sliders } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { base44 } from "@/api/base44Client";
 import ColumnConfigDialog from "./ColumnConfigDialog";
@@ -147,9 +147,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const [configuringCol, setConfiguringCol] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // Visual Analysis
-  const [visualConfigs, setVisualConfigs] = useState({}); // colId -> config
+  // Visual Analysis — persisted to localStorage
+  const [visualConfigs, setVisualConfigs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`tracker_visualConfigs_${initialTracker.id}`) || "{}"); } catch { return {}; }
+  });
+  // Per-column: tracks whether the custom config is currently "shown" or "hidden" (toggle)
+  const [visualActive, setVisualActive] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`tracker_visualActive_${initialTracker.id}`) || "{}"); } catch { return {}; }
+  });
   const [visualDialogCol, setVisualDialogCol] = useState(null); // col object
+  const gaugeClickTimerRef = useRef({}); // colId -> timeout id for double-click detection
 
   // Sorting
   const [sortColId, setSortColId] = useState(null);
@@ -203,6 +210,55 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   useEffect(() => { try { localStorage.setItem(`tracker_filter_roles_${tracker.id}`, JSON.stringify(selectedRoles)); } catch {} }, [selectedRoles, tracker.id]);
   useEffect(() => { try { localStorage.setItem(`tracker_filter_quals_${tracker.id}`, JSON.stringify(selectedQualifications)); } catch {} }, [selectedQualifications, tracker.id]);
   useEffect(() => { try { localStorage.setItem(`tracker_filter_workers_${tracker.id}`, JSON.stringify(selectedWorkerIds)); } catch {} }, [selectedWorkerIds, tracker.id]);
+  useEffect(() => { try { localStorage.setItem(`tracker_visualConfigs_${tracker.id}`, JSON.stringify(visualConfigs)); } catch {} }, [visualConfigs, tracker.id]);
+  useEffect(() => { try { localStorage.setItem(`tracker_visualActive_${tracker.id}`, JSON.stringify(visualActive)); } catch {} }, [visualActive, tracker.id]);
+
+  // Returns the effective config for a column (null if toggled off)
+  const getEffectiveVisualConfig = (colId) => {
+    const cfg = visualConfigs[colId];
+    if (!cfg) return null;
+    if (visualActive[colId] === false) return null;
+    return cfg;
+  };
+
+  // Handle Gauge button click — single = avg_scale toggle, double = open dialog
+  const handleGaugeClick = (col) => {
+    const colId = col.id;
+    const existing = visualConfigs[colId];
+
+    if (gaugeClickTimerRef.current[colId]) {
+      // Double click detected — clear single-click timer and open dialog
+      clearTimeout(gaugeClickTimerRef.current[colId]);
+      gaugeClickTimerRef.current[colId] = null;
+      setVisualDialogCol(col);
+      return;
+    }
+
+    // Start single-click timer (250ms window for double-click)
+    gaugeClickTimerRef.current[colId] = setTimeout(() => {
+      gaugeClickTimerRef.current[colId] = null;
+
+      if (!existing) {
+        // No config yet → apply avg_scale automatically
+        const vals = filteredWorkers.map(w => {
+          const v = computeAutoValue(col, w.id);
+          if (typeof v === "number") return v;
+          if (typeof v === "object" && v !== null) {
+            if (col.quantitative_single_item) return v[col.quantitative_single_item] || 0;
+            return Object.values(v).reduce((s, x) => s + (x || 0), 0);
+          }
+          return 0;
+        }).filter(v => !isNaN(v) && v > 0);
+        const avg = vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : 0;
+        const cfg = { mode: "avg_scale", _avg: avg };
+        setVisualConfigs(prev => ({ ...prev, [colId]: cfg }));
+        setVisualActive(prev => ({ ...prev, [colId]: true }));
+      } else {
+        // Has config → toggle active state
+        setVisualActive(prev => ({ ...prev, [colId]: !(prev[colId] !== false) }));
+      }
+    }, 250);
+  };
 
   useEffect(() => { loadEntries(); }, [tracker.id]);
   useEffect(() => { setTracker(initialTracker); }, [initialTracker]);
@@ -1009,15 +1065,37 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
                   : <ArrowUpDown className="w-3 h-3 text-gray-300" />)}
               </button>
-              {!editMode && isAuto(col.type) && (
-                <button
-                  onClick={() => setVisualDialogCol(col)}
-                  title="ניתוח ויזואלי"
-                  className={`p-0.5 rounded hover:bg-blue-100 transition-colors ${visualConfigs[col.id] ? "text-blue-600" : "text-gray-300 hover:text-blue-400"}`}
-                >
-                  <Gauge className="w-3.5 h-3.5" />
-                </button>
-              )}
+              {!editMode && isAuto(col.type) && (() => {
+                const cfg = visualConfigs[col.id];
+                const isActive = visualActive[col.id] !== false && !!cfg;
+                const isOff = cfg && !isActive;
+                const ModeIcon = cfg?.mode === "avg_scale" ? BarChart2 : cfg?.mode === "custom_scale" ? Target : cfg?.mode === "thresholds" ? Sliders : null;
+                const tooltipText = !cfg
+                  ? "לחץ להפעלת סקאלה לפי ממוצע | לחץ פעמיים לפתיחת הגדרות"
+                  : isActive
+                  ? `מצב: ${cfg.mode === "avg_scale" ? "סקאלה לפי ממוצע" : cfg.mode === "custom_scale" ? "סקאלה אישית" : "ספים"} — לחץ לכיבוי | לחץ פעמיים לשינוי`
+                  : "כבוי — לחץ להפעלה מחדש | לחץ פעמיים לשינוי הגדרות";
+                return (
+                  <div className="relative flex items-center" title={tooltipText}>
+                    <button
+                      onClick={() => handleGaugeClick(col)}
+                      className={`p-0.5 rounded hover:bg-blue-100 transition-colors relative ${
+                        isActive ? "text-blue-600" : isOff ? "text-gray-400" : "text-gray-300 hover:text-blue-400"
+                      }`}
+                    >
+                      <Gauge className="w-3.5 h-3.5" />
+                      {/* Small mode indicator dot */}
+                      {cfg && (
+                        <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${isActive ? "bg-blue-500" : "bg-gray-400"}`} />
+                      )}
+                    </button>
+                    {/* Mode icon badge */}
+                    {ModeIcon && isActive && (
+                      <ModeIcon className="w-2.5 h-2.5 text-blue-400 ml-0.5" />
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             {col.description && (
               <span className="text-xs text-gray-400 font-normal text-center leading-tight">{col.description}</span>
@@ -1099,7 +1177,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               return <div key={col.id} className="px-2 py-0.5 text-gray-300 text-xs flex items-center justify-center">אין משימות</div>;
             }
             const grandTotal = Object.values(hours).reduce((sum, h) => sum + (h || 0), 0);
-            const bgColorTask = visualConfigs[col.id] ? getVisualColor(grandTotal, visualConfigs[col.id]) : null;
+            const bgColorTask = getVisualColor(grandTotal, getEffectiveVisualConfig(col.id));
             return (
               <div key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm flex items-center justify-center"
                 style={bgColorTask ? { backgroundColor: bgColorTask } : {}}>
@@ -1117,7 +1195,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             const counts = typeof value === "object" && value !== null ? value : {};
             if (col.quantitative_single_item) {
               const num = counts[col.quantitative_single_item] || 0;
-              const bgColorQ = visualConfigs[col.id] ? getVisualColor(num, visualConfigs[col.id]) : null;
+              const bgColorQ = getVisualColor(num, getEffectiveVisualConfig(col.id));
               return (
                 <div key={col.id} className="text-center font-semibold px-2 py-0.5 text-sm flex items-center justify-center"
                   style={bgColorQ ? { backgroundColor: bgColorQ } : {}}>
@@ -1150,8 +1228,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             const quantCriteriaCheck = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
             const isQuantSumCol = col.type === "schedule_col" && quantCriteriaCheck.length > 0;
             const showAsHours = col.type === "schedule_col" && !isQuantSumCol;
-            const vCfg = visualConfigs[col.id];
-            const bgColor = vCfg && typeof value === "number" ? getVisualColor(value, vCfg) : null;
+            const bgColor = typeof value === "number" ? getVisualColor(value, getEffectiveVisualConfig(col.id)) : null;
             return (
               <div key={col.id} className="text-center font-semibold text-blue-900 px-2 py-0.5 text-sm flex items-center justify-center"
                 style={bgColor ? { backgroundColor: bgColor } : {}}>
@@ -1381,7 +1458,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           onOpenChange={(o) => { if (!o) setVisualDialogCol(null); }}
           config={visualConfigs[visualDialogCol.id] || null}
           onConfigChange={(cfg) => {
-            setVisualConfigs(prev => ({ ...prev, [visualDialogCol.id]: cfg }));
+            const colId = visualDialogCol.id;
+            if (cfg) {
+              setVisualConfigs(prev => ({ ...prev, [colId]: cfg }));
+              setVisualActive(prev => ({ ...prev, [colId]: true }));
+            } else {
+              // "הסר עיצוב" — clear everything
+              setVisualConfigs(prev => { const n = { ...prev }; delete n[colId]; return n; });
+              setVisualActive(prev => { const n = { ...prev }; delete n[colId]; return n; });
+            }
           }}
         />
       )}
