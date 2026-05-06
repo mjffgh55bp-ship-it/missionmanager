@@ -852,8 +852,13 @@ export default function Schedule() {
                                       value={row.values?.status || ""}
                                       onValueChange={async (value) => {
                                         const newValues = { ...row.values, status: value };
-                                        await base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                        setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                        try {
+                                          await base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                          setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                        } catch {
+                                          // Row no longer exists — reload to sync state
+                                          await loadData();
+                                        }
                                       }}>
                                       <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
                                         <SelectValue placeholder="-" />
