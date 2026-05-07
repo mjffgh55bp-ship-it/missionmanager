@@ -97,18 +97,19 @@ export default function Schedule() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     lastWeekStart.current = weekStartStr;
 
-    // Batch: fetch day-specific live data + static data from cache
+    // Batch 1: static reference data (cached) — max 3 concurrent
     console.time("Schedule initial load");
-    const [
-      workersData, availabilitiesData, unavailabilitiesData,
-      allTemplatesData, templateRowsData, allSettings
-    ] = await Promise.all([
+    const [workersData, allTemplatesData, allSettings] = await Promise.all([
       getCachedWorkers(base44.entities),
+      getCachedTemplates(base44.entities),
+      getCachedAllSettings(base44.entities),
+    ]);
+
+    // Batch 2: day-specific live data — max 3 concurrent
+    const [availabilitiesData, unavailabilitiesData, templateRowsData] = await Promise.all([
       base44.entities.Availability.filter({ week_start_date: weekStartStr }),
       base44.entities.Unavailability.filter({ date: dateString }),
-      getCachedTemplates(base44.entities),
       base44.entities.TemplateRow.filter({ date: dateString }),
-      getCachedAllSettings(base44.entities),
     ]);
     console.timeEnd("Schedule initial load");
 
