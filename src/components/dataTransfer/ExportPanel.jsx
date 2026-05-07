@@ -295,13 +295,21 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       allCols.forEach(col => {
         const internalKey = getInternalValueKey(col);
         const rawVal = values[internalKey];
-        if (isEmpty(rawVal)) return;
+        // For ColumnCell columns, the display value may be in _subTypes even if main value is empty
+        const subTypesVal = values[`${internalKey}_subTypes`];
+        const hasSubTypes = Array.isArray(subTypesVal) && subTypesVal.length > 0;
+        if (isEmpty(rawVal) && !hasSubTypes) return;
         let displayVal;
         if (col.type === "worker" || isKnownWorkerCol(col.name)) {
           const w = workerById[rawVal];
-          displayVal = w ? (w.nickname || w.id) : String(rawVal);
-        } else {
+          displayVal = w ? (w.nickname || w.id) : String(rawVal || "");
+        } else if (!isEmpty(rawVal)) {
           displayVal = serializeForExport(rawVal);
+        } else if (hasSubTypes) {
+          // Show subTypes as the display value when main value is empty
+          displayVal = subTypesVal.join(", ");
+        } else {
+          return;
         }
         hrRows.push([
           row.date,

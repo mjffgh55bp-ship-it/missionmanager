@@ -321,11 +321,35 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       const fieldsDiag = [];
 
       const rowValues = valuesByRowId[irow.row_id] || [];
+      // Build a set of live column names for subTypes validation
+      const liveColNames = new Set((liveTemplate.columns || []).map(c => c.name));
+
       rowValues.forEach(iv => {
         const colName = iv.column_name;
 
-        // Skip subTypes rows — handled together with main column
-        if (colName.endsWith("_subTypes")) return;
+        // ── Handle *_subTypes rows directly ──────────────────────────────────
+        // These are NOT in MokedColumns; validate via parent column name
+        if (colName.endsWith("_subTypes")) {
+          const parentColName = colName.slice(0, -"_subTypes".length);
+          // Only import if parent column exists in the live template
+          if (!liveColNames.has(parentColName)) {
+            fieldsDiag.push({ col: colName, internalKey: colName, rawVal: iv.value_exported, writtenVal: null, status: "skipped" });
+            return;
+          }
+          const rawVal = iv.value_exported || iv.value_raw;
+          if (isEmpty(rawVal)) {
+            fieldsDiag.push({ col: colName, internalKey: colName, rawVal: "", writtenVal: null, status: "empty_skip" });
+            return;
+          }
+          const stripped = String(rawVal).startsWith("'") ? String(rawVal).slice(1) : String(rawVal);
+          // Parse JSON array if present, otherwise wrap in array
+          let parsed;
+          try { parsed = JSON.parse(stripped); } catch { parsed = [stripped]; }
+          if (!Array.isArray(parsed)) parsed = [String(parsed)];
+          parsedValues[colName] = parsed;
+          fieldsDiag.push({ col: colName, internalKey: colName, rawVal: stripped, writtenVal: parsed, status: "written" });
+          return;
+        }
 
         const key = colMatchKey(irow.template_id, colName);
         const cm = colMatchResult[key];
@@ -410,16 +434,6 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         if (deserialized !== null && deserialized !== undefined) {
           parsedValues[internalKey] = deserialized;
           fieldsDiag.push({ col: colName, internalKey, rawVal: stripped, writtenVal: deserialized, status: "written" });
-
-          // Also handle subTypes if present
-          const subTypesIv = rowValues.find(v => v.column_name === `${colName}_subTypes`);
-          if (subTypesIv && !isEmpty(subTypesIv.value_exported || subTypesIv.value_raw)) {
-            const subRaw = subTypesIv.value_exported || subTypesIv.value_raw;
-            const subDeserialized = deserializeFromImport(String(subRaw).startsWith("'") ? String(subRaw).slice(1) : String(subRaw));
-            if (subDeserialized !== null) {
-              parsedValues[`${internalKey}_subTypes`] = subDeserialized;
-            }
-          }
         }
       });
 
