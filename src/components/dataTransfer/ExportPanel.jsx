@@ -9,13 +9,17 @@ import {
   sanitizeText,
   isEmpty,
   serializeForExport,
-  SCHEDULE_META_COLS,
-  SCHEDULE_SHEET,
-  AVAIL_SHEET,
-  META_SHEET,
-  INTERNAL_SKIP_KEYS,
-  EXPORT_SOURCE_NAME,
+  getInternalValueKey,
   isKnownWorkerCol,
+  EXPORT_VERSION,
+  EXPORT_SOURCE_NAME,
+  SHEET_MANIFEST,
+  SHEET_MOKED_TEMPLATES,
+  SHEET_MOKED_COLUMNS,
+  SHEET_MOKED_ROWS,
+  SHEET_MOKED_VALUES,
+  SHEET_WORKERS_MAP,
+  SHEET_HUMAN_READABLE,
 } from "@/lib/dataTransferSchema";
 
 const HEBREW_MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
@@ -55,185 +59,263 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     const dateEnd = dates[dates.length - 1];
     const dateSet = new Set(dates);
 
-    // Load all needed data in parallel
-    const [workers, allTemplates, templateRows, availabilities] = await Promise.all([
+    // ── Step 1: Load all source data ─────────────────────────────────────────
+    const [workers, allTemplates, templateRows] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Template.list(),
       base44.entities.TemplateRow.list(),
-      base44.entities.Availability.list(),
     ]);
 
-    // Build lookup maps
-    const workerIdToName = {};
-    workers.forEach(w => { workerIdToName[w.id] = w.nickname || w.id; });
+    // Build lookups
+    const workerById = {};
+    workers.forEach(w => { workerById[w.id] = w; });
 
-    const templateMap = {};
-    allTemplates.forEach(t => { templateMap[t.id] = t; });
+    const templateById = {};
+    allTemplates.forEach(t => { templateById[t.id] = t; });
 
-    // Filter rows to selected dates only, sorted stably within each group
+    // Filter rows to selected dates, sorted stably
     const filteredRows = templateRows
       .filter(r => dateSet.has(r.date))
       .sort((a, b) => {
-        // Sort within same group by _order, then created_date
-        if (a.date === b.date && a.group_id === b.group_id) {
-          const aO = a.values?._order ?? Infinity;
-          const bO = b.values?._order ?? Infinity;
-          if (aO !== bO) return aO - bO;
-          return new Date(a.created_date) - new Date(b.created_date);
-        }
-        // Sort by date, then group_id
         if (a.date !== b.date) return a.date.localeCompare(b.date);
-        return (a.group_id || "").localeCompare(b.group_id || "");
+        if ((a.group_id || "") !== (b.group_id || "")) return (a.group_id || "").localeCompare(b.group_id || "");
+        const aO = a.values?._order ?? Infinity;
+        const bO = b.values?._order ?? Infinity;
+        if (aO !== bO) return aO - bO;
+        return new Date(a.created_date) - new Date(b.created_date);
       });
 
-    // Assign stable _order values per group so every row has a unique, stable identifier
-    const groupRowIndex = {}; // "date|group_id" → counter
+    // Assign stable _order per group if missing
+    const groupOrderCounter = {};
     filteredRows.forEach(row => {
       const gKey = `${row.date}|${row.group_id || ""}`;
-      if (groupRowIndex[gKey] === undefined) groupRowIndex[gKey] = 0;
-      // If _order not set, assign the stable index
+      if (groupOrderCounter[gKey] === undefined) groupOrderCounter[gKey] = 0;
       if (row.values?._order === undefined || row.values?._order === null) {
-        row._exportOrder = groupRowIndex[gKey];
+        row._stableOrder = groupOrderCounter[gKey];
       } else {
-        row._exportOrder = row.values._order;
+        row._stableOrder = row.values._order;
       }
-      groupRowIndex[gKey]++;
+      groupOrderCounter[gKey]++;
     });
 
-    // --- Build the set of all dynamic column names ---
-    // We collect every key that appears in any row's values, minus internal fields.
-    // This guarantees no dynamic column is ever missed.
-    const dynamicColsSet = new Set();
-    filteredRows.forEach(row => {
-      // Include all columns defined on the template
-      const tmpl = templateMap[row.template_id];
-      if (tmpl) {
-        (tmpl.columns || []).forEach(col => dynamicColsSet.add(col.name));
-      }
-      // Also include any extra keys actually stored in values (e.g. from older data)
-      Object.keys(row.values || {}).forEach(k => {
-        if (
-          !k.startsWith("_") &&          // internal fields excluded
-          !INTERNAL_SKIP_KEYS.has(k) &&  // explicitly excluded internals
-          !k.endsWith("_subTypes")        // sub-type suffix not needed
-        ) {
-          dynamicColsSet.add(k);
-        }
-      });
-    });
-    // "סטטוס" is exported last, separately
-    dynamicColsSet.delete("status");
-    dynamicColsSet.delete("סטטוס");
-
-    const dynamicCols = [...dynamicColsSet];
-
-    // Header: fixed meta cols + dynamic data cols + סטטוס
-    const scheduleHeader = [...SCHEDULE_META_COLS, ...dynamicCols, "סטטוס"];
-
-    // Build data rows
-    const scheduleRows = filteredRows.map(row => {
-      const tmpl = templateMap[row.template_id];
-      const mokedName = sanitizeText(tmpl?.name || row.template_name || "");
-      const values = row.values || {};
-
-      // Build set of worker-type column names for this specific template
-      // Use BOTH: template column type === "worker" AND known worker column names as fallback
-      const tmplWorkerCols = new Set(
-        (tmpl?.columns || []).filter(c => c.type === "worker").map(c => c.name)
-      );
-      const isWorkerCol = (colName) => tmplWorkerCols.has(colName) || isKnownWorkerCol(colName);
-
-      // Fixed meta cells — always use _exportOrder for stable matching
-      const metaCells = [
-        sanitizeText(row.date),
-        mokedName,
-        sanitizeText(row.group_id || ""),
-        String(row._exportOrder ?? ""),
-      ];
-
-      // Diagnostic: log raw values vs what will be exported
-      const missingFields = dynamicCols.filter(colName => {
-        const val = values[colName];
-        if (isEmpty(val)) return false; // genuinely empty, not missing
-        // It has a value — check if export will produce empty
-        if (isWorkerCol(colName)) {
-          return !workerIdToName[val]; // worker ID not found → will export empty
-        }
-        return false;
-      });
-      if (missingFields.length > 0) {
-        console.warn("[Export diag] Row", row.date, mokedName, "| raw values:", JSON.stringify(values), "| missing/unresolved fields:", missingFields);
-      }
-
-      // Dynamic data cells
-      const dataCells = dynamicCols.map(colName => {
-        const val = values[colName];
-        if (isEmpty(val)) return "";
-
-        if (isWorkerCol(colName)) {
-          // Worker fields: export as nickname (or empty if unknown ID)
-          const name = workerIdToName[val];
-          if (!name) {
-            console.warn("[Export diag] Worker ID not found for column", colName, "value:", val);
-          }
-          return name ? sanitizeText(name) : "";
-        }
-
-        return serializeForExport(val);
-      });
-
-      const statusCell = sanitizeText(values.status || values["סטטוס"] || "");
-
-      return [...metaCells, ...dataCells, statusCell];
-    });
-
-    // --- Availability sheet (unchanged from before) ---
-    const filteredAvailabilities = availabilities.filter(av =>
-      (av.shifts || []).some(s => dateSet.has(s.date))
-    );
-    const availHeader = ["מזהה עובד", "שם עובד", "שבוע", "תאריך משמרת", "שעת התחלה", "שעת סיום", "סוג זמינות", "סטטוס הגשה"];
-    const availRows = filteredAvailabilities.flatMap(av => {
-      const worker = workers.find(w => w.id === av.worker_id);
-      if (!worker) return [];
-      return (av.shifts || [])
-        .filter(s => dateSet.has(s.date))
-        .map(s => [
-          sanitizeText(worker.id),
-          sanitizeText(worker.nickname || ""),
-          sanitizeText(av.week_start_date),
-          sanitizeText(s.date),
-          sanitizeText(s.start_time || ""),
-          sanitizeText(s.end_time || ""),
-          sanitizeText(s.type || ""),
-          sanitizeText(av.status || ""),
-        ]);
-    });
-
-    const totalRows = scheduleRows.length + availRows.length;
-    if (totalRows === 0) {
+    if (filteredRows.length === 0) {
       setExporting(false);
       alert("לא נמצאו נתונים לטווח התאריכים שנבחר.");
       return;
     }
 
-    // Build workbook
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([scheduleHeader, ...scheduleRows]), SCHEDULE_SHEET);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([availHeader, ...availRows]), AVAIL_SHEET);
-
     const exportedAt = format(new Date(), "yyyy-MM-dd HH:mm");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-      ["מקור", EXPORT_SOURCE_NAME],
-      ["תאריך ייצוא", exportedAt],
-      ["תאריך התחלה", dateStart],
-      ["תאריך סיום", dateEnd],
-      ["מספר ימים", dates.length],
-      ["שורות לוח משמרות", scheduleRows.length],
-      ["שורות זמינות", availRows.length],
-      ["עמודות דינמיות", dynamicCols.join(", ")],
-      ["מייצא", sanitizeText(currentUser?.email || "")],
-    ]), META_SHEET);
+    const wb = XLSX.utils.book_new();
 
+    // ── Sheet 1: Manifest ─────────────────────────────────────────────────────
+    const manifestData = [
+      ["export_version", EXPORT_VERSION],
+      ["export_date", exportedAt],
+      ["source", EXPORT_SOURCE_NAME],
+      ["date_start", dateStart],
+      ["date_end", dateEnd],
+      ["days_count", dates.length],
+      ["rows_count", filteredRows.length],
+      ["exported_by", sanitizeText(currentUser?.email || "")],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(manifestData), SHEET_MANIFEST);
+
+    // ── Sheet 2: MokedTemplates ───────────────────────────────────────────────
+    // Collect only templates that appear in filtered rows
+    const usedTemplateIds = new Set(filteredRows.map(r => r.template_id));
+    const usedTemplates = allTemplates.filter(t => usedTemplateIds.has(t.id));
+
+    const tmplHeader = ["template_id", "template_name", "color", "is_default", "active"];
+    const tmplRows = usedTemplates.map(t => [
+      t.id,
+      sanitizeText(t.name),
+      t.color || "#3b82f6",
+      t.is_default ? "true" : "false",
+      t.active !== false ? "true" : "false",
+    ]);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([tmplHeader, ...tmplRows]), SHEET_MOKED_TEMPLATES);
+
+    // ── Sheet 3: MokedColumns ─────────────────────────────────────────────────
+    // One row per column per template, in exact Template.columns order
+    const colHeader = [
+      "template_id", "template_name", "column_index", "column_name",
+      "display_name", "internal_value_key", "type", "width",
+      "default_value", "options_json", "role_filter", "is_worker_column",
+      "is_task_column",
+    ];
+    const colRows = [];
+    usedTemplates.forEach(t => {
+      (t.columns || []).forEach((col, idx) => {
+        const internalKey = getInternalValueKey(col);
+        const isWorker = col.type === "worker" || isKnownWorkerCol(col.name);
+        const isTask   = col.type === "task";
+        colRows.push([
+          t.id,
+          sanitizeText(t.name),
+          idx,
+          sanitizeText(col.name),         // column_name (identity key)
+          sanitizeText(col.name),         // display_name (human readable, same as name)
+          sanitizeText(internalKey),      // internal_value_key (what values obj uses)
+          sanitizeText(col.type || "text"),
+          col.width || 120,
+          sanitizeText(col.default_value || ""),
+          col.options ? JSON.stringify(col.options) : "",
+          sanitizeText(col.role_filter || ""),
+          isWorker ? "true" : "false",
+          isTask   ? "true" : "false",
+        ]);
+      });
+      // Always add the implicit "status" column at the end
+      colRows.push([
+        t.id, sanitizeText(t.name),
+        (t.columns || []).length,
+        "status", "סטטוס", "status", "select", 100,
+        "", "", "", "false", "false",
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([colHeader, ...colRows]), SHEET_MOKED_COLUMNS);
+
+    // ── Sheet 4: MokedRows ────────────────────────────────────────────────────
+    const rowHeader = [
+      "row_id", "template_id", "template_name", "date",
+      "group_id", "_order", "created_date",
+    ];
+    const rowData = filteredRows.map(row => [
+      row.id,
+      row.template_id,
+      sanitizeText(row.template_name || templateById[row.template_id]?.name || ""),
+      row.date,
+      sanitizeText(row.group_id || ""),
+      row._stableOrder,
+      row.created_date || "",
+    ]);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([rowHeader, ...rowData]), SHEET_MOKED_ROWS);
+
+    // ── Sheet 5: MokedValues ──────────────────────────────────────────────────
+    // One row per (row × column) cell value — even empty ones from template columns
+    const valHeader = [
+      "row_id", "template_id", "template_name", "date",
+      "group_id", "_order", "column_name", "display_name",
+      "internal_value_key", "column_type", "is_worker_column", "is_task_column",
+      "value_raw", "value_exported",
+    ];
+    const valRows = [];
+
+    filteredRows.forEach(row => {
+      const tmpl = templateById[row.template_id];
+      if (!tmpl) return;
+      const values = row.values || {};
+
+      const allCols = [...(tmpl.columns || [])];
+      // Add implicit status column
+      allCols.push({ name: "status", type: "select", _isStatusCol: true });
+
+      allCols.forEach(col => {
+        const internalKey = col._isStatusCol ? "status" : getInternalValueKey(col);
+        const displayName = col._isStatusCol ? "סטטוס" : col.name;
+        const isWorker = !col._isStatusCol && (col.type === "worker" || isKnownWorkerCol(col.name));
+        const isTask   = !col._isStatusCol && col.type === "task";
+
+        const rawVal = values[internalKey];
+
+        let exportedVal = "";
+        if (!isEmpty(rawVal)) {
+          if (isWorker) {
+            const w = workerById[rawVal];
+            exportedVal = w ? sanitizeText(w.nickname || w.id) : sanitizeText(String(rawVal));
+            if (!w) {
+              console.warn(`[Export] Worker ID not found: ${rawVal} in col ${col.name}`);
+            }
+          } else {
+            exportedVal = serializeForExport(rawVal);
+          }
+        }
+
+        // Also export _subTypes for ColumnCell columns
+        const subTypesKey = `${internalKey}_subTypes`;
+        const subTypesVal = values[subTypesKey];
+        const subTypesExported = !isEmpty(subTypesVal) ? serializeForExport(subTypesVal) : "";
+
+        valRows.push([
+          row.id,
+          row.template_id,
+          sanitizeText(row.template_name || tmpl.name),
+          row.date,
+          sanitizeText(row.group_id || ""),
+          row._stableOrder,
+          sanitizeText(col.name),         // column_name
+          sanitizeText(displayName),      // display_name
+          sanitizeText(internalKey),      // internal_value_key
+          sanitizeText(col.type || "text"),
+          isWorker ? "true" : "false",
+          isTask   ? "true" : "false",
+          sanitizeText(String(rawVal ?? "")), // value_raw
+          exportedVal,                    // value_exported (nicknames for workers)
+        ]);
+
+        // Export subTypes as a separate row if present
+        if (subTypesExported) {
+          valRows.push([
+            row.id, row.template_id,
+            sanitizeText(row.template_name || tmpl.name),
+            row.date,
+            sanitizeText(row.group_id || ""),
+            row._stableOrder,
+            sanitizeText(`${col.name}_subTypes`),
+            sanitizeText(`${displayName} (סוגים)`),
+            sanitizeText(subTypesKey),
+            "subtypes", "false", "false",
+            sanitizeText(String(subTypesVal ?? "")),
+            subTypesExported,
+          ]);
+        }
+      });
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([valHeader, ...valRows]), SHEET_MOKED_VALUES);
+
+    // ── Sheet 6: WorkersMap ───────────────────────────────────────────────────
+    const workerHeader = ["worker_id", "nickname", "full_name", "roles", "active"];
+    const workerRows = workers.map(w => [
+      w.id,
+      sanitizeText(w.nickname || ""),
+      sanitizeText(w.full_name || ""),
+      Array.isArray(w.role) ? w.role.join(", ") : (w.role || ""),
+      w.active !== false ? "true" : "false",
+    ]);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([workerHeader, ...workerRows]), SHEET_WORKERS_MAP);
+
+    // ── Sheet 7: HumanReadableSchedule ───────────────────────────────────────
+    // Build a flat readable view grouped by template
+    const hrRows = [["תאריך", "מוקד", "קבוצה", "שורה", "עמודה", "ערך"]];
+    filteredRows.forEach(row => {
+      const tmpl = templateById[row.template_id];
+      if (!tmpl) return;
+      const values = row.values || {};
+      const allCols = [...(tmpl.columns || []), { name: "status", type: "select" }];
+      allCols.forEach(col => {
+        const internalKey = getInternalValueKey(col);
+        const rawVal = values[internalKey];
+        if (isEmpty(rawVal)) return;
+        let displayVal;
+        if (col.type === "worker" || isKnownWorkerCol(col.name)) {
+          const w = workerById[rawVal];
+          displayVal = w ? (w.nickname || w.id) : String(rawVal);
+        } else {
+          displayVal = serializeForExport(rawVal);
+        }
+        hrRows.push([
+          row.date,
+          sanitizeText(tmpl.name),
+          sanitizeText(row.group_id || ""),
+          row._stableOrder,
+          sanitizeText(col.name),
+          sanitizeText(displayVal),
+        ]);
+      });
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hrRows), SHEET_HUMAN_READABLE);
+
+    // ── Write file ────────────────────────────────────────────────────────────
     const fileName = `export_${dateStart}_${dateEnd}.xlsx`;
     XLSX.writeFile(wb, fileName);
 
@@ -242,7 +324,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       file_name: fileName,
       user_email: currentUser?.email || "",
       user_name: currentUser?.full_name || "",
-      row_count: totalRows,
+      row_count: filteredRows.length,
       date_range_start: dateStart,
       date_range_end: dateEnd,
     });
@@ -328,6 +410,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       {done && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
           ✓ הקובץ הורד בהצלחה ונרשם ביומן הביקורת.
+          <div className="text-xs text-green-700 mt-1">הקובץ כולל גיליונות מובנים: MokedTemplates, MokedColumns, MokedRows, MokedValues, WorkersMap</div>
         </div>
       )}
     </div>

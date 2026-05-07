@@ -1,64 +1,83 @@
 // =============================================================
-// Data Transfer Schema — round-trip safe
-// Export and import use the exact same field set.
-// ALL TemplateRow.values fields are included dynamically.
-// Internal fields (starting with _) are NOT exported as data columns,
-// EXCEPT _group_id and _order which are needed for row matching.
+// Data Transfer Schema — structured round-trip-safe architecture
+// Version 2.0
+//
+// Internal value key rules (derived from Schedule.jsx):
+//   col.type === "task"   → internal key is always "task"
+//   col.type === "time"   → internal key is col.name (e.g. "התחלה", "סיום")
+//   col.type === "worker" → internal key is col.name
+//   col.type === "text"   → internal key is col.name
+//   col.type === "select" → internal key is col.name
+//   status column         → internal key is "status"
+//
+// ColumnCell (custom params) stores:
+//   values[col.name]           → main value (string or JSON)
+//   values[col.name_subTypes]  → array of selected sub-types
 // =============================================================
 
-// Column alias map: XLSX header → canonical internal key
-// This normalizes known English/alternate headers to Hebrew DB keys
-export const COLUMN_ALIAS_MAP = {
-  "task":   "משימה",
-  "status": "סטטוס",
-  "start":  "התחלה",
-  "end":    "סיום",
-};
-
+export const EXPORT_VERSION = "2.0";
 export const EXPORT_SOURCE_NAME = "מערכת ניהול כוח אדם";
 
-// Fixed meta-columns that always appear at the start of every exported row
-export const SCHEDULE_META_COLS = ["תאריך", "מוקד", "_group_id", "_order"];
+// ── Sheet names ────────────────────────────────────────────────────────────────
+export const SHEET_MANIFEST           = "Manifest";
+export const SHEET_MOKED_TEMPLATES    = "MokedTemplates";
+export const SHEET_MOKED_COLUMNS      = "MokedColumns";
+export const SHEET_MOKED_ROWS         = "MokedRows";
+export const SHEET_MOKED_VALUES       = "MokedValues";
+export const SHEET_WORKERS_MAP        = "WorkersMap";
+export const SHEET_HUMAN_READABLE     = "HumanReadableSchedule";
+export const SHEET_IMPORT_DIAGNOSTICS = "ImportDiagnostics";
 
-// Sheet names
-export const SCHEDULE_SHEET = "לוח משמרות";
-export const AVAIL_SHEET    = "זמינות";
-export const META_SHEET     = "מטא-נתונים";
+// ── Legacy sheet names (for backward compat detection) ────────────────────────
+export const LEGACY_SCHEDULE_SHEET = "לוח משמרות";
+export const LEGACY_AVAIL_SHEET    = "זמינות";
 
-// Internal keys that must never be exported as data columns
-export const INTERNAL_SKIP_KEYS = new Set([
-  "is_continuation",
-  "continuation_from_date",
-  "continuation_source_row_id",
-  "status",
-  "_order",          // exported separately as a meta col
-]);
+// ── Internal-value-key resolver ───────────────────────────────────────────────
+// Given a Template column definition, returns the actual key used in TemplateRow.values
+export function getInternalValueKey(col) {
+  if (!col) return null;
+  if (col.type === "task") return "task";
+  // time, worker, text, select, and custom all use col.name as key
+  return col.name;
+}
 
-// Well-known worker column names — used as fallback detection in export/import
-// when the template column type may have been incorrectly set (e.g. "text" instead of "worker")
-// NOTE: "צרכן" intentionally excluded — it may be a text/select column in some templates
+// ── Well-known worker column names ────────────────────────────────────────────
 export const KNOWN_WORKER_COL_NAMES = new Set([
   "שף", "סו-שף", "סו־שף", "מנהל", 'מנל"ח', "מנל״ח", "עובד",
 ]);
 
-// Normalize a column name for worker-type matching
-// Handles ASCII hyphen vs Hebrew maqaf (־) variants
-export function normalizeColName(name) {
-  return String(name ?? "").replace(/[־\-]/g, "-").trim();
+// ── Normalize a string for matching ───────────────────────────────────────────
+// Handles: trim, lowercase, Hebrew maqaf ↔ ASCII hyphen, gershayim normalization
+export function normalizeForMatch(str) {
+  if (str === null || str === undefined) return "";
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .replace(/[־–—]/g, "-")    // maqaf and dashes → ASCII hyphen
+    .replace(/״|"/g, '"')      // normalize gershayim
+    .replace(/׳|'/g, "'");     // normalize geresh
 }
 
-// Normalized version of KNOWN_WORKER_COL_NAMES for safe lookup
-export const KNOWN_WORKER_COL_NAMES_NORMALIZED = new Set(
-  [...KNOWN_WORKER_COL_NAMES].map(normalizeColName)
-);
+// ── Column alias map: normalized raw header → canonical Hebrew display name ──
+// Used when matching XLSX headers to known internal column concepts
+export const COLUMN_ALIAS_MAP = {
+  "task":    "task",      // task type internal key
+  "status":  "status",
+  "start":   "התחלה",
+  "end":     "סיום",
+  "briefing": "תדריך",
+};
 
-/** Check if a column name is a known worker column (with normalization) */
+// ── Check if a column is a worker column ─────────────────────────────────────
 export function isKnownWorkerCol(colName) {
-  return KNOWN_WORKER_COL_NAMES.has(colName) ||
-    KNOWN_WORKER_COL_NAMES_NORMALIZED.has(normalizeColName(colName));
+  const n = normalizeForMatch(colName);
+  for (const known of KNOWN_WORKER_COL_NAMES) {
+    if (normalizeForMatch(known) === n) return true;
+  }
+  return false;
 }
 
-/** Strip a text value from formula-injection attempts */
+// ── Sanitize text to prevent formula injection ────────────────────────────────
 export function sanitizeText(val) {
   if (val === null || val === undefined) return "";
   const s = String(val).trim();
@@ -66,51 +85,28 @@ export function sanitizeText(val) {
   return s;
 }
 
-/** Is a value considered "empty" for export/import purposes? */
+// ── Empty value check ─────────────────────────────────────────────────────────
 export function isEmpty(v) {
   if (v === null || v === undefined) return true;
-  if (v === "" || v === "None" || v === "none") return true;
-  return false;
+  const s = String(v).trim();
+  return s === "" || s === "None" || s === "none";
 }
 
-/** Serialize a value for export to XLSX cell */
+// ── Serialize for XLSX cell ───────────────────────────────────────────────────
 export function serializeForExport(val) {
   if (isEmpty(val)) return "";
   if (typeof val === "object") return sanitizeText(JSON.stringify(val));
   return sanitizeText(String(val));
 }
 
-/** Deserialize a cell value from XLSX back into the correct type.
- *  JSON strings are parsed back into objects. */
+// ── Deserialize from XLSX cell ────────────────────────────────────────────────
 export function deserializeFromImport(rawStr) {
   const s = String(rawStr ?? "").trim();
   if (!s || s === "None") return null;
-  // Try to parse JSON objects/arrays
   if ((s.startsWith("{") && s.endsWith("}")) || (s.startsWith("[") && s.endsWith("]"))) {
     try { return JSON.parse(s); } catch { /* fall through */ }
   }
+  // Strip leading apostrophe (formula injection protection)
+  if (s.startsWith("'")) return s.slice(1);
   return s;
-}
-
-/** Validate a parsed schedule row (before applying to DB).
- *  Returns array of error strings (empty = valid). */
-export function validateScheduleRow(row) {
-  const errors = [];
-  if (!row["תאריך"] || !/^\d{4}-\d{2}-\d{2}$/.test(row["תאריך"])) {
-    errors.push("תאריך חסר או בפורמט שגוי (נדרש YYYY-MM-DD)");
-  }
-  if (!row["מוקד"]) {
-    errors.push("שם מוקד חסר");
-  }
-  return errors;
-}
-
-/** Validate a parsed availability row. Returns array of error strings. */
-export function validateAvailRow(row) {
-  const errors = [];
-  if (!row["מזהה עובד"]) errors.push("מזהה עובד חסר");
-  if (!row["תאריך משמרת"] || !/^\d{4}-\d{2}-\d{2}$/.test(row["תאריך משמרת"])) {
-    errors.push("תאריך משמרת חסר או בפורמט שגוי");
-  }
-  return errors;
 }
