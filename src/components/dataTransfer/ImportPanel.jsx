@@ -184,7 +184,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       base44.entities.AppSettings.list(),
     ]);
 
-    // Parse settings
+    // Parse settings helper
     const getSetting = (key) => {
       const s = allSettings.find(s => s.setting_key === key);
       return s ? (() => { try { return JSON.parse(s.setting_value); } catch { return null; } })() : null;
@@ -192,6 +192,33 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     const shiftStatuses    = getSetting("shift_statuses")        || [];
     const customParams     = getSetting("custom_schedule_params") || [];
     const tasksList        = getSetting("tasks_list")             || [];
+
+    // ── Build per-date daily columns + column orders (mirrors ExportPanel / Schedule.jsx) ──
+    const dailyColumnsPerDate = {};   // dateStr → { [templateId]: col[] }
+    const columnOrderPerDate  = {};   // dateStr → { [templateId]: string[] }
+    allSettings.forEach(s => {
+      const dcMatch = s.setting_key.match(/^schedule_daily_columns_(.+)$/);
+      if (dcMatch) { try { dailyColumnsPerDate[dcMatch[1]] = JSON.parse(s.setting_value); } catch {} }
+      const coMatch = s.setting_key.match(/^schedule_column_order_(.+)$/);
+      if (coMatch) { try { columnOrderPerDate[coMatch[1]] = JSON.parse(s.setting_value); } catch {} }
+    });
+
+    // Returns effective columns for a template on a given date — identical to ExportPanel logic
+    const getEffectiveColumns = (tmpl, dateStr) => {
+      const dailyCustomColumns = dailyColumnsPerDate[dateStr] || {};
+      const customColumnOrders = columnOrderPerDate[dateStr]  || {};
+      const templateCols = tmpl.columns || [];
+      const dailyCols    = dailyCustomColumns[tmpl.id] || [];
+      const allColNames  = new Set(templateCols.map(c => c.name));
+      const uniqueDailyCols = dailyCols.filter(c => !allColNames.has(c.name));
+      const allCols = [...templateCols, ...uniqueDailyCols];
+      const customOrder = customColumnOrders[tmpl.id];
+      if (!customOrder) return allCols;
+      return [
+        ...customOrder.map(name => allCols.find(c => c.name === name)).filter(Boolean),
+        ...allCols.filter(c => !customOrder.includes(c.name)),
+      ];
+    };
 
     // Build dropdown options per column name
     const dropdownOptions = {};
@@ -249,37 +276,59 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       cols.sort((a, b) => Number(a.column_index || 0) - Number(b.column_index || 0));
     });
 
+    // Load existing TemplateRows for import dates (needed before column matching for date-aware effective cols)
+    const { rows: importedRowMeta } = rawSheets.mokedRows;
+    const importDates = [...new Set(importedRowMeta.map(r => r.date).filter(Boolean))];
+
     // Build column matching result per (template_id, column_name)
+    // For effective columns, use the first date each imported template appears on
+    const firstDateByImportedTemplate = {};
+    importedRowMeta.forEach(r => {
+      if (!firstDateByImportedTemplate[r.template_id]) firstDateByImportedTemplate[r.template_id] = r.date;
+    });
+
     const colMatchKey = (tid, colName) => `${tid}::${colName}`;
-    const colMatchResult = {}; // key → { importedCol, liveCol, action, internalKey, reason }
+    const colMatchResult = {}; // key → { importedCol, liveCol, action, internalKey, reason, matchedSource }
 
     Object.entries(importedColsByTemplate).forEach(([tid, cols]) => {
       const liveTemplate = templateMatch[tid];
-      const liveColumns  = liveTemplate?.columns || [];
+      if (!liveTemplate) {
+        cols.forEach(ic => {
+          const key = colMatchKey(tid, ic.column_name);
+          if (ic.column_name === "status") {
+            colMatchResult[key] = { importedCol: ic, liveCol: null, action: "status", internalKey: "status", matchedSource: "implicit" };
+          } else {
+            colMatchResult[key] = { importedCol: ic, liveCol: null, action: "no_template", internalKey: null, reason: "תבנית לא קיימת", matchedSource: "not_found" };
+          }
+        });
+        return;
+      }
+
+      const firstDate = firstDateByImportedTemplate[tid] || importDates[0] || "";
+      const effectiveCols = getEffectiveColumns(liveTemplate, firstDate);
+      const templateColNames = new Set((liveTemplate.columns || []).map(c => c.name));
 
       cols.forEach(ic => {
         const key = colMatchKey(tid, ic.column_name);
-        const liveCol = matchColumn(ic, liveColumns);
 
         if (ic.column_name === "status") {
-          colMatchResult[key] = { importedCol: ic, liveCol: null, action: "status", internalKey: "status" };
+          colMatchResult[key] = { importedCol: ic, liveCol: null, action: "status", internalKey: "status", matchedSource: "implicit" };
           return;
         }
 
+        // Match against effective columns (Template.columns + dailyCustomColumns)
+        const liveCol = matchColumn(ic, effectiveCols);
+
         if (liveCol) {
-          const internalKey = getInternalValueKey(liveCol);
-          colMatchResult[key] = { importedCol: ic, liveCol, action: "matched", internalKey };
-        } else if (!liveTemplate) {
-          colMatchResult[key] = { importedCol: ic, liveCol: null, action: "no_template", internalKey: null, reason: "תבנית לא קיימת" };
+          const isTask = liveCol.type === "task";
+          const internalKey = isTask ? "task" : getInternalValueKey(liveCol);
+          const matchedSource = templateColNames.has(liveCol.name) ? "template" : "daily_custom";
+          colMatchResult[key] = { importedCol: ic, liveCol, action: "matched", internalKey, matchedSource };
         } else {
-          colMatchResult[key] = { importedCol: ic, liveCol: null, action: "missing", internalKey: null, reason: "עמודה לא קיימת בתבנית" };
+          colMatchResult[key] = { importedCol: ic, liveCol: null, action: "missing", internalKey: null, reason: "עמודה לא קיימת בתבנית או בעמודות יומיות", matchedSource: "not_found" };
         }
       });
     });
-
-    // Load existing TemplateRows for import dates
-    const { rows: importedRowMeta } = rawSheets.mokedRows;
-    const importDates = [...new Set(importedRowMeta.map(r => r.date).filter(Boolean))];
     const existingRows = importDates.length > 0
       ? (await Promise.all(importDates.map(d => base44.entities.TemplateRow.filter({ date: d })))).flat()
       : [];
@@ -321,33 +370,39 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       const fieldsDiag = [];
 
       const rowValues = valuesByRowId[irow.row_id] || [];
-      // Build a set of live column names for subTypes validation
-      const liveColNames = new Set((liveTemplate.columns || []).map(c => c.name));
+      // Build effective column set for this row's date (for subTypes parent validation)
+      const effectiveColsForRow = getEffectiveColumns(liveTemplate, irow.date);
+      const effectiveColNames = new Set(effectiveColsForRow.map(c => c.name));
+      // task columns: name may be "משימה" but effective name is what's in the col definition
+      effectiveColsForRow.forEach(c => { if (c.type === "task") effectiveColNames.add("משימה"); });
 
       rowValues.forEach(iv => {
         const colName = iv.column_name;
 
         // ── Handle *_subTypes rows directly ──────────────────────────────────
-        // These are NOT in MokedColumns; validate via parent column name
+        // These are NOT in MokedColumns; validate via parent column in effectiveColumns
         if (colName.endsWith("_subTypes")) {
           const parentColName = colName.slice(0, -"_subTypes".length);
-          // Only import if parent column exists in the live template
-          if (!liveColNames.has(parentColName)) {
+          // Resolve the actual parent key using effective columns
+          const parentEffectiveCol = effectiveColsForRow.find(c => c.name === parentColName || (c.type === "task" && parentColName === "משימה"));
+          const parentInternalKey  = parentEffectiveCol ? (parentEffectiveCol.type === "task" ? "task" : getInternalValueKey(parentEffectiveCol)) : null;
+          // Only import if parent column exists in effective columns
+          if (!effectiveColNames.has(parentColName) || !parentInternalKey) {
             fieldsDiag.push({ col: colName, internalKey: colName, rawVal: iv.value_exported, writtenVal: null, status: "skipped" });
             return;
           }
+          const subTypesWriteKey = `${parentInternalKey}_subTypes`;
           const rawVal = iv.value_exported || iv.value_raw;
           if (isEmpty(rawVal)) {
-            fieldsDiag.push({ col: colName, internalKey: colName, rawVal: "", writtenVal: null, status: "empty_skip" });
+            fieldsDiag.push({ col: colName, internalKey: subTypesWriteKey, rawVal: "", writtenVal: null, status: "empty_skip" });
             return;
           }
           const stripped = String(rawVal).startsWith("'") ? String(rawVal).slice(1) : String(rawVal);
-          // Parse JSON array if present, otherwise wrap in array
           let parsed;
           try { parsed = JSON.parse(stripped); } catch { parsed = [stripped]; }
           if (!Array.isArray(parsed)) parsed = [String(parsed)];
-          parsedValues[colName] = parsed;
-          fieldsDiag.push({ col: colName, internalKey: colName, rawVal: stripped, writtenVal: parsed, status: "written" });
+          parsedValues[subTypesWriteKey] = parsed;
+          fieldsDiag.push({ col: colName, internalKey: subTypesWriteKey, rawVal: stripped, writtenVal: parsed, status: "written" });
           return;
         }
 
@@ -470,14 +525,15 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
     // Column diagnostics summary
     const colDiagList = Object.values(colMatchResult).map(cm => ({
-      templateName: templateMatch[cm.importedCol.template_id]?.name || cm.importedCol.template_name,
-      importedName: cm.importedCol.column_name,
-      displayName: cm.importedCol.display_name,
-      internalKey: cm.internalKey,
-      liveColName: cm.liveCol?.name || null,
-      liveColType: cm.liveCol?.type || null,
-      action: cm.action,
-      reason: cm.reason || null,
+      templateName:  templateMatch[cm.importedCol.template_id]?.name || cm.importedCol.template_name,
+      importedName:  cm.importedCol.column_name,
+      displayName:   cm.importedCol.display_name,
+      internalKey:   cm.internalKey,
+      liveColName:   cm.liveCol?.name || null,
+      liveColType:   cm.liveCol?.type || null,
+      action:        cm.action,
+      matchedSource: cm.matchedSource || null,
+      reason:        cm.reason || null,
     }));
 
     setPreview({ rowPlan, colDiagList, workerDiagAll });
@@ -703,10 +759,16 @@ function PreviewPanel({ preview, fileName, showColDiag, setShowColDiag, showRowD
 function ColDiagTable({ colDiagList }) {
   const actionLabel = {
     matched:     { label: "✓ מותאם",              cls: "text-green-700" },
-    missing:     { label: "✗ חסר בתבנית",         cls: "text-red-600" },
+    missing:     { label: "✗ חסר",                cls: "text-red-600" },
     no_template: { label: "✗ תבנית לא נמצאה",     cls: "text-red-600" },
     status:      { label: "→ עמודת סטטוס",         cls: "text-blue-600" },
     skipped:     { label: "דולג",                  cls: "text-gray-400" },
+  };
+  const sourceLabel = {
+    template:      { label: "תבנית",        cls: "text-gray-600" },
+    daily_custom:  { label: "יומי / מכוון", cls: "text-purple-700 font-semibold" },
+    implicit:      { label: "מובנה",        cls: "text-gray-400" },
+    not_found:     { label: "—",            cls: "text-red-400" },
   };
   return (
     <div className="overflow-x-auto">
@@ -718,12 +780,14 @@ function ColDiagTable({ colDiagList }) {
             <th className="px-2 py-1.5 text-right font-medium text-gray-600">שם בתבנית</th>
             <th className="px-2 py-1.5 text-right font-medium text-gray-600">מפתח פנימי</th>
             <th className="px-2 py-1.5 text-right font-medium text-gray-600">סוג</th>
+            <th className="px-2 py-1.5 text-right font-medium text-gray-600">מקור</th>
             <th className="px-2 py-1.5 text-right font-medium text-gray-600">פעולה</th>
           </tr>
         </thead>
         <tbody>
           {colDiagList.map((c, i) => {
             const a = actionLabel[c.action] || { label: c.action, cls: "text-gray-500" };
+            const src = sourceLabel[c.matchedSource] || { label: c.matchedSource || "—", cls: "text-gray-400" };
             return (
               <tr key={i} className="border-b">
                 <td className="px-2 py-1 text-gray-500 text-xs">{c.templateName}</td>
@@ -731,6 +795,7 @@ function ColDiagTable({ colDiagList }) {
                 <td className="px-2 py-1">{c.liveColName || <span className="text-red-400">—</span>}</td>
                 <td className="px-2 py-1 font-mono text-xs text-blue-700">{c.internalKey || "—"}</td>
                 <td className="px-2 py-1 text-gray-500">{c.liveColType || "—"}</td>
+                <td className={`px-2 py-1 ${src.cls}`}>{src.label}</td>
                 <td className={`px-2 py-1 font-semibold ${a.cls}`}>{a.label}</td>
               </tr>
             );
