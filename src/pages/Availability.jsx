@@ -16,6 +16,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { formatHebrewDate } from "../components/utils/HebrewDate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import ShiftDemandPanel from "@/components/availability/ShiftDemandPanel";
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const HEBREW_DAYS_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -87,6 +88,8 @@ export default function Availability() {
   const [templateRows, setTemplateRows] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
   const [isManager, setIsManager] = useState(false);
+  const [weekAvailabilities, setWeekAvailabilities] = useState([]);
+  const [signupMode, setSignupMode] = useState("allow_over_sign_up");
   const [editingTips, setEditingTips] = useState(false);
   const [tipsEditValue, setTipsEditValue] = useState("");
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
@@ -131,6 +134,8 @@ export default function Availability() {
     // Extract settings client-side (no extra API calls)
     const openReg = parseSetting(allSettings, "open_registrations", []);
     const userRoles = parseSetting(allSettings, "user_roles", {});
+    const signupModeSetting = parseSetting(allSettings, "availability_signup_mode", "allow_over_sign_up");
+    setSignupMode(signupModeSetting);
     const globalTips = parseSetting(allSettings, "availability_tips", null);
     const weekTipsRaw = allSettings.find(s => s.setting_key === `availability_tips_${weekStartStr2}`);
     const weekTips = weekTipsRaw ? (() => { try { return JSON.parse(weekTipsRaw.setting_value); } catch { return null; } })() : null;
@@ -203,10 +208,11 @@ export default function Availability() {
     });
     setUnavailabilities(weekUnavailabilities);
 
-    // Batch 2: templates (cached) + chef assignments (max 2 concurrent)
-    const [templatesData, assignmentsData] = await Promise.all([
+    // Batch 2: templates (cached) + chef assignments + all week availabilities (concurrent)
+    const [templatesData, assignmentsData, weekAvailsData] = await Promise.all([
       getCachedTemplates(base44.entities),
       base44.entities.Assignment.filter({ chef_id: worker.id }),
+      base44.entities.Availability.filter({ week_start_date: weekStartStr }),
     ]);
 
     // Batch 3: sous/additional assignments + template rows (max 2 concurrent)
@@ -221,6 +227,7 @@ export default function Availability() {
     setAssignments(allAssignments);
     setTemplateRows(templateRowsData);
     setAllTemplates(templatesData);
+    setWeekAvailabilities(weekAvailsData);
   };
 
   // Legacy alias for components that call loadData()
@@ -649,6 +656,28 @@ END:VEVENT
   const wantedShifts = selectedShifts.filter((s) => s.type === "wanted").sort((a, b) => (a.priority || 0) - (b.priority || 0));
   const availableShifts = selectedShifts.filter((s) => s.type === "available").sort((a, b) => (a.priority || 0) - (b.priority || 0));
 
+  // Handle signup from the demand panel: add the shift to selectedShifts
+  const handleDemandSignup = (unifiedShift, roleName, type) => {
+    if (!canEdit || currentWorker?.availability_locked) return;
+    const { date, startTime, endTime } = unifiedShift;
+    // Remove any existing entry for this slot
+    let newShifts = selectedShifts.filter(
+      s => !(s.date === date && s.start_time === startTime && s.end_time === endTime)
+    );
+    const count = newShifts.filter(s => s.type === type).length;
+    newShifts.push({
+      date,
+      start_time: startTime,
+      end_time: endTime,
+      type,
+      priority: count + 1,
+      moked_name: unifiedShift.mokedName,
+      role_or_qualification: roleName,
+      unified_shift_key: unifiedShift.key,
+    });
+    setSelectedShifts(newShifts);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -961,6 +990,20 @@ END:VEVENT
                 </CardContent>
               </Card>
           }
+
+            {/* Shift Demand Panel — reflects real schedule demand */}
+            <ShiftDemandPanel
+              templateRows={templateRows}
+              allTemplates={allTemplates}
+              allAvailabilities={weekAvailabilities}
+              workers={workers}
+              currentWorker={currentWorker}
+              selectedShifts={selectedShifts}
+              signupMode={signupMode}
+              weekStart={weekStart}
+              onSignup={handleDemandSignup}
+              canEdit={canEdit && !currentWorker?.availability_locked}
+            />
 
             {/* Shift Selection Grid */}
             <Card className="border-none shadow-lg mb-4">
