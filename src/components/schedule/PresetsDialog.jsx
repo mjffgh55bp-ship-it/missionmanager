@@ -34,9 +34,13 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
   const [workerRoles, setWorkerRoles] = useState([]);
   const [columnTypes, setColumnTypes] = useState([]);
   const [workers, setWorkers] = useState([]);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
-    if (open) { loadPresets(); loadSettings(); }
+    if (open) {
+      loadPresets();
+      if (!settingsLoaded) loadSettings();
+    }
   }, [open]);
 
   const loadPresets = async () => {
@@ -58,6 +62,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
       setColumnTypes(customParams.map(c => c.name));
     }
     setWorkers(workersData);
+    setSettingsLoaded(true);
   };
 
   const updateRowCell = (rowIdx, colName, value) => {
