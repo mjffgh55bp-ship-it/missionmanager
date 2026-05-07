@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Upload, ClipboardList, ShieldCheck } from "lucide-react";
+import { Download, Upload, ClipboardList, ShieldCheck, CalendarDays } from "lucide-react";
 import ExportPanel from "@/components/dataTransfer/ExportPanel";
 import ImportPanel from "@/components/dataTransfer/ImportPanel";
 import AuditLogTable from "@/components/dataTransfer/AuditLogTable";
+import AvailabilityExportPanel from "@/components/dataTransfer/AvailabilityExportPanel";
+import AvailabilityImportPanel from "@/components/dataTransfer/AvailabilityImportPanel";
 
 export default function DataTransfer() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -55,15 +57,21 @@ export default function DataTransfer() {
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="mb-6 w-full grid grid-cols-3">
-            <TabsTrigger value="export" className="flex items-center gap-2">
-              <Download className="w-4 h-4" />ייצוא נתונים
+          <TabsList className="mb-6 w-full grid grid-cols-5">
+            <TabsTrigger value="export" className="flex items-center gap-1 text-xs">
+              <Download className="w-4 h-4" />ייצוא לו״ז
             </TabsTrigger>
-            <TabsTrigger value="import" className="flex items-center gap-2">
-              <Upload className="w-4 h-4" />ייבוא נתונים
+            <TabsTrigger value="import" className="flex items-center gap-1 text-xs">
+              <Upload className="w-4 h-4" />ייבוא לו״ז
             </TabsTrigger>
-            <TabsTrigger value="audit" className="flex items-center gap-2">
-              <ClipboardList className="w-4 h-4" />יומן ביקורת
+            <TabsTrigger value="avail-export" className="flex items-center gap-1 text-xs">
+              <CalendarDays className="w-4 h-4" />ייצוא זמינות
+            </TabsTrigger>
+            <TabsTrigger value="avail-import" className="flex items-center gap-1 text-xs">
+              <CalendarDays className="w-4 h-4" />ייבוא זמינות
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="flex items-center gap-1 text-xs">
+              <ClipboardList className="w-4 h-4" />יומן
             </TabsTrigger>
           </TabsList>
 
@@ -73,6 +81,14 @@ export default function DataTransfer() {
 
           <TabsContent value="import">
             <ImportPanel currentUser={currentUser} onAuditLog={refreshLogs} />
+          </TabsContent>
+
+          <TabsContent value="avail-export">
+            <AvailabilityExportPanel currentUser={currentUser} onAuditLog={refreshLogs} />
+          </TabsContent>
+
+          <TabsContent value="avail-import">
+            <AvailabilityImportPanel currentUser={currentUser} onAuditLog={refreshLogs} />
           </TabsContent>
 
           <TabsContent value="audit">

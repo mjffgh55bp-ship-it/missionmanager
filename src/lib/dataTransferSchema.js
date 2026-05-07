@@ -28,6 +28,11 @@ export const SHEET_WORKERS_MAP        = "WorkersMap";
 export const SHEET_HUMAN_READABLE     = "HumanReadableSchedule";
 export const SHEET_IMPORT_DIAGNOSTICS = "ImportDiagnostics";
 
+// ── Availability sheet names ───────────────────────────────────────────────────
+export const SHEET_AVAIL_SUBMISSIONS  = "AvailabilitySubmissions";
+export const SHEET_AVAIL_WINDOWS      = "AvailabilityWindows";
+export const SHEET_UNAVAIL_WINDOWS    = "UnavailabilityWindows";
+
 // ── Legacy sheet names (for backward compat detection) ────────────────────────
 export const LEGACY_SCHEDULE_SHEET = "לוח משמרות";
 export const LEGACY_AVAIL_SHEET    = "זמינות";
