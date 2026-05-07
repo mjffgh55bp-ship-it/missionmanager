@@ -60,10 +60,11 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     const dateSet = new Set(dates);
 
     // ── Step 1: Load all source data ─────────────────────────────────────────
-    const [workers, allTemplates, templateRows] = await Promise.all([
+    const [workers, allTemplates, templateRows, allSettings] = await Promise.all([
       base44.entities.Worker.list(),
       base44.entities.Template.list(),
       base44.entities.TemplateRow.list(),
+      base44.entities.AppSettings.list(),
     ]);
 
     // Build lookups
@@ -72,6 +73,40 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
 
     const templateById = {};
     allTemplates.forEach(t => { templateById[t.id] = t; });
+
+    // Build per-date daily columns and column orders from AppSettings
+    const dailyColumnsPerDate = {};   // dateStr → { [templateId]: col[] }
+    const columnOrderPerDate = {};    // dateStr → { [templateId]: string[] }
+    allSettings.forEach(s => {
+      const dcMatch = s.setting_key.match(/^schedule_daily_columns_(.+)$/);
+      if (dcMatch) {
+        try { dailyColumnsPerDate[dcMatch[1]] = JSON.parse(s.setting_value); } catch {}
+      }
+      const coMatch = s.setting_key.match(/^schedule_column_order_(.+)$/);
+      if (coMatch) {
+        try { columnOrderPerDate[coMatch[1]] = JSON.parse(s.setting_value); } catch {}
+      }
+    });
+
+    // Build effective columns for a given template + date (mirrors Schedule.jsx logic exactly)
+    const getEffectiveColumns = (tmpl, dateStr) => {
+      const dailyCustomColumns = dailyColumnsPerDate[dateStr] || {};
+      const customColumnOrders = columnOrderPerDate[dateStr] || {};
+      const templateCols = tmpl.columns || [];
+      const dailyCols = dailyCustomColumns[tmpl.id] || [];
+      // Deduplicate: daily cols that don't already exist in template cols by name
+      const allColNames = new Set(templateCols.map(c => c.name));
+      const uniqueDailyCols = dailyCols.filter(c => !allColNames.has(c.name));
+      const allCols = [...templateCols, ...uniqueDailyCols];
+      const customOrder = customColumnOrders[tmpl.id];
+      if (!customOrder) return allCols;
+      // Apply custom order: ordered first, then remainder
+      const ordered = [
+        ...customOrder.map(name => allCols.find(c => c.name === name)).filter(Boolean),
+        ...allCols.filter(c => !customOrder.includes(c.name)),
+      ];
+      return ordered;
+    };
 
     // Filter rows to selected dates, sorted stably
     const filteredRows = templateRows
@@ -136,7 +171,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([tmplHeader, ...tmplRows]), SHEET_MOKED_TEMPLATES);
 
     // ── Sheet 3: MokedColumns ─────────────────────────────────────────────────
-    // One row per column per template, in exact Template.columns order
+    // One row per effective column per template, using the first date the template appears on
     const colHeader = [
       "template_id", "template_name", "column_index", "column_name",
       "display_name", "internal_value_key", "type", "width",
@@ -144,19 +179,26 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       "is_task_column",
     ];
     const colRows = [];
+    // Find the first date each template appears on (for effective column resolution)
+    const firstDateByTemplate = {};
+    filteredRows.forEach(r => {
+      if (!firstDateByTemplate[r.template_id]) firstDateByTemplate[r.template_id] = r.date;
+    });
     usedTemplates.forEach(t => {
-      (t.columns || []).forEach((col, idx) => {
-        const internalKey = getInternalValueKey(col);
-        const isWorker = col.type === "worker" || isKnownWorkerCol(col.name);
-        const isTask   = col.type === "task";
+      const firstDate = firstDateByTemplate[t.id] || dates[0];
+      const effectiveCols = getEffectiveColumns(t, firstDate);
+      effectiveCols.forEach((col, idx) => {
+        const isTask = col.type === "task";
+        const internalKey = isTask ? "task" : getInternalValueKey(col);
+        const isWorker = !isTask && (col.type === "worker" || isKnownWorkerCol(col.name));
         colRows.push([
           t.id,
           sanitizeText(t.name),
           idx,
-          sanitizeText(col.name),         // column_name (identity key)
-          sanitizeText(col.name),         // display_name (human readable, same as name)
-          sanitizeText(internalKey),      // internal_value_key (what values obj uses)
-          sanitizeText(col.type || "text"),
+          sanitizeText(isTask ? "משימה" : col.name),  // column_name
+          sanitizeText(isTask ? "משימה" : col.name),  // display_name
+          sanitizeText(internalKey),                   // internal_value_key
+          sanitizeText(isTask ? "task" : col.type || "text"),
           col.width || 120,
           sanitizeText(col.default_value || ""),
           col.options ? JSON.stringify(col.options) : "",
@@ -168,7 +210,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       // Always add the implicit "status" column at the end
       colRows.push([
         t.id, sanitizeText(t.name),
-        (t.columns || []).length,
+        effectiveCols.length,
         "status", "סטטוס", "status", "select", 100,
         "", "", "", "false", "false",
       ]);
@@ -206,15 +248,17 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       if (!tmpl) return;
       const values = row.values || {};
 
-      const allCols = [...(tmpl.columns || [])];
+      // Use effective columns for this row's date (mirrors Schedule.jsx exactly)
+      const effectiveCols = getEffectiveColumns(tmpl, row.date);
       // Add implicit status column
-      allCols.push({ name: "status", type: "select", _isStatusCol: true });
+      const allCols = [...effectiveCols, { name: "status", type: "select", _isStatusCol: true }];
 
       allCols.forEach(col => {
-        const internalKey = col._isStatusCol ? "status" : getInternalValueKey(col);
-        const displayName = col._isStatusCol ? "סטטוס" : col.name;
-        const isWorker = !col._isStatusCol && (col.type === "worker" || isKnownWorkerCol(col.name));
         const isTask   = !col._isStatusCol && col.type === "task";
+        const internalKey = col._isStatusCol ? "status" : (isTask ? "task" : getInternalValueKey(col));
+        const columnName  = col._isStatusCol ? "status" : (isTask ? "משימה" : col.name);
+        const displayName = col._isStatusCol ? "סטטוס" : (isTask ? "משימה" : col.name);
+        const isWorker = !col._isStatusCol && !isTask && (col.type === "worker" || isKnownWorkerCol(col.name));
 
         const rawVal = values[internalKey];
 
@@ -223,9 +267,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
           if (isWorker) {
             const w = workerById[rawVal];
             exportedVal = w ? sanitizeText(w.nickname || w.id) : sanitizeText(String(rawVal));
-            if (!w) {
-              console.warn(`[Export] Worker ID not found: ${rawVal} in col ${col.name}`);
-            }
+            if (!w) console.warn(`[Export] Worker ID not found: ${rawVal} in col ${col.name}`);
           } else {
             exportedVal = serializeForExport(rawVal);
           }
@@ -243,14 +285,14 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
           row.date,
           sanitizeText(row.group_id || ""),
           row._stableOrder,
-          sanitizeText(col.name),         // column_name
+          sanitizeText(columnName),       // column_name (משימה for task cols)
           sanitizeText(displayName),      // display_name
-          sanitizeText(internalKey),      // internal_value_key
-          sanitizeText(col.type || "text"),
+          sanitizeText(internalKey),      // internal_value_key (task for task cols)
+          sanitizeText(isTask ? "task" : col.type || "text"),
           isWorker ? "true" : "false",
           isTask   ? "true" : "false",
-          sanitizeText(String(rawVal ?? "")), // value_raw
-          exportedVal,                    // value_exported (nicknames for workers)
+          sanitizeText(String(rawVal ?? "")),
+          exportedVal,
         ]);
 
         // Export subTypes as a separate row if present
@@ -261,7 +303,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
             row.date,
             sanitizeText(row.group_id || ""),
             row._stableOrder,
-            sanitizeText(`${col.name}_subTypes`),
+            sanitizeText(`${columnName}_subTypes`),
             sanitizeText(`${displayName} (סוגים)`),
             sanitizeText(subTypesKey),
             "subtypes", "false", "false",
@@ -291,22 +333,23 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       const tmpl = templateById[row.template_id];
       if (!tmpl) return;
       const values = row.values || {};
-      const allCols = [...(tmpl.columns || []), { name: "status", type: "select" }];
+      const effectiveCols = getEffectiveColumns(tmpl, row.date);
+      const allCols = [...effectiveCols, { name: "status", type: "select" }];
       allCols.forEach(col => {
-        const internalKey = getInternalValueKey(col);
+        const isTask = col.type === "task";
+        const internalKey = isTask ? "task" : getInternalValueKey(col);
+        const displayColName = isTask ? "משימה" : col.name;
         const rawVal = values[internalKey];
-        // For ColumnCell columns, the display value may be in _subTypes even if main value is empty
         const subTypesVal = values[`${internalKey}_subTypes`];
         const hasSubTypes = Array.isArray(subTypesVal) && subTypesVal.length > 0;
         if (isEmpty(rawVal) && !hasSubTypes) return;
         let displayVal;
-        if (col.type === "worker" || isKnownWorkerCol(col.name)) {
+        if (!isTask && (col.type === "worker" || isKnownWorkerCol(col.name))) {
           const w = workerById[rawVal];
           displayVal = w ? (w.nickname || w.id) : String(rawVal || "");
         } else if (!isEmpty(rawVal)) {
           displayVal = serializeForExport(rawVal);
         } else if (hasSubTypes) {
-          // Show subTypes as the display value when main value is empty
           displayVal = subTypesVal.join(", ");
         } else {
           return;
@@ -316,7 +359,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
           sanitizeText(tmpl.name),
           sanitizeText(row.group_id || ""),
           row._stableOrder,
-          sanitizeText(col.name),
+          sanitizeText(displayColName),
           sanitizeText(displayVal),
         ]);
       });
