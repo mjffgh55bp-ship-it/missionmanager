@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, parseSetting } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -91,132 +92,134 @@ export default function Availability() {
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
   const initialLoadStarted = useRef(false);
   const lastWeekStart = useRef(null);
+  const staticLoaded = useRef(false);
+  const cachedUser = useRef(null);
+  const cachedWorker = useRef(null);
 
   useEffect(() => {
     const weekKey = weekStart.toISOString();
     if (!initialLoadStarted.current) {
       initialLoadStarted.current = true;
       lastWeekStart.current = weekKey;
-      loadData();
+      loadAllData();
       return;
     }
     if (lastWeekStart.current === weekKey) return;
     lastWeekStart.current = weekKey;
-    loadData();
+    // On week change: reload only dynamic (week-scoped) data, skip static
+    loadDynamicData(cachedWorker.current, cachedUser.current);
   }, [weekStart]);
 
-  const loadData = async () => {
+  // First load: static + dynamic in parallel where possible
+  const loadAllData = async () => {
+    console.time("Availability load");
     const user = await base44.auth.me();
+    cachedUser.current = user;
     setCurrentUser(user);
 
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-    // Batch 1: workers + events
-    const [workersData, eventsData] = await Promise.all([
-      base44.entities.Worker.filter({ active: true }),
+    // Batch 1: static reference data (cached) + week-specific settings in parallel
+    const [workersData, allSettings, eventsData, yearlyEventsData] = await Promise.all([
+      getCachedWorkers(base44.entities),
+      getCachedAllSettings(base44.entities),
       base44.entities.CompanyEvent.list("-date"),
-    ]);
-
-    // Batch 2: settings
-    const [openRegSettings, userRolesSettings, settings, weekTipsSettings] = await Promise.all([
-      base44.entities.AppSettings.filter({ setting_key: "open_registrations" }),
-      base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
-      base44.entities.AppSettings.filter({ setting_key: `availability_tips_${weekStartStr2}` }),
-    ]);
-
-    // Batch 3: yearly events + acknowledged tips
-    const [yearlyEventsData, acknowledgedSettings] = await Promise.all([
       base44.entities.YearlyEvent.list("-start_date", 500),
-      base44.entities.AppSettings.filter({ setting_key: `tips_acknowledged_${user.email}` }),
     ]);
+
+    // Extract settings client-side (no extra API calls)
+    const openReg = parseSetting(allSettings, "open_registrations", []);
+    const userRoles = parseSetting(allSettings, "user_roles", {});
+    const globalTips = parseSetting(allSettings, "availability_tips", null);
+    const weekTipsRaw = allSettings.find(s => s.setting_key === `availability_tips_${weekStartStr2}`);
+    const weekTips = weekTipsRaw ? (() => { try { return JSON.parse(weekTipsRaw.setting_value); } catch { return null; } })() : null;
+    const acknowledgedRaw = allSettings.find(s => s.setting_key === `tips_acknowledged_${user.email}`);
+    const acknowledgedVersion = acknowledgedRaw ? acknowledgedRaw.setting_value : null;
 
     setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
     setCompanyEvents(eventsData);
     setYearlyEvents(yearlyEventsData);
-
-    if (openRegSettings.length > 0) {
-      setOpenRegistrations(JSON.parse(openRegSettings[0].setting_value) || []);
-    }
+    setOpenRegistrations(openReg);
 
     const worker = workersData.find((w) => w.email === user.email);
+    cachedWorker.current = worker;
     setCurrentWorker(worker);
 
-    // Check if manager
-    if (userRolesSettings.length > 0) {
-      const rolesData = JSON.parse(userRolesSettings[0].setting_value);
-      const role = rolesData[user.email];
-      setIsManager(user.role === 'admin' || role === 'manager');
-    } else {
-      setIsManager(user.role === 'admin');
-    }
+    // Manager check
+    const role = userRoles[user.email];
+    setIsManager(user.role === 'admin' || role === 'manager');
 
-    // Load week-specific tips, fallback to global
-    const activeWeekTips = weekTipsSettings.length > 0 ? weekTipsSettings[0] : null;
-    const activeGlobalTips = settings.length > 0 ? settings[0] : null;
-    const tipsSource = activeWeekTips || activeGlobalTips;
-    if (tipsSource) {
-      const tipsData = JSON.parse(tipsSource.setting_value);
+    // Tips
+    const tipsData = weekTips || globalTips;
+    if (tipsData) {
       setTipsMessage(tipsData.message || "");
       setTipsEditValue(tipsData.message || "");
       setShowTipsAsPopup(tipsData.showAsPopup || false);
-      if (tipsData.message && tipsData.message.trim() && tipsData.showAsPopup) {
-        const acknowledgedVersion = acknowledgedSettings.length > 0
-          ? acknowledgedSettings[0].setting_value
-          : null;
-        if (acknowledgedVersion !== tipsData.message) {
-          setShowTipsPopup(true);
-        }
+      if (tipsData.message?.trim() && tipsData.showAsPopup && acknowledgedVersion !== tipsData.message) {
+        setShowTipsPopup(true);
       }
     } else {
       setTipsMessage("");
       setTipsEditValue("");
     }
 
+    staticLoaded.current = true;
+
+    // Now load dynamic (week-scoped) data
     if (worker) {
-      const weekStartStr = format(weekStart, "yyyy-MM-dd");
-      const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-
-      // Worker batch 1
-      const [availabilities, unavailabilitiesData, templatesData] = await Promise.all([
-        base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
-        base44.entities.Unavailability.filter({ worker_id: worker.id }),
-        base44.entities.Template.filter({ active: true }),
-      ]);
-
-      // Worker batch 2
-      const [assignmentsData, templateRowsData] = await Promise.all([
-        base44.entities.Assignment.list("-date", 100),
-        base44.entities.TemplateRow.list("-date", 100),
-      ]);
-
-      if (availabilities.length > 0) {
-        setExistingAvailability(availabilities[0]);
-        const shifts = availabilities[0].shifts || [];
-        setSelectedShifts(shifts);
-        setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
-        setExtraTaskStates(availabilities[0].extra_tasks || {});
-      } else {
-        setExistingAvailability(null);
-        setSelectedShifts([]);
-        setOriginalShifts([]);
-      }
-
-      const weekUnavailabilities = unavailabilitiesData.filter((u) => {
-        const uDate = new Date(u.date);
-        return uDate >= new Date(weekStartStr) && uDate <= new Date(weekEndStr);
-      });
-      setUnavailabilities(weekUnavailabilities);
-
-      const workerAssignments = assignmentsData.filter((a) =>
-        a.chef_id === worker.id ||
-        a.sous_chef_id === worker.id ||
-        a.additional_chef_id === worker.id
-      );
-      setAssignments(workerAssignments);
-      setTemplateRows(templateRowsData);
-      setAllTemplates(templatesData);
+      await loadDynamicData(worker, user);
     }
+    console.timeEnd("Availability load");
+  };
+
+  // Week-change reload: only dynamic data, use cached templates
+  const loadDynamicData = async (worker, user) => {
+    if (!worker) return;
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
+
+    // Batch: week-scoped availability + unavailability + templates (cached) + assignments/rows
+    const [availabilities, unavailabilitiesData, templatesData, assignmentsData, templateRowsData] = await Promise.all([
+      base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
+      base44.entities.Unavailability.filter({ worker_id: worker.id }),
+      getCachedTemplates(base44.entities),
+      base44.entities.Assignment.filter({ chef_id: worker.id }),
+      base44.entities.TemplateRow.list("-date", 200),
+    ]);
+
+    if (availabilities.length > 0) {
+      setExistingAvailability(availabilities[0]);
+      const shifts = availabilities[0].shifts || [];
+      setSelectedShifts(shifts);
+      setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
+      setExtraTaskStates(availabilities[0].extra_tasks || {});
+    } else {
+      setExistingAvailability(null);
+      setSelectedShifts([]);
+      setOriginalShifts([]);
+    }
+
+    const weekUnavailabilities = unavailabilitiesData.filter((u) => {
+      const uDate = new Date(u.date);
+      return uDate >= new Date(weekStartStr) && uDate <= new Date(weekEndStr);
+    });
+    setUnavailabilities(weekUnavailabilities);
+
+    // Also include assignments where worker is sous_chef or additional_chef
+    const [sousAssignments, additionalAssignments] = await Promise.all([
+      base44.entities.Assignment.filter({ sous_chef_id: worker.id }),
+      base44.entities.Assignment.filter({ additional_chef_id: worker.id }),
+    ]);
+    const allAssignments = [...assignmentsData, ...sousAssignments, ...additionalAssignments];
+    setAssignments(allAssignments);
+    setTemplateRows(templateRowsData);
+    setAllTemplates(templatesData);
+  };
+
+  // Legacy alias for components that call loadData()
+  const loadData = async () => {
+    await loadDynamicData(cachedWorker.current, cachedUser.current);
   };
 
   const getShiftState = (date, shiftBlock) => {

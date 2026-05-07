@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,18 +97,20 @@ export default function Schedule() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     lastWeekStart.current = weekStartStr;
 
-    // Batch: fetch workers, templates, rows, availabilities + ALL settings in one call
+    // Batch: fetch day-specific live data + static data from cache
+    console.time("Schedule initial load");
     const [
       workersData, availabilitiesData, unavailabilitiesData,
       allTemplatesData, templateRowsData, allSettings
     ] = await Promise.all([
-      base44.entities.Worker.filter({ active: true }),
+      getCachedWorkers(base44.entities),
       base44.entities.Availability.filter({ week_start_date: weekStartStr }),
       base44.entities.Unavailability.filter({ date: dateString }),
-      base44.entities.Template.filter({ active: true }),
+      getCachedTemplates(base44.entities),
       base44.entities.TemplateRow.filter({ date: dateString }),
-      base44.entities.AppSettings.list(), // single call for all settings
+      getCachedAllSettings(base44.entities),
     ]);
+    console.timeEnd("Schedule initial load");
 
     // Filter settings client-side
     const colTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
@@ -135,10 +138,11 @@ export default function Schedule() {
 
     // Fetch daily AppSettings in one batch by fetching all settings with date suffix
     // then filter client-side — avoids 3 separate rate-limited calls
+    console.time("Schedule date change");
     const promises = [
       base44.entities.TemplateRow.filter({ date: dateString }),
       base44.entities.Unavailability.filter({ date: dateString }),
-      base44.entities.AppSettings.list(), // fetch all settings once, filter below
+      getCachedAllSettings(base44.entities), // served from cache if fresh
     ];
     if (weekChanged) {
       promises.push(base44.entities.Availability.filter({ week_start_date: weekStartStr }));
@@ -155,6 +159,7 @@ export default function Schedule() {
 
     applyDailyData({ dateString, templateRowsData, allTemplatesData: allTemplates, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     setDailyLoading(false);
+    console.timeEnd("Schedule date change");
   };
 
   const applyStaticData = ({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData }) => {
