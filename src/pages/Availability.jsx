@@ -51,6 +51,9 @@ const SHIFT_BLOCKS = [
 
 const DAYS_OF_WEEK = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
+// Permanent denylist — these registration names are obsolete and must never be shown
+const STALE_REG_DENYLIST_STATIC = ["מנהלי מסעדה יום", "מנהלי מסעדה לילה"];
+
 export default function Availability() {
   const queryClient = useQueryClient();
   const [currentUser, setCurrentUser] = useState(null);
@@ -178,6 +181,28 @@ export default function Availability() {
     if (worker) {
       await loadDynamicData(worker, user);
     }
+
+    // Auto-cleanup: silently remove denylist entries from AppSettings on every load
+    const hasDenylistInReg = openReg.some(reg => {
+      const regName = reg?.name || (typeof reg === 'string' ? reg : '');
+      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
+      return STALE_REG_DENYLIST_STATIC.some(d => regName.includes(d) || regKey.includes(d));
+    });
+    if (hasDenylistInReg) {
+      const cleanedReg = openReg.filter(reg => {
+        const regName = reg?.name || (typeof reg === 'string' ? reg : '');
+        const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
+        return !STALE_REG_DENYLIST_STATIC.some(d => regName.includes(d) || regKey.includes(d));
+      });
+      const openRegSettingsArr = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
+      if (openRegSettingsArr.length > 0) {
+        await base44.entities.AppSettings.update(openRegSettingsArr[0].id, {
+          setting_value: JSON.stringify(cleanedReg)
+        });
+      }
+      setOpenRegistrations(cleanedReg);
+    }
+
     console.timeEnd("Availability load");
   };
 
@@ -685,57 +710,100 @@ END:VEVENT
     setSelectedShifts(newShifts);
   };
 
-  // Build the set of valid registration keys from active templateRows
-  const activeRegKeys = useMemo(() => {
+  // Stale registration name denylist — permanently ignored regardless of any other check
+  const STALE_REG_DENYLIST = STALE_REG_DENYLIST_STATIC;
+
+  // Build the set of valid group keys from active TemplateRows in the selected week
+  // Key format used by Schedule: `${template_id}_${group_id || 'default'}`
+  const activeGroupKeys = useMemo(() => {
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
     const keys = new Set();
     templateRows.forEach(row => {
-      if (row.template_name) keys.add(row.template_name);
-      if (row.template_id) keys.add(row.template_id);
-    });
-    allTemplates.forEach(t => {
-      if (t.name) keys.add(t.name);
-      if (t.id) keys.add(t.id);
+      if (!row.date || row.date < weekStartStr || row.date > weekEndStr) return;
+      const gKey = `${row.template_id}_${row.group_id || 'default'}`;
+      keys.add(gKey);
     });
     return keys;
-  }, [templateRows, allTemplates]);
+  }, [templateRows, weekStart]);
 
-  // Filter openRegistrations: only show entries whose key/name maps to an active template with rows
+  // A registration is valid only if:
+  // 1. Its name is NOT in the denylist
+  // 2. Its key maps to an existing TemplateRow group in the selected week
+  // 3. It has shifts defined
+  // 4. Its date is inside the selected week (or no date set)
   const validOpenRegistrations = useMemo(() => {
-    if (templateRows.length === 0 && allTemplates.length === 0) return openRegistrations; // not loaded yet, show all
+    if (templateRows.length === 0) return []; // not loaded yet — show nothing until data is ready
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
     return openRegistrations.filter(reg => {
-      const regKey = reg?.key || reg;
-      const regName = reg?.name || reg;
-      // Must match an active template by key or name
-      return activeRegKeys.has(regKey) || activeRegKeys.has(regName);
+      const regName = reg?.name || (typeof reg === 'string' ? reg : '');
+      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
+      const regDate = reg?.date || null;
+      const regShifts = reg?.shifts || [];
+
+      // 1. Denylist check
+      if (STALE_REG_DENYLIST.some(d => regName.includes(d) || regKey.includes(d))) return false;
+      // 2. Must have shifts
+      if (regShifts.length === 0) return false;
+      // 3. Date must be inside current week (if date is set)
+      if (regDate && (regDate < weekStartStr || regDate > weekEndStr)) return false;
+      // 4. Key must map to an existing TemplateRow group in this week
+      if (!activeGroupKeys.has(regKey)) return false;
+      return true;
     });
-  }, [openRegistrations, activeRegKeys, templateRows, allTemplates]);
+  }, [openRegistrations, activeGroupKeys, templateRows, weekStart]);
+
+  // Compute stale keys for cleanup (inverse of valid)
+  const staleRegistrations = useMemo(() => {
+    if (templateRows.length === 0) return [];
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
+    return openRegistrations.filter(reg => {
+      const regName = reg?.name || (typeof reg === 'string' ? reg : '');
+      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
+      const regDate = reg?.date || null;
+      const regShifts = reg?.shifts || [];
+      if (STALE_REG_DENYLIST.some(d => regName.includes(d) || regKey.includes(d))) return true;
+      if (regShifts.length === 0) return true;
+      if (regDate && (regDate < weekStartStr || regDate > weekEndStr)) return true;
+      if (!activeGroupKeys.has(regKey)) return true;
+      return false;
+    });
+  }, [openRegistrations, activeGroupKeys, templateRows, weekStart]);
+
+  // Build stale extra_tasks keys from a list of stale registrations
+  const buildStaleTaskKeys = (staleRegs) => {
+    const staleKeys = new Set();
+    // Also always add denylist patterns
+    STALE_REG_DENYLIST.forEach(name => staleKeys.add(name));
+    staleRegs.forEach(reg => {
+      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
+      const regShifts = reg?.shifts || [];
+      if (regShifts.length > 0) {
+        regShifts.forEach((_, si) => staleKeys.add(`${regKey}__${si}`));
+      }
+      staleKeys.add(regKey);
+    });
+    return staleKeys;
+  };
 
   const handleOpenCleanupDialog = async () => {
     setCleanupLoading(true);
     setShowCleanupDialog(true);
-    // Find stale registrations
-    const stale = openRegistrations.filter(reg => {
-      const regKey = reg?.key || reg;
-      const regName = reg?.name || reg;
-      return !activeRegKeys.has(regKey) && !activeRegKeys.has(regName);
-    });
-    // Count how many Availability records have extra_tasks keys from stale regs
-    const staleKeys = new Set();
-    stale.forEach(reg => {
-      const regKey = reg?.key || reg;
-      const regShifts = reg?.shifts || [];
-      if (regShifts.length > 0) {
-        regShifts.forEach((_, si) => staleKeys.add(`${regKey}__${si}`));
-      } else {
-        staleKeys.add(regKey);
-      }
-    });
-    // Fetch all availabilities to count affected extra_tasks
+    const stale = staleRegistrations;
+    const staleKeys = buildStaleTaskKeys(stale);
+
+    // Also find any extra_tasks keys matching denylist patterns directly
     const allAvails = await base44.entities.Availability.list();
     let affectedAvails = 0;
     allAvails.forEach(avail => {
       const tasks = avail.extra_tasks || {};
-      const hasStale = Object.keys(tasks).some(k => staleKeys.has(k));
+      const hasStale = Object.keys(tasks).some(k => {
+        if (staleKeys.has(k)) return true;
+        // Also check if key contains any denylist name
+        return STALE_REG_DENYLIST.some(d => k.includes(d));
+      });
       if (hasStale) affectedAvails++;
     });
     setCleanupPreview({ stale, staleKeys, affectedAvails, allAvails });
@@ -745,17 +813,26 @@ END:VEVENT
   const handleRunCleanup = async () => {
     if (!cleanupPreview) return;
     setCleanupLoading(true);
-    const { stale, staleKeys, allAvails } = cleanupPreview;
+    const { staleKeys, allAvails } = cleanupPreview;
 
-    // 1. Clean open_registrations in AppSettings
+    // 1. Remove stale entries from open_registrations in AppSettings
+    // Keep ALL registrations that pass validation (valid for any week, not just current)
+    // We remove: denylist names, and entries whose key is in staleKeys
     const cleaned = openRegistrations.filter(reg => {
-      const regKey = reg?.key || reg;
-      const regName = reg?.name || reg;
-      return activeRegKeys.has(regKey) || activeRegKeys.has(regName);
+      const regName = reg?.name || (typeof reg === 'string' ? reg : '');
+      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
+      if (STALE_REG_DENYLIST.some(d => regName.includes(d) || regKey.includes(d))) return false;
+      if (staleKeys.has(regKey)) return false;
+      return true;
     });
     const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
     if (openRegSettings.length > 0) {
       await base44.entities.AppSettings.update(openRegSettings[0].id, {
+        setting_value: JSON.stringify(cleaned)
+      });
+    } else if (cleaned.length < openRegistrations.length) {
+      await base44.entities.AppSettings.create({
+        setting_key: "open_registrations",
         setting_value: JSON.stringify(cleaned)
       });
     }
@@ -764,19 +841,22 @@ END:VEVENT
     // 2. Clean extra_tasks from each Availability record
     for (const avail of allAvails) {
       const tasks = avail.extra_tasks || {};
-      const hasStale = Object.keys(tasks).some(k => staleKeys.has(k));
-      if (hasStale) {
-        const cleaned = {};
-        Object.entries(tasks).forEach(([k, v]) => {
-          if (!staleKeys.has(k)) cleaned[k] = v;
-        });
-        await base44.entities.Availability.update(avail.id, { extra_tasks: cleaned });
+      const keysToRemove = Object.keys(tasks).filter(k => {
+        if (staleKeys.has(k)) return true;
+        return STALE_REG_DENYLIST.some(d => k.includes(d));
+      });
+      if (keysToRemove.length > 0) {
+        const cleanedTasks = { ...tasks };
+        keysToRemove.forEach(k => delete cleanedTasks[k]);
+        await base44.entities.Availability.update(avail.id, { extra_tasks: cleanedTasks });
       }
     }
 
     setCleanupLoading(false);
     setShowCleanupDialog(false);
     setCleanupPreview(null);
+    // Reload dynamic data to reflect changes
+    await loadDynamicData(cachedWorker.current, cachedUser.current);
   };
 
   return (
@@ -1454,7 +1534,7 @@ END:VEVENT
           </DialogContent>
         </Dialog>
 
-        {/* Cleanup Dialog — manager only */}
+        {/* Cleanup Dialog — manager only — cleans stale open_registrations + extra_tasks */}
         <Dialog open={showCleanupDialog} onOpenChange={(v) => { if (!v) { setShowCleanupDialog(false); setCleanupPreview(null); } }}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle dir="rtl">נקה הרשמות ישנות</DialogTitle></DialogHeader>
