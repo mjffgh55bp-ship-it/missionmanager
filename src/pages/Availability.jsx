@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
 import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, parseSetting } from "@/lib/appDataCache";
@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Calendar as CalendarIcon, Check, X, AlertCircle, Info, GripVertical, Plus, XCircle, Star, Ban, ChevronLeft, ChevronRight, PartyPopper, Pencil, Download, Lock } from "lucide-react";
+import { Calendar as CalendarIcon, Check, X, AlertCircle, Info, GripVertical, Plus, XCircle, Star, Ban, ChevronLeft, ChevronRight, PartyPopper, Pencil, Download, Lock, Trash2 } from "lucide-react";
 import { format, startOfWeek, addDays, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -93,6 +93,9 @@ export default function Availability() {
   const [editingTips, setEditingTips] = useState(false);
   const [tipsEditValue, setTipsEditValue] = useState("");
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
+  const [cleanupPreview, setCleanupPreview] = useState(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
   const initialLoadStarted = useRef(false);
   const lastWeekStart = useRef(null);
   const staticLoaded = useRef(false);
@@ -682,6 +685,100 @@ END:VEVENT
     setSelectedShifts(newShifts);
   };
 
+  // Build the set of valid registration keys from active templateRows
+  const activeRegKeys = useMemo(() => {
+    const keys = new Set();
+    templateRows.forEach(row => {
+      if (row.template_name) keys.add(row.template_name);
+      if (row.template_id) keys.add(row.template_id);
+    });
+    allTemplates.forEach(t => {
+      if (t.name) keys.add(t.name);
+      if (t.id) keys.add(t.id);
+    });
+    return keys;
+  }, [templateRows, allTemplates]);
+
+  // Filter openRegistrations: only show entries whose key/name maps to an active template with rows
+  const validOpenRegistrations = useMemo(() => {
+    if (templateRows.length === 0 && allTemplates.length === 0) return openRegistrations; // not loaded yet, show all
+    return openRegistrations.filter(reg => {
+      const regKey = reg?.key || reg;
+      const regName = reg?.name || reg;
+      // Must match an active template by key or name
+      return activeRegKeys.has(regKey) || activeRegKeys.has(regName);
+    });
+  }, [openRegistrations, activeRegKeys, templateRows, allTemplates]);
+
+  const handleOpenCleanupDialog = async () => {
+    setCleanupLoading(true);
+    setShowCleanupDialog(true);
+    // Find stale registrations
+    const stale = openRegistrations.filter(reg => {
+      const regKey = reg?.key || reg;
+      const regName = reg?.name || reg;
+      return !activeRegKeys.has(regKey) && !activeRegKeys.has(regName);
+    });
+    // Count how many Availability records have extra_tasks keys from stale regs
+    const staleKeys = new Set();
+    stale.forEach(reg => {
+      const regKey = reg?.key || reg;
+      const regShifts = reg?.shifts || [];
+      if (regShifts.length > 0) {
+        regShifts.forEach((_, si) => staleKeys.add(`${regKey}__${si}`));
+      } else {
+        staleKeys.add(regKey);
+      }
+    });
+    // Fetch all availabilities to count affected extra_tasks
+    const allAvails = await base44.entities.Availability.list();
+    let affectedAvails = 0;
+    allAvails.forEach(avail => {
+      const tasks = avail.extra_tasks || {};
+      const hasStale = Object.keys(tasks).some(k => staleKeys.has(k));
+      if (hasStale) affectedAvails++;
+    });
+    setCleanupPreview({ stale, staleKeys, affectedAvails, allAvails });
+    setCleanupLoading(false);
+  };
+
+  const handleRunCleanup = async () => {
+    if (!cleanupPreview) return;
+    setCleanupLoading(true);
+    const { stale, staleKeys, allAvails } = cleanupPreview;
+
+    // 1. Clean open_registrations in AppSettings
+    const cleaned = openRegistrations.filter(reg => {
+      const regKey = reg?.key || reg;
+      const regName = reg?.name || reg;
+      return activeRegKeys.has(regKey) || activeRegKeys.has(regName);
+    });
+    const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
+    if (openRegSettings.length > 0) {
+      await base44.entities.AppSettings.update(openRegSettings[0].id, {
+        setting_value: JSON.stringify(cleaned)
+      });
+    }
+    setOpenRegistrations(cleaned);
+
+    // 2. Clean extra_tasks from each Availability record
+    for (const avail of allAvails) {
+      const tasks = avail.extra_tasks || {};
+      const hasStale = Object.keys(tasks).some(k => staleKeys.has(k));
+      if (hasStale) {
+        const cleaned = {};
+        Object.entries(tasks).forEach(([k, v]) => {
+          if (!staleKeys.has(k)) cleaned[k] = v;
+        });
+        await base44.entities.Availability.update(avail.id, { extra_tasks: cleaned });
+      }
+    }
+
+    setCleanupLoading(false);
+    setShowCleanupDialog(false);
+    setCleanupPreview(null);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -857,7 +954,7 @@ END:VEVENT
           }
 
             {/* Extra Tasks Section */}
-            {openRegistrations.filter((reg) => {
+            {validOpenRegistrations.filter((reg) => {
             const regShifts = reg?.shifts || [];
             if (regShifts.length === 0) return false;
             if (!reg?.date) return true;
@@ -867,12 +964,19 @@ END:VEVENT
           }).length > 0 &&
           <Card className="border-none shadow-lg mb-4">
                 <CardHeader className="border-b bg-white py-3 px-4">
-                  <CardTitle className="text-base" dir="rtl">משימות נוספות</CardTitle>
+                  <div className="flex items-center justify-between" dir="rtl">
+                    <CardTitle className="text-base">משימות נוספות</CardTitle>
+                    {isManager && (
+                      <Button size="sm" variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50 text-xs" onClick={handleOpenCleanupDialog} dir="rtl">
+                        <Trash2 className="w-3 h-3 mr-1" />נקה ישנות
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="py-3 px-4">
                   <p className="text-xs text-gray-500 mb-3" dir="rtl">לחיצה בודדת - רצוי, לחיצה כפולה - זמין, שלוש לחיצות - לא זמין</p>
                   <div className="space-y-3">
-                    {openRegistrations.filter((reg) => {
+                    {validOpenRegistrations.filter((reg) => {
                   const regShifts = reg?.shifts || [];
                   if (regShifts.length === 0) return false;
                   if (!reg?.date) return true;
@@ -1346,6 +1450,49 @@ END:VEVENT
             <DialogFooter>
               <Button variant="outline" onClick={() => setShowChangeRecap(false)} dir="rtl">ביטול</Button>
               <Button onClick={handleSubmitChangeRequest} className="bg-blue-900 hover:bg-blue-800" dir="rtl">שלח בקשת שינוי</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Cleanup Dialog — manager only */}
+        <Dialog open={showCleanupDialog} onOpenChange={(v) => { if (!v) { setShowCleanupDialog(false); setCleanupPreview(null); } }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle dir="rtl">נקה הרשמות ישנות</DialogTitle></DialogHeader>
+            <div className="py-4 space-y-4" dir="rtl">
+              {cleanupLoading ? (
+                <p className="text-sm text-gray-500 text-center">בודק נתונים...</p>
+              ) : cleanupPreview ? (
+                <>
+                  {cleanupPreview.stale.length === 0 ? (
+                    <p className="text-sm text-green-700 font-semibold">אין הרשמות ישנות — הכל תקין!</p>
+                  ) : (
+                    <>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800 mb-1">הרשמות שיוסרו ({cleanupPreview.stale.length}):</p>
+                        <div className="space-y-1">
+                          {cleanupPreview.stale.map((reg, i) => (
+                            <div key={i} className="text-xs bg-red-50 border border-red-200 rounded px-2 py-1 text-red-800">
+                              {reg?.name || reg?.key || reg}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        {cleanupPreview.affectedAvails} רשומות זמינות יעודכנו (מפתחות ישנים יוסרו מ-extra_tasks)
+                      </p>
+                      <p className="text-xs text-orange-600 font-semibold">פעולה זו לא ניתנת לביטול</p>
+                    </>
+                  )}
+                </>
+              ) : null}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setShowCleanupDialog(false); setCleanupPreview(null); }} dir="rtl">ביטול</Button>
+              {cleanupPreview && cleanupPreview.stale.length > 0 && (
+                <Button onClick={handleRunCleanup} disabled={cleanupLoading} className="bg-red-600 hover:bg-red-700" dir="rtl">
+                  {cleanupLoading ? "מנקה..." : "נקה עכשיו"}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
