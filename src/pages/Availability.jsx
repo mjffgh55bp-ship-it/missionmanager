@@ -664,6 +664,10 @@ END:VEVENT
     let newShifts = selectedShifts.filter(
       s => !(s.date === date && s.start_time === startTime && s.end_time === endTime)
     );
+    if (type === "remove") {
+      setSelectedShifts(newShifts);
+      return;
+    }
     const count = newShifts.filter(s => s.type === type).length;
     newShifts.push({
       date,
