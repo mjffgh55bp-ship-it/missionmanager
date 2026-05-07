@@ -111,18 +111,22 @@ export default function Availability() {
 
     const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-    // Batch 1: core data
-    const [workersData, openRegSettings, userRolesSettings, eventsData] = await Promise.all([
+    // Batch 1: workers + events
+    const [workersData, eventsData] = await Promise.all([
       base44.entities.Worker.filter({ active: true }),
-      base44.entities.AppSettings.filter({ setting_key: "open_registrations" }),
-      base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.CompanyEvent.list("-date"),
     ]);
 
-    // Batch 2: tips + yearly events
-    const [settings, weekTipsSettings, yearlyEventsData, acknowledgedSettings] = await Promise.all([
+    // Batch 2: settings
+    const [openRegSettings, userRolesSettings, settings, weekTipsSettings] = await Promise.all([
+      base44.entities.AppSettings.filter({ setting_key: "open_registrations" }),
+      base44.entities.AppSettings.filter({ setting_key: "user_roles" }),
       base44.entities.AppSettings.filter({ setting_key: "availability_tips" }),
       base44.entities.AppSettings.filter({ setting_key: `availability_tips_${weekStartStr2}` }),
+    ]);
+
+    // Batch 3: yearly events + acknowledged tips
+    const [yearlyEventsData, acknowledgedSettings] = await Promise.all([
       base44.entities.YearlyEvent.list("-start_date", 500),
       base44.entities.AppSettings.filter({ setting_key: `tips_acknowledged_${user.email}` }),
     ]);
@@ -173,11 +177,15 @@ export default function Availability() {
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
-      // Batch 3: all worker-specific data in parallel
-      const [availabilities, unavailabilitiesData, templatesData, assignmentsData, templateRowsData] = await Promise.all([
+      // Worker batch 1
+      const [availabilities, unavailabilitiesData, templatesData] = await Promise.all([
         base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
         base44.entities.Unavailability.filter({ worker_id: worker.id }),
         base44.entities.Template.filter({ active: true }),
+      ]);
+
+      // Worker batch 2
+      const [assignmentsData, templateRowsData] = await Promise.all([
         base44.entities.Assignment.list("-date", 100),
         base44.entities.TemplateRow.list("-date", 100),
       ]);
