@@ -179,13 +179,10 @@ export default function Availability() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
-    // Batch: week-scoped availability + unavailability + templates (cached) + assignments/rows
-    const [availabilities, unavailabilitiesData, templatesData, assignmentsData, templateRowsData] = await Promise.all([
+    // Batch 1: availability + unavailability (max 2 concurrent)
+    const [availabilities, unavailabilitiesData] = await Promise.all([
       base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
       base44.entities.Unavailability.filter({ worker_id: worker.id }),
-      getCachedTemplates(base44.entities),
-      base44.entities.Assignment.filter({ chef_id: worker.id }),
-      base44.entities.TemplateRow.list("-date", 200),
     ]);
 
     if (availabilities.length > 0) {
@@ -206,11 +203,20 @@ export default function Availability() {
     });
     setUnavailabilities(weekUnavailabilities);
 
-    // Also include assignments where worker is sous_chef or additional_chef
-    const [sousAssignments, additionalAssignments] = await Promise.all([
-      base44.entities.Assignment.filter({ sous_chef_id: worker.id }),
-      base44.entities.Assignment.filter({ additional_chef_id: worker.id }),
+    // Batch 2: templates (cached) + chef assignments (max 2 concurrent)
+    const [templatesData, assignmentsData] = await Promise.all([
+      getCachedTemplates(base44.entities),
+      base44.entities.Assignment.filter({ chef_id: worker.id }),
     ]);
+
+    // Batch 3: sous/additional assignments + template rows (max 2 concurrent)
+    const [sousAssignments, templateRowsData] = await Promise.all([
+      base44.entities.Assignment.filter({ sous_chef_id: worker.id }),
+      base44.entities.TemplateRow.list("-date", 200),
+    ]);
+
+    const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
+
     const allAssignments = [...assignmentsData, ...sousAssignments, ...additionalAssignments];
     setAssignments(allAssignments);
     setTemplateRows(templateRowsData);
