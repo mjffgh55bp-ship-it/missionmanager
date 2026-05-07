@@ -6,6 +6,15 @@
 // EXCEPT _group_id and _order which are needed for row matching.
 // =============================================================
 
+// Column alias map: XLSX header → canonical internal key
+// This normalizes known English/alternate headers to Hebrew DB keys
+export const COLUMN_ALIAS_MAP = {
+  "task":   "משימה",
+  "status": "סטטוס",
+  "start":  "התחלה",
+  "end":    "סיום",
+};
+
 export const EXPORT_SOURCE_NAME = "מערכת ניהול כוח אדם";
 
 // Fixed meta-columns that always appear at the start of every exported row

@@ -4,10 +4,9 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Upload, AlertTriangle, CheckCircle2, Loader2, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Upload, AlertTriangle, CheckCircle2, Loader2, X, ChevronDown, ChevronUp, Info } from "lucide-react";
 import {
   sanitizeText,
-  isEmpty,
   deserializeFromImport,
   validateScheduleRow,
   validateAvailRow,
@@ -15,17 +14,133 @@ import {
   AVAIL_SHEET,
   SCHEDULE_META_COLS,
   isKnownWorkerCol,
+  normalizeColName,
+  COLUMN_ALIAS_MAP,
 } from "@/lib/dataTransferSchema";
 
-// ── Column alias map ──────────────────────────────────────────────────────────
-// Maps XLSX column header names → canonical internal key used in TemplateRow.values
-// This lets us accept legacy/English column names without writing them to the DB.
-const COLUMN_ALIAS_MAP = {
-  "task":   "משימה",
-  "status": "סטטוס",
-  "start":  "התחלה",
-  "end":    "סיום",
-};
+// ── Value emptiness check ──────────────────────────────────────────────────────
+function isEmptyValue(v) {
+  if (v === null || v === undefined) return true;
+  const s = String(v).trim();
+  return s === "" || s === "None" || s === "none";
+}
+
+// ── Parse worksheet → array of objects, normalizing column names ───────────────
+function parseSheet(ws) {
+  if (!ws) return [];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+  return rows
+    .map(row => {
+      const clean = {};
+      Object.entries(row).forEach(([k, v]) => {
+        // Normalize: trim + Hebrew maqaf → ASCII hyphen
+        const nk = normalizeColName(k);
+        clean[nk] = v === null || v === undefined ? "" : String(v).trim();
+      });
+      return clean;
+    })
+    .filter(row => Object.values(row).some(v => v !== ""));
+}
+
+// ── Normalize + alias a raw XLSX header to its canonical key ──────────────────
+// Returns { canonical, wasAliased }
+function resolveHeader(rawHeader) {
+  const normalized = normalizeColName(rawHeader);
+  const aliased = COLUMN_ALIAS_MAP[normalized] || COLUMN_ALIAS_MAP[rawHeader];
+  if (aliased) return { canonical: aliased, wasAliased: true, normalized };
+  return { canonical: normalized, wasAliased: false, normalized };
+}
+
+// ── Match a canonical header to an existing template column ───────────────────
+// Returns the matching template column object or null
+function matchToTemplateColumn(canonical, templateColumns) {
+  // Exact match first
+  const exact = templateColumns.find(c => c.name === canonical);
+  if (exact) return exact;
+  // Normalized match
+  const normCanon = normalizeColName(canonical);
+  return templateColumns.find(c => normalizeColName(c.name) === normCanon) || null;
+}
+
+// ── Build column mapping for a row given its template ────────────────────────
+// Returns array of { xlsxHeader, canonical, normalized, matchedCol, action }
+//   action: "matched" | "meta" | "missing" | "internal"
+function buildColMapping(rawRow, template) {
+  const templateColumns = template?.columns || [];
+  const mapping = [];
+  const metaSet = new Set(SCHEDULE_META_COLS);
+  const internalKeys = new Set(["_rowNum", "_status", "_errors", "סטטוס", "status"]);
+
+  Object.keys(rawRow).forEach(xlsxHeader => {
+    if (metaSet.has(xlsxHeader)) {
+      mapping.push({ xlsxHeader, canonical: xlsxHeader, normalized: xlsxHeader, matchedCol: null, action: "meta" });
+      return;
+    }
+    if (internalKeys.has(xlsxHeader)) {
+      mapping.push({ xlsxHeader, canonical: xlsxHeader, normalized: xlsxHeader, matchedCol: null, action: "internal" });
+      return;
+    }
+
+    const { canonical, wasAliased, normalized } = resolveHeader(xlsxHeader);
+    const matchedCol = matchToTemplateColumn(canonical, templateColumns);
+
+    if (matchedCol) {
+      mapping.push({ xlsxHeader, canonical: matchedCol.name, normalized, matchedCol, wasAliased, action: "matched" });
+    } else {
+      mapping.push({ xlsxHeader, canonical, normalized, matchedCol: null, wasAliased, action: "missing" });
+    }
+  });
+
+  return mapping;
+}
+
+// ── Resolve and validate values for one row ───────────────────────────────────
+// Uses prebuilt colMapping. Returns { values, warnings, rejectedFields, workerDiagnostics }
+function resolveRowValues(rawRow, colMapping, workerNameToId, workerIdSet) {
+  const values = {};
+  const warnings = [];
+  const rejectedFields = [];
+  const workerDiagnostics = [];
+
+  for (const cm of colMapping) {
+    if (cm.action === "meta" || cm.action === "internal" || cm.action === "missing") continue;
+
+    const rawVal = rawRow[cm.xlsxHeader];
+    if (isEmptyValue(rawVal)) continue; // NEVER overwrite with empty
+
+    const strVal = String(rawVal).trim();
+    const stripped = strVal.startsWith("'") ? strVal.slice(1) : strVal;
+
+    const colType = cm.matchedCol?.type;
+    const isWorkerCol = colType === "worker" || isKnownWorkerCol(cm.canonical);
+
+    if (isWorkerCol) {
+      const byNickname = workerNameToId[stripped] || workerNameToId[strVal];
+      const byId = !byNickname && workerIdSet.has(strVal) ? strVal : null;
+
+      if (byNickname) {
+        values[cm.canonical] = byNickname;
+        workerDiagnostics.push({ col: cm.canonical, rawValue: strVal, resolvedId: byNickname, status: "resolved" });
+      } else if (byId) {
+        values[cm.canonical] = byId;
+        workerDiagnostics.push({ col: cm.canonical, rawValue: strVal, resolvedId: byId, status: "resolved" });
+      } else {
+        warnings.push(`העובד "${stripped}" לא נמצא עבור "${cm.canonical}" — השדה לא יעודכן`);
+        rejectedFields.push({ col: cm.canonical, value: stripped, reason: `עובד לא נמצא` });
+        workerDiagnostics.push({ col: cm.canonical, rawValue: strVal, resolvedId: null, status: "unresolved" });
+      }
+      continue;
+    }
+
+    // Non-worker: deserialize and store
+    const deserialized = deserializeFromImport(strVal);
+    if (deserialized !== null && deserialized !== undefined) {
+      values[cm.canonical] = deserialized;
+    }
+  }
+
+  return { values, warnings, rejectedFields, workerDiagnostics };
+}
 
 const STATUS_STYLES = {
   תקין:   "bg-green-100 text-green-800",
@@ -47,177 +162,14 @@ function StatusBadge({ status, tooltip }) {
   );
 }
 
-/** Parse a worksheet into array-of-objects using first row as headers.
- *  Column names are normalized: Hebrew maqaf (־) → ASCII hyphen (-). */
-function parseSheet(ws) {
-  if (!ws) return [];
-  const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
-  return rows.map(row => {
-    const clean = {};
-    Object.entries(row).forEach(([k, v]) => {
-      // Normalize column name: replace Hebrew maqaf with ASCII hyphen
-      const normalizedKey = String(k).trim().replace(/[־]/g, "-");
-      clean[normalizedKey] = v === null || v === undefined ? "" : String(v).trim();
-    });
-    return clean;
-  }).filter(row => Object.values(row).some(v => v !== ""));
-}
-
-/**
- * Build a settings context from AppSettings — used for value validation.
- * Returns:
- *   scheduleColumns: array of { name, options, sub_options, quantitative_items, free_text }
- *   tasksList: string[]
- *   shiftStatuses: string[]
- *   colAllowedValues: Map<colName, Set<string> | null>
- *     null = free-text (any value allowed)
- *     Set = only these values are valid
- */
 async function loadAppSettingsContext() {
   const allSettings = await base44.entities.AppSettings.list();
   const getSetting = (key) => {
     const s = allSettings.find(s => s.setting_key === key);
     return s ? JSON.parse(s.setting_value) : null;
   };
-
-  const scheduleColumns = getSetting("custom_schedule_params") || [];
-  const tasksList       = getSetting("tasks_list") || [];
-  const shiftStatuses   = getSetting("shift_statuses") || [];
-
-  // Build per-column allowed-values map
-  const colAllowedValues = new Map(); // colName → Set<string> | null (null = free text)
-  for (const col of scheduleColumns) {
-    if (col.free_text) {
-      colAllowedValues.set(col.name, null); // any value OK
-    } else {
-      const allowed = new Set();
-      // options (legacy simple options array)
-      (col.options || []).forEach(o => allowed.add(String(o)));
-      // sub_options — the criterion is what gets stored in the DB
-      (col.sub_options || []).forEach(so => {
-        if (so.criterion) allowed.add(String(so.criterion));
-        if (so.name)      allowed.add(String(so.name));
-      });
-      // quantitative_items — stored as JSON keys, so any value key is valid
-      // We allow the whole JSON object through (validated later by structure)
-      if (col.report_type === "count_quantitative") {
-        colAllowedValues.set(col.name, null); // JSON blob — validated structurally
-      } else {
-        colAllowedValues.set(col.name, allowed.size > 0 ? allowed : null);
-      }
-    }
-  }
-
-  // "משימה" column: allowed values are the tasks list
-  colAllowedValues.set("משימה", tasksList.length > 0 ? new Set(tasksList) : null);
-
-  // "סטטוס" column: allowed values are the shift statuses
-  colAllowedValues.set("סטטוס", shiftStatuses.length > 0 ? new Set(shiftStatuses) : null);
-
-  return { scheduleColumns, tasksList, shiftStatuses, colAllowedValues };
-}
-
-/**
- * Resolve and validate all fields in one raw XLSX row.
- * - Applies COLUMN_ALIAS_MAP to normalize header names
- * - Worker cols: nickname → ID (warn if not found, skip field)
- * - Schedule cols: validate against allowed values (reject + warn if invalid)
- * - Time cols ("התחלה","סיום","תדריך"): always pass through (time strings)
- * - Status col: validate against shiftStatuses
- * Returns: { values, warnings, rejectedFields }
- *   rejectedFields: [{ col, value, reason }]
- */
-function resolveAndValidateRow(rawRow, workerColNames, workerNameToId, workerIdSet, colAllowedValues) {
-  const skipCols = new Set([...SCHEDULE_META_COLS, "סטטוס", "_rowNum", "_status", "_errors"]);
-  const values = {};
-  const warnings = [];
-  const rejectedFields = [];
-  const workerDiagnostics = []; // [{col, rawValue, resolvedId, status}]
-
-  // Time column names (always pass through without validation)
-  const TIME_COL_NAMES = new Set(["התחלה", "שעת התחלה", "סיום", "שעת סיום", "תדריך"]);
-
-  Object.entries(rawRow).forEach(([rawKey, rawVal]) => {
-    // Apply alias mapping (keys already normalized by parseSheet)
-    const k = COLUMN_ALIAS_MAP[rawKey] ?? rawKey;
-
-    if (skipCols.has(k)) return;
-    if (k.startsWith("_")) return;
-    if (k.endsWith("_subTypes")) return;
-
-    const strVal = String(rawVal ?? "").trim();
-    if (!strVal || strVal === "None") return; // skip empty — never overwrite existing
-
-    // Strip leading ' that sanitizeText may have added to prevent formula injection
-    const stripped = strVal.startsWith("'") ? strVal.slice(1) : strVal;
-
-    // ── Detect if this is a worker column ─────────────────────────────────────
-    // A column is a worker column if:
-    //   (a) the template defines it as type "worker", OR
-    //   (b) it's in the known worker column names list (שף, סו-שף, מנהל, etc.)
-    const isWorkerCol = workerColNames.has(k) || isKnownWorkerCol(k);
-
-    if (isWorkerCol) {
-      // Try: nickname → worker ID
-      const byNickname = workerNameToId[strVal] || workerNameToId[stripped];
-      // Try: already a valid worker ID
-      const byId = !byNickname && (workerIdSet.has(strVal) ? strVal : null);
-
-      if (byNickname) {
-        values[k] = byNickname;
-        workerDiagnostics.push({ col: k, rawValue: strVal, resolvedId: byNickname, status: "resolved" });
-      } else if (byId) {
-        values[k] = byId;
-        workerDiagnostics.push({ col: k, rawValue: strVal, resolvedId: byId, status: "resolved" });
-      } else {
-        // Could not resolve — REJECT, do not write to values
-        warnings.push(`העובד "${stripped || strVal}" לא נמצא עבור העמודה "${k}" — השדה לא יעודכן`);
-        rejectedFields.push({ col: k, value: stripped || strVal, reason: `העובד "${stripped || strVal}" לא נמצא עבור העמודה "${k}"` });
-        workerDiagnostics.push({ col: k, rawValue: strVal, resolvedId: null, status: "unresolved" });
-      }
-      return;
-    }
-
-    // ── Time columns — always pass through ────────────────────────────────────
-    if (TIME_COL_NAMES.has(k)) {
-      values[k] = strVal;
-      return;
-    }
-
-    // ── Status ("סטטוס") — handled in caller via rawRow["סטטוס"] ────────────
-    // (already in skipCols, handled separately)
-
-    // ── Validate against allowed values ───────────────────────────────────────
-    const deserialized = deserializeFromImport(strVal);
-
-    // JSON quantitative objects — pass through (structure is valid by construction)
-    if (typeof deserialized === "object" && deserialized !== null) {
-      values[k] = deserialized;
-      return;
-    }
-
-    if (colAllowedValues.has(k)) {
-      const allowed = colAllowedValues.get(k);
-      if (allowed === null) {
-        // free-text column: any value OK
-        values[k] = deserialized ?? strVal;
-      } else if (allowed.has(strVal)) {
-        values[k] = deserialized ?? strVal;
-      } else {
-        // Value not in settings — REJECT
-        rejectedFields.push({ col: k, value: strVal, reason: `הערך "${strVal}" לא קיים בהגדרות עבור העמודה "${k}"` });
-        warnings.push(`הערך "${strVal}" לא קיים בהגדרות עבור העמודה "${k}" — השדה לא יעודכן`);
-      }
-      return;
-    }
-
-    // Column not in settings at all — pass through (may be a time/text template column)
-    if (deserialized !== null && deserialized !== undefined) {
-      values[k] = deserialized;
-    }
-  });
-
-  return { values, warnings, rejectedFields, workerDiagnostics };
+  const shiftStatuses = getSetting("shift_statuses") || [];
+  return { shiftStatuses };
 }
 
 export default function ImportPanel({ currentUser, onAuditLog }) {
@@ -229,14 +181,15 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
   const [applying, setApplying] = useState(false);
   const [result, setResult] = useState(null);
   const [parseError, setParseError] = useState("");
+  const [showColDiag, setShowColDiag] = useState(false);
 
   const reset = () => {
     setFileName(""); setParsedData(null); setPreview(null);
-    setResult(null); setParseError(""); setLoadingPreview(false);
+    setResult(null); setParseError(""); setLoadingPreview(false); setShowColDiag(false);
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  // Step 1: Read file → parse raw rows (no DB calls yet)
+  // Step 1: Read file → parse raw rows
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -265,21 +218,20 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     reader.readAsArrayBuffer(file);
   };
 
-  // Step 2: Load DB data + app settings, build enriched & validated preview
+  // Step 2: Build preview with full diagnostics
   const handleBuildPreview = async () => {
     if (!parsedData) return;
     setLoadingPreview(true);
 
     const { rawSchedule, rawAvail } = parsedData;
 
-    // Load everything in parallel
     const [allTemplates, workers, settingsCtx] = await Promise.all([
       base44.entities.Template.list(),
       base44.entities.Worker.list(),
       loadAppSettingsContext(),
     ]);
 
-    const { colAllowedValues, shiftStatuses } = settingsCtx;
+    const { shiftStatuses } = settingsCtx;
 
     const templateByName = {};
     allTemplates.forEach(t => { templateByName[t.name] = t; });
@@ -288,70 +240,61 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     workers.forEach(w => { if (w.nickname) workerNameToId[w.nickname] = w.id; });
     const workerIdSet = new Set(workers.map(w => w.id).filter(Boolean));
 
-    // Load existing TemplateRows for the dates in the import
+    // Load existing TemplateRows for all import dates
     const importDates = [...new Set(rawSchedule.map(r => r["תאריך"]).filter(Boolean))];
     const existingRows = importDates.length > 0
       ? (await Promise.all(importDates.map(d => base44.entities.TemplateRow.filter({ date: d })))).flat()
       : [];
 
-    // Build row-matching lookups (by _order primary, by index fallback)
-    const existingRowByOrder = {};
-    const existingRowByIndex = {};
+    // Build matching lookups
     const existingByGroup = {};
     existingRows.forEach(row => {
       const gKey = `${row.date}|${row.group_id || ""}`;
       if (!existingByGroup[gKey]) existingByGroup[gKey] = [];
       existingByGroup[gKey].push(row);
     });
-    Object.entries(existingByGroup).forEach(([gKey, rows]) => {
+    Object.values(existingByGroup).forEach(rows => {
       rows.sort((a, b) => {
         const aO = a.values?._order ?? Infinity;
         const bO = b.values?._order ?? Infinity;
         if (aO !== bO) return aO - bO;
         return new Date(a.created_date) - new Date(b.created_date);
       });
-      rows.forEach((row, idx) => {
-        if (row.values?._order !== undefined && row.values?._order !== null) {
-          existingRowByOrder[`${gKey}|${row.values._order}`] = row;
-        }
-        existingRowByIndex[`${gKey}|idx:${idx}`] = row;
-      });
     });
 
     const lookupExistingRow = (date, groupId, order, rowIndexInGroup) => {
       const gKey = `${date}|${groupId}`;
+      const rows = existingByGroup[gKey] || [];
       if (order !== "" && order !== undefined) {
-        const found = existingRowByOrder[`${gKey}|${order}`];
-        if (found) return found;
+        const byOrder = rows.find(r => String(r.values?._order) === String(order));
+        if (byOrder) return byOrder;
       }
-      return existingRowByIndex[`${gKey}|idx:${rowIndexInGroup}`] || null;
+      return rows[rowIndexInGroup] || null;
     };
+
+    // Collect global column diagnostics across all rows
+    const globalColDiag = {}; // xlsxHeader → { xlsxHeader, canonical, action, matchedType, count }
 
     const groupRowCounter = {};
 
-    // Enrich + validate schedule rows
     const scheduleRows = rawSchedule.map((rawRow, i) => {
       const rowNum = i + 2;
       const errors = validateScheduleRow(rawRow);
-      if (errors.length > 0) {
-        return {
-          _rowNum: rowNum, _status: "שגיאה", _errors: errors,
-          תאריך: rawRow["תאריך"] || "", מוקד: rawRow["מוקד"] || "",
-          _group_id: rawRow["_group_id"] || "", _order: rawRow["_order"] || "",
-          _warnings: [], _parsedValues: {}, _rejectedFields: [], _action: "skip",
-          _fieldsUpdated: [], _fieldsSkipped: [], _aliasedCols: [],
-        };
-      }
 
-      const date      = rawRow["תאריך"];
-      const mokedName = rawRow["מוקד"];
+      const date      = rawRow["תאריך"] || "";
+      const mokedName = rawRow["מוקד"] || "";
       const groupId   = rawRow["_group_id"] || "";
       const order     = rawRow["_order"] !== undefined ? String(rawRow["_order"]).trim() : "";
       const statusRaw = rawRow["סטטוס"] || "";
 
-      const gKey = `${date}|${groupId}`;
-      const rowIndexInGroup = groupRowCounter[gKey] ?? 0;
-      groupRowCounter[gKey] = rowIndexInGroup + 1;
+      if (errors.length > 0) {
+        return {
+          _rowNum: rowNum, _status: "שגיאה", _errors: errors,
+          תאריך: date, מוקד: mokedName, _group_id: groupId, _order: order,
+          _warnings: [], _parsedValues: {}, _rejectedFields: [], _action: "skip",
+          _fieldsUpdated: [], _colMapping: [],
+        };
+      }
 
       const template = templateByName[mokedName];
       if (!template) {
@@ -360,34 +303,47 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           _errors: [`מוקד "${mokedName}" לא קיים במערכת`],
           תאריך: date, מוקד: mokedName, _group_id: groupId, _order: order,
           _warnings: [], _parsedValues: {}, _rejectedFields: [], _action: "skip",
-          _fieldsUpdated: [], _fieldsSkipped: [], _aliasedCols: [],
-          _rowIndexInGroup: rowIndexInGroup,
+          _fieldsUpdated: [], _colMapping: [],
         };
       }
 
-      // Worker columns: template type === "worker" OR known worker col names (normalized)
-      const workerColNames = new Set(
-        (template.columns || []).filter(c => c.type === "worker").map(c => c.name)
-      );
+      // Build column mapping for this row's template
+      const colMapping = buildColMapping(rawRow, template);
 
-      // Detect which raw columns were aliased (for preview display)
-      const aliasedCols = Object.keys(rawRow)
-        .filter(k => COLUMN_ALIAS_MAP[k])
-        .map(k => `${k} → ${COLUMN_ALIAS_MAP[k]}`);
+      // Accumulate global column diagnostics
+      colMapping.forEach(cm => {
+        if (cm.action === "meta" || cm.action === "internal") return;
+        if (!globalColDiag[cm.xlsxHeader]) {
+          globalColDiag[cm.xlsxHeader] = {
+            xlsxHeader: cm.xlsxHeader,
+            normalized: cm.normalized,
+            canonical: cm.canonical,
+            action: cm.action,
+            matchedType: cm.matchedCol?.type || null,
+            wasAliased: cm.wasAliased || false,
+            count: 0,
+          };
+        }
+        globalColDiag[cm.xlsxHeader].count++;
+      });
 
       const { values: parsedValues, warnings, rejectedFields, workerDiagnostics } =
-        resolveAndValidateRow(rawRow, workerColNames, workerNameToId, workerIdSet, colAllowedValues);
+        resolveRowValues(rawRow, colMapping, workerNameToId, workerIdSet);
 
-      // Handle status separately: validate against shiftStatuses
-      if (statusRaw) {
-        const statusAllowed = colAllowedValues.get("סטטוס");
-        if (!statusAllowed || statusAllowed.has(statusRaw)) {
+      // Handle status
+      if (statusRaw && !isEmptyValue(statusRaw)) {
+        const statusValid = shiftStatuses.length === 0 || shiftStatuses.includes(statusRaw);
+        if (statusValid) {
           parsedValues.status = statusRaw;
         } else {
-          warnings.push(`הסטטוס "${statusRaw}" לא קיים בהגדרות — הסטטוס לא יעודכן`);
-          rejectedFields.push({ col: "סטטוס", value: statusRaw, reason: `הסטטוס "${statusRaw}" לא קיים בהגדרות` });
+          warnings.push(`הסטטוס "${statusRaw}" לא קיים בהגדרות — לא יעודכן`);
+          rejectedFields.push({ col: "סטטוס", value: statusRaw, reason: `סטטוס לא תקין` });
         }
       }
+
+      const gKey = `${date}|${groupId}`;
+      const rowIndexInGroup = groupRowCounter[gKey] ?? 0;
+      groupRowCounter[gKey] = rowIndexInGroup + 1;
 
       const existingRow = lookupExistingRow(date, groupId, order, rowIndexInGroup);
 
@@ -406,8 +362,15 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         Object.keys(parsedValues).forEach(k => fieldsUpdated.push(k));
       }
 
-      const hasRejections = rejectedFields.length > 0;
-      const status = warnings.length > 0 || hasRejections ? "אזהרה" : "תקין";
+      // Check for missing columns (XLSX columns that had no template match)
+      const missingCols = colMapping.filter(cm => cm.action === "missing");
+      if (missingCols.length > 0) {
+        missingCols.forEach(cm => {
+          warnings.push(`עמודה "${cm.xlsxHeader}" לא קיימת בתבנית "${mokedName}" — תידלג`);
+        });
+      }
+
+      const status = warnings.length > 0 || rejectedFields.length > 0 ? "אזהרה" : "תקין";
 
       return {
         _rowNum: rowNum, _status: status, _errors: [], _warnings: warnings,
@@ -415,34 +378,15 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         _parsedValues: parsedValues,
         _rejectedFields: rejectedFields,
         _workerDiagnostics: workerDiagnostics || [],
-        _aliasedCols: aliasedCols,
         _action: existingRow ? "update" : "create",
         _existingRowId: existingRow?.id || null,
         _existingValues: existingRow?.values || null,
         _templateId: template.id,
         _fieldsUpdated: fieldsUpdated,
         _fieldsSkipped: fieldsSkipped,
-        _rowIndexInGroup: rowIndexInGroup,
+        _colMapping: colMapping,
       };
     });
-
-    // Compute which NEW columns will be added to templates (for display)
-    const templateColsToAdd = {};
-    for (const row of scheduleRows) {
-      if (row._status === "שגיאה" || row._action === "skip") continue;
-      const template = Object.values(templateByName).find(t => t.id === row._templateId);
-      if (!template) continue;
-      const existingColNames = new Set((template.columns || []).map(c => c.name));
-      Object.keys(row._parsedValues || {}).forEach(k => {
-        if (k === "status" || k.startsWith("_")) return;
-        if (!existingColNames.has(k)) {
-          if (!templateColsToAdd[template.name]) templateColsToAdd[template.name] = new Set();
-          templateColsToAdd[template.name].add(k);
-        }
-      });
-    }
-    const templateColsToAddArr = {};
-    Object.entries(templateColsToAdd).forEach(([k, v]) => { templateColsToAddArr[k] = [...v]; });
 
     // Availability rows
     const importWeeks = [...new Set(rawAvail.map(r => r["שבוע"]).filter(Boolean))];
@@ -455,11 +399,17 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       return { ...rawRow, _rowNum: i + 2, _status: errors.length > 0 ? "שגיאה" : "תקין", _errors: errors };
     });
 
-    setPreview({ scheduleRows, availRows, workers, existingAvailabilities, templateColsToAdd: templateColsToAddArr });
+    setPreview({
+      scheduleRows,
+      availRows,
+      workers,
+      existingAvailabilities,
+      globalColDiag: Object.values(globalColDiag),
+    });
     setLoadingPreview(false);
   };
 
-  // Step 3: Apply — only valid/warned rows (not errored), only validated fields
+  // Step 3: Apply
   const handleApply = async () => {
     if (!preview) return;
     setApplying(true);
@@ -467,66 +417,11 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     const { scheduleRows, availRows, workers, existingAvailabilities } = preview;
     const workerNameToId = {};
     workers.forEach(w => { if (w.nickname) workerNameToId[w.nickname] = w.id; });
-    const workerIdSet = new Set(workers.map(w => w.id).filter(Boolean));
 
     let imported = 0, updated = 0, skipped = 0, errors = 0;
     const resultRows = [];
 
-    // ── STEP 0: Sync missing columns into Template.columns ────────────────────
-    // Only add columns that are in parsedValues (already validated)
-    // Never add aliased names like "task" — those are already mapped to "משימה"
-    const templateColumnsNeeded = {};
-    for (const row of scheduleRows) {
-      if (row._status === "שגיאה" || row._action === "skip") continue;
-      if (!templateColumnsNeeded[row._templateId]) templateColumnsNeeded[row._templateId] = new Set();
-      Object.keys(row._parsedValues || {}).forEach(k => {
-        if (k === "status" || k.startsWith("_")) return;
-        templateColumnsNeeded[row._templateId].add(k);
-      });
-    }
-
-    const templateIds = Object.keys(templateColumnsNeeded);
-    if (templateIds.length > 0) {
-      const freshTemplates = (await Promise.all(templateIds.map(id => base44.entities.Template.filter({ id })))).flat();
-      const templateMap = {};
-      freshTemplates.forEach(t => { templateMap[t.id] = t; });
-
-      for (const templateId of templateIds) {
-        const template = templateMap[templateId];
-        if (!template) continue;
-        let existingCols = template.columns || [];
-        const existingColNames = new Set(existingCols.map(c => c.name));
-        const missing = [...templateColumnsNeeded[templateId]].filter(n => !existingColNames.has(n));
-
-        // Fix existing columns that have wrong type (e.g. worker column stored as "text")
-        let colsChanged = false;
-        existingCols = existingCols.map(col => {
-          const shouldBeWorker = isKnownWorkerCol(col.name) || (
-            scheduleRows.some(r => r._parsedValues?.[col.name] && workerIdSet.has(r._parsedValues[col.name]))
-          );
-          if (shouldBeWorker && col.type !== "worker") {
-            colsChanged = true;
-            return { ...col, type: "worker", width: col.width || 150 };
-          }
-          return col;
-        });
-
-        // Add missing columns with correct type inference
-        const newCols = missing.map(name => {
-          const isWorker = isKnownWorkerCol(name) || (
-            scheduleRows.some(r => r._parsedValues?.[name] && workerIdSet.has(r._parsedValues[name]))
-          );
-          return { name, type: isWorker ? "worker" : "text", width: isWorker ? 150 : 120 };
-        });
-
-        if (missing.length > 0 || colsChanged) {
-          await base44.entities.Template.update(templateId, { columns: [...existingCols, ...newCols] });
-        }
-      }
-    }
-    // ── END STEP 0 ────────────────────────────────────────────────────────────
-
-    // Apply schedule rows
+    // Apply schedule rows — NO column creation, NO reordering
     for (const row of scheduleRows) {
       if (row._status === "שגיאה" || row._action === "skip") {
         errors++;
@@ -535,14 +430,15 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       }
 
       if (row._action === "update" && row._existingRowId) {
+        // Merge: existing values first, then overlay only non-empty imported values
+        // Preserve _order from existing
         const preserved = {};
         if (row._existingValues?._order !== undefined) preserved._order = row._existingValues._order;
         const newValues = { ...(row._existingValues || {}), ...row._parsedValues, ...preserved };
         await base44.entities.TemplateRow.update(row._existingRowId, { values: newValues });
         updated++;
         const rejSummary = row._rejectedFields?.length > 0
-          ? ` | נדחו: ${row._rejectedFields.map(r => r.col).join(", ")}`
-          : "";
+          ? ` | נדחו: ${row._rejectedFields.map(r => r.col).join(", ")}` : "";
         resultRows.push({ ...row, _finalStatus: "עודכן", _reason: `עודכנו: ${row._fieldsUpdated.join(", ") || "ללא שינויים"}${rejSummary}` });
       } else {
         const groupId = row._group_id || (Date.now().toString() + Math.random().toString(36).substr(2, 6));
@@ -555,8 +451,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         });
         imported++;
         const rejSummary = row._rejectedFields?.length > 0
-          ? ` | נדחו: ${row._rejectedFields.map(r => r.col).join(", ")}`
-          : "";
+          ? ` | נדחו: ${row._rejectedFields.map(r => r.col).join(", ")}` : "";
         resultRows.push({ ...row, _finalStatus: "יובא", _reason: `שורה חדשה נוצרה${rejSummary}` });
       }
     }
@@ -582,6 +477,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         resultRows.push({ ...row, _type: "avail", _finalStatus: "דולג", _reason: "מזהה עובד לא נמצא" });
         continue;
       }
+
       const existing = existingAvailabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStart);
       if (existing) {
         const shifts = [...(existing.shifts || [])];
@@ -592,11 +488,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         updated++;
         resultRows.push({ ...row, _type: "avail", _finalStatus: "עודכן", _reason: "משמרת זמינות עודכנה" });
       } else {
-        if (!weekStart) {
-          skipped++;
-          resultRows.push({ ...row, _type: "avail", _finalStatus: "דולג", _reason: "חסר תאריך שבוע" });
-          continue;
-        }
+        if (!weekStart) { skipped++; resultRows.push({ ...row, _type: "avail", _finalStatus: "דולג", _reason: "חסר תאריך שבוע" }); continue; }
         await base44.entities.Availability.create({
           worker_id: workerId, worker_name: worker.nickname, week_start_date: weekStart,
           shifts: [{ date, start_time: startTime, end_time: endTime, type: shiftType, priority: 1 }],
@@ -619,8 +511,6 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     setApplying(false);
     setPreview(null);
   };
-
-  // ── UI ──────────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -653,7 +543,6 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           </div>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
             נמצאו {parsedData.rawSchedule.length} שורות לוח משמרות ו-{parsedData.rawAvail.length} שורות זמינות.
-            לחץ על "בדוק ייבוא" לניתוח מפורט לפני האישור.
           </div>
           <Button onClick={handleBuildPreview} disabled={loadingPreview} className="w-full bg-blue-900 hover:bg-blue-800">
             {loadingPreview
@@ -666,10 +555,10 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       {/* Step 2: Preview */}
       {preview && !result && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex gap-2 items-center flex-wrap">
               <span className="font-semibold text-gray-800 text-sm">{fileName}</span>
-              <Badge variant="outline">{preview.scheduleRows.length} שורות לוח</Badge>
+              <Badge variant="outline">{preview.scheduleRows.length} שורות</Badge>
               {preview.scheduleRows.filter(r => r._status === "שגיאה").length > 0 && (
                 <Badge className="bg-red-100 text-red-800">{preview.scheduleRows.filter(r => r._status === "שגיאה").length} שגיאות</Badge>
               )}
@@ -686,89 +575,32 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
             <Button variant="ghost" size="sm" onClick={reset}><X className="w-4 h-4" /></Button>
           </div>
 
-          {/* Aliased columns notice */}
-          {(() => {
-            const allAliased = [...new Set(preview.scheduleRows.flatMap(r => r._aliasedCols || []))];
-            return allAliased.length > 0 ? (
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800 space-y-1">
-                <div className="font-semibold">מיפוי עמודות:</div>
-                {allAliased.map(a => <div key={a} className="text-xs">{a}</div>)}
-              </div>
-            ) : null;
-          })()}
+          {/* Column Diagnostic Panel */}
+          <ColumnDiagPanel colDiag={preview.globalColDiag} open={showColDiag} onToggle={() => setShowColDiag(v => !v)} />
 
-          {/* New columns to be created */}
-          {Object.keys(preview.templateColsToAdd || {}).length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 space-y-1">
-              <div className="font-semibold">עמודות חדשות שייווצרו בתבניות:</div>
-              {Object.entries(preview.templateColsToAdd).map(([tmplName, cols]) => (
-                <div key={tmplName} className="text-xs">
-                  <span className="font-medium">{tmplName}:</span> {cols.join(", ")}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Worker field diagnostics */}
-          {(() => {
-            const allDiag = preview.scheduleRows.flatMap(r => r._workerDiagnostics || []);
-            if (allDiag.length === 0) return null;
-            const unresolved = allDiag.filter(d => d.status === "unresolved");
-            const resolved = allDiag.filter(d => d.status === "resolved");
-            return (
-              <div className={`border rounded-lg p-3 text-sm space-y-1 ${unresolved.length > 0 ? "bg-orange-50 border-orange-200 text-orange-900" : "bg-green-50 border-green-200 text-green-900"}`}>
-                <div className="font-semibold flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  אבחון עמודות עובדים ({resolved.length} פוענחו, {unresolved.length} לא נמצאו):
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs mt-1">
-                    <thead><tr className="border-b">
-                      <th className="text-right py-1 px-1">עמודה</th>
-                      <th className="text-right py-1 px-1">ערך XLSX</th>
-                      <th className="text-right py-1 px-1">מזהה שפוענח</th>
-                      <th className="text-right py-1 px-1">סטטוס</th>
-                    </tr></thead>
-                    <tbody>
-                      {[...new Map(allDiag.map(d => [`${d.col}|${d.rawValue}`, d])).values()].slice(0, 15).map((d, i) => (
-                        <tr key={i} className="border-b border-dashed">
-                          <td className="py-0.5 px-1 font-medium">{d.col}</td>
-                          <td className="py-0.5 px-1">{d.rawValue}</td>
-                          <td className="py-0.5 px-1 font-mono text-xs">{d.resolvedId || "—"}</td>
-                          <td className={`py-0.5 px-1 font-semibold ${d.status === "resolved" ? "text-green-700" : "text-red-600"}`}>
-                            {d.status === "resolved" ? "✓ פוענח" : "✗ לא נמצא"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Rejected fields summary */}
-          {preview.scheduleRows.some(r => (r._rejectedFields || []).length > 0) && (
+          {/* Missing columns warning */}
+          {preview.globalColDiag.some(c => c.action === "missing") && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 space-y-1">
               <div className="font-semibold flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
-                שדות שנדחו (לא קיימים בהגדרות):
+                עמודות שלא נמצאו בתבנית — ידולגו:
               </div>
-              {preview.scheduleRows.flatMap(r => r._rejectedFields || []).slice(0, 10).map((rf, i) => (
-                <div key={i} className="text-xs">{rf.reason}</div>
+              {preview.globalColDiag.filter(c => c.action === "missing").map((c, i) => (
+                <div key={i} className="text-xs">"{c.xlsxHeader}" (נרמול: "{c.normalized}")</div>
               ))}
-              {preview.scheduleRows.flatMap(r => r._rejectedFields || []).length > 10 && (
-                <div className="text-xs text-red-500">...ועוד</div>
-              )}
             </div>
           )}
 
+          {/* Worker diagnostics */}
+          <WorkerDiagPanel rows={preview.scheduleRows} />
+
+          {/* Row preview table */}
           <DiagnosticPreviewTable rows={preview.scheduleRows} />
 
           {preview.scheduleRows.some(r => r._status === "שגיאה") && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 flex gap-2">
               <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              שורות עם שגיאות יידלגו בעת הייבוא. שורות עם אזהרות ייובאו עם השדות התקפים בלבד.
+              שורות עם שגיאות יידלגו. שורות עם אזהרות ייובאו עם השדות התקפים בלבד.
             </div>
           )}
 
@@ -808,7 +640,98 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
   );
 }
 
-/** Full diagnostic preview table for schedule rows */
+// ── Column Diagnostic Panel ────────────────────────────────────────────────────
+function ColumnDiagPanel({ colDiag, open, onToggle }) {
+  if (!colDiag || colDiag.length === 0) return null;
+  const actionLabel = {
+    matched: { label: "✓ מותאם", cls: "text-green-700" },
+    missing: { label: "✗ חסר בתבנית", cls: "text-red-600" },
+  };
+  return (
+    <Card className="border shadow-sm">
+      <button onClick={onToggle} className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+        <span className="flex items-center gap-2"><Info className="w-4 h-4" />אבחון עמודות XLSX ({colDiag.length})</span>
+        {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+      </button>
+      {open && (
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs" dir="rtl">
+              <thead>
+                <tr className="bg-gray-50 border-b">
+                  <th className="px-3 py-2 text-right font-medium text-gray-600">כותרת XLSX</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-600">לאחר נרמול</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-600">עמודה מותאמת</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-600">סוג</th>
+                  <th className="px-3 py-2 text-right font-medium text-gray-600">פעולה</th>
+                </tr>
+              </thead>
+              <tbody>
+                {colDiag.map((c, i) => {
+                  const a = actionLabel[c.action] || { label: c.action, cls: "text-gray-500" };
+                  return (
+                    <tr key={i} className="border-b">
+                      <td className="px-3 py-1.5 font-medium">{c.xlsxHeader}{c.wasAliased ? <span className="text-purple-600 mr-1">(alias)</span> : null}</td>
+                      <td className="px-3 py-1.5 text-gray-500">{c.normalized}</td>
+                      <td className="px-3 py-1.5">{c.action === "matched" ? c.canonical : <span className="text-red-400">—</span>}</td>
+                      <td className="px-3 py-1.5 text-gray-500">{c.matchedType || "—"}</td>
+                      <td className={`px-3 py-1.5 font-semibold ${a.cls}`}>{a.label}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// ── Worker Diagnostic Panel ────────────────────────────────────────────────────
+function WorkerDiagPanel({ rows }) {
+  const allDiag = rows.flatMap(r => r._workerDiagnostics || []);
+  if (allDiag.length === 0) return null;
+  const unresolved = allDiag.filter(d => d.status === "unresolved");
+  const resolved   = allDiag.filter(d => d.status === "resolved");
+  if (resolved.length === 0 && unresolved.length === 0) return null;
+
+  const uniqueDiag = [...new Map(allDiag.map(d => [`${d.col}|${d.rawValue}`, d])).values()];
+  const hasIssue = unresolved.length > 0;
+
+  return (
+    <div className={`border rounded-lg p-3 text-sm space-y-1 ${hasIssue ? "bg-orange-50 border-orange-200 text-orange-900" : "bg-green-50 border-green-200 text-green-900"}`}>
+      <div className="font-semibold flex items-center gap-2">
+        <AlertTriangle className="w-4 h-4" />
+        עמודות עובדים ({resolved.length} פוענחו, {unresolved.length} לא נמצאו):
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs mt-1">
+          <thead><tr className="border-b">
+            <th className="text-right py-1 px-1">עמודה</th>
+            <th className="text-right py-1 px-1">ערך XLSX</th>
+            <th className="text-right py-1 px-1">מזהה</th>
+            <th className="text-right py-1 px-1">סטטוס</th>
+          </tr></thead>
+          <tbody>
+            {uniqueDiag.slice(0, 15).map((d, i) => (
+              <tr key={i} className="border-b border-dashed">
+                <td className="py-0.5 px-1 font-medium">{d.col}</td>
+                <td className="py-0.5 px-1">{d.rawValue}</td>
+                <td className="py-0.5 px-1 font-mono text-xs">{d.resolvedId || "—"}</td>
+                <td className={`py-0.5 px-1 font-semibold ${d.status === "resolved" ? "text-green-700" : "text-red-600"}`}>
+                  {d.status === "resolved" ? "✓" : "✗ לא נמצא"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Row Preview Table ──────────────────────────────────────────────────────────
 function DiagnosticPreviewTable({ rows }) {
   const [expanded, setExpanded] = useState(false);
   const displayRows = expanded ? rows : rows.slice(0, 8);
@@ -816,55 +739,48 @@ function DiagnosticPreviewTable({ rows }) {
   return (
     <Card className="border shadow-sm">
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">תצוגה מקדימה — ניתוח שורות</CardTitle>
+        <CardTitle className="text-sm">ניתוח שורות</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-xs" dir="rtl">
             <thead>
               <tr className="bg-gray-50 border-b">
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">שורה</th>
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">תאריך</th>
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">מוקד</th>
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">סדר</th>
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">פעולה</th>
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">שדות תקינים</th>
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">שדות שנדחו</th>
-                <th className="px-2 py-1.5 text-right font-medium text-gray-600 whitespace-nowrap">סטטוס</th>
+                <th className="px-2 py-1.5 text-right font-medium text-gray-600">שורה</th>
+                <th className="px-2 py-1.5 text-right font-medium text-gray-600">תאריך</th>
+                <th className="px-2 py-1.5 text-right font-medium text-gray-600">מוקד</th>
+                <th className="px-2 py-1.5 text-right font-medium text-gray-600">פעולה</th>
+                <th className="px-2 py-1.5 text-right font-medium text-gray-600">שדות שיעודכנו</th>
+                <th className="px-2 py-1.5 text-right font-medium text-gray-600">הערות</th>
+                <th className="px-2 py-1.5 text-right font-medium text-gray-600">סטטוס</th>
               </tr>
             </thead>
             <tbody>
               {displayRows.map((row, i) => {
                 const actionLabel = row._action === "create" ? "יצירה" : row._action === "update" ? "עדכון" : "דילוג";
                 const actionColor = row._action === "create" ? "text-emerald-700" : row._action === "update" ? "text-blue-700" : "text-gray-400";
-                const rejected = row._rejectedFields || [];
+                const allWarnings = [...(row._errors || []), ...(row._warnings || [])];
                 return (
                   <tr key={i} className="border-b hover:bg-gray-50">
                     <td className="px-2 py-1.5 text-gray-400">{row._rowNum}</td>
                     <td className="px-2 py-1.5 text-gray-700 whitespace-nowrap">{row["תאריך"] || "-"}</td>
                     <td className="px-2 py-1.5 text-gray-700 max-w-[100px] truncate" title={row["מוקד"]}>{row["מוקד"] || "-"}</td>
-                    <td className="px-2 py-1.5 text-gray-500 text-center">{row._order !== undefined && row._order !== "" ? row._order : "-"}</td>
                     <td className={`px-2 py-1.5 font-semibold ${actionColor}`}>{actionLabel}</td>
-                    <td className="px-2 py-1.5 text-gray-600 max-w-[160px]">
+                    <td className="px-2 py-1.5 text-gray-600 max-w-[180px]">
                       {row._status === "שגיאה"
-                        ? <span className="text-red-600">{row._errors.join("; ")}</span>
+                        ? <span className="text-red-600">{row._errors?.join("; ")}</span>
                         : row._fieldsUpdated?.length > 0
                           ? <span className="text-blue-700 truncate block" title={row._fieldsUpdated.join(", ")}>{row._fieldsUpdated.join(", ")}</span>
                           : <span className="text-gray-300">ללא שינויים</span>
                       }
                     </td>
-                    <td className="px-2 py-1.5 max-w-[160px]">
-                      {rejected.length > 0
-                        ? <span className="text-red-600 truncate block" title={rejected.map(r => r.reason).join("; ")}>
-                            {rejected.map(r => r.col).join(", ")}
-                          </span>
-                        : row._warnings?.length > 0
-                          ? <span className="text-orange-600 truncate block" title={row._warnings.join("; ")}>{row._warnings.join("; ")}</span>
-                          : <span className="text-gray-300">-</span>
-                      }
+                    <td className="px-2 py-1.5 max-w-[180px]">
+                      {allWarnings.length > 0
+                        ? <span className="text-orange-600 truncate block text-xs" title={allWarnings.join("; ")}>{allWarnings[0]}</span>
+                        : <span className="text-gray-300">-</span>}
                     </td>
                     <td className="px-2 py-1.5">
-                      <StatusBadge status={row._status} tooltip={[...row._errors, ...(row._warnings || [])].join("; ")} />
+                      <StatusBadge status={row._status} tooltip={allWarnings.join("; ")} />
                     </td>
                   </tr>
                 );
@@ -874,9 +790,7 @@ function DiagnosticPreviewTable({ rows }) {
         </div>
         {rows.length > 8 && (
           <button onClick={() => setExpanded(!expanded)} className="w-full text-xs text-blue-700 py-2 hover:bg-blue-50 border-t flex items-center justify-center gap-1">
-            {expanded
-              ? <><ChevronUp className="w-3 h-3" />הצג פחות</>
-              : <><ChevronDown className="w-3 h-3" />הצג את כל {rows.length} השורות</>}
+            {expanded ? <><ChevronUp className="w-3 h-3" />הצג פחות</> : <><ChevronDown className="w-3 h-3" />הצג את כל {rows.length} השורות</>}
           </button>
         )}
       </CardContent>
@@ -884,7 +798,7 @@ function DiagnosticPreviewTable({ rows }) {
   );
 }
 
-/** Result table after applying import */
+// ── Result Table ───────────────────────────────────────────────────────────────
 function ResultTable({ rows }) {
   const [expanded, setExpanded] = useState(false);
   const displayRows = expanded ? rows : rows.slice(0, 8);
