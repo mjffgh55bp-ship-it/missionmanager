@@ -175,31 +175,23 @@ function DayColumn({ dateStr, shifts, allAvailabilities, workers, myRoles, selec
   );
 }
 
-// ── Tap hint icon ──────────────────────────────────────────────────────────────
-function TapHint({ count, label, labelClass }) {
+// ── Tap hint icon — uses the 3-icon sprite image ──────────────────────────────
+const TAP_IMG = "https://media.base44.com/images/public/68e8a79f232bbd29be8a3e62/ad1520f82_image.png";
+// Image has 3 equal icons side-by-side; we show 1/3 of the width per icon (index 0,1,2)
+function TapIcon({ index }) {
   return (
-    <div className="flex items-center gap-1">
-      <div className="relative inline-flex items-center justify-center w-7 h-8">
-        {/* Finger click SVG */}
-        <svg viewBox="0 0 48 52" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-6 h-7">
-          {/* Rays around fingertip */}
-          <line x1="24" y1="3" x2="24" y2="0" stroke="#374151" strokeWidth="1.8" strokeLinecap="round"/>
-          <line x1="30" y1="4.5" x2="32" y2="2" stroke="#374151" strokeWidth="1.8" strokeLinecap="round"/>
-          <line x1="35" y1="8" x2="38" y2="6" stroke="#374151" strokeWidth="1.8" strokeLinecap="round"/>
-          <line x1="18" y1="4.5" x2="16" y2="2" stroke="#374151" strokeWidth="1.8" strokeLinecap="round"/>
-          <line x1="13" y1="8" x2="10" y2="6" stroke="#374151" strokeWidth="1.8" strokeLinecap="round"/>
-          {/* Finger pointing up */}
-          <rect x="20" y="8" width="8" height="20" rx="4" stroke="#374151" strokeWidth="1.8" fill="none"/>
-          {/* Hand / palm */}
-          <path d="M14 24 C14 22 16 21 18 22 L18 28 C16 28 14 27 14 24Z" stroke="#374151" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
-          <path d="M34 24 C34 22 32 21 30 22 L30 28 C32 28 34 27 34 24Z" stroke="#374151" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
-          <path d="M18 22 L18 36 C18 39 20 40 24 40 C28 40 30 39 30 36 L30 22" stroke="#374151" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
-          {/* Number badge */}
-          <circle cx="36" cy="10" r="7" fill="#1f2937"/>
-          <text x="36" y="13.5" textAnchor="middle" fill="white" fontSize="8" fontWeight="bold">{count}</text>
-        </svg>
-      </div>
-      <span className={labelClass}>{label}</span>
+    <div style={{ width: 20, height: 20, overflow: "hidden", flexShrink: 0, position: "relative" }}>
+      <img
+        src={TAP_IMG}
+        alt=""
+        style={{
+          width: 60,
+          height: 20,
+          objectFit: "cover",
+          objectPosition: `${-index * 20}px 0`,
+          display: "block",
+        }}
+      />
     </div>
   );
 }
@@ -305,11 +297,20 @@ export default function ShiftDemandPanel({
           ) : (
             <>
               {/* Tap infographic */}
-              <div className="flex items-center gap-4 mb-3 text-[10px] text-gray-500 bg-gray-50 rounded-lg px-3 py-2 flex-wrap" dir="rtl">
-                <TapHint count={1} label="רצוי" labelClass="text-green-600 font-semibold" />
-                <TapHint count={2} label="זמין" labelClass="text-cyan-600 font-semibold" />
-                <TapHint count={3} label="לא זמין" labelClass="text-red-600 font-semibold" />
-                {isLimitMode && <span className="text-orange-600 font-semibold">· מלאות חסומות</span>}
+              <div className="flex items-center justify-center gap-4 mb-3 bg-gray-50 rounded-lg px-3 py-1.5 flex-wrap" dir="rtl">
+                <div className="flex items-center gap-1">
+                  <TapIcon index={0} />
+                  <span className="text-[10px] text-green-600 font-semibold">רצוי</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <TapIcon index={1} />
+                  <span className="text-[10px] text-cyan-600 font-semibold">זמין</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <TapIcon index={2} />
+                  <span className="text-[10px] text-red-600 font-semibold">לא זמין</span>
+                </div>
+                {isLimitMode && <span className="text-[10px] text-orange-600 font-semibold">· מלאות חסומות</span>}
               </div>
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {dates.map(date => (
