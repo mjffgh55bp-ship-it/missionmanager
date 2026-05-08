@@ -1411,94 +1411,85 @@ export default function Matrix() {
     <>
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} dir="rtl">
       <div className="max-w-screen-2xl mx-auto">
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b bg-white">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div dir="rtl">
-                <CardTitle className="text-2xl">מטריצת שעות {viewMode === "weekly" ? "שבועית" : "יומית"}</CardTitle>
-                <p className="text-sm text-gray-600 mt-1">גרור קצוות לשינוי גודל, גרור אמצע להזזה, לחץ על עיגול הסוג לשינוי</p>
-                <div className="flex gap-2 mt-2 flex-wrap">
-                  <Badge className="bg-green-100 text-green-800" dir="rtl"><Star className="w-3 h-3 mr-1 fill-current" />רצוי</Badge>
-                  <Badge className="bg-cyan-100 text-cyan-800" dir="rtl"><Check className="w-3 h-3 mr-1" />זמין</Badge>
-                  <Badge className="bg-red-100 text-red-800" dir="rtl"><Ban className="w-3 h-3 mr-1" />לא זמין</Badge>
-                  <Badge className="bg-purple-400 text-white" dir="rtl">שיבוץ (לוח)</Badge>
-                </div>
+        <Card className="border-none shadow-lg mb-3">
+          <CardHeader className="border-b bg-white py-2 px-4">
+            <div className="flex items-center gap-2 flex-wrap" dir="rtl">
+              {/* Title */}
+              <span className="font-bold text-base whitespace-nowrap">מטריצת שעות {viewMode === "weekly" ? "שבועית" : "יומית"}</span>
+              {/* Hint */}
+              <span className="text-xs text-gray-400 hidden lg:inline">גרור קצוות לשינוי גודל, גרור אמצע להזזה, לחץ על עיגול הסוג לשינוי</span>
+              {/* Legend badges */}
+              <div className="flex gap-1 items-center">
+                <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0" dir="rtl"><Star className="w-2.5 h-2.5 mr-0.5 fill-current" />רצוי</Badge>
+                <Badge className="bg-cyan-100 text-cyan-800 text-[10px] px-1.5 py-0" dir="rtl"><Check className="w-2.5 h-2.5 mr-0.5" />זמין</Badge>
+                <Badge className="bg-red-100 text-red-800 text-[10px] px-1.5 py-0" dir="rtl"><Ban className="w-2.5 h-2.5 mr-0.5" />לא זמין</Badge>
+                <Badge className="bg-purple-400 text-white text-[10px] px-1.5 py-0" dir="rtl">שיבוץ (לוח)</Badge>
               </div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <Select value={populationFilter} onValueChange={setPopulationFilter}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="אוכלוסייה" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">כל האוכלוסיות</SelectItem>
-                    {populations.map(pop => (
-                      <SelectItem key={pop} value={pop}>{pop}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="תפקיד" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">כל התפקידים</SelectItem>
-                    {workerRoles.map(role => (
-                      <SelectItem key={role} value={role}>{role}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="סטטוס" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">כל הסטטוסים</SelectItem>
-                    {shiftStatuses.map(status => (
-                      <SelectItem key={status} value={status}>{status}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <div className="flex items-center gap-2 bg-white border rounded-lg px-3 py-1">
-                  <Calendar className="w-4 h-4" />
-                  <span className="text-sm" dir="rtl">יומי</span>
-                  <Switch checked={viewMode === "weekly"} onCheckedChange={(checked) => setViewMode(checked ? "weekly" : "daily")} />
-                  <CalendarDays className="w-4 h-4" />
-                  <span className="text-sm" dir="rtl">שבועי</span>
-                </div>
-                <button
-                  onClick={() => saveSignupMode(signupMode === "allow_over_sign_up" ? "limit_sign_up" : "allow_over_sign_up")}
-                  disabled={savingSignupMode}
-                  title={signupMode === "allow_over_sign_up" ? "מצב: הרשמה חופשית (לחץ לשינוי)" : "מצב: הגבלת הרשמה (לחץ לשינוי)"}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
-                    signupMode === "allow_over_sign_up"
-                      ? "bg-green-50 border-green-300 text-green-800 hover:bg-green-100"
-                      : "bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100"
-                  } ${savingSignupMode ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
-                  dir="rtl"
-                >
-                  {signupMode === "allow_over_sign_up" ? "🟢 הרשמה חופשית" : "🔒 הגבלת הרשמה"}
-                </button>
-                <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronRight className="w-4 h-4" /></Button>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center cursor-pointer hover:bg-blue-800 transition-colors">
-                      {viewMode === "weekly" ? `שבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "d")}` : format(currentDate, "d.M.yyyy")}
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="center">
-                    <CalendarPicker
-                      mode="single"
-                      selected={currentDate}
-                      onSelect={(date) => date && setCurrentDate(date)}
-                    />
-                  </PopoverContent>
-                </Popover>
-                <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronLeft className="w-4 h-4" /></Button>
-                <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
+              {/* Spacer */}
+              <div className="flex-1" />
+              {/* Filters */}
+              <Select value={populationFilter} onValueChange={setPopulationFilter}>
+                <SelectTrigger className="h-7 text-xs w-[130px]">
+                  <SelectValue placeholder="אוכלוסייה" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">כל האוכלוסיות</SelectItem>
+                  {populations.map(pop => <SelectItem key={pop} value={pop}>{pop}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="h-7 text-xs w-[110px]">
+                  <SelectValue placeholder="תפקיד" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">כל התפקידים</SelectItem>
+                  {workerRoles.map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-7 text-xs w-[110px]">
+                  <SelectValue placeholder="סטטוס" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">כל הסטטוסים</SelectItem>
+                  {shiftStatuses.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {/* View toggle */}
+              <div className="flex items-center gap-1 border rounded px-2 py-1 bg-white h-7">
+                <Calendar className="w-3 h-3 text-gray-500" />
+                <span className="text-xs text-gray-600">יומי</span>
+                <Switch checked={viewMode === "weekly"} onCheckedChange={(checked) => setViewMode(checked ? "weekly" : "daily")} className="scale-75" />
+                <CalendarDays className="w-3 h-3 text-gray-500" />
+                <span className="text-xs text-gray-600">שבועי</span>
               </div>
+              {/* Signup mode */}
+              <button
+                onClick={() => saveSignupMode(signupMode === "allow_over_sign_up" ? "limit_sign_up" : "allow_over_sign_up")}
+                disabled={savingSignupMode}
+                title={signupMode === "allow_over_sign_up" ? "הרשמה חופשית" : "הגבלת הרשמה"}
+                className={`flex items-center gap-1 px-2 py-1 rounded border text-xs font-medium h-7 transition-colors ${
+                  signupMode === "allow_over_sign_up"
+                    ? "bg-green-50 border-green-300 text-green-800 hover:bg-green-100"
+                    : "bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100"
+                } ${savingSignupMode ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
+              >
+                {signupMode === "allow_over_sign_up" ? "🟢 הרשמה חופשית" : "🔒 הגבלת הרשמה"}
+              </button>
+              {/* Date nav */}
+              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCurrentDate(subDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronRight className="w-3 h-3" /></Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <div className="px-3 py-1 bg-blue-900 text-white rounded font-semibold text-xs min-w-[120px] text-center cursor-pointer hover:bg-blue-800 transition-colors h-7 flex items-center justify-center">
+                    {viewMode === "weekly" ? `שבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "d")}` : format(currentDate, "d.M.yyyy")}
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="center">
+                  <CalendarPicker mode="single" selected={currentDate} onSelect={(date) => date && setCurrentDate(date)} />
+                </PopoverContent>
+              </Popover>
+              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCurrentDate(addDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronLeft className="w-3 h-3" /></Button>
+              <Button variant="outline" className="h-7 text-xs px-2" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
             </div>
           </CardHeader>
         </Card>
