@@ -841,10 +841,12 @@ END:VEVENT
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 md:p-4">
       <div className="max-w-7xl mx-auto">
 
-        {/* ── Top bar: title + week nav + status badge ── */}
+        {/* ── Top bar: greeting + week nav + status badge ── */}
         <div className="flex items-center justify-between mb-3 px-1" dir="rtl">
           <div>
-            <h1 className="text-lg font-bold text-gray-900">זמינות שבועית</h1>
+            <h1 className="text-lg font-bold text-gray-900">
+              {currentWorker ? `שלום, ${currentWorker.nickname}!` : "שלום!"}
+            </h1>
             <p className="text-xs text-gray-500">
               {formatDateHebrew(weekStart)} – {formatDateHebrew(addDays(weekStart, 6))}
               <span className="text-gray-400 mr-1">({formatHebrewDate(weekStart)})</span>

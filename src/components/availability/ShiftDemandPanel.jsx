@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+
 import { ChevronDown, ChevronUp, Users, Star, Check, Ban, Lock } from "lucide-react";
 import { format, addDays } from "date-fns";
 import {
@@ -175,6 +175,24 @@ function DayColumn({ dateStr, shifts, allAvailabilities, workers, myRoles, selec
   );
 }
 
+// ── Tap hint icon ──────────────────────────────────────────────────────────────
+function TapHint({ count, label, labelClass }) {
+  return (
+    <div className="flex items-center gap-1">
+      <div className="relative inline-flex items-center justify-center w-7 h-7">
+        {/* Finger SVG */}
+        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-6 h-6">
+          <path d="M20 30 C20 30 10 22 10 15 C10 10 14 7 17 8 C18 8 19 9 20 10 C21 9 22 8 23 8 C26 7 30 10 30 15 C30 22 20 30 20 30Z" stroke="#374151" strokeWidth="1.5" fill="none"/>
+          <line x1="20" y1="10" x2="20" y2="5" stroke="#374151" strokeWidth="1.5" strokeLinecap="round"/>
+          <circle cx="28" cy="5" r="6" fill="#1f2937" />
+          <text x="28" y="8" textAnchor="middle" fill="white" fontSize="7" fontWeight="bold">{count}</text>
+        </svg>
+      </div>
+      <span className={labelClass}>{label}</span>
+    </div>
+  );
+}
+
 // ── Main Panel ─────────────────────────────────────────────────────────────────
 export default function ShiftDemandPanel({
   templateRows,
@@ -242,20 +260,12 @@ export default function ShiftDemandPanel({
               בחר משמרות
             </CardTitle>
             {isLocked && (
-              <Badge className="bg-red-100 text-red-800 text-xs">
-                <Lock className="w-3 h-3 mr-1" />זמינות נעולה
-              </Badge>
+              <span className="text-xs text-red-600 font-medium flex items-center gap-1">
+                <Lock className="w-3 h-3" />זמינות נעולה
+              </span>
             )}
-            {isLimitMode ? (
-              <Badge className="bg-orange-100 text-orange-800 text-xs">הגבלת הרשמה</Badge>
-            ) : (
-              <Badge className="bg-green-100 text-green-800 text-xs">הרשמה חופשית</Badge>
-            )}
-            {(wantedCount > 0 || availableCount > 0) && (
-              <div className="flex gap-1">
-                {wantedCount > 0 && <Badge className="bg-green-500 text-white text-xs">{wantedCount} רצוי</Badge>}
-                {availableCount > 0 && <Badge className="bg-cyan-500 text-white text-xs">{availableCount} זמין</Badge>}
-              </div>
+            {isLimitMode && (
+              <span className="text-xs text-orange-600 font-medium">הגבלת הרשמה</span>
             )}
           </div>
           {collapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
@@ -268,27 +278,11 @@ export default function ShiftDemandPanel({
           ) : (
             <>
               {/* Tap infographic */}
-              <div className="flex items-center gap-3 mb-3 text-[10px] text-gray-500 bg-gray-50 rounded-lg px-3 py-2" dir="rtl">
-                <div className="flex items-center gap-1">
-                  <span className="text-base">👆</span>
-                  <span className="text-green-600 font-semibold">רצוי</span>
-                </div>
-                <span className="text-gray-300">·</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-base">👆👆</span>
-                  <span className="text-cyan-600 font-semibold">זמין</span>
-                </div>
-                <span className="text-gray-300">·</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-base">👆👆👆</span>
-                  <span className="text-red-600 font-semibold">לא זמין</span>
-                </div>
-                <span className="text-gray-300">·</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-base">👆👆👆👆</span>
-                  <span>ביטול</span>
-                </div>
-                {isLimitMode && <><span className="text-gray-300">·</span><span className="text-orange-600 font-semibold">מלאות חסומות</span></>}
+              <div className="flex items-center gap-4 mb-3 text-[10px] text-gray-500 bg-gray-50 rounded-lg px-3 py-2 flex-wrap" dir="rtl">
+                <TapHint count={1} label="רצוי" labelClass="text-green-600 font-semibold" />
+                <TapHint count={2} label="זמין" labelClass="text-cyan-600 font-semibold" />
+                <TapHint count={3} label="לא זמין" labelClass="text-red-600 font-semibold" />
+                {isLimitMode && <span className="text-orange-600 font-semibold">· מלאות חסומות</span>}
               </div>
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {dates.map(date => (

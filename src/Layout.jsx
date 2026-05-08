@@ -13,8 +13,8 @@ const managerNavigationItems = [
   { title: "דוחות", url: createPageUrl("Reports"), icon: BarChart3 },
   { title: "תקופתית", url: createPageUrl("Yearly"), icon: CalendarDays },
   { title: "מחשבון משמרות", url: createPageUrl("ShiftMaster"), icon: Calculator },
-  { title: "הגדרות", url: createPageUrl("Settings"), icon: Settings },
   { title: "העברת נתונים", url: createPageUrl("DataTransfer"), icon: ShieldCheck },
+  { title: "הגדרות", url: createPageUrl("Settings"), icon: Settings },
 ];
 
 const userNavigationItems = [
