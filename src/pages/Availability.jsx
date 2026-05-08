@@ -182,27 +182,6 @@ export default function Availability() {
       await loadDynamicData(worker, user);
     }
 
-    // Auto-cleanup: silently remove denylist entries from AppSettings on every load
-    const hasDenylistInReg = openReg.some(reg => {
-      const regName = reg?.name || (typeof reg === 'string' ? reg : '');
-      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
-      return STALE_REG_DENYLIST_STATIC.some(d => regName.includes(d) || regKey.includes(d));
-    });
-    if (hasDenylistInReg) {
-      const cleanedReg = openReg.filter(reg => {
-        const regName = reg?.name || (typeof reg === 'string' ? reg : '');
-        const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
-        return !STALE_REG_DENYLIST_STATIC.some(d => regName.includes(d) || regKey.includes(d));
-      });
-      const openRegSettingsArr = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
-      if (openRegSettingsArr.length > 0) {
-        await base44.entities.AppSettings.update(openRegSettingsArr[0].id, {
-          setting_value: JSON.stringify(cleanedReg)
-        });
-      }
-      setOpenRegistrations(cleanedReg);
-    }
-
     console.timeEnd("Availability load");
   };
 
@@ -212,7 +191,7 @@ export default function Availability() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
-    // Batch 1: availability + unavailability (max 2 concurrent)
+    // Batch 1: availability + unavailability + open_registrations (always reload from DB)
     const [availabilities, unavailabilitiesData] = await Promise.all([
       base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
       base44.entities.Unavailability.filter({ worker_id: worker.id }),
@@ -243,11 +222,15 @@ export default function Availability() {
       base44.entities.Availability.filter({ week_start_date: weekStartStr }),
     ]);
 
-    // Batch 3: sous/additional assignments + template rows (max 2 concurrent)
-    const [sousAssignments, templateRowsData] = await Promise.all([
+    // Batch 3: sous/additional assignments + week-scoped template rows
+    // Fetch template rows for every day in the selected week to ensure accuracy
+    const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(new Date(weekStartStr), i), "yyyy-MM-dd"));
+    const [sousAssignments, ...weekTemplateRowArrays] = await Promise.all([
       base44.entities.Assignment.filter({ sous_chef_id: worker.id }),
-      base44.entities.TemplateRow.list("-date", 200),
+      ...weekDates.map(date => base44.entities.TemplateRow.filter({ date })),
     ]);
+
+    const templateRowsData = weekTemplateRowArrays.flat();
 
     const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
 
@@ -256,6 +239,64 @@ export default function Availability() {
     setTemplateRows(templateRowsData);
     setAllTemplates(templatesData);
     setWeekAvailabilities(weekAvailsData);
+
+    // Reload open_registrations fresh from DB on every week load, then auto-clean stale entries
+    const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
+    const freshOpenReg = openRegSettings.length > 0
+      ? (() => { try { return JSON.parse(openRegSettings[0].setting_value); } catch { return []; } })()
+      : [];
+
+    // Build valid group keys from the just-loaded templateRowsData (week-scoped)
+    const validGroupKeys = new Set(
+      templateRowsData.map(row => `${row.template_id}_${row.group_id || 'default'}`)
+    );
+
+    // Partition into valid and stale
+    const validRegs = freshOpenReg.filter(reg => {
+      const regName = reg?.name || (typeof reg === 'string' ? reg : '');
+      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
+      const regShifts = reg?.shifts || [];
+      if (STALE_REG_DENYLIST_STATIC.some(d => regName.includes(d) || regKey.includes(d))) return false;
+      if (regShifts.length === 0) return false;
+      if (!validGroupKeys.has(regKey)) return false;
+      return true;
+    });
+    const staleRegs = freshOpenReg.filter(reg => !validRegs.includes(reg));
+
+    setOpenRegistrations(freshOpenReg); // keep full list; validOpenRegistrations memo will filter
+
+    // Auto-clean stale entries from DB silently
+    if (staleRegs.length > 0 && openRegSettings.length > 0) {
+      await base44.entities.AppSettings.update(openRegSettings[0].id, {
+        setting_value: JSON.stringify(validRegs)
+      });
+      setOpenRegistrations(validRegs);
+
+      // Also clean extra_tasks keys from this worker's current availability
+      if (availabilities.length > 0) {
+        const avail = availabilities[0];
+        const tasks = avail.extra_tasks || {};
+        const staleTaskKeys = new Set();
+        staleRegs.forEach(reg => {
+          const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
+          (reg?.shifts || []).forEach((_, si) => staleTaskKeys.add(`${regKey}__${si}`));
+          staleTaskKeys.add(regKey);
+        });
+        STALE_REG_DENYLIST_STATIC.forEach(d => {
+          Object.keys(tasks).forEach(k => { if (k.includes(d)) staleTaskKeys.add(k); });
+        });
+        const keysToRemove = Object.keys(tasks).filter(k => {
+          const baseKey = k.split('__')[0];
+          return staleTaskKeys.has(k) || !validGroupKeys.has(baseKey);
+        });
+        if (keysToRemove.length > 0) {
+          const cleanedTasks = { ...tasks };
+          keysToRemove.forEach(k => delete cleanedTasks[k]);
+          await base44.entities.Availability.update(avail.id, { extra_tasks: cleanedTasks });
+          setExtraTaskStates(cleanedTasks);
+        }
+      }
+    }
   };
 
   // Legacy alias for components that call loadData()
@@ -727,13 +768,10 @@ END:VEVENT
     return keys;
   }, [templateRows, weekStart]);
 
-  // A registration is valid only if:
-  // 1. Its name is NOT in the denylist
-  // 2. Its key maps to an existing TemplateRow group in the selected week
-  // 3. It has shifts defined
-  // 4. Its date is inside the selected week (or no date set)
+  // A registration is valid only if its key maps to a real TemplateRow group in this week,
+  // it has shifts, its date is in the week, and its name is not denylisted.
+  // Note: loadDynamicData already cleans stale entries from DB — this is a safe UI-layer guard.
   const validOpenRegistrations = useMemo(() => {
-    if (templateRows.length === 0) return []; // not loaded yet — show nothing until data is ready
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
     return openRegistrations.filter(reg => {
@@ -741,18 +779,13 @@ END:VEVENT
       const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
       const regDate = reg?.date || null;
       const regShifts = reg?.shifts || [];
-
-      // 1. Denylist check
       if (STALE_REG_DENYLIST.some(d => regName.includes(d) || regKey.includes(d))) return false;
-      // 2. Must have shifts
       if (regShifts.length === 0) return false;
-      // 3. Date must be inside current week (if date is set)
       if (regDate && (regDate < weekStartStr || regDate > weekEndStr)) return false;
-      // 4. Key must map to an existing TemplateRow group in this week
       if (!activeGroupKeys.has(regKey)) return false;
       return true;
     });
-  }, [openRegistrations, activeGroupKeys, templateRows, weekStart]);
+  }, [openRegistrations, activeGroupKeys, weekStart]);
 
   // Compute stale keys for cleanup (inverse of valid)
   const staleRegistrations = useMemo(() => {

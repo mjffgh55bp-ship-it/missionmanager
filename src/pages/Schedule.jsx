@@ -631,6 +631,15 @@ export default function Schedule() {
                                   for (const row of templateRowsForTemplate) {
                                     await base44.entities.TemplateRow.delete(row.id);
                                   }
+                                  // Remove this group's key from open_registrations so it doesn't leave phantoms in Availability
+                                  const updatedRegs = openRegistrations.filter(r => r && r.key !== group.key);
+                                  if (updatedRegs.length !== openRegistrations.length) {
+                                    setOpenRegistrations(updatedRegs);
+                                    const regSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
+                                    const regData = { setting_key: "open_registrations", setting_value: JSON.stringify(updatedRegs) };
+                                    if (regSettings.length > 0) await base44.entities.AppSettings.update(regSettings[0].id, regData);
+                                    else await base44.entities.AppSettings.create(regData);
+                                  }
                                   loadData();
                                 }
                               }} dir="rtl">
