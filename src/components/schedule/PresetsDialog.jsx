@@ -21,6 +21,7 @@ const DEFAULT_COLUMNS = [
 const COLUMN_TYPE_OPTIONS = [
   { value: "time", label: "זמן" },
   { value: "worker", label: "איש צוות" },
+  { value: "task", label: "משימה" },
   { value: "text", label: "טקסט" },
 ];
 
@@ -79,6 +80,8 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
       columnToAdd = { name: "סיום", type: "time", width: 100 };
     } else if (newColumnName === "worker_member") {
       columnToAdd = { name: newColumnRole, type: "worker", width: 150, role_filter: newColumnRole };
+    } else if (newColumnName === "task") {
+      columnToAdd = { name: "משימה", type: "task", width: 120 };
     } else {
       columnToAdd = { name: newColumnName, type: "text", width: 120 };
     }
@@ -405,6 +408,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                   <SelectItem key={t} value={t}>{t}</SelectItem>
                 ))}
                 <SelectItem value="worker_member">חבר צוות</SelectItem>
+                <SelectItem value="task">משימה</SelectItem>
               </SelectContent>
             </Select>
           </div>
