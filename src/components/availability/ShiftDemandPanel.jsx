@@ -50,7 +50,7 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   const isSignedAvailable = currentType === "available";
   const isSignedUnavailable = currentType === "unavailable";
 
-  let chipClass = "border-2 rounded-lg px-1.5 py-1.5 sm:px-2 sm:py-2 text-xs text-center transition-all select-none w-full ";
+  let chipClass = "border rounded-md px-1 py-1 text-xs text-center transition-all select-none w-full ";
   if (isSignedWanted) {
     chipClass += "bg-green-500 text-white border-green-600 cursor-pointer";
   } else if (isSignedAvailable) {
@@ -217,6 +217,7 @@ export default function ShiftDemandPanel({
   onSignup,
   canEdit,
   isLocked,
+  onAddConstraint,
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -248,6 +249,9 @@ export default function ShiftDemandPanel({
 
   const byDate = {};
   weekDemand.forEach(s => {
+    // Skip Saturday (day 6)
+    const dayOfWeek = new Date(s.date + "T00:00:00").getDay();
+    if (dayOfWeek === 6) return;
     if (!byDate[s.date]) byDate[s.date] = [];
     byDate[s.date].push(s);
   });
@@ -259,31 +263,43 @@ export default function ShiftDemandPanel({
   const isLimitMode = signupMode === "limit_sign_up";
 
   return (
-    <Card className="border-none shadow-lg mb-4">
-      <CardHeader className="border-b bg-white py-3 px-4">
-        <button
-          className="w-full flex items-center justify-between"
-          onClick={() => setCollapsed(v => !v)}
-        >
-          <div className="flex items-center gap-2" dir="rtl">
+    <Card className={`border-none shadow-lg mb-4 ${isLocked ? "opacity-60" : ""}`}>
+      <CardHeader className="border-b bg-white py-2 px-4">
+        <div className="flex items-center justify-between" dir="rtl">
+          <button
+            className="flex items-center gap-2 flex-1"
+            onClick={() => setCollapsed(v => !v)}
+          >
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-4 h-4 text-blue-600" />
               בחר משמרות
             </CardTitle>
-            {isLocked && (
-              <span className="text-xs text-red-600 font-medium flex items-center gap-1">
-                <Lock className="w-3 h-3" />זמינות נעולה
-              </span>
-            )}
+            {isLocked && <Lock className="w-3.5 h-3.5 text-red-500" />}
             {isLimitMode && (
               <span className="text-xs text-orange-600 font-medium">הגבלת הרשמה</span>
             )}
-          </div>
-          {collapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
-        </button>
+            {collapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
+          </button>
+          {onAddConstraint && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onAddConstraint(); }}
+              title="הוסף אילוץ"
+              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 transition-colors"
+            >
+              <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
+                <rect x="2" y="4" width="16" height="13" rx="2" stroke="#dc2626" strokeWidth="1.5"/>
+                <line x1="2" y1="8" x2="18" y2="8" stroke="#dc2626" strokeWidth="1.5"/>
+                <line x1="6" y1="2" x2="6" y2="6" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
+                <line x1="14" y1="2" x2="14" y2="6" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
+                <line x1="7.5" y1="11.5" x2="12.5" y2="16.5" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
+                <line x1="12.5" y1="11.5" x2="7.5" y2="16.5" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
       </CardHeader>
       {!collapsed && (
-        <CardContent className="py-4 px-4" dir="rtl">
+        <CardContent className="py-3 px-4" dir="rtl">
           {weekDemand.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-4">אין משמרות שהוגדרו בלוח לשבוע זה</p>
           ) : (

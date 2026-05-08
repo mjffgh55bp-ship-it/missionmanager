@@ -874,49 +874,6 @@ END:VEVENT
           </div>
         </div>
 
-        {/* ── Tips banner (collapsed to 1 line unless editing) ── */}
-        {(tipsMessage || isManager) && (
-          <Card className="border-none shadow-sm mb-3">
-            <CardContent className="py-2 px-4">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                <div className="flex-1 min-w-0">
-                  {editingTips ? (
-                    <div className="space-y-2">
-                      <Textarea value={tipsEditValue} onChange={e => setTipsEditValue(e.target.value)} rows={4} dir="rtl" className="text-sm" placeholder="הכנס הודעה לעובדים..." />
-                      <div className="flex items-center gap-2 justify-end" dir="rtl">
-                        <Label className="text-xs text-gray-600">פופ-אפ שדורש אישור</Label>
-                        <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
-                      </div>
-                      <div className="flex gap-2 justify-end">
-                        <Button size="sm" variant="outline" onClick={() => setEditingTips(false)} dir="rtl">ביטול</Button>
-                        <Button size="sm" className="bg-blue-900 hover:bg-blue-800" dir="rtl" onClick={async () => {
-                          const weekStartStr3 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
-                          const key = `availability_tips_${weekStartStr3}`;
-                          const existing = await base44.entities.AppSettings.filter({ setting_key: key });
-                          const data = { setting_key: key, setting_value: JSON.stringify({ message: tipsEditValue, showAsPopup: showTipsAsPopup }) };
-                          if (existing.length > 0) await base44.entities.AppSettings.update(existing[0].id, data);
-                          else await base44.entities.AppSettings.create(data);
-                          setTipsMessage(tipsEditValue);
-                          setEditingTips(false);
-                        }}>שמור</Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-gray-600 truncate" dir="rtl">{tipsMessage || <span className="text-gray-400">לא הוגדרה הודעה</span>}</p>
-                      {isManager && (
-                        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs shrink-0" onClick={() => { setTipsEditValue(tipsMessage); setEditingTips(true); }} dir="rtl">
-                          <Pencil className="w-3 h-3" />
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {!currentWorker ? (
           <Card className="border-none shadow-lg">
@@ -929,8 +886,8 @@ END:VEVENT
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4" dir="rtl">
 
-            {/* ── RIGHT COLUMN: calendar — shown first on mobile via order ── */}
-            <div className="order-first lg:order-last">
+            {/* ── RIGHT COLUMN: calendar + tips — shown first on mobile via order ── */}
+            <div className="order-first lg:order-last space-y-3">
               <Card className="border-none shadow-sm lg:sticky lg:top-4">
                 <CardHeader className="border-b bg-white py-2 px-3">
                   <div className="flex items-center justify-between">
@@ -984,6 +941,50 @@ END:VEVENT
                   </div>
                 </CardContent>
               </Card>
+
+              {/* ── Tips banner (moved below calendar) ── */}
+              {(tipsMessage || isManager) && (
+                <Card className="border-none shadow-sm">
+                  <CardContent className="py-2 px-4">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        {editingTips ? (
+                          <div className="space-y-2">
+                            <Textarea value={tipsEditValue} onChange={e => setTipsEditValue(e.target.value)} rows={4} dir="rtl" className="text-sm" placeholder="הכנס הודעה לעובדים..." />
+                            <div className="flex items-center gap-2 justify-end" dir="rtl">
+                              <Label className="text-xs text-gray-600">פופ-אפ שדורש אישור</Label>
+                              <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                              <Button size="sm" variant="outline" onClick={() => setEditingTips(false)} dir="rtl">ביטול</Button>
+                              <Button size="sm" className="bg-blue-900 hover:bg-blue-800" dir="rtl" onClick={async () => {
+                                const weekStartStr3 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
+                                const key = `availability_tips_${weekStartStr3}`;
+                                const existing = await base44.entities.AppSettings.filter({ setting_key: key });
+                                const data = { setting_key: key, setting_value: JSON.stringify({ message: tipsEditValue, showAsPopup: showTipsAsPopup }) };
+                                if (existing.length > 0) await base44.entities.AppSettings.update(existing[0].id, data);
+                                else await base44.entities.AppSettings.create(data);
+                                setTipsMessage(tipsEditValue);
+                                setEditingTips(false);
+                              }}>שמור</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs text-gray-600 truncate" dir="rtl">{tipsMessage || <span className="text-gray-400">לא הוגדרה הודעה</span>}</p>
+                            {isManager && (
+                              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs shrink-0" onClick={() => { setTipsEditValue(tipsMessage); setEditingTips(true); }} dir="rtl">
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* ── LEFT COLUMN: registration functions ── */}
@@ -1033,6 +1034,7 @@ END:VEVENT
                 onSignup={handleDemandSignup}
                 canEdit={canEdit && !currentWorker?.availability_locked}
                 isLocked={!!currentWorker?.availability_locked}
+                onAddConstraint={() => setShowUnavailabilityDialog(true)}
               />
 
               {/* Extra Tasks */}
