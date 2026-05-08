@@ -179,13 +179,24 @@ function DayColumn({ dateStr, shifts, allAvailabilities, workers, myRoles, selec
 function TapHint({ count, label, labelClass }) {
   return (
     <div className="flex items-center gap-1">
-      <div className="relative inline-flex items-center justify-center w-7 h-7">
-        {/* Finger SVG */}
-        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-6 h-6">
-          <path d="M20 30 C20 30 10 22 10 15 C10 10 14 7 17 8 C18 8 19 9 20 10 C21 9 22 8 23 8 C26 7 30 10 30 15 C30 22 20 30 20 30Z" stroke="#374151" strokeWidth="1.5" fill="none"/>
-          <line x1="20" y1="10" x2="20" y2="5" stroke="#374151" strokeWidth="1.5" strokeLinecap="round"/>
-          <circle cx="28" cy="5" r="6" fill="#1f2937" />
-          <text x="28" y="8" textAnchor="middle" fill="white" fontSize="7" fontWeight="bold">{count}</text>
+      <div className="relative inline-flex items-center justify-center w-7 h-8">
+        {/* Finger click SVG */}
+        <svg viewBox="0 0 48 52" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-6 h-7">
+          {/* Rays around fingertip */}
+          <line x1="24" y1="3" x2="24" y2="0" stroke="#374151" strokeWidth="1.8" strokeLinecap="round"/>
+          <line x1="30" y1="4.5" x2="32" y2="2" stroke="#374151" strokeWidth="1.8" strokeLinecap="round"/>
+          <line x1="35" y1="8" x2="38" y2="6" stroke="#374151" strokeWidth="1.8" strokeLinecap="round"/>
+          <line x1="18" y1="4.5" x2="16" y2="2" stroke="#374151" strokeWidth="1.8" strokeLinecap="round"/>
+          <line x1="13" y1="8" x2="10" y2="6" stroke="#374151" strokeWidth="1.8" strokeLinecap="round"/>
+          {/* Finger pointing up */}
+          <rect x="20" y="8" width="8" height="20" rx="4" stroke="#374151" strokeWidth="1.8" fill="none"/>
+          {/* Hand / palm */}
+          <path d="M14 24 C14 22 16 21 18 22 L18 28 C16 28 14 27 14 24Z" stroke="#374151" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+          <path d="M34 24 C34 22 32 21 30 22 L30 28 C32 28 34 27 34 24Z" stroke="#374151" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+          <path d="M18 22 L18 36 C18 39 20 40 24 40 C28 40 30 39 30 36 L30 22" stroke="#374151" strokeWidth="1.8" fill="none" strokeLinejoin="round"/>
+          {/* Number badge */}
+          <circle cx="36" cy="10" r="7" fill="#1f2937"/>
+          <text x="36" y="13.5" textAnchor="middle" fill="white" fontSize="8" fontWeight="bold">{count}</text>
         </svg>
       </div>
       <span className={labelClass}>{label}</span>
