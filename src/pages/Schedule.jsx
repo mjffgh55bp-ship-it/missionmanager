@@ -78,11 +78,13 @@ export default function Schedule() {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       lastWeekStart.current = weekStartStr;
-      staticDataLoaded.current = true;
       loadAllData();
       return;
     }
     
+    // Guard: don't run daily load until initial load is complete
+    if (!staticDataLoaded.current) return;
+
     localStorage.setItem('schedule_last_date', format(currentDate, 'yyyy-MM-dd'));
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
