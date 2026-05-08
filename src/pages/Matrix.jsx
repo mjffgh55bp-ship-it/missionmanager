@@ -150,10 +150,6 @@ export default function Matrix() {
     loadDynamicData(false);
   }, [currentDate, viewMode]);
 
-  // Keep a ref to debouncedLoadData so subscriptions always call the latest version
-  const debouncedLoadDataRef = useRef(null);
-  debouncedLoadDataRef.current = debouncedLoadData;
-
   // Real-time subscriptions — register once on mount only
   useEffect(() => {
     const unsubAssignment = base44.entities.Assignment.subscribe(() => {
@@ -285,6 +281,10 @@ export default function Matrix() {
       loadDynamicData(silent);
     }, 300);
   };
+
+  // Keep a ref to debouncedLoadData so subscriptions always call the latest version
+  const debouncedLoadDataRef = useRef(null);
+  debouncedLoadDataRef.current = debouncedLoadData;
 
   const dateString = format(currentDate, "yyyy-MM-dd");
   const weekStartDate = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
