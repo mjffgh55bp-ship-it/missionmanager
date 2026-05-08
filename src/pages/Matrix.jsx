@@ -141,6 +141,8 @@ export default function Matrix() {
   const [trackerEntries, setTrackerEntries] = useState([]);
   const [signupMode, setSignupMode] = useState("allow_over_sign_up");
   const [savingSignupMode, setSavingSignupMode] = useState(false);
+  // Cache settings record IDs to avoid extra filter() calls during save
+  const settingsIdCache = useRef({});
 
   // Load static data once on mount
   useEffect(() => { loadStaticData(); }, []);
@@ -193,6 +195,8 @@ export default function Matrix() {
       setSummaryColumns(parseSetting("matrix_summary_columns") || []);
       setScheduleParams(parseSetting("custom_schedule_params") || []);
       setSignupMode(parseSetting("availability_signup_mode") || "allow_over_sign_up");
+      // Cache setting record IDs for use in save functions (avoids extra filter() calls)
+      allSettings.forEach(s => { settingsIdCache.current[s.setting_key] = s.id; });
       setTrackers(trackersData);
       setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
     } catch (error) {
@@ -1072,22 +1076,24 @@ export default function Matrix() {
 
   const saveSignupMode = async (newMode) => {
     setSavingSignupMode(true);
-    const existing = await base44.entities.AppSettings.filter({ setting_key: "availability_signup_mode" });
-    if (existing.length > 0) {
-      await base44.entities.AppSettings.update(existing[0].id, { setting_value: JSON.stringify(newMode) });
+    const existingId = settingsIdCache.current["availability_signup_mode"];
+    if (existingId) {
+      await base44.entities.AppSettings.update(existingId, { setting_value: JSON.stringify(newMode) });
     } else {
-      await base44.entities.AppSettings.create({ setting_key: "availability_signup_mode", setting_value: JSON.stringify(newMode) });
+      const created = await base44.entities.AppSettings.create({ setting_key: "availability_signup_mode", setting_value: JSON.stringify(newMode) });
+      settingsIdCache.current["availability_signup_mode"] = created.id;
     }
     setSignupMode(newMode);
     setSavingSignupMode(false);
   };
 
   const saveSummaryColumns = async (cols) => {
-    const existing = await base44.entities.AppSettings.filter({ setting_key: 'matrix_summary_columns' });
-    if (existing.length > 0) {
-      await base44.entities.AppSettings.update(existing[0].id, { setting_value: JSON.stringify(cols) });
+    const existingId = settingsIdCache.current["matrix_summary_columns"];
+    if (existingId) {
+      await base44.entities.AppSettings.update(existingId, { setting_value: JSON.stringify(cols) });
     } else {
-      await base44.entities.AppSettings.create({ setting_key: 'matrix_summary_columns', setting_value: JSON.stringify(cols) });
+      const created = await base44.entities.AppSettings.create({ setting_key: 'matrix_summary_columns', setting_value: JSON.stringify(cols) });
+      settingsIdCache.current["matrix_summary_columns"] = created.id;
     }
     setSummaryColumns(cols);
   };
