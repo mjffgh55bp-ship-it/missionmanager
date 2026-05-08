@@ -177,22 +177,24 @@ function DayColumn({ dateStr, shifts, allAvailabilities, workers, myRoles, selec
 
 // ── Tap hint icon — uses the 3-icon sprite image ──────────────────────────────
 const TAP_IMG = "https://media.base44.com/images/public/68e8a79f232bbd29be8a3e62/ad1520f82_image.png";
-// Image has 3 equal icons side-by-side; we show 1/3 of the width per icon (index 0,1,2)
+// Image is 3 icons side-by-side (each ~33.33% width). We use background-size/position to crop each.
 function TapIcon({ index }) {
+  // Container is 22x22px. background-size: 300% 100% means full image is 3x the container width.
+  // background-position: 0%/50%/100% left for icon 0/1/2.
+  const positions = ["0% 50%", "50% 50%", "100% 50%"];
   return (
-    <div style={{ width: 20, height: 20, overflow: "hidden", flexShrink: 0, position: "relative" }}>
-      <img
-        src={TAP_IMG}
-        alt=""
-        style={{
-          width: 60,
-          height: 20,
-          objectFit: "cover",
-          objectPosition: `${-index * 20}px 0`,
-          display: "block",
-        }}
-      />
-    </div>
+    <div
+      style={{
+        width: 22,
+        height: 22,
+        flexShrink: 0,
+        backgroundImage: `url(${TAP_IMG})`,
+        backgroundSize: "300% 100%",
+        backgroundPosition: positions[index],
+        backgroundRepeat: "no-repeat",
+        imageRendering: "crisp-edges",
+      }}
+    />
   );
 }
 
@@ -297,19 +299,20 @@ export default function ShiftDemandPanel({
           ) : (
             <>
               {/* Tap infographic */}
-              <div className="flex items-center justify-center gap-4 mb-3 bg-gray-50 rounded-lg px-3 py-1.5 flex-wrap" dir="rtl">
-                <div className="flex items-center gap-1">
-                  <TapIcon index={0} />
-                  <span className="text-[10px] text-green-600 font-semibold">רצוי</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <TapIcon index={1} />
-                  <span className="text-[10px] text-cyan-600 font-semibold">זמין</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <TapIcon index={2} />
-                  <span className="text-[10px] text-red-600 font-semibold">לא זמין</span>
-                </div>
+              <div className="flex items-center justify-center gap-5 mb-3 bg-gray-50 rounded-lg px-3 py-2" dir="ltr">
+                {[
+                  { index: 0, tap: "×1", label: "רצוי", color: "#16a34a" },
+                  { index: 1, tap: "×2", label: "זמין", color: "#0891b2" },
+                  { index: 2, tap: "×3", label: "לא זמין", color: "#dc2626" },
+                ].map(({ index, tap, label, color }) => (
+                  <div key={index} className="flex flex-col items-center gap-0.5">
+                    <div className="flex items-center gap-0.5">
+                      <TapIcon index={index} />
+                      <span className="text-[9px] font-bold text-gray-500">{tap}</span>
+                    </div>
+                    <span className="text-[10px] font-semibold" style={{ color }}>{label}</span>
+                  </div>
+                ))}
                 {isLimitMode && <span className="text-[10px] text-orange-600 font-semibold">· מלאות חסומות</span>}
               </div>
               <div className="flex gap-3 overflow-x-auto pb-2">
