@@ -135,11 +135,9 @@ export default function Availability() {
       getCachedAllSettings(base44.entities),
     ]);
 
-    // Batch 2: non-cached dynamic data
-    const [eventsData, yearlyEventsData] = await Promise.all([
-      base44.entities.CompanyEvent.list("-date"),
-      base44.entities.YearlyEvent.list("-start_date", 500),
-    ]);
+    // Batch 2: non-cached dynamic data — sequential to avoid rate limits on concurrent page loads
+    const eventsData = await base44.entities.CompanyEvent.list("-date");
+    const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
 
     // Extract settings client-side (no extra API calls)
     const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -219,19 +217,13 @@ export default function Availability() {
     });
     setUnavailabilities(weekUnavailabilities);
 
-    // Batch 2: templates (cached) + all week availabilities
-    const [templatesData, weekAvailsData] = await Promise.all([
-      getCachedTemplates(base44.entities),
-      base44.entities.Availability.filter({ week_start_date: weekStartStr }),
-    ]);
-
-    // Batch 3: all assignments for this worker + template rows
-    const [assignmentsData, sousAssignments, additionalAssignments, allTemplateRowsData] = await Promise.all([
-      base44.entities.Assignment.filter({ chef_id: worker.id }),
-      base44.entities.Assignment.filter({ sous_chef_id: worker.id }),
-      base44.entities.Assignment.filter({ additional_chef_id: worker.id }),
-      base44.entities.TemplateRow.list(),
-    ]);
+    // Batch 2 & 3: sequential to avoid rate limits on concurrent page loads
+    const templatesData = await getCachedTemplates(base44.entities);
+    const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
+    const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
+    const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
+    const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
+    const allTemplateRowsData = await base44.entities.TemplateRow.list();
 
     // Filter client-side to only rows within this week
     const templateRowsData = allTemplateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
