@@ -925,17 +925,71 @@ END:VEVENT
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4" dir="rtl">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4" dir="rtl">
+
+            {/* ── RIGHT COLUMN: calendar — shown first on mobile via order ── */}
+            <div className="order-first lg:order-last">
+              <Card className="border-none shadow-sm lg:sticky lg:top-4">
+                <CardHeader className="border-b bg-white py-2 px-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
+                        <ChevronRight className="w-3 h-3" />
+                      </Button>
+                      <span className="text-sm font-semibold px-1" dir="rtl">{formatDateHebrew(calendarMonth, "monthYear")}</span>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
+                        <ChevronLeft className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={generateICSFile} title="סנכרן ללוח השנה">
+                      <Download className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="py-2 px-2">
+                  <div className="grid grid-cols-7 gap-0.5 text-center text-xs">
+                    {["א", "ב", "ג", "ד", "ה", "ו", "ש"].map((d, i) => (
+                      <div key={i} className="font-semibold text-gray-400 py-1 text-[10px]">{d}</div>
+                    ))}
+                    {calendarDays.map((day, idx) => {
+                      const dayAssignments = getAssignmentForDate(day);
+                      const event = getEventForDate(day);
+                      const workerYearlyEvents = getYearlyEventsForDate(day);
+                      const isCurrentMonth = isSameMonth(day, calendarMonth);
+                      const isToday = isSameDay(day, new Date());
+                      return (
+                        <button key={idx} onClick={() => handleDateClick(day)}
+                          className={`p-0.5 min-h-[40px] border rounded text-[10px] hover:bg-blue-50 transition-colors ${isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-300"} ${isToday ? "ring-2 ring-blue-500" : ""}`}>
+                          <div className={`font-medium ${isToday ? "text-blue-600" : ""}`}>{format(day, "d")}</div>
+                          {event && <div className="text-purple-500 text-[8px] leading-tight">🎉</div>}
+                          {workerYearlyEvents.slice(0, 1).map((e, i) => (
+                            <div key={i} className="bg-green-100 text-green-700 rounded text-[8px] leading-tight truncate mt-0.5" title={e.title}>●</div>
+                          ))}
+                          {dayAssignments.slice(0, 1).map((a, i) => {
+                            const displayTime = a.briefing_time || a.start_time;
+                            return (
+                              <div key={i} className="bg-blue-100 text-blue-700 rounded text-[8px] leading-tight mt-0.5">
+                                {displayTime.slice(0, 5)}
+                              </div>
+                            );
+                          })}
+                          {dayAssignments.length + workerYearlyEvents.length > 1 && (
+                            <div className="text-gray-400 text-[8px]">+{dayAssignments.length + workerYearlyEvents.length - 1}</div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
             {/* ── LEFT COLUMN: registration functions ── */}
-            <div className="space-y-4">
+            <div className="space-y-4 order-last lg:order-first">
 
-              {/* Action bar: legend + desired count + submit/edit buttons */}
+              {/* Action bar: desired count + submit/edit buttons */}
               <div className="flex flex-wrap items-center gap-2 bg-white border rounded-xl px-3 py-2 shadow-sm">
-                <Badge className="bg-green-100 text-green-800 text-xs"><Star className="w-3 h-3 mr-1" />רצוי</Badge>
-                <Badge className="bg-cyan-100 text-cyan-800 text-xs"><Check className="w-3 h-3 mr-1" />זמין</Badge>
-                <Badge className="bg-red-100 text-red-800 text-xs"><Ban className="w-3 h-3 mr-1" />לא זמין</Badge>
-                <div className="flex items-center gap-1 mr-2">
+                <div className="flex items-center gap-1">
                   <Label className="text-xs text-gray-500 whitespace-nowrap">רצויות:</Label>
                   <Input type="number" className="w-14 h-6 text-xs px-1" value={desiredShiftsCount} onChange={(e) => setDesiredShiftsCount(e.target.value)} placeholder="#" />
                 </div>
@@ -1104,63 +1158,6 @@ END:VEVENT
               </Card>
             </div>
 
-            {/* ── RIGHT COLUMN: calendar ── */}
-            <div>
-              <Card className="border-none shadow-sm sticky top-4">
-                <CardHeader className="border-b bg-white py-2 px-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
-                        <ChevronRight className="w-3 h-3" />
-                      </Button>
-                      <span className="text-sm font-semibold px-1" dir="rtl">{formatDateHebrew(calendarMonth, "monthYear")}</span>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
-                        <ChevronLeft className="w-3 h-3" />
-                      </Button>
-                    </div>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={generateICSFile} title="סנכרן ללוח השנה">
-                      <Download className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="py-2 px-2">
-                  <div className="grid grid-cols-7 gap-0.5 text-center text-xs">
-                    {["א", "ב", "ג", "ד", "ה", "ו", "ש"].map((d, i) => (
-                      <div key={i} className="font-semibold text-gray-400 py-1 text-[10px]">{d}</div>
-                    ))}
-                    {calendarDays.map((day, idx) => {
-                      const dayAssignments = getAssignmentForDate(day);
-                      const event = getEventForDate(day);
-                      const workerYearlyEvents = getYearlyEventsForDate(day);
-                      const isCurrentMonth = isSameMonth(day, calendarMonth);
-                      const isToday = isSameDay(day, new Date());
-                      const hasContent = dayAssignments.length > 0 || event || workerYearlyEvents.length > 0;
-                      return (
-                        <button key={idx} onClick={() => handleDateClick(day)}
-                          className={`p-0.5 min-h-[40px] border rounded text-[10px] hover:bg-blue-50 transition-colors ${isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-300"} ${isToday ? "ring-2 ring-blue-500" : ""}`}>
-                          <div className={`font-medium ${isToday ? "text-blue-600" : ""}`}>{format(day, "d")}</div>
-                          {event && <div className="text-purple-500 text-[8px] leading-tight">🎉</div>}
-                          {workerYearlyEvents.slice(0, 1).map((e, i) => (
-                            <div key={i} className="bg-green-100 text-green-700 rounded text-[8px] leading-tight truncate mt-0.5" title={e.title}>●</div>
-                          ))}
-                          {dayAssignments.slice(0, 1).map((a, i) => {
-                            const displayTime = a.briefing_time || a.start_time;
-                            return (
-                              <div key={i} className="bg-blue-100 text-blue-700 rounded text-[8px] leading-tight mt-0.5">
-                                {displayTime.slice(0, 5)}
-                              </div>
-                            );
-                          })}
-                          {dayAssignments.length + workerYearlyEvents.length > 1 && (
-                            <div className="text-gray-400 text-[8px]">+{dayAssignments.length + workerYearlyEvents.length - 1}</div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </div>
         )}
 

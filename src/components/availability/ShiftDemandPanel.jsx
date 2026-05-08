@@ -50,13 +50,13 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   const isSignedAvailable = currentType === "available";
   const isSignedUnavailable = currentType === "unavailable";
 
-  let chipClass = "border-2 rounded-lg px-2 py-2 text-xs text-center transition-all select-none w-full ";
+  let chipClass = "border-2 rounded-lg px-1.5 py-1.5 sm:px-2 sm:py-2 text-xs text-center transition-all select-none w-full ";
   if (isSignedWanted) {
-    chipClass += "bg-green-500 text-white border-green-600 font-bold cursor-pointer";
+    chipClass += "bg-green-500 text-white border-green-600 cursor-pointer";
   } else if (isSignedAvailable) {
-    chipClass += "bg-cyan-500 text-white border-cyan-600 font-semibold cursor-pointer";
+    chipClass += "bg-cyan-500 text-white border-cyan-600 cursor-pointer";
   } else if (isSignedUnavailable) {
-    chipClass += "bg-red-500 text-white border-red-600 font-semibold cursor-pointer";
+    chipClass += "bg-red-500 text-white border-red-600 cursor-pointer";
   } else if (!hasMyRole) {
     chipClass += "bg-gray-50 border-gray-200 text-gray-400 cursor-default";
   } else if (blocked) {
@@ -108,7 +108,7 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
       title={!hasMyRole ? "אין תפקיד מתאים" : blocked ? "המשמרת מלאה" : "לחץ לבחירה"}
       disabled={!canEdit}
     >
-      <div className="font-semibold text-[11px]">{shift.startTime}–{shift.endTime}</div>
+      <div className="text-[10px] sm:text-[11px] text-gray-600">{shift.startTime}–{shift.endTime}</div>
       {displayRole && (
         <>
           {/* Fill bar */}
@@ -142,7 +142,7 @@ function DayColumn({ dateStr, shifts, allAvailabilities, workers, myRoles, selec
   });
 
   return (
-    <div className="flex-shrink-0 w-[140px]" dir="rtl">
+    <div className="flex-shrink-0 w-[100px] sm:w-[130px]" dir="rtl">
       {/* Date header */}
       <div className="text-center mb-2 pb-2 border-b border-gray-200">
         <div className="font-bold text-sm text-gray-800">{dayName}</div>
@@ -267,13 +267,29 @@ export default function ShiftDemandPanel({
             <p className="text-sm text-gray-400 text-center py-4">אין משמרות שהוגדרו בלוח לשבוע זה</p>
           ) : (
             <>
-              <p className="text-xs text-gray-500 mb-3">
-                לחיצה אחת = <span className="text-green-600 font-semibold">רצוי</span> ·
-                לחיצה שנייה = <span className="text-cyan-600 font-semibold">זמין</span> ·
-                לחיצה שלישית = <span className="text-red-600 font-semibold">לא זמין</span> ·
-                לחיצה רביעית = ביטול
-                {isLimitMode && <span className="text-orange-600 font-semibold"> · משמרות מלאות חסומות</span>}
-              </p>
+              {/* Tap infographic */}
+              <div className="flex items-center gap-3 mb-3 text-[10px] text-gray-500 bg-gray-50 rounded-lg px-3 py-2" dir="rtl">
+                <div className="flex items-center gap-1">
+                  <span className="text-base">👆</span>
+                  <span className="text-green-600 font-semibold">רצוי</span>
+                </div>
+                <span className="text-gray-300">·</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-base">👆👆</span>
+                  <span className="text-cyan-600 font-semibold">זמין</span>
+                </div>
+                <span className="text-gray-300">·</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-base">👆👆👆</span>
+                  <span className="text-red-600 font-semibold">לא זמין</span>
+                </div>
+                <span className="text-gray-300">·</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-base">👆👆👆👆</span>
+                  <span>ביטול</span>
+                </div>
+                {isLimitMode && <><span className="text-gray-300">·</span><span className="text-orange-600 font-semibold">מלאות חסומות</span></>}
+              </div>
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {dates.map(date => (
                   <DayColumn
