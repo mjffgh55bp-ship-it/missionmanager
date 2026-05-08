@@ -139,6 +139,8 @@ export default function Matrix() {
   const [scheduleParams, setScheduleParams] = useState([]);
   const [trackers, setTrackers] = useState([]);
   const [trackerEntries, setTrackerEntries] = useState([]);
+  const [signupMode, setSignupMode] = useState("allow_over_sign_up");
+  const [savingSignupMode, setSavingSignupMode] = useState(false);
 
   // Load static data once on mount
   useEffect(() => { loadStaticData(); }, []);
@@ -190,6 +192,7 @@ export default function Matrix() {
       setShiftStatuses(parseSetting("shift_statuses") || []);
       setSummaryColumns(parseSetting("matrix_summary_columns") || []);
       setScheduleParams(parseSetting("custom_schedule_params") || []);
+      setSignupMode(parseSetting("availability_signup_mode") || "allow_over_sign_up");
       setTrackers(trackersData);
       setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
     } catch (error) {
@@ -1067,6 +1070,18 @@ export default function Matrix() {
 
   const isStandbyStatus = (status) => /^\d+[׳']/.test(status || '');
 
+  const saveSignupMode = async (newMode) => {
+    setSavingSignupMode(true);
+    const existing = await base44.entities.AppSettings.filter({ setting_key: "availability_signup_mode" });
+    if (existing.length > 0) {
+      await base44.entities.AppSettings.update(existing[0].id, { setting_value: JSON.stringify(newMode) });
+    } else {
+      await base44.entities.AppSettings.create({ setting_key: "availability_signup_mode", setting_value: JSON.stringify(newMode) });
+    }
+    setSignupMode(newMode);
+    setSavingSignupMode(false);
+  };
+
   const saveSummaryColumns = async (cols) => {
     const existing = await base44.entities.AppSettings.filter({ setting_key: 'matrix_summary_columns' });
     if (existing.length > 0) {
@@ -1447,6 +1462,19 @@ export default function Matrix() {
                   <CalendarDays className="w-4 h-4" />
                   <span className="text-sm" dir="rtl">שבועי</span>
                 </div>
+                <button
+                  onClick={() => saveSignupMode(signupMode === "allow_over_sign_up" ? "limit_sign_up" : "allow_over_sign_up")}
+                  disabled={savingSignupMode}
+                  title={signupMode === "allow_over_sign_up" ? "מצב: הרשמה חופשית (לחץ לשינוי)" : "מצב: הגבלת הרשמה (לחץ לשינוי)"}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+                    signupMode === "allow_over_sign_up"
+                      ? "bg-green-50 border-green-300 text-green-800 hover:bg-green-100"
+                      : "bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100"
+                  } ${savingSignupMode ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
+                  dir="rtl"
+                >
+                  {signupMode === "allow_over_sign_up" ? "🟢 הרשמה חופשית" : "🔒 הגבלת הרשמה"}
+                </button>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronRight className="w-4 h-4" /></Button>
                 <Popover>
                   <PopoverTrigger asChild>
