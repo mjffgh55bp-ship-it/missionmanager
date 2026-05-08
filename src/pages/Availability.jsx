@@ -222,17 +222,15 @@ export default function Availability() {
       base44.entities.Availability.filter({ week_start_date: weekStartStr }),
     ]);
 
-    // Batch 3: sous/additional assignments + week-scoped template rows
-    // Fetch template rows for every day in the selected week to ensure accuracy
-    const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(new Date(weekStartStr), i), "yyyy-MM-dd"));
-    const [sousAssignments, ...weekTemplateRowArrays] = await Promise.all([
+    // Batch 3: sous/additional assignments + week-scoped template rows in ONE list call
+    const [sousAssignments, additionalAssignments, allTemplateRowsData] = await Promise.all([
       base44.entities.Assignment.filter({ sous_chef_id: worker.id }),
-      ...weekDates.map(date => base44.entities.TemplateRow.filter({ date })),
+      base44.entities.Assignment.filter({ additional_chef_id: worker.id }),
+      base44.entities.TemplateRow.list(),
     ]);
 
-    const templateRowsData = weekTemplateRowArrays.flat();
-
-    const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
+    // Filter client-side to only rows within this week
+    const templateRowsData = allTemplateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
 
     const allAssignments = [...assignmentsData, ...sousAssignments, ...additionalAssignments];
     setAssignments(allAssignments);
