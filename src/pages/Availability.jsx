@@ -89,6 +89,7 @@ export default function Availability() {
   const [openRegistrations, setOpenRegistrations] = useState([]);
   const [extraTaskStates, setExtraTaskStates] = useState({});
   const [templateRows, setTemplateRows] = useState([]);
+  const [allTemplateRowsForCalendar, setAllTemplateRowsForCalendar] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
   const [isManager, setIsManager] = useState(false);
   const [weekAvailabilities, setWeekAvailabilities] = useState([]);
@@ -226,12 +227,13 @@ export default function Availability() {
     const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
     const allTemplateRowsData = await base44.entities.TemplateRow.list();
 
-    // Filter client-side to only rows within this week
+    // Filter client-side to only rows within this week (for demand panel)
     const templateRowsData = allTemplateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
 
     const allAssignments = [...assignmentsData, ...sousAssignments, ...additionalAssignments];
     setAssignments(allAssignments);
     setTemplateRows(templateRowsData);
+    setAllTemplateRowsForCalendar(allTemplateRowsData);
     setAllTemplates(templatesData);
     setWeekAvailabilities(weekAvailsData);
 
@@ -635,7 +637,9 @@ END:VEVENT
     // Get template shifts for this worker on this date
     if (!currentWorker) return regularAssignments;
 
-    const templateShifts = templateRows.filter((row) => {
+    // Use allTemplateRowsForCalendar so shifts from all months are visible in the calendar
+    const rowsToSearch = allTemplateRowsForCalendar.length > 0 ? allTemplateRowsForCalendar : templateRows;
+    const templateShifts = rowsToSearch.filter((row) => {
       if (row.date !== dateStr || !row.values) return false;
 
       // Check if worker is assigned in this row
@@ -889,6 +893,7 @@ END:VEVENT
 
             {/* ── RIGHT COLUMN: calendar + tips — shown first on mobile via order ── */}
             <div className="order-first lg:order-last space-y-3">
+              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide px-1" dir="rtl">יומן</h2>
               <Card className="border-none shadow-sm lg:sticky lg:top-4">
                 <CardHeader className="border-b bg-white py-2 px-3">
                   <div className="flex items-center justify-between">
@@ -990,6 +995,7 @@ END:VEVENT
 
             {/* ── LEFT COLUMN: registration functions ── */}
             <div className="space-y-4 order-last lg:order-first">
+              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide px-1" dir="rtl">הרשמה</h2>
 
               {/* Action bar: desired count + submit/edit buttons */}
               <div className="flex flex-wrap items-center gap-2 bg-white border rounded-xl px-3 py-2 shadow-sm">
@@ -1134,33 +1140,21 @@ END:VEVENT
                 </Card>
               )}
 
-              {/* Constraints — compact inline list + add button */}
-              <Card className="border-none shadow-sm">
-                <CardContent className="py-2 px-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-gray-700">אילוצים</span>
-                    <Button onClick={() => setShowUnavailabilityDialog(true)} size="sm" variant="outline" className="h-7 text-xs border-red-300 text-red-600 hover:bg-red-50">
-                      <Plus className="w-3 h-3 mr-1" />הוסף אילוץ
-                    </Button>
-                  </div>
-                  {unavailabilities.length === 0 ? (
-                    <p className="text-xs text-gray-400 text-center py-1">אין אילוצים השבוע</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {unavailabilities.map((unavail) => (
-                        <div key={unavail.id} className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1 text-xs">
-                          <span className="font-medium text-gray-800">{formatDateHebrew(unavail.date, "short")}</span>
-                          <span className="text-gray-500">{unavail.start_time}–{unavail.end_time}</span>
-                          <span className="text-gray-400">{unavail.reason === 'overseas' ? 'חו"ל' : 'תפוס'}</span>
-                          <button onClick={() => handleDeleteUnavailability(unavail.id)} className="text-red-400 hover:text-red-600 ml-1">
-                            <XCircle className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
+              {/* Constraints — shown only as tags if any exist */}
+              {unavailabilities.length > 0 && (
+                <div className="flex flex-wrap gap-2 px-1" dir="rtl">
+                  {unavailabilities.map((unavail) => (
+                    <div key={unavail.id} className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1 text-xs">
+                      <span className="font-medium text-gray-800">{formatDateHebrew(unavail.date, "short")}</span>
+                      <span className="text-gray-500">{unavail.start_time}–{unavail.end_time}</span>
+                      <span className="text-gray-400">{unavail.reason === 'overseas' ? 'חו"ל' : 'תפוס'}</span>
+                      <button onClick={() => handleDeleteUnavailability(unavail.id)} className="text-red-400 hover:text-red-600 ml-1">
+                        <XCircle className="w-3.5 h-3.5" />
+                      </button>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>
