@@ -138,8 +138,9 @@ export default function Availability() {
 
     // Batch 2: non-cached dynamic data — staggered to avoid rate limits
     const eventsData = await base44.entities.CompanyEvent.list("-date");
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
     const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
+    await new Promise(r => setTimeout(r, 200));
 
     // Extract settings client-side (no extra API calls)
     const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -219,12 +220,17 @@ export default function Availability() {
     });
     setUnavailabilities(weekUnavailabilities);
 
-    // Batch 2 & 3: sequential to avoid rate limits on concurrent page loads
+    // Sequential fetches with small delays to avoid rate limits
     const templatesData = await getCachedTemplates(base44.entities);
+    await new Promise(r => setTimeout(r, 120));
     const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-    const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
-    const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
-    const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
+    await new Promise(r => setTimeout(r, 120));
+    const [assignmentsData, sousAssignments, additionalAssignments] = await Promise.all([
+      base44.entities.Assignment.filter({ chef_id: worker.id }),
+      base44.entities.Assignment.filter({ sous_chef_id: worker.id }),
+      base44.entities.Assignment.filter({ additional_chef_id: worker.id }),
+    ]);
+    await new Promise(r => setTimeout(r, 120));
     const allTemplateRowsData = await base44.entities.TemplateRow.list();
 
     // Filter client-side to only rows within this week (for demand panel)
