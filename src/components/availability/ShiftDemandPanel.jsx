@@ -175,26 +175,26 @@ function DayColumn({ dateStr, shifts, allAvailabilities, workers, myRoles, selec
   );
 }
 
-// ── Tap hint icon — uses the 3-icon sprite image ──────────────────────────────
-const TAP_IMG = "https://media.base44.com/images/public/68e8a79f232bbd29be8a3e62/ad1520f82_image.png";
-// Image is 3 icons side-by-side (each ~33.33% width). We use background-size/position to crop each.
+// ── Tap hint icons — inline SVG, one per tap count ───────────────────────────
 function TapIcon({ index }) {
-  // Container is 22x22px. background-size: 300% 100% means full image is 3x the container width.
-  // background-position: 0%/50%/100% left for icon 0/1/2.
-  const positions = ["0% 50%", "50% 50%", "100% 50%"];
+  // index 0 = ×1 tap (single finger), index 1 = ×2 tap (double), index 2 = ×3 tap (triple)
+  const colors = ["#16a34a", "#0891b2", "#dc2626"];
+  const color = colors[index];
+  const dots = index + 1; // 1, 2, or 3 dots representing tap count
+
   return (
-    <div
-      style={{
-        width: 22,
-        height: 22,
-        flexShrink: 0,
-        backgroundImage: `url(${TAP_IMG})`,
-        backgroundSize: "300% 100%",
-        backgroundPosition: positions[index],
-        backgroundRepeat: "no-repeat",
-        imageRendering: "crisp-edges",
-      }}
-    />
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+      {/* Finger silhouette */}
+      <path
+        d="M10 2C8.9 2 8 2.9 8 4v6.5l-1.2-1.2a1.1 1.1 0 0 0-1.6 1.6l3.3 3.3c.4.4.9.8 1.5.8h3c1.1 0 2-.9 2-2V8c0-.6-.4-1-1-1s-1 .4-1 1v1c0-.6-.4-1-1-1s-1 .4-1 1V4c0-1.1-.9-2-2-2z"
+        fill={color}
+        opacity="0.85"
+      />
+      {/* Tap count dots — top-right corner */}
+      {Array.from({ length: dots }).map((_, i) => (
+        <circle key={i} cx={17 - i * 3.5} cy={3} r="1.8" fill={color} />
+      ))}
+    </svg>
   );
 }
 
@@ -298,22 +298,19 @@ export default function ShiftDemandPanel({
             <p className="text-sm text-gray-400 text-center py-4">אין משמרות שהוגדרו בלוח לשבוע זה</p>
           ) : (
             <>
-              {/* Tap infographic */}
-              <div className="flex items-center justify-center gap-5 mb-3 bg-gray-50 rounded-lg px-3 py-2" dir="ltr">
+              {/* Tap infographic — RTL: רצוי right → לא זמין left */}
+              <div className="flex items-center justify-center gap-4 mb-3 bg-gray-50 rounded-lg px-3 py-2" dir="rtl">
                 {[
-                  { index: 0, tap: "×1", label: "רצוי", color: "#16a34a" },
-                  { index: 1, tap: "×2", label: "זמין", color: "#0891b2" },
-                  { index: 2, tap: "×3", label: "לא זמין", color: "#dc2626" },
-                ].map(({ index, tap, label, color }) => (
-                  <div key={index} className="flex flex-col items-center gap-0.5">
-                    <div className="flex items-center gap-0.5">
-                      <TapIcon index={index} />
-                      <span className="text-[9px] font-bold text-gray-500">{tap}</span>
-                    </div>
-                    <span className="text-[10px] font-semibold" style={{ color }}>{label}</span>
+                  { index: 0, label: "רצוי", color: "#16a34a" },
+                  { index: 1, label: "זמין", color: "#0891b2" },
+                  { index: 2, label: "לא זמין", color: "#dc2626" },
+                ].map(({ index, label, color }) => (
+                  <div key={index} className="flex items-center gap-1.5">
+                    <TapIcon index={index} />
+                    <span className="text-[10px] text-gray-500">{label}</span>
                   </div>
                 ))}
-                {isLimitMode && <span className="text-[10px] text-orange-600 font-semibold">· מלאות חסומות</span>}
+                {isLimitMode && <span className="text-[10px] text-orange-600">· מלאות חסומות</span>}
               </div>
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {dates.map(date => (
