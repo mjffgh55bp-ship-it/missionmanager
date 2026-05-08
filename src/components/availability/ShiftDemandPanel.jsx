@@ -10,6 +10,7 @@ import {
   workerSignedForShift,
   filterDemandForWeek,
 } from "@/lib/shiftDemand";
+import { filterVisibleScheduleRows } from "@/lib/scheduleVisibility";
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
@@ -145,9 +146,15 @@ export default function ShiftDemandPanel({
     return templateRows.filter(r => dates.has(r.date));
   }, [templateRows, weekStart]);
 
-  const demandMap = useMemo(
-    () => buildUnifiedShiftDemand(weekTemplateRows, allTemplates),
+  // Only pass rows whose template is visible in the Schedule calendar
+  const visibleWeekTemplateRows = useMemo(
+    () => filterVisibleScheduleRows(weekTemplateRows, allTemplates),
     [weekTemplateRows, allTemplates]
+  );
+
+  const demandMap = useMemo(
+    () => buildUnifiedShiftDemand(visibleWeekTemplateRows, allTemplates),
+    [visibleWeekTemplateRows, allTemplates]
   );
 
   const weekDemand = useMemo(

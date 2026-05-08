@@ -4,6 +4,8 @@
  * counts signups from all Availability records, and calculates status.
  */
 
+import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
+
 // ── 1. Build unified shift demand from TemplateRows ───────────────────────────
 // Returns Map: unifiedKey → { key, date, mokedName, startTime, endTime, roles: { roleName: count } }
 export function buildUnifiedShiftDemand(templateRows, templates) {
@@ -14,7 +16,8 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
 
   templateRows.forEach(row => {
     const tmpl = templateById[row.template_id];
-    if (!tmpl || !row.values) return;
+    // Skip rows whose template is missing or not visible in the Schedule calendar
+    if (!tmpl || !isVisibleScheduleTemplate(tmpl) || !row.values) return;
 
     const values = row.values;
     const startTime = values["התחלה"] || values["שעת התחלה"];

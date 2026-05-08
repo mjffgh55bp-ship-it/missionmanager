@@ -30,6 +30,7 @@ import ColumnCell from "../components/schedule/ColumnCell";
 import WorkerCell from "../components/schedule/WorkerCell";
 import TimeCell from "../components/schedule/TimeCell";
 import PresetsDialog from "../components/schedule/PresetsDialog";
+import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 
 export default function Schedule() {
   const [currentDate, setCurrentDate] = useState(() => {
@@ -214,7 +215,7 @@ export default function Schedule() {
     };
 
     if (templateRowsData.length === 0) {
-      const defaultTemplates = allTemplatesData.filter((t) => t.is_default && t.active);
+      const defaultTemplates = allTemplatesData.filter((t) => t.is_default && t.active && isVisibleScheduleTemplate(t));
       if (defaultTemplates.length > 0) {
         // Create default rows asynchronously without blocking UI
         (async () => {
@@ -505,8 +506,7 @@ export default function Schedule() {
 
               return groups.filter((group) => {
                 const template = allTemplates.find((t) => t.id === group.template_id);
-                if (!template) return false;
-                return !(template.columns || []).some(c => c.name === 'תפקיד');
+                return isVisibleScheduleTemplate(template);
               }).map((group, groupIndex) => {
                 const template = allTemplates.find((t) => t.id === group.template_id);
                 if (!template) return null;
