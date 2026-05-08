@@ -6,6 +6,8 @@
 const CACHE_TTL_MS = 3 * 60 * 1000;
 
 const cache = {};
+// Tracks in-flight promises to deduplicate concurrent requests for the same key
+const pending = {};
 
 function isFresh(key) {
   const entry = cache[key];
@@ -31,28 +33,32 @@ function invalidateAll() {
 // ── Cached loaders ────────────────────────────────────────────────────────────
 // Each loader checks the cache first; only hits the API on miss or TTL expiry.
 
-export async function getCachedWorkers(entities) {
-  const cached = get('workers');
+async function cachedFetch(key, fetcher) {
+  const cached = get(key);
   if (cached) return cached;
-  const data = await entities.Worker.filter({ active: true });
-  set('workers', data);
-  return data;
+  // If already in-flight, return the same promise
+  if (pending[key]) return pending[key];
+  pending[key] = fetcher().then(data => {
+    set(key, data);
+    delete pending[key];
+    return data;
+  }).catch(err => {
+    delete pending[key];
+    throw err;
+  });
+  return pending[key];
+}
+
+export async function getCachedWorkers(entities) {
+  return cachedFetch('workers', () => entities.Worker.filter({ active: true }));
 }
 
 export async function getCachedTemplates(entities) {
-  const cached = get('templates');
-  if (cached) return cached;
-  const data = await entities.Template.filter({ active: true });
-  set('templates', data);
-  return data;
+  return cachedFetch('templates', () => entities.Template.filter({ active: true }));
 }
 
 export async function getCachedAllSettings(entities) {
-  const cached = get('allSettings');
-  if (cached) return cached;
-  const data = await entities.AppSettings.list();
-  set('allSettings', data);
-  return data;
+  return cachedFetch('allSettings', () => entities.AppSettings.list());
 }
 
 /**
