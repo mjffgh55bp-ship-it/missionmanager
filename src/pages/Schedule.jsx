@@ -108,13 +108,9 @@ export default function Schedule() {
       getCachedAllSettings(base44.entities),
     ]);
 
-    // Batch 2: availability + unavailability
-    const [availabilitiesData, unavailabilitiesData] = await Promise.all([
-      base44.entities.Availability.filter({ week_start_date: weekStartStr }),
-      base44.entities.Unavailability.filter({ date: dateString }),
-    ]);
-
-    // Batch 3: template rows (separate to avoid rate limit)
+    // Batch 2 & 3: run sequentially to avoid rate limits when multiple pages load together
+    const availabilitiesData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
+    const unavailabilitiesData = await base44.entities.Unavailability.filter({ date: dateString });
     const templateRowsData = await base44.entities.TemplateRow.filter({ date: dateString });
     console.timeEnd("Schedule initial load");
 
