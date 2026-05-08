@@ -678,7 +678,7 @@ END:VEVENT
   const wantedShifts = selectedShifts.filter((s) => s.type === "wanted").sort((a, b) => (a.priority || 0) - (b.priority || 0));
   const availableShifts = selectedShifts.filter((s) => s.type === "available").sort((a, b) => (a.priority || 0) - (b.priority || 0));
 
-  // Handle signup from the demand panel: add the shift to selectedShifts
+  // Handle signup from the demand panel: add/update the shift in selectedShifts
   const handleDemandSignup = (unifiedShift, roleName, type) => {
     if (!canEdit || currentWorker?.availability_locked) return;
     const { date, startTime, endTime } = unifiedShift;
@@ -696,7 +696,7 @@ END:VEVENT
       start_time: startTime,
       end_time: endTime,
       type,
-      priority: count + 1,
+      priority: type === "unavailable" ? 0 : count + 1,
       moked_name: unifiedShift.mokedName,
       role_or_qualification: roleName,
       unified_shift_key: unifiedShift.key,
@@ -1151,7 +1151,7 @@ END:VEVENT
               </Card>
           }
 
-            {/* Shift Demand Panel — reflects real schedule demand */}
+            {/* Unified shift selection panel — based on schedule */}
             <ShiftDemandPanel
               templateRows={templateRows}
               allTemplates={allTemplates}
@@ -1163,102 +1163,22 @@ END:VEVENT
               weekStart={weekStart}
               onSignup={handleDemandSignup}
               canEdit={canEdit && !currentWorker?.availability_locked}
+              isLocked={!!currentWorker?.availability_locked}
             />
 
-            {/* Shift Selection Grid */}
-            <Card className="border-none shadow-lg mb-4">
-              <CardHeader className="border-b bg-white py-3 px-4">
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-base" dir="rtl">בחר משמרות (לחץ כדי להחליף: רצוי → זמין → לא זמין)</CardTitle>
-                  {currentWorker?.availability_locked &&
-                <Badge className="bg-red-100 text-red-800" dir="rtl">
-                      <Lock className="w-3 h-3 mr-1" />
-                      זמינות נעולה
-                    </Badge>
-                }
-                </div>
-              </CardHeader>
-              <CardContent className="py-3 px-2">
-                <div className="space-y-3">
-                  {DAYS_OF_WEEK.map((day, dayIndex) => {
-                  const date = format(addDays(weekStart, dayIndex), "yyyy-MM-dd");
-                  const event = getEventForDate(addDays(weekStart, dayIndex));
-
-                  return (
-                    <div key={day} className="border rounded-lg p-2">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <span className="font-semibold text-sm" dir="rtl">{day}</span>
-                            <span className="text-xs text-gray-500 ml-2" dir="rtl">{formatDateHebrew(addDays(weekStart, dayIndex))}</span>
-                            <span className="text-xs text-gray-400 ml-1">({formatHebrewDate(addDays(weekStart, dayIndex))})</span>
-                          </div>
-                          {event &&
-                        <Badge className="bg-purple-100 text-purple-800 text-xs">
-                              <PartyPopper className="w-3 h-3 mr-1" />{event.title}
-                            </Badge>
-                        }
-                        </div>
-                        {(() => {
-                        const dayYearlyEvts = yearlyEvents.filter((e) =>
-                        e.worker_ids?.includes(currentWorker?.id) &&
-                        e.start_date <= date && e.end_date >= date &&
-                        e.start_time && e.end_time
-                        );
-                        return dayYearlyEvts.length > 0 ?
-                        <div className="relative h-4 mb-1">
-                                {dayYearlyEvts.map((evt) => {
-                            const pos = getEventBarPositionFull(evt.start_time, evt.end_time);
-                            if (!pos) return null;
-                            return (
-                              <div
-                                key={evt.id} className="bg-green-300 text-[8px] px-1 rounded absolute h-3.5 flex items-center overflow-hidden whitespace-nowrap"
-
-                                style={{ right: pos.right, width: pos.width }}
-                                title={`${evt.title} (${evt.start_time}-${evt.end_time})`}>
-
-                                      {evt.title}
-                                    </div>);
-
-                          })}
-                              </div> :
-                        null;
-                      })()}
-                        <div className="grid grid-cols-6 gap-1">
-                          {SHIFT_BLOCKS.map((shift) => {
-                          const state = getShiftState(date, shift);
-                          return (
-                            <button
-                              key={shift.start}
-                              onClick={() => cycleShiftState(date, shift)}
-                              disabled={!canEdit || currentWorker?.availability_locked}
-                              className={`p-1.5 rounded border-2 transition-all flex flex-col items-center justify-center ${getShiftStyle(state)} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-
-                                {getShiftIcon(state)}
-                                <span className="text-[10px] mt-0.5">{shift.start}</span>
-                              </button>);
-
-                        })}
-                        </div>
-                      </div>);
-
-                })}
-                </div>
-
-                {!isApproved && !isPendingChange &&
-              <div className="flex justify-end gap-2 mt-4">
-                    <Button variant="outline" size="sm" onClick={() => setSelectedShifts([])} disabled={currentWorker?.availability_locked} dir="rtl">נקה</Button>
-                    <Button
+            {/* Submit / clear buttons */}
+            {!isApproved && !isPendingChange &&
+              <div className="flex justify-end gap-2 mb-4">
+                <Button variant="outline" size="sm" onClick={() => setSelectedShifts([])} disabled={currentWorker?.availability_locked} dir="rtl">נקה</Button>
+                <Button
                   onClick={() => setShowSummary(true)}
                   disabled={selectedShifts.filter((s) => s.type !== "unavailable").length === 0 || currentWorker?.availability_locked}
                   size="sm"
                   className="bg-blue-900 hover:bg-blue-800">
-
-                      סקור ושלח
-                    </Button>
-                  </div>
-              }
-              </CardContent>
-            </Card>
+                  סקור ושלח
+                </Button>
+              </div>
+            }
 
             {/* Summary Calendar */}
             <Card className="border-none shadow-lg">
