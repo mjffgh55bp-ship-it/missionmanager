@@ -263,38 +263,31 @@ export default function Availability() {
     });
     const staleRegs = freshOpenReg.filter(reg => !validRegs.includes(reg));
 
-    setOpenRegistrations(freshOpenReg); // keep full list; validOpenRegistrations memo will filter
+    // Always set only valid regs into state — never the raw full list
+    setOpenRegistrations(validRegs);
 
-    // Auto-clean stale entries from DB silently
+    // Auto-clean stale entries from DB silently if any found
     if (staleRegs.length > 0 && openRegSettings.length > 0) {
       await base44.entities.AppSettings.update(openRegSettings[0].id, {
         setting_value: JSON.stringify(validRegs)
       });
-      setOpenRegistrations(validRegs);
+    }
 
-      // Also clean extra_tasks keys from this worker's current availability
-      if (availabilities.length > 0) {
-        const avail = availabilities[0];
-        const tasks = avail.extra_tasks || {};
-        const staleTaskKeys = new Set();
-        staleRegs.forEach(reg => {
-          const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
-          (reg?.shifts || []).forEach((_, si) => staleTaskKeys.add(`${regKey}__${si}`));
-          staleTaskKeys.add(regKey);
-        });
-        STALE_REG_DENYLIST_STATIC.forEach(d => {
-          Object.keys(tasks).forEach(k => { if (k.includes(d)) staleTaskKeys.add(k); });
-        });
-        const keysToRemove = Object.keys(tasks).filter(k => {
-          const baseKey = k.split('__')[0];
-          return staleTaskKeys.has(k) || !validGroupKeys.has(baseKey);
-        });
-        if (keysToRemove.length > 0) {
-          const cleanedTasks = { ...tasks };
-          keysToRemove.forEach(k => delete cleanedTasks[k]);
-          await base44.entities.Availability.update(avail.id, { extra_tasks: cleanedTasks });
-          setExtraTaskStates(cleanedTasks);
-        }
+    // Clean extra_tasks keys from this worker's current availability
+    if (availabilities.length > 0) {
+      const avail = availabilities[0];
+      const tasks = avail.extra_tasks || {};
+      const keysToRemove = Object.keys(tasks).filter(k => {
+        const baseKey = k.split('__')[0];
+        // Remove if baseKey not in valid group keys, or matches denylist
+        if (!validGroupKeys.has(baseKey)) return true;
+        return STALE_REG_DENYLIST_STATIC.some(d => k.includes(d));
+      });
+      if (keysToRemove.length > 0) {
+        const cleanedTasks = { ...tasks };
+        keysToRemove.forEach(k => delete cleanedTasks[k]);
+        await base44.entities.Availability.update(avail.id, { extra_tasks: cleanedTasks });
+        setExtraTaskStates(cleanedTasks);
       }
     }
   };
@@ -754,24 +747,24 @@ END:VEVENT
   // Stale registration name denylist — permanently ignored regardless of any other check
   const STALE_REG_DENYLIST = STALE_REG_DENYLIST_STATIC;
 
-  // Build the set of valid group keys from active TemplateRows in the selected week
-  // Key format used by Schedule: `${template_id}_${group_id || 'default'}`
+  // Build the set of valid group keys from active TemplateRows in the selected week.
+  // templateRows is already week-scoped (loaded via 7 per-date queries in loadDynamicData).
+  // Key format matches Schedule.jsx: `${template_id}_${group_id || 'default'}`
   const activeGroupKeys = useMemo(() => {
-    const weekStartStr = format(weekStart, "yyyy-MM-dd");
-    const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
     const keys = new Set();
     templateRows.forEach(row => {
-      if (!row.date || row.date < weekStartStr || row.date > weekEndStr) return;
-      const gKey = `${row.template_id}_${row.group_id || 'default'}`;
-      keys.add(gKey);
+      if (!row.template_id) return;
+      keys.add(`${row.template_id}_${row.group_id || 'default'}`);
     });
     return keys;
-  }, [templateRows, weekStart]);
+  }, [templateRows]);
 
   // A registration is valid only if its key maps to a real TemplateRow group in this week,
   // it has shifts, its date is in the week, and its name is not denylisted.
-  // Note: loadDynamicData already cleans stale entries from DB — this is a safe UI-layer guard.
+  // openRegistrations state is already pre-filtered by loadDynamicData — this is a final UI guard.
   const validOpenRegistrations = useMemo(() => {
+    // If templateRows not loaded yet, show nothing to avoid flash of stale data
+    if (activeGroupKeys.size === 0) return [];
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
     return openRegistrations.filter(reg => {
@@ -1066,15 +1059,8 @@ END:VEVENT
               </Card>
           }
 
-            {/* Extra Tasks Section */}
-            {validOpenRegistrations.filter((reg) => {
-            const regShifts = reg?.shifts || [];
-            if (regShifts.length === 0) return false;
-            if (!reg?.date) return true;
-            const weekStartStr = format(weekStart, "yyyy-MM-dd");
-            const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-            return reg.date >= weekStartStr && reg.date <= weekEndStr;
-          }).length > 0 &&
+            {/* Extra Tasks Section — only shown when there are valid registrations for this week */}
+            {validOpenRegistrations.length > 0 &&
           <Card className="border-none shadow-lg mb-4">
                 <CardHeader className="border-b bg-white py-3 px-4">
                   <div className="flex items-center justify-between" dir="rtl">
@@ -1089,14 +1075,7 @@ END:VEVENT
                 <CardContent className="py-3 px-4">
                   <p className="text-xs text-gray-500 mb-3" dir="rtl">לחיצה בודדת - רצוי, לחיצה כפולה - זמין, שלוש לחיצות - לא זמין</p>
                   <div className="space-y-3">
-                    {validOpenRegistrations.filter((reg) => {
-                  const regShifts = reg?.shifts || [];
-                  if (regShifts.length === 0) return false;
-                  if (!reg?.date) return true;
-                  const weekStartStr = format(weekStart, "yyyy-MM-dd");
-                  const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-                  return reg.date >= weekStartStr && reg.date <= weekEndStr;
-                }).map((reg) => {
+                    {validOpenRegistrations.map((reg) => {
                   const regKey = reg?.key || reg;
                   const regName = reg?.name || reg;
                   const regDate = reg?.date || null;
