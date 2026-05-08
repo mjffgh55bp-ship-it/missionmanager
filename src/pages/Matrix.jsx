@@ -223,15 +223,15 @@ export default function Matrix() {
         ? await base44.entities.Assignment.filter({ date: dateStr })
         : await base44.entities.Assignment.list();
 
-      // Batch 2: availability + unavailabilities
-      const [availabilitiesData, unavailabilitiesData] = await Promise.all([
-        base44.entities.Availability.list(),
-        viewMode === "daily"
-          ? base44.entities.Unavailability.filter({ date: dateStr })
-          : base44.entities.Unavailability.list(),
-      ]);
+      // Batch 2: availability + unavailabilities (sequential to reduce burst)
+      const availabilitiesData = await base44.entities.Availability.list();
+      await new Promise(r => setTimeout(r, 100));
+      const unavailabilitiesData = await (viewMode === "daily"
+        ? base44.entities.Unavailability.filter({ date: dateStr })
+        : base44.entities.Unavailability.list());
 
       // Batch 3: template rows + templates (templates served from cache)
+      await new Promise(r => setTimeout(r, 100));
       const [templateRowsData, allTemplatesData] = await Promise.all([
         viewMode === "daily"
           ? base44.entities.TemplateRow.filter({ date: dateStr })
@@ -286,7 +286,7 @@ export default function Matrix() {
     }
     loadingTimeoutRef.current = setTimeout(() => {
       loadDynamicData(silent);
-    }, 300);
+    }, 1500);
   };
 
   // Keep a ref to debouncedLoadData so subscriptions always call the latest version

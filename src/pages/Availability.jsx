@@ -135,8 +135,9 @@ export default function Availability() {
       getCachedAllSettings(base44.entities),
     ]);
 
-    // Batch 2: non-cached dynamic data — sequential to avoid rate limits on concurrent page loads
+    // Batch 2: non-cached dynamic data — staggered to avoid rate limits
     const eventsData = await base44.entities.CompanyEvent.list("-date");
+    await new Promise(r => setTimeout(r, 150));
     const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
 
     // Extract settings client-side (no extra API calls)
