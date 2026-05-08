@@ -129,10 +129,14 @@ export default function Availability() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-    // Batch 1: static reference data (cached) + week-specific settings in parallel
-    const [workersData, allSettings, eventsData, yearlyEventsData] = await Promise.all([
+    // Batch 1: cached static data first
+    const [workersData, allSettings] = await Promise.all([
       getCachedWorkers(base44.entities),
       getCachedAllSettings(base44.entities),
+    ]);
+
+    // Batch 2: non-cached dynamic data
+    const [eventsData, yearlyEventsData] = await Promise.all([
       base44.entities.CompanyEvent.list("-date"),
       base44.entities.YearlyEvent.list("-start_date", 500),
     ]);
@@ -215,15 +219,15 @@ export default function Availability() {
     });
     setUnavailabilities(weekUnavailabilities);
 
-    // Batch 2: templates (cached) + chef assignments + all week availabilities (concurrent)
-    const [templatesData, assignmentsData, weekAvailsData] = await Promise.all([
+    // Batch 2: templates (cached) + all week availabilities
+    const [templatesData, weekAvailsData] = await Promise.all([
       getCachedTemplates(base44.entities),
-      base44.entities.Assignment.filter({ chef_id: worker.id }),
       base44.entities.Availability.filter({ week_start_date: weekStartStr }),
     ]);
 
-    // Batch 3: sous/additional assignments + week-scoped template rows in ONE list call
-    const [sousAssignments, additionalAssignments, allTemplateRowsData] = await Promise.all([
+    // Batch 3: all assignments for this worker + template rows
+    const [assignmentsData, sousAssignments, additionalAssignments, allTemplateRowsData] = await Promise.all([
+      base44.entities.Assignment.filter({ chef_id: worker.id }),
       base44.entities.Assignment.filter({ sous_chef_id: worker.id }),
       base44.entities.Assignment.filter({ additional_chef_id: worker.id }),
       base44.entities.TemplateRow.list(),
