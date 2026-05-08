@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { usePageState } from "@/hooks/usePageState";
 import { base44 } from "@/api/base44Client";
+import { getCachedAllSettings, getCachedWorkers, getCachedTemplates } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -149,23 +150,27 @@ export default function Matrix() {
     loadDynamicData(false);
   }, [currentDate, viewMode]);
 
-  // Real-time subscriptions — never show loading spinner
+  // Keep a ref to debouncedLoadData so subscriptions always call the latest version
+  const debouncedLoadDataRef = useRef(null);
+  debouncedLoadDataRef.current = debouncedLoadData;
+
+  // Real-time subscriptions — register once on mount only
   useEffect(() => {
     const unsubAssignment = base44.entities.Assignment.subscribe(() => {
-      debouncedLoadData(true);
+      debouncedLoadDataRef.current(true);
     });
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
-      debouncedLoadData(true);
+      debouncedLoadDataRef.current(true);
     });
     return () => {
       unsubAssignment();
       unsubTemplateRow();
     };
-  }, [currentDate, viewMode]);
+  }, []);
 
   const refreshWorkers = async () => {
     try {
-      const workersData = await base44.entities.Worker.filter({ active: true });
+      const workersData = await getCachedWorkers(base44.entities);
       setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
     } catch (error) {
       console.error('Error refreshing workers:', error);
@@ -174,33 +179,23 @@ export default function Matrix() {
 
   const loadStaticData = async () => {
     try {
-      // Batch 1: workers + trackers
-    const [workersData, trackersData] = await Promise.all([
-      base44.entities.Worker.filter({ active: true }),
-      base44.entities.Tracker.list()
-    ]);
+      // Use shared cache — avoids redundant API calls when navigating between pages
+      const [workersData, allSettings, trackersData] = await Promise.all([
+        getCachedWorkers(base44.entities),
+        getCachedAllSettings(base44.entities),
+        base44.entities.Tracker.list()
+      ]);
 
-    // Batch 2: settings
-    const [populationsSettings, workerRolesSettings, shiftStatusesSettings] = await Promise.all([
-      base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "shift_statuses" }),
-    ]);
+      const findSetting = (key) => allSettings.find(s => s.setting_key === key);
+      const parseSetting = (key) => { const s = findSetting(key); return s ? JSON.parse(s.setting_value) : null; };
 
-    // Batch 3: more settings
-    const [summaryColsSettings, scheduleParamsSettings] = await Promise.all([
-      base44.entities.AppSettings.filter({ setting_key: "matrix_summary_columns" }),
-      base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
-    ]);
-    if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
-    else setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
-    if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
-    else setWorkerRoles(["שף", "סו-שף"]);
-    if (shiftStatusesSettings.length > 0) setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
-    if (summaryColsSettings.length > 0) setSummaryColumns(JSON.parse(summaryColsSettings[0].setting_value) || []);
-    if (scheduleParamsSettings.length > 0) setScheduleParams(JSON.parse(scheduleParamsSettings[0].setting_value) || []);
-    setTrackers(trackersData);
-    setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
+      setPopulations(parseSetting("worker_populations") || ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
+      setWorkerRoles(parseSetting("worker_roles") || ["שף", "סו-שף"]);
+      setShiftStatuses(parseSetting("shift_statuses") || []);
+      setSummaryColumns(parseSetting("matrix_summary_columns") || []);
+      setScheduleParams(parseSetting("custom_schedule_params") || []);
+      setTrackers(trackersData);
+      setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
     } catch (error) {
       console.error('Error loading static matrix data:', error);
     }
@@ -233,12 +228,12 @@ export default function Matrix() {
           : base44.entities.Unavailability.list(),
       ]);
 
-      // Batch 3: template rows + templates
+      // Batch 3: template rows + templates (templates served from cache)
       const [templateRowsData, allTemplatesData] = await Promise.all([
         viewMode === "daily"
           ? base44.entities.TemplateRow.filter({ date: dateStr })
           : base44.entities.TemplateRow.list(),
-        base44.entities.Template.filter({ active: true })
+        getCachedTemplates(base44.entities)
       ]);
       
       // Filter weekly assignments and template rows
