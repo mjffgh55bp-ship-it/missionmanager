@@ -242,56 +242,14 @@ export default function Availability() {
     setAllTemplates(templatesData);
     setWeekAvailabilities(weekAvailsData);
 
-    // Reload open_registrations fresh from DB on every week load, then auto-clean stale entries
+    // Reload open_registrations fresh from DB — load ALL, do NOT auto-clean
+    // (cleaning is only done intentionally via the "נקה ישנות" button)
     const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
     const freshOpenReg = openRegSettings.length > 0
       ? (() => { try { return JSON.parse(openRegSettings[0].setting_value); } catch { return []; } })()
       : [];
 
-    // Build valid group keys from the just-loaded templateRowsData (week-scoped)
-    const validGroupKeys = new Set(
-      templateRowsData.map(row => `${row.template_id}_${row.group_id || 'default'}`)
-    );
-
-    // Partition into valid and stale
-    const validRegs = freshOpenReg.filter(reg => {
-      const regName = reg?.name || (typeof reg === 'string' ? reg : '');
-      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
-      const regShifts = reg?.shifts || [];
-      if (STALE_REG_DENYLIST_STATIC.some(d => regName.includes(d) || regKey.includes(d))) return false;
-      if (regShifts.length === 0) return false;
-      if (!validGroupKeys.has(regKey)) return false;
-      return true;
-    });
-    const staleRegs = freshOpenReg.filter(reg => !validRegs.includes(reg));
-
-    // Always set only valid regs into state — never the raw full list
-    setOpenRegistrations(validRegs);
-
-    // Auto-clean stale entries from DB silently if any found
-    if (staleRegs.length > 0 && openRegSettings.length > 0) {
-      await base44.entities.AppSettings.update(openRegSettings[0].id, {
-        setting_value: JSON.stringify(validRegs)
-      });
-    }
-
-    // Clean extra_tasks keys from this worker's current availability
-    if (availabilities.length > 0) {
-      const avail = availabilities[0];
-      const tasks = avail.extra_tasks || {};
-      const keysToRemove = Object.keys(tasks).filter(k => {
-        const baseKey = k.split('__')[0];
-        // Remove if baseKey not in valid group keys, or matches denylist
-        if (!validGroupKeys.has(baseKey)) return true;
-        return STALE_REG_DENYLIST_STATIC.some(d => k.includes(d));
-      });
-      if (keysToRemove.length > 0) {
-        const cleanedTasks = { ...tasks };
-        keysToRemove.forEach(k => delete cleanedTasks[k]);
-        await base44.entities.Availability.update(avail.id, { extra_tasks: cleanedTasks });
-        setExtraTaskStates(cleanedTasks);
-      }
-    }
+    setOpenRegistrations(freshOpenReg);
   };
 
   // Legacy alias for components that call loadData()
