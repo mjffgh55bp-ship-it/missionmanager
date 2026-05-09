@@ -1001,7 +1001,14 @@ END:VEVENT
 
             {/* ── LEFT COLUMN: registration functions ── */}
             <div className="space-y-4 order-last lg:order-first">
-              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide px-1" dir="rtl">הרשמה</h2>
+              <div className="flex items-center gap-2 px-1" dir="rtl">
+                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide">הרשמה</h2>
+                {signupMode === "limit_sign_up" ? (
+                  <span className="text-xs bg-orange-100 text-orange-700 font-medium px-2 py-0.5 rounded-full">הגבלת הרשמה</span>
+                ) : (
+                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">הרשמה חופשית</span>
+                )}
+              </div>
 
               {/* Action bar: desired count + submit/edit buttons */}
               <div className="flex flex-wrap items-center gap-2 bg-white border rounded-xl px-3 py-2 shadow-sm">

@@ -4,8 +4,10 @@ import { getCachedWorkers, getCachedTemplates, getCachedAllSettings } from "@/li
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Pencil } from "lucide-react";
-import { format, addDays, subDays, startOfWeek } from "date-fns";
+import { Plus, Trash2, Pencil, X, Copy, UserCheck, Users } from "lucide-react";
+import { format, addDays, subDays, startOfWeek, differenceInDays } from "date-fns";
+import { getHebrewDate } from "../components/utils/HebrewDate";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 import toast from 'react-hot-toast';
 
@@ -18,6 +20,16 @@ const formatDateHebrew = (date) => {
   const day = d.getDate();
   const year = d.getFullYear();
   return `${day} ${monthName}, ${year}`;
+};
+
+const getCustomWeekNumber = (date) => {
+  const year = date.getFullYear();
+  const dec28PrevYear = new Date(year - 1, 11, 28);
+  const weekStartDec28 = new Date(dec28PrevYear);
+  weekStartDec28.setDate(dec28PrevYear.getDate() - dec28PrevYear.getDay());
+  const diffDays = differenceInDays(date, weekStartDec28);
+  if (diffDays < 0) return 0;
+  return Math.floor(diffDays / 7) + 1;
 };
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -377,53 +389,82 @@ export default function Schedule() {
           <CardHeader className="border-b bg-white pb-0">
             <div className="flex flex-col gap-3">
               {/* Top row: title + controls */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-wrap">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-wrap" dir="rtl">
                 <div className="flex items-center gap-2">
-                  <CardTitle className="text-2xl" dir="rtl">לוח</CardTitle>
+                  <CardTitle className="text-2xl">לוח</CardTitle>
                   {isDailyLoading && <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-700 rounded-full animate-spin" />}
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <div className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[160px] text-center cursor-pointer hover:bg-blue-800 transition-colors" dir="rtl">{formatDateHebrew(currentDate)}</div>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={currentDate}
-                        onSelect={(date) => date && setCurrentDate(date)}
-                        disabled={(date) => false}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
-                  <Button variant="outline" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
-                  <div className="w-px h-6 bg-gray-300 mx-1" />
-                  <Button
-                    variant={editMode ? "default" : "outline"}
-                    onClick={() => setEditMode(!editMode)}
-                    className={editMode ? "bg-purple-600 hover:bg-purple-700" : ""}
-                    dir="rtl">
-                    <Pencil className="w-4 h-4 ml-2" />
-                    {editMode ? 'סיים עריכה' : 'עריכה'}
-                  </Button>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  {/* Edit mode toolbar — shown in edit mode */}
                   {editMode && (
-                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowPresetsDialog(true)} dir="rtl">
-                      <Plus className="w-4 h-4 ml-2" />הוסף מוקד
-                    </Button>
+                    <>
+                      {templateRows.length > 0 && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="destructive" size="icon" onClick={async () => {
+                                if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
+                                  for (const row of templateRows) {
+                                    await base44.entities.TemplateRow.delete(row.id);
+                                  }
+                                  loadData();
+                                }
+                              }}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent dir="rtl">מחק את כל המוקדים</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowPresetsDialog(true)} dir="rtl">
+                        <Plus className="w-4 h-4 ml-1" />הוסף מוקד
+                      </Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" onClick={() => setEditMode(false)}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent dir="rtl">צא ממצב עריכה</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </>
                   )}
-                  {editMode && templateRows.length > 0 && (
-                    <Button variant="destructive" onClick={async () => {
-                      if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
-                        for (const row of templateRows) {
-                          await base44.entities.TemplateRow.delete(row.id);
-                        }
-                        loadData();
-                      }
-                    }} dir="rtl">
-                      <Trash2 className="w-4 h-4 ml-2" />מחק הכל
-                    </Button>
+
+                  {/* Date navigation — always visible */}
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" onClick={() => setCurrentDate(new Date())} size="sm" dir="rtl">היום</Button>
+                    <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <div className="px-3 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[150px] text-center cursor-pointer hover:bg-blue-800 transition-colors text-sm" dir="rtl">{formatDateHebrew(currentDate)}</div>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={currentDate}
+                          onSelect={(date) => date && setCurrentDate(date)}
+                          disabled={(date) => false}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
+                  </div>
+
+                  {/* Edit mode toggle — icon-only when not in edit mode */}
+                  {!editMode && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" size="icon" onClick={() => setEditMode(true)}>
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent dir="rtl">מצב עריכה</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                 </div>
               </div>
@@ -431,19 +472,26 @@ export default function Schedule() {
               {/* Week days navigation bar */}
               {(() => {
                 const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+                const weekNum = getCustomWeekNumber(weekStart);
                 return (
                   <div className="flex gap-1 pb-2" dir="rtl">
+                    {/* Week number label */}
+                    <div className="flex flex-col items-center justify-center px-2 text-[10px] text-gray-400 font-medium min-w-[32px]">
+                      <span>שב׳</span>
+                      <span className="text-gray-500 font-bold">{weekNum}</span>
+                    </div>
                     {Array.from({ length: 7 }).map((_, i) => {
                       const day = addDays(weekStart, i);
                       const dayStr = format(day, "yyyy-MM-dd");
                       const todayStr = format(new Date(), "yyyy-MM-dd");
                       const isSelected = dayStr === dateString;
                       const isToday = dayStr === todayStr;
+                      const hebDate = getHebrewDate(day);
                       return (
                         <button
                           key={i}
                           onClick={() => setCurrentDate(day)}
-                          className={`flex flex-col items-center px-3 py-1.5 rounded-lg text-xs transition-all duration-150 flex-1 ${
+                          className={`flex flex-col items-center px-2 py-1.5 rounded-lg text-xs transition-all duration-150 flex-1 ${
                             isSelected
                               ? "bg-blue-900 text-white font-semibold"
                               : isToday
@@ -451,10 +499,13 @@ export default function Schedule() {
                               : "text-gray-600 hover:bg-gray-100"
                           }`}
                         >
-                          <span className={`text-[11px] ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
-                            {format(day, "d/M")}
+                          <span className="font-medium text-[12px]">{HEBREW_DAYS[day.getDay()]}</span>
+                          <span className={`text-[10px] ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
+                            {format(day, "d.M")}
                           </span>
-                          <span className="font-medium">{HEBREW_DAYS[day.getDay()]}</span>
+                          <span className={`text-[9px] ${isSelected ? "text-blue-300" : "text-gray-400"}`}>
+                            {hebDate.dayHeb}
+                          </span>
                         </button>
                       );
                     })}
@@ -583,68 +634,82 @@ export default function Schedule() {
                           )}
                         </div>
                         {editMode && (
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleDuplicateMoked(group)} dir="rtl">
-                              <Plus className="w-3 h-3 ml-1" />שכפל מוקד
-                            </Button>
-                            {(() => {
-                              const isOpen = openRegistrations.some((r) => r && r.key === group.key);
-                              return (
-                                <Button
-                                  size="sm"
-                                  variant={isOpen ? "default" : "outline"}
-                                  className={isOpen ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
-                                  onClick={async () => {
-                                    let updated;
-                                    if (isOpen) {
-                                      updated = openRegistrations.filter((r) => r && r.key !== group.key);
-                                    } else {
-                                      const rowShifts = templateRowsForTemplate
-                                        .map((row) => ({
-                                          start_time: row.values?.["התחלה"] || row.values?.["שעת התחלה"] || null,
-                                          end_time: row.values?.["סיום"] || row.values?.["שעת סיום"] || null
-                                        }))
-                                        .filter((s) => s.start_time && s.end_time);
-                                      const entry = {
-                                        key: group.key,
-                                        name: template.name,
-                                        date: dateString,
-                                        shifts: rowShifts.length > 0 ? rowShifts : []
-                                      };
-                                      updated = [...openRegistrations, entry];
-                                    }
-                                    setOpenRegistrations(updated);
-                                    const settings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
-                                    const data = { setting_key: "open_registrations", setting_value: JSON.stringify(updated) };
-                                    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                                    else await base44.entities.AppSettings.create(data);
-                                    toast.success(!isOpen ? `הרשמה לـ"${template.name}" נפתחה` : `הרשמה לـ"${template.name}" נסגרה`);
-                                  }}
-                                  dir="rtl">
-                                  <Plus className="w-3 h-3 ml-1" />{isOpen ? "בטל הרשמה" : "אפשר הרשמה"}
-                                </Button>
-                              );
-                            })()}
-                            <Button size="sm" variant="destructive"
-                              onClick={async () => {
-                                if (confirm(`האם למחוק את המוקד "${template.name}" מהלוח?`)) {
-                                  for (const row of templateRowsForTemplate) {
-                                    await base44.entities.TemplateRow.delete(row.id);
-                                  }
-                                  // Remove this group's key from open_registrations so it doesn't leave phantoms in Availability
-                                  const updatedRegs = openRegistrations.filter(r => r && r.key !== group.key);
-                                  if (updatedRegs.length !== openRegistrations.length) {
-                                    setOpenRegistrations(updatedRegs);
-                                    const regSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
-                                    const regData = { setting_key: "open_registrations", setting_value: JSON.stringify(updatedRegs) };
-                                    if (regSettings.length > 0) await base44.entities.AppSettings.update(regSettings[0].id, regData);
-                                    else await base44.entities.AppSettings.create(regData);
-                                  }
-                                  loadData();
-                                }
-                              }} dir="rtl">
-                              <Trash2 className="w-3 h-3 ml-1" />מחק מוקד
-                            </Button>
+                          <div className="flex gap-1">
+                            <TooltipProvider>
+                              {/* Delete moked */}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button size="icon" variant="destructive" className="h-7 w-7"
+                                    onClick={async () => {
+                                      if (confirm(`האם למחוק את המוקד "${template.name}" מהלוח?`)) {
+                                        for (const row of templateRowsForTemplate) {
+                                          await base44.entities.TemplateRow.delete(row.id);
+                                        }
+                                        const updatedRegs = openRegistrations.filter(r => r && r.key !== group.key);
+                                        if (updatedRegs.length !== openRegistrations.length) {
+                                          setOpenRegistrations(updatedRegs);
+                                          const regSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
+                                          const regData = { setting_key: "open_registrations", setting_value: JSON.stringify(updatedRegs) };
+                                          if (regSettings.length > 0) await base44.entities.AppSettings.update(regSettings[0].id, regData);
+                                          else await base44.entities.AppSettings.create(regData);
+                                        }
+                                        loadData();
+                                      }
+                                    }}>
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent dir="rtl">מחק מוקד</TooltipContent>
+                              </Tooltip>
+
+                              {/* Allow registration */}
+                              {(() => {
+                                const isOpen = openRegistrations.some((r) => r && r.key === group.key);
+                                return (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        className={`h-7 w-7 ${isOpen ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+                                        onClick={async () => {
+                                          let updated;
+                                          if (isOpen) {
+                                            updated = openRegistrations.filter((r) => r && r.key !== group.key);
+                                          } else {
+                                            const rowShifts = templateRowsForTemplate
+                                              .map((row) => ({
+                                                start_time: row.values?.["התחלה"] || row.values?.["שעת התחלה"] || null,
+                                                end_time: row.values?.["סיום"] || row.values?.["שעת סיום"] || null
+                                              }))
+                                              .filter((s) => s.start_time && s.end_time);
+                                            const entry = { key: group.key, name: template.name, date: dateString, shifts: rowShifts.length > 0 ? rowShifts : [] };
+                                            updated = [...openRegistrations, entry];
+                                          }
+                                          setOpenRegistrations(updated);
+                                          const settings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
+                                          const data = { setting_key: "open_registrations", setting_value: JSON.stringify(updated) };
+                                          if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+                                          else await base44.entities.AppSettings.create(data);
+                                          toast.success(!isOpen ? `הרשמה לـ"${template.name}" נפתחה` : `הרשמה לـ"${template.name}" נסגרה`);
+                                        }}>
+                                        <UserCheck className="w-3 h-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent dir="rtl">{isOpen ? "הרשמה פתוחה" : "אפשר הרשמה"}</TooltipContent>
+                                  </Tooltip>
+                                );
+                              })()}
+
+                              {/* Duplicate moked */}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => handleDuplicateMoked(group)}>
+                                    <Copy className="w-3 h-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent dir="rtl">שכפל מוקד</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         )}
                       </div>
