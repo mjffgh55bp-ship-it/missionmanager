@@ -389,84 +389,83 @@ export default function Schedule() {
           <CardHeader className="border-b bg-white pb-0">
             <div className="flex flex-col gap-3">
               {/* Top row: title + controls */}
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 flex-wrap" dir="rtl">
+              <div className="flex items-center gap-2 flex-wrap" dir="rtl">
                 <div className="flex items-center gap-2">
                   <CardTitle className="text-2xl">לוח</CardTitle>
                   {isDailyLoading && <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-700 rounded-full animate-spin" />}
                 </div>
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                  {/* Edit mode toolbar — shown in edit mode */}
-                  {editMode && (
-                    <>
-                      {templateRows.length > 0 && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button variant="destructive" size="icon" onClick={async () => {
-                                if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
-                                  for (const row of templateRows) {
-                                    await base44.entities.TemplateRow.delete(row.id);
-                                  }
-                                  loadData();
-                                }
-                              }}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent dir="rtl">מחק את כל המוקדים</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                      <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowPresetsDialog(true)} dir="rtl">
-                        <Plus className="w-4 h-4 ml-1" />הוסף מוקד
-                      </Button>
+
+                {/* Date navigation — always on the right (mr-auto pushes it right in RTL) */}
+                <div className="flex items-center gap-1 mr-auto">
+                  <Button variant="outline" onClick={() => setCurrentDate(new Date())} size="sm" dir="rtl">היום</Button>
+                  <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <div className="px-3 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[150px] text-center cursor-pointer hover:bg-blue-800 transition-colors text-sm" dir="rtl">{formatDateHebrew(currentDate)}</div>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={currentDate}
+                        onSelect={(date) => date && setCurrentDate(date)}
+                        disabled={(date) => false}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
+                </div>
+
+                {/* Edit mode toolbar — shown in edit mode */}
+                {editMode && (
+                  <>
+                    {templateRows.length > 0 && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="outline" size="icon" onClick={() => setEditMode(false)}>
-                              <X className="w-4 h-4" />
+                            <Button variant="destructive" size="icon" onClick={async () => {
+                              if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
+                                for (const row of templateRows) {
+                                  await base44.entities.TemplateRow.delete(row.id);
+                                }
+                                loadData();
+                              }
+                            }}>
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent dir="rtl">צא ממצב עריכה</TooltipContent>
+                          <TooltipContent dir="rtl">מחק את כל המוקדים</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                    </>
-                  )}
-
-                  {/* Date navigation — always visible */}
-                  <div className="flex items-center gap-1">
-                    <Button variant="outline" onClick={() => setCurrentDate(new Date())} size="sm" dir="rtl">היום</Button>
-                    <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <div className="px-3 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[150px] text-center cursor-pointer hover:bg-blue-800 transition-colors text-sm" dir="rtl">{formatDateHebrew(currentDate)}</div>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={currentDate}
-                          onSelect={(date) => date && setCurrentDate(date)}
-                          disabled={(date) => false}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
-                  </div>
-
-                  {/* Edit mode toggle — icon-only when not in edit mode */}
-                  {!editMode && (
+                    )}
+                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => setShowPresetsDialog(true)} dir="rtl">
+                      <Plus className="w-4 h-4 ml-1" />הוסף מוקד
+                    </Button>
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="outline" size="icon" onClick={() => setEditMode(true)}>
-                            <Pencil className="w-4 h-4" />
+                          <Button variant="outline" size="icon" onClick={() => setEditMode(false)}>
+                            <X className="w-4 h-4" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent dir="rtl">מצב עריכה</TooltipContent>
+                        <TooltipContent dir="rtl">צא ממצב עריכה</TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                  )}
-                </div>
+                  </>
+                )}
+
+                {/* Edit mode toggle — icon-only when not in edit mode */}
+                {!editMode && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={() => setEditMode(true)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent dir="rtl">מצב עריכה</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
               </div>
 
               {/* Week days navigation bar */}
