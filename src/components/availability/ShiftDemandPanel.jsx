@@ -280,13 +280,18 @@ export default function ShiftDemandPanel({
               title="הוסף אילוץ"
               className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 transition-colors"
             >
-              <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5">
-                <rect x="2" y="4" width="16" height="13" rx="2" stroke="#dc2626" strokeWidth="1.5"/>
-                <line x1="2" y1="8" x2="18" y2="8" stroke="#dc2626" strokeWidth="1.5"/>
-                <line x1="6" y1="2" x2="6" y2="6" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
-                <line x1="14" y1="2" x2="14" y2="6" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
-                <line x1="7.5" y1="11.5" x2="12.5" y2="16.5" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
-                <line x1="12.5" y1="11.5" x2="7.5" y2="16.5" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round"/>
+              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4">
+                {/* Calendar body */}
+                <rect x="1" y="3" width="14" height="12" rx="1.5" stroke="#dc2626" strokeWidth="1.4"/>
+                {/* Header bar */}
+                <rect x="1" y="3" width="14" height="4" rx="1.5" fill="#dc2626" opacity="0.15"/>
+                <line x1="1" y1="7" x2="15" y2="7" stroke="#dc2626" strokeWidth="1.4"/>
+                {/* Binding pegs */}
+                <line x1="5" y1="1.5" x2="5" y2="4.5" stroke="#dc2626" strokeWidth="1.4" strokeLinecap="round"/>
+                <line x1="11" y1="1.5" x2="11" y2="4.5" stroke="#dc2626" strokeWidth="1.4" strokeLinecap="round"/>
+                {/* X in body */}
+                <line x1="5.5" y1="9.5" x2="10.5" y2="13.5" stroke="#dc2626" strokeWidth="1.4" strokeLinecap="round"/>
+                <line x1="10.5" y1="9.5" x2="5.5" y2="13.5" stroke="#dc2626" strokeWidth="1.4" strokeLinecap="round"/>
               </svg>
             </button>
           )}
