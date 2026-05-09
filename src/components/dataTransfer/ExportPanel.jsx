@@ -156,17 +156,26 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(manifestData), SHEET_MANIFEST);
 
     // ── Sheet 2: MokedTemplates ───────────────────────────────────────────────
-    // Collect only templates that appear in filtered rows
+    // Collect only templates that appear in filtered rows, skip non-exportable
     const usedTemplateIds = new Set(filteredRows.map(r => r.template_id));
-    const usedTemplates = allTemplates.filter(t => usedTemplateIds.has(t.id));
+    const usedTemplates = allTemplates.filter(t => usedTemplateIds.has(t.id) && t.is_exportable !== false);
 
-    const tmplHeader = ["template_id", "template_name", "color", "is_default", "active"];
+    const tmplHeader = [
+      "template_id", "template_name", "color", "is_default", "active",
+      "template_mapping_id", "exported_template_name", "local_template_name",
+      "is_importable", "is_exportable",
+    ];
     const tmplRows = usedTemplates.map(t => [
       t.id,
-      sanitizeText(t.name),
+      sanitizeText(t.export_name || t.name),  // use export_name if set (security)
       t.color || "#3b82f6",
       t.is_default ? "true" : "false",
       t.active !== false ? "true" : "false",
+      sanitizeText(t.mapping_id || ""),
+      sanitizeText(t.export_name || t.name),
+      sanitizeText(t.name),
+      t.is_importable !== false ? "true" : "false",
+      t.is_exportable !== false ? "true" : "false",
     ]);
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([tmplHeader, ...tmplRows]), SHEET_MOKED_TEMPLATES);
 
@@ -177,6 +186,8 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       "display_name", "internal_value_key", "type", "width",
       "default_value", "options_json", "role_filter", "is_worker_column",
       "is_task_column",
+      "column_mapping_id", "exported_column_name", "local_column_name",
+      "is_importable", "is_exportable",
     ];
     const colRows = [];
     // Find the first date each template appears on (for effective column resolution)
@@ -188,16 +199,18 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       const firstDate = firstDateByTemplate[t.id] || dates[0];
       const effectiveCols = getEffectiveColumns(t, firstDate);
       effectiveCols.forEach((col, idx) => {
+        if (col.is_exportable === false) return; // skip non-exportable columns
         const isTask = col.type === "task";
         const internalKey = isTask ? "task" : getInternalValueKey(col);
         const isWorker = !isTask && (col.type === "worker" || isKnownWorkerCol(col.name));
+        const exportedColName = col.export_name || col.name;
         colRows.push([
           t.id,
-          sanitizeText(t.name),
+          sanitizeText(t.export_name || t.name),
           idx,
-          sanitizeText(isTask ? "משימה" : col.name),  // column_name
-          sanitizeText(isTask ? "משימה" : col.name),  // display_name
-          sanitizeText(internalKey),                   // internal_value_key
+          sanitizeText(isTask ? "משימה" : exportedColName),  // column_name (exported)
+          sanitizeText(isTask ? "משימה" : exportedColName),  // display_name
+          sanitizeText(internalKey),
           sanitizeText(isTask ? "task" : col.type || "text"),
           col.width || 120,
           sanitizeText(col.default_value || ""),
@@ -205,14 +218,20 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
           sanitizeText(col.role_filter || ""),
           isWorker ? "true" : "false",
           isTask   ? "true" : "false",
+          sanitizeText(col.mapping_id || ""),
+          sanitizeText(isTask ? "משימה" : exportedColName),
+          sanitizeText(isTask ? "משימה" : col.name),
+          col.is_importable !== false ? "true" : "false",
+          col.is_exportable !== false ? "true" : "false",
         ]);
       });
       // Always add the implicit "status" column at the end
       colRows.push([
-        t.id, sanitizeText(t.name),
+        t.id, sanitizeText(t.export_name || t.name),
         effectiveCols.length,
         "status", "סטטוס", "status", "select", 100,
         "", "", "", "false", "false",
+        "", "status", "status", "true", "true",
       ]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([colHeader, ...colRows]), SHEET_MOKED_COLUMNS);
@@ -240,6 +259,9 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       "group_id", "_order", "column_name", "display_name",
       "internal_value_key", "column_type", "is_worker_column", "is_task_column",
       "value_raw", "value_exported",
+      "template_mapping_id", "column_mapping_id",
+      "exported_template_name", "exported_column_name",
+      "local_template_name", "local_column_name",
     ];
     const valRows = [];
 
@@ -254,10 +276,13 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       const allCols = [...effectiveCols, { name: "status", type: "select", _isStatusCol: true }];
 
       allCols.forEach(col => {
+        if (!col._isStatusCol && col.is_exportable === false) return; // skip non-exportable
         const isTask   = !col._isStatusCol && col.type === "task";
         const internalKey = col._isStatusCol ? "status" : (isTask ? "task" : getInternalValueKey(col));
-        const columnName  = col._isStatusCol ? "status" : (isTask ? "משימה" : col.name);
-        const displayName = col._isStatusCol ? "סטטוס" : (isTask ? "משימה" : col.name);
+        const exportedColName = col._isStatusCol ? "status" : (col.export_name || (isTask ? "משימה" : col.name));
+        const localColName    = col._isStatusCol ? "status" : (isTask ? "משימה" : col.name);
+        const columnName  = exportedColName;  // use exported name in the file
+        const displayName = exportedColName;
         const isWorker = !col._isStatusCol && !isTask && (col.type === "worker" || isKnownWorkerCol(col.name));
 
         const rawVal = values[internalKey];
@@ -281,25 +306,31 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
         valRows.push([
           row.id,
           row.template_id,
-          sanitizeText(row.template_name || tmpl.name),
+          sanitizeText(tmpl.export_name || row.template_name || tmpl.name),
           row.date,
           sanitizeText(row.group_id || ""),
           row._stableOrder,
-          sanitizeText(columnName),       // column_name (משימה for task cols)
-          sanitizeText(displayName),      // display_name
-          sanitizeText(internalKey),      // internal_value_key (task for task cols)
+          sanitizeText(columnName),
+          sanitizeText(displayName),
+          sanitizeText(internalKey),
           sanitizeText(isTask ? "task" : col.type || "text"),
           isWorker ? "true" : "false",
           isTask   ? "true" : "false",
           sanitizeText(String(rawVal ?? "")),
           exportedVal,
+          sanitizeText(tmpl.mapping_id || ""),
+          sanitizeText(col._isStatusCol ? "" : (col.mapping_id || "")),
+          sanitizeText(tmpl.export_name || tmpl.name),
+          sanitizeText(exportedColName),
+          sanitizeText(tmpl.name),
+          sanitizeText(localColName),
         ]);
 
         // Export subTypes as a separate row if present
         if (subTypesExported) {
           valRows.push([
             row.id, row.template_id,
-            sanitizeText(row.template_name || tmpl.name),
+            sanitizeText(tmpl.export_name || row.template_name || tmpl.name),
             row.date,
             sanitizeText(row.group_id || ""),
             row._stableOrder,
@@ -309,6 +340,12 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
             "subtypes", "false", "false",
             sanitizeText(String(subTypesVal ?? "")),
             subTypesExported,
+            sanitizeText(tmpl.mapping_id || ""),
+            sanitizeText(col._isStatusCol ? "" : (col.mapping_id || "")),
+            sanitizeText(tmpl.export_name || tmpl.name),
+            sanitizeText(`${exportedColName}_subTypes`),
+            sanitizeText(tmpl.name),
+            sanitizeText(`${localColName}_subTypes`),
           ]);
         }
       });

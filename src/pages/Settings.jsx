@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check, Calendar, UserCog } from "lucide-react";
+import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check, Calendar, UserCog, Link } from "lucide-react";
+import MappingSettings from "@/components/settings/MappingSettings";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -385,6 +386,7 @@ export default function Settings() {
     { key: "schedule", label: "לוח ודוחות", icon: Calendar },
     { key: "workers", label: "עובדים", icon: UserCog },
     { key: "users", label: "משתמשים", icon: Users },
+    { key: "mapping", label: "מיפוי ייצוא/ייבוא", icon: Link },
   ];
 
   return (
@@ -897,6 +899,11 @@ export default function Settings() {
         </Card>
 
         </> /* end users tab */}
+
+        {/* === TAB: מיפוי ייצוא/ייבוא === */}
+        {activeTab === "mapping" && (
+          <MappingSettings />
+        )}
 
       </div>
     </div>

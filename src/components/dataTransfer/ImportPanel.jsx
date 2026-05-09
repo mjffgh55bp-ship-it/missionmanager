@@ -38,41 +38,56 @@ function parseSheet(ws) {
 }
 
 // ── Match an imported column entry to a live template column ──────────────────
-// Returns the matched live column object or null
+// Returns { col, matchMethod } or null
+// matchMethod: "mapping_id" | "internal_value_key" | "name" | null
 function matchColumn(importedCol, liveColumns) {
-  const { column_name, display_name, internal_value_key } = importedCol;
+  const { column_name, display_name, internal_value_key, column_mapping_id, local_column_name } = importedCol;
 
-  // 1. Exact column_name match
+  // 0. mapping_id — highest priority (cross-environment stable match)
+  if (column_mapping_id && column_mapping_id.trim()) {
+    const mid = column_mapping_id.trim();
+    const match = liveColumns.find(c => c.mapping_id && c.mapping_id === mid);
+    if (match) return { col: match, matchMethod: "mapping_id" };
+    // mapping_id present but no local match → signal missing_mapping_id (will be handled by caller)
+    return { col: null, matchMethod: "mapping_id_missing", mappingId: mid };
+  }
+
+  // 1. Exact column_name match (backward compat)
   let match = liveColumns.find(c => c.name === column_name);
-  if (match) return match;
+  if (match) return { col: match, matchMethod: "name" };
+
+  // Also try local_column_name if present (from newer exports)
+  if (local_column_name && local_column_name !== column_name) {
+    match = liveColumns.find(c => c.name === local_column_name);
+    if (match) return { col: match, matchMethod: "name" };
+  }
 
   // 2. Exact internal_value_key match — handles task type
-  //    (imported internal_value_key === "task" → find col where type === "task")
   if (internal_value_key === "task") {
     match = liveColumns.find(c => c.type === "task");
-    if (match) return match;
+    if (match) return { col: match, matchMethod: "internal_value_key" };
   }
 
   // 3. Normalized column_name match
   const nColName = normalizeForMatch(column_name);
   match = liveColumns.find(c => normalizeForMatch(c.name) === nColName);
-  if (match) return match;
+  if (match) return { col: match, matchMethod: "name" };
 
   // 4. Normalized display_name match
   if (display_name) {
     const nDisp = normalizeForMatch(display_name);
     match = liveColumns.find(c => normalizeForMatch(c.name) === nDisp);
-    if (match) return match;
+    if (match) return { col: match, matchMethod: "name" };
   }
 
   // 5. Alias: internal_value_key normalization
   if (internal_value_key) {
     const nKey = normalizeForMatch(internal_value_key);
     match = liveColumns.find(c => normalizeForMatch(getInternalValueKey(c)) === nKey);
-    if (match) return match;
+    if (match) return { col: match, matchMethod: "internal_value_key" };
   }
 
-  return null;
+  return { col: null, matchMethod: null };
 }
 
 // ── Find existing TemplateRow by row_id or by (template+date+group+order) ─────
@@ -252,15 +267,42 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     const templateById = {};
     allTemplates.forEach(t => { templateById[t.id] = t; });
 
+    // Build mapping_id → template lookup
+    const templateByMappingId = {};
+    allTemplates.forEach(t => { if (t.mapping_id) templateByMappingId[t.mapping_id] = t; });
+
     // ── STEP 3: Match templates ───────────────────────────────────────────────
     const { rows: importedTmplRows } = rawSheets.mokedTemplates;
-    const templateMatch = {}; // imported template_id → live Template
+    const templateMatch = {};       // imported template_id → live Template
+    const templateMatchMethod = {}; // imported template_id → matchMethod string
     importedTmplRows.forEach(it => {
-      // Try by ID first
+      // Priority 1: template_mapping_id (cross-environment stable match)
+      const mid = it.template_mapping_id?.trim();
+      if (mid) {
+        const byMid = templateByMappingId[mid];
+        if (byMid) {
+          templateMatch[it.template_id] = byMid;
+          templateMatchMethod[it.template_id] = "mapping_id";
+          return;
+        }
+        // mapping_id present but no local match → skip with specific warning
+        templateMatch[it.template_id] = null;
+        templateMatchMethod[it.template_id] = "mapping_id_missing";
+        return;
+      }
+      // Priority 2: same-environment template_id
       let live = templateById[it.template_id];
-      // Fallback by normalized name
-      if (!live) live = templateByName[normalizeForMatch(it.template_name)];
-      templateMatch[it.template_id] = live || null;
+      if (live) { templateMatch[it.template_id] = live; templateMatchMethod[it.template_id] = "template_id"; return; }
+      // Priority 3: normalized name fallback
+      // Try exported_template_name, local_template_name, then template_name
+      for (const nameField of [it.local_template_name, it.exported_template_name, it.template_name]) {
+        if (nameField) {
+          live = templateByName[normalizeForMatch(nameField)];
+          if (live) { templateMatch[it.template_id] = live; templateMatchMethod[it.template_id] = "name"; return; }
+        }
+      }
+      templateMatch[it.template_id] = null;
+      templateMatchMethod[it.template_id] = "not_found";
     });
 
     // ── STEP 4: Match columns ─────────────────────────────────────────────────
@@ -288,17 +330,21 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     });
 
     const colMatchKey = (tid, colName) => `${tid}::${colName}`;
-    const colMatchResult = {}; // key → { importedCol, liveCol, action, internalKey, reason, matchedSource }
+    const colMatchResult = {}; // key → { importedCol, liveCol, action, internalKey, reason, matchedSource, matchMethod }
 
     Object.entries(importedColsByTemplate).forEach(([tid, cols]) => {
       const liveTemplate = templateMatch[tid];
       if (!liveTemplate) {
+        const isMappingIdMissing = templateMatchMethod[tid] === "mapping_id_missing";
         cols.forEach(ic => {
           const key = colMatchKey(tid, ic.column_name);
           if (ic.column_name === "status") {
-            colMatchResult[key] = { importedCol: ic, liveCol: null, action: "status", internalKey: "status", matchedSource: "implicit" };
+            colMatchResult[key] = { importedCol: ic, liveCol: null, action: "status", internalKey: "status", matchedSource: "implicit", matchMethod: "implicit" };
           } else {
-            colMatchResult[key] = { importedCol: ic, liveCol: null, action: "no_template", internalKey: null, reason: "תבנית לא קיימת", matchedSource: "not_found" };
+            const reason = isMappingIdMissing
+              ? `מוקד לא זוהה לפי מזהה מיפוי (${templateMatchMethod[tid]})`
+              : "תבנית לא קיימת";
+            colMatchResult[key] = { importedCol: ic, liveCol: null, action: "no_template", internalKey: null, reason, matchedSource: "not_found", matchMethod: null };
           }
         });
         return;
@@ -312,20 +358,27 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         const key = colMatchKey(tid, ic.column_name);
 
         if (ic.column_name === "status") {
-          colMatchResult[key] = { importedCol: ic, liveCol: null, action: "status", internalKey: "status", matchedSource: "implicit" };
+          colMatchResult[key] = { importedCol: ic, liveCol: null, action: "status", internalKey: "status", matchedSource: "implicit", matchMethod: "implicit" };
           return;
         }
 
         // Match against effective columns (Template.columns + dailyCustomColumns)
-        const liveCol = matchColumn(ic, effectiveCols);
+        const matchResult = matchColumn(ic, effectiveCols);
+        const { col: liveCol, matchMethod, mappingId } = matchResult;
 
         if (liveCol) {
           const isTask = liveCol.type === "task";
           const internalKey = isTask ? "task" : getInternalValueKey(liveCol);
           const matchedSource = templateColNames.has(liveCol.name) ? "template" : "daily_custom";
-          colMatchResult[key] = { importedCol: ic, liveCol, action: "matched", internalKey, matchedSource };
+          colMatchResult[key] = { importedCol: ic, liveCol, action: "matched", internalKey, matchedSource, matchMethod };
+        } else if (matchMethod === "mapping_id_missing") {
+          colMatchResult[key] = {
+            importedCol: ic, liveCol: null, action: "missing_mapping_id", internalKey: null,
+            reason: `עמודה לא זוהתה לפי מזהה מיפוי (${mappingId}) ולכן לא יובאה`,
+            matchedSource: "not_found", matchMethod: "mapping_id_missing",
+          };
         } else {
-          colMatchResult[key] = { importedCol: ic, liveCol: null, action: "missing", internalKey: null, reason: "עמודה לא קיימת בתבנית או בעמודות יומיות", matchedSource: "not_found" };
+          colMatchResult[key] = { importedCol: ic, liveCol: null, action: "missing", internalKey: null, reason: "עמודה לא קיימת בתבנית או בעמודות יומיות", matchedSource: "not_found", matchMethod: null };
         }
       });
     });
@@ -383,11 +436,31 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         // These are NOT in MokedColumns; validate via parent column in effectiveColumns
         if (colName.endsWith("_subTypes")) {
           const parentColName = colName.slice(0, -"_subTypes".length);
-          // Resolve the actual parent key using effective columns
-          const parentEffectiveCol = effectiveColsForRow.find(c => c.name === parentColName || (c.type === "task" && parentColName === "משימה"));
-          const parentInternalKey  = parentEffectiveCol ? (parentEffectiveCol.type === "task" ? "task" : getInternalValueKey(parentEffectiveCol)) : null;
-          // Only import if parent column exists in effective columns
-          if (!effectiveColNames.has(parentColName) || !parentInternalKey) {
+
+          // Try mapping_id resolution first for subTypes parent
+          let parentEffectiveCol = null;
+          const parentColMid = iv.column_mapping_id?.trim();
+          if (parentColMid) {
+            parentEffectiveCol = effectiveColsForRow.find(c => c.mapping_id && c.mapping_id === parentColMid);
+          }
+          // Fallback: resolve by column name
+          if (!parentEffectiveCol) {
+            parentEffectiveCol = effectiveColsForRow.find(c =>
+              c.name === parentColName ||
+              (c.type === "task" && parentColName === "משימה") ||
+              (c.name === iv.local_column_name?.replace(/_subTypes$/, ""))
+            );
+          }
+          const parentInternalKey = parentEffectiveCol
+            ? (parentEffectiveCol.type === "task" ? "task" : getInternalValueKey(parentEffectiveCol))
+            : null;
+
+          // Only import if parent column resolved
+          if (!parentEffectiveCol || !parentInternalKey) {
+            if (parentColMid) {
+              // mapping_id present but not found locally
+              warnings.push(`עמודת subTypes "${colName}" לא זוהתה לפי מזהה מיפוי (${parentColMid}) ולכן לא יובאה`);
+            }
             fieldsDiag.push({ col: colName, internalKey: colName, rawVal: iv.value_exported, writtenVal: null, status: "skipped" });
             return;
           }
@@ -426,9 +499,13 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           return;
         }
 
-        if (!cm || cm.action === "missing" || cm.action === "no_template") {
+        if (!cm || cm.action === "missing" || cm.action === "no_template" || cm.action === "missing_mapping_id") {
           if (!isEmpty(iv.value_exported) || !isEmpty(iv.value_raw)) {
-            warnings.push(`עמודה "${colName}" לא קיימת בתבנית — תידלג`);
+            if (cm?.action === "missing_mapping_id") {
+              warnings.push(cm.reason || `עמודה לא זוהתה לפי מזהה מיפוי — תידלג`);
+            } else {
+              warnings.push(`עמודה "${colName}" לא קיימת בתבנית — תידלג`);
+            }
           }
           fieldsDiag.push({ col: colName, internalKey: null, rawVal: iv.value_exported, writtenVal: null, status: "skipped" });
           return;
@@ -525,18 +602,32 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
     // Column diagnostics summary
     const colDiagList = Object.values(colMatchResult).map(cm => ({
-      templateName:  templateMatch[cm.importedCol.template_id]?.name || cm.importedCol.template_name,
-      importedName:  cm.importedCol.column_name,
-      displayName:   cm.importedCol.display_name,
-      internalKey:   cm.internalKey,
-      liveColName:   cm.liveCol?.name || null,
-      liveColType:   cm.liveCol?.type || null,
-      action:        cm.action,
-      matchedSource: cm.matchedSource || null,
-      reason:        cm.reason || null,
+      templateName:        templateMatch[cm.importedCol.template_id]?.name || cm.importedCol.template_name,
+      importedName:        cm.importedCol.column_name,
+      displayName:         cm.importedCol.display_name,
+      importedMappingId:   cm.importedCol.column_mapping_id || null,
+      localColName:        cm.liveCol?.name || null,
+      internalKey:         cm.internalKey,
+      liveColName:         cm.liveCol?.name || null,
+      liveColType:         cm.liveCol?.type || null,
+      action:              cm.action,
+      matchedSource:       cm.matchedSource || null,
+      matchMethod:         cm.matchMethod || null,
+      reason:              cm.reason || null,
     }));
 
-    setPreview({ rowPlan, colDiagList, workerDiagAll });
+    // Template diagnostics summary (for Part 10)
+    const tmplDiagList = importedTmplRows.map(it => ({
+      importedId:          it.template_id,
+      importedMappingId:   it.template_mapping_id || null,
+      importedName:        it.template_name,
+      exportedName:        it.exported_template_name || null,
+      localName:           it.local_template_name || null,
+      liveTemplateName:    templateMatch[it.template_id]?.name || null,
+      matchMethod:         templateMatchMethod[it.template_id] || "not_found",
+    }));
+
+    setPreview({ rowPlan, colDiagList, tmplDiagList, workerDiagAll });
     setLoadingPreview(false);
   };
 
@@ -674,13 +765,16 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
 // ── Preview panel ─────────────────────────────────────────────────────────────
 function PreviewPanel({ preview, fileName, showColDiag, setShowColDiag, showRowDiag, setShowRowDiag, applying, onApply, onCancel }) {
-  const { rowPlan, colDiagList, workerDiagAll } = preview;
+  const { rowPlan, colDiagList, tmplDiagList, workerDiagAll } = preview;
+  const [showTmplDiag, setShowTmplDiag] = useState(false);
   const errCount  = rowPlan.filter(r => r.status === "שגיאה").length;
   const warnCount = rowPlan.filter(r => r.status === "אזהרה").length;
   const newCount  = rowPlan.filter(r => r.action === "create").length;
   const updCount  = rowPlan.filter(r => r.action === "update").length;
-  const missingCols = colDiagList.filter(c => c.action === "missing");
+  const missingCols = colDiagList.filter(c => c.action === "missing" || c.action === "missing_mapping_id");
+  const missingMappingIdCols = colDiagList.filter(c => c.action === "missing_mapping_id");
   const unresWorkers = workerDiagAll.filter(d => d.status === "unresolved");
+  const missingMappingIdTemplates = (tmplDiagList || []).filter(t => t.matchMethod === "mapping_id_missing");
 
   return (
     <div className="space-y-4">
@@ -697,11 +791,31 @@ function PreviewPanel({ preview, fileName, showColDiag, setShowColDiag, showRowD
         <Button variant="ghost" size="sm" onClick={onCancel}><X className="w-4 h-4" /></Button>
       </div>
 
-      {/* Missing columns alert */}
-      {missingCols.length > 0 && (
+      {/* Missing mapping_id templates alert */}
+      {missingMappingIdTemplates.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800 space-y-1">
+          <div className="font-semibold flex items-center gap-2"><AlertTriangle className="w-4 h-4" />מוקדים שלא זוהו לפי מזהה מיפוי — ידולגו:</div>
+          {missingMappingIdTemplates.map((t, i) => (
+            <div key={i} className="text-xs">מזהה מיפוי: "{t.importedMappingId}" (שם מיוצא: {t.importedName}) — לא נמצא מוקד מקומי עם מזהה זה</div>
+          ))}
+        </div>
+      )}
+
+      {/* Missing mapping_id columns alert */}
+      {missingMappingIdCols.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800 space-y-1">
+          <div className="font-semibold flex items-center gap-2"><AlertTriangle className="w-4 h-4" />עמודות שלא זוהו לפי מזהה מיפוי — ידולגו:</div>
+          {missingMappingIdCols.map((c, i) => (
+            <div key={i} className="text-xs">מזהה מיפוי: "{c.importedMappingId}" (שם מיוצא: "{c.importedName}", תבנית: {c.templateName})</div>
+          ))}
+        </div>
+      )}
+
+      {/* Missing columns alert (name-based) */}
+      {missingCols.filter(c => c.action === "missing").length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800 space-y-1">
           <div className="font-semibold flex items-center gap-2"><AlertTriangle className="w-4 h-4" />עמודות שלא נמצאו בתבנית — ידולגו:</div>
-          {missingCols.map((c, i) => (
+          {missingCols.filter(c => c.action === "missing").map((c, i) => (
             <div key={i} className="text-xs">"{c.importedName}" (תבנית: {c.templateName})</div>
           ))}
         </div>
@@ -715,6 +829,18 @@ function PreviewPanel({ preview, fileName, showColDiag, setShowColDiag, showRowD
             <div key={i} className="text-xs">"{d.rawValue}" (עמודה: {d.col})</div>
           ))}
         </div>
+      )}
+
+      {/* Template diagnostics */}
+      {tmplDiagList && tmplDiagList.length > 0 && (
+        <CollapsibleSection
+          title={`אבחון מוקדים (${tmplDiagList.length})`}
+          open={showTmplDiag}
+          onToggle={() => setShowTmplDiag(v => !v)}
+          icon={<Info className="w-4 h-4" />}
+        >
+          <TmplDiagTable tmplDiagList={tmplDiagList} />
+        </CollapsibleSection>
       )}
 
       {/* Column diagnostics */}
@@ -755,14 +881,53 @@ function PreviewPanel({ preview, fileName, showColDiag, setShowColDiag, showRowD
   );
 }
 
+// ── Template diagnostics table ─────────────────────────────────────────────────
+function TmplDiagTable({ tmplDiagList }) {
+  const methodLabel = {
+    mapping_id:         { label: "🔑 מזהה מיפוי",    cls: "text-green-700 font-semibold" },
+    mapping_id_missing: { label: "✗ מזהה לא נמצא",   cls: "text-orange-600 font-semibold" },
+    template_id:        { label: "ID זהה",            cls: "text-blue-600" },
+    name:               { label: "שם (fallback)",     cls: "text-yellow-700" },
+    not_found:          { label: "✗ לא נמצא",         cls: "text-red-600" },
+  };
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs" dir="rtl">
+        <thead>
+          <tr className="bg-gray-50 border-b">
+            <th className="px-2 py-1.5 text-right font-medium text-gray-600">מזהה מיפוי (ייבוא)</th>
+            <th className="px-2 py-1.5 text-right font-medium text-gray-600">שם מיוצא</th>
+            <th className="px-2 py-1.5 text-right font-medium text-gray-600">שם מקומי (התאמה)</th>
+            <th className="px-2 py-1.5 text-right font-medium text-gray-600">שיטת התאמה</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tmplDiagList.map((t, i) => {
+            const m = methodLabel[t.matchMethod] || { label: t.matchMethod || "—", cls: "text-gray-500" };
+            return (
+              <tr key={i} className="border-b">
+                <td className="px-2 py-1 font-mono text-xs text-purple-700">{t.importedMappingId || <span className="text-gray-400">—</span>}</td>
+                <td className="px-2 py-1">{t.exportedName || t.importedName}</td>
+                <td className="px-2 py-1 font-medium">{t.liveTemplateName || <span className="text-red-400">—</span>}</td>
+                <td className={`px-2 py-1 ${m.cls}`}>{m.label}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Column diagnostics table ───────────────────────────────────────────────────
 function ColDiagTable({ colDiagList }) {
   const actionLabel = {
-    matched:     { label: "✓ מותאם",              cls: "text-green-700" },
-    missing:     { label: "✗ חסר",                cls: "text-red-600" },
-    no_template: { label: "✗ תבנית לא נמצאה",     cls: "text-red-600" },
-    status:      { label: "→ עמודת סטטוס",         cls: "text-blue-600" },
-    skipped:     { label: "דולג",                  cls: "text-gray-400" },
+    matched:             { label: "✓ מותאם",              cls: "text-green-700" },
+    missing:             { label: "✗ חסר",                cls: "text-red-600" },
+    missing_mapping_id:  { label: "✗ מזהה מיפוי חסר",    cls: "text-orange-600" },
+    no_template:         { label: "✗ תבנית לא נמצאה",     cls: "text-red-600" },
+    status:              { label: "→ עמודת סטטוס",         cls: "text-blue-600" },
+    skipped:             { label: "דולג",                  cls: "text-gray-400" },
   };
   const sourceLabel = {
     template:      { label: "תבנית",        cls: "text-gray-600" },
@@ -770,16 +935,24 @@ function ColDiagTable({ colDiagList }) {
     implicit:      { label: "מובנה",        cls: "text-gray-400" },
     not_found:     { label: "—",            cls: "text-red-400" },
   };
+  const matchMethodLabel = {
+    mapping_id:         "🔑",
+    internal_value_key: "⚙",
+    name:               "שם",
+    implicit:           "מובנה",
+    mapping_id_missing: "✗",
+  };
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs" dir="rtl">
         <thead>
           <tr className="bg-gray-50 border-b">
             <th className="px-2 py-1.5 text-right font-medium text-gray-600">תבנית</th>
+            <th className="px-2 py-1.5 text-right font-medium text-gray-600">מזהה מיפוי</th>
             <th className="px-2 py-1.5 text-right font-medium text-gray-600">שם ייבוא</th>
-            <th className="px-2 py-1.5 text-right font-medium text-gray-600">שם בתבנית</th>
-            <th className="px-2 py-1.5 text-right font-medium text-gray-600">מפתח פנימי</th>
-            <th className="px-2 py-1.5 text-right font-medium text-gray-600">סוג</th>
+            <th className="px-2 py-1.5 text-right font-medium text-gray-600">שם מקומי</th>
+            <th className="px-2 py-1.5 text-right font-medium text-gray-600">מפתח כתיבה</th>
+            <th className="px-2 py-1.5 text-right font-medium text-gray-600">שיטה</th>
             <th className="px-2 py-1.5 text-right font-medium text-gray-600">מקור</th>
             <th className="px-2 py-1.5 text-right font-medium text-gray-600">פעולה</th>
           </tr>
@@ -788,13 +961,15 @@ function ColDiagTable({ colDiagList }) {
           {colDiagList.map((c, i) => {
             const a = actionLabel[c.action] || { label: c.action, cls: "text-gray-500" };
             const src = sourceLabel[c.matchedSource] || { label: c.matchedSource || "—", cls: "text-gray-400" };
+            const mm = matchMethodLabel[c.matchMethod] || "—";
             return (
               <tr key={i} className="border-b">
                 <td className="px-2 py-1 text-gray-500 text-xs">{c.templateName}</td>
+                <td className="px-2 py-1 font-mono text-xs text-purple-700">{c.importedMappingId || <span className="text-gray-300">—</span>}</td>
                 <td className="px-2 py-1 font-medium">{c.importedName}</td>
                 <td className="px-2 py-1">{c.liveColName || <span className="text-red-400">—</span>}</td>
                 <td className="px-2 py-1 font-mono text-xs text-blue-700">{c.internalKey || "—"}</td>
-                <td className="px-2 py-1 text-gray-500">{c.liveColType || "—"}</td>
+                <td className="px-2 py-1 text-center">{mm}</td>
                 <td className={`px-2 py-1 ${src.cls}`}>{src.label}</td>
                 <td className={`px-2 py-1 font-semibold ${a.cls}`}>{a.label}</td>
               </tr>
