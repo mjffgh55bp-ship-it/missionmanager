@@ -496,12 +496,11 @@ export default function Schedule() {
                               : "text-gray-600 hover:bg-gray-100"
                           }`}
                         >
-                          <span className="font-medium text-[12px]">{HEBREW_DAYS[day.getDay()]}</span>
-                          <span className={`text-[10px] ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
-                            {format(day, "d.M")}
-                          </span>
-                          <span className={`text-[9px] ${isSelected ? "text-blue-300" : "text-gray-400"}`}>
-                            {hebDate.dayHeb}
+                          <span className="font-medium text-[12px] leading-tight">{HEBREW_DAYS[day.getDay()]}</span>
+                          <span className={`text-[9px] leading-tight flex gap-0.5 items-center ${isSelected ? "text-blue-200" : "text-gray-400"}`}>
+                            <span>{format(day, "d.M")}</span>
+                            <span className="opacity-50">|</span>
+                            <span className="truncate max-w-[52px]">{hebDate.dayHeb} {hebDate.monthHeb}</span>
                           </span>
                         </button>
                       );

@@ -5,21 +5,21 @@ import { getCachedAllSettings, getCachedWorkers, getCachedTemplates } from "@/li
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { format, addDays, subDays, startOfWeek, endOfWeek, differenceInDays } from "date-fns";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarPicker } from "@/components/ui/calendar";
-import { ChevronLeft, ChevronRight, ChefHat, Send, Star, Check, Ban, Calendar, CalendarDays, Plus, Trash2, Lock, LockOpen, MessageCircle } from "lucide-react";
+import { format, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
+import { getOperationalStartDate } from "@/lib/operationalDate";
+// Popover/Calendar moved to MatrixHeader component
+import { ChevronLeft, ChevronRight, ChefHat, Send, Star, Check, Ban, Plus, Trash2, Lock, LockOpen, MessageCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import BriefingBar from "../components/matrix/BriefingBar";
 import WorkerLockButton from "../components/matrix/WorkerLockButton";
 import MasterControls from "../components/matrix/MasterControls";
 import SummaryColumnsDialog from "../components/matrix/SummaryColumnsDialog";
+import MatrixHeader from "../components/matrix/MatrixHeader";
 
 // Timeline: 00:00 → 24:00 (right to left in RTL)
 const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
@@ -50,18 +50,6 @@ const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }, weekStartDate = 
   return allSlots.slice(startIdx, endIdx);
 };
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
-
-const getCustomWeekNumber = (date) => {
-  const year = date.getFullYear();
-  const dec28PrevYear = new Date(year - 1, 11, 28);
-  const weekStartDec28 = new Date(dec28PrevYear);
-  weekStartDec28.setDate(dec28PrevYear.getDate() - dec28PrevYear.getDay());
-  const diffDays = differenceInDays(date, weekStartDec28);
-  if (diffDays < 0) return 0;
-  return Math.floor(diffDays / 7) + 1;
-};
-
-
 
 // Timeline: 00:00 (right, 0%) → 24:00 (left, 100%) in RTL
 const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
@@ -348,13 +336,13 @@ export default function Matrix() {
             briefingTime = sourceRow.values?.["תדריך"];
           }
         }
-        // Include if this continuation row is for the target date
-        shouldInclude = row.date === targetDate;
+        // Include if this continuation row is for the target date (operational date aware)
+        shouldInclude = row.date === targetDate || getOperationalStartDate(row.date, row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "06:00") === targetDate;
       } else {
         // For regular rows, check if worker is assigned directly
         isAssigned = Object.values(row.values).some(val => val === workerId);
-        // Include if this regular row is for the target date
-        shouldInclude = row.date === targetDate;
+        // Include if this regular row is for the target date (use schedule date, not operational date)
+        shouldInclude = row.date === targetDate || getOperationalStartDate(row.date, row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "06:00") === targetDate;
       }
       
       if (!isAssigned || !shouldInclude) return;
@@ -367,9 +355,12 @@ export default function Matrix() {
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
 
       if (startTime && endTime) {
+        // Use operational date: shifts 00:00-05:59 belong to the next calendar day
+        const effectiveDate = getOperationalStartDate(row.date, startTime);
         shifts.push({
           id: `template_${row.id}`,
-          date: row.date,
+          date: effectiveDate,
+          schedule_date: row.date,
           start_time: startTime,
           end_time: endTime,
           briefing_time: briefingTime,
@@ -1114,17 +1105,20 @@ export default function Matrix() {
     const weekStartStr = format(weekStart, 'yyyy-MM-dd');
     const weekEndStr = format(weekEnd, 'yyyy-MM-dd');
 
-    // Get all template row shifts for this worker in this week
+    // Get all template row shifts for this worker in this week (using operational date)
     const weeklyShifts = [];
     templateRows.forEach(row => {
-      if (!row.values || row.date < weekStartStr || row.date > weekEndStr) return;
+      if (!row.values) return;
       const isAssigned = Object.values(row.values).some(val => val === workerId);
       if (!isAssigned) return;
       const st = row.values?.['התחלה'] || row.values?.['שעת התחלה'];
       const et = row.values?.['סיום'] || row.values?.['שעת סיום'];
       if (st && et) {
+        // Operational date: 00:00-05:59 shifts belong to next calendar day
+        const effectiveDate = getOperationalStartDate(row.date, st);
+        if (effectiveDate < weekStartStr || effectiveDate > weekEndStr) return;
         weeklyShifts.push({
-          date: row.date,
+          date: effectiveDate,
           start_time: st,
           end_time: et,
           status: row.values?.status || null,
@@ -1174,7 +1168,9 @@ export default function Matrix() {
   };
 
   const AssignmentBar = ({ assignment }) => {
-    const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(assignment.date) : 0;
+    // For timeline position: use schedule_date (original date on schedule) if available, else date
+    const positionDate = assignment.schedule_date || assignment.date;
+    const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(positionDate) : 0;
     const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
     // Handle overnight shifts: if end hour < start hour, treat end as next day (+24h)
     const [startH] = assignment.start_time.split(':').map(Number);
@@ -1388,28 +1384,47 @@ export default function Matrix() {
     );
   };
 
+  const calcHours = (startTime, endTime) => {
+    if (!startTime || !endTime) return 0;
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+    let s = sh * 60 + sm, e = eh * 60 + em;
+    if (e <= s) e += 24 * 60;
+    return Math.max(0, (e - s) / 60);
+  };
+
   const WeeklySummary = ({ worker }) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const days = [];
+    let totalWeeklyHours = 0;
     
     for (let i = 0; i < 7; i++) {
       const d = format(addDays(weekStart, i), "yyyy-MM-dd");
-      
-      // Check template shifts for this specific day by calling the helper function
-      const dayTemplateShifts = getWorkerTemplateShifts(worker.id, d);
-      const hasTemplateShift = dayTemplateShifts.length > 0;
-      
-      days.push({ 
-        date: d, 
-        day: DAYS_OF_WEEK[i], 
-        working: hasTemplateShift 
-      });
+      const dayShifts = getWorkerTemplateShifts(worker.id, d);
+      const dayHours = dayShifts.reduce((sum, s) => sum + calcHours(s.start_time, s.end_time), 0);
+      totalWeeklyHours += dayHours;
+      days.push({ date: d, day: DAYS_OF_WEEK[i], hours: dayHours, working: dayShifts.length > 0 });
     }
     
+    if (viewMode === 'weekly') {
+      // In weekly view, show total hours prominently
+      return (
+        <div className="flex items-center gap-1">
+          <span className={`text-[10px] font-bold ${totalWeeklyHours > 0 ? 'text-blue-700' : 'text-gray-300'}`}>
+            {totalWeeklyHours > 0 ? `${Math.round(totalWeeklyHours * 10) / 10}h` : ''}
+          </span>
+        </div>
+      );
+    }
+
     return (
-      <div className="flex gap-1 ml-2">
+      <div className="flex gap-0.5 items-center">
         {days.map((d, i) => (
-          <div key={i} className={`text-[10px] font-medium ${d.working ? 'text-green-600' : 'text-gray-300'}`} title={`${d.day}: ${d.working ? 'עובד' : 'חופש'}`}>
+          <div
+            key={i}
+            className={`text-[9px] font-medium leading-tight ${d.working ? 'text-green-600' : 'text-gray-300'}`}
+            title={`${d.day}: ${d.working ? d.hours.toFixed(1) + 'h' : 'חופש'}`}
+          >
             {d.day}
           </div>
         ))}
@@ -1422,86 +1437,24 @@ export default function Matrix() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} dir="rtl">
       <div className="max-w-screen-2xl mx-auto">
         <Card className="border-none shadow-lg mb-3">
-          <CardHeader className="border-b bg-white py-2 px-4">
-            <div className="flex items-center gap-2 flex-wrap" dir="rtl">
-              {/* Title */}
-              <span className="font-bold text-base whitespace-nowrap">מטריצת שעות {viewMode === "weekly" ? "שבועית" : "יומית"}</span>
-              {/* Hint */}
-              <span className="text-xs text-gray-400 hidden lg:inline">גרור קצוות לשינוי גודל, גרור אמצע להזזה, לחץ על עיגול הסוג לשינוי</span>
-              {/* Legend badges */}
-              <div className="flex gap-1 items-center">
-                <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0" dir="rtl"><Star className="w-2.5 h-2.5 mr-0.5 fill-current" />רצוי</Badge>
-                <Badge className="bg-cyan-100 text-cyan-800 text-[10px] px-1.5 py-0" dir="rtl"><Check className="w-2.5 h-2.5 mr-0.5" />זמין</Badge>
-                <Badge className="bg-red-100 text-red-800 text-[10px] px-1.5 py-0" dir="rtl"><Ban className="w-2.5 h-2.5 mr-0.5" />לא זמין</Badge>
-                <Badge className="bg-purple-400 text-white text-[10px] px-1.5 py-0" dir="rtl">שיבוץ (לוח)</Badge>
-              </div>
-              {/* Spacer */}
-              <div className="flex-1" />
-              {/* Filters */}
-              <Select value={populationFilter} onValueChange={setPopulationFilter}>
-                <SelectTrigger className="h-7 text-xs w-[130px]">
-                  <SelectValue placeholder="אוכלוסייה" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">כל האוכלוסיות</SelectItem>
-                  {populations.map(pop => <SelectItem key={pop} value={pop}>{pop}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="h-7 text-xs w-[110px]">
-                  <SelectValue placeholder="תפקיד" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">כל התפקידים</SelectItem>
-                  {workerRoles.map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-7 text-xs w-[110px]">
-                  <SelectValue placeholder="סטטוס" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">כל הסטטוסים</SelectItem>
-                  {shiftStatuses.map(status => <SelectItem key={status} value={status}>{status}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {/* View toggle */}
-              <div className="flex items-center gap-1 border rounded px-2 py-1 bg-white h-7">
-                <Calendar className="w-3 h-3 text-gray-500" />
-                <span className="text-xs text-gray-600">יומי</span>
-                <Switch checked={viewMode === "weekly"} onCheckedChange={(checked) => setViewMode(checked ? "weekly" : "daily")} className="scale-75" />
-                <CalendarDays className="w-3 h-3 text-gray-500" />
-                <span className="text-xs text-gray-600">שבועי</span>
-              </div>
-              {/* Signup mode */}
-              <button
-                onClick={() => saveSignupMode(signupMode === "allow_over_sign_up" ? "limit_sign_up" : "allow_over_sign_up")}
-                disabled={savingSignupMode}
-                title={signupMode === "allow_over_sign_up" ? "הרשמה חופשית" : "הגבלת הרשמה"}
-                className={`flex items-center gap-1 px-2 py-1 rounded border text-xs font-medium h-7 transition-colors ${
-                  signupMode === "allow_over_sign_up"
-                    ? "bg-green-50 border-green-300 text-green-800 hover:bg-green-100"
-                    : "bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100"
-                } ${savingSignupMode ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
-              >
-                {signupMode === "allow_over_sign_up" ? "🟢 הרשמה חופשית" : "🔒 הגבלת הרשמה"}
-              </button>
-              {/* Date nav */}
-              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCurrentDate(subDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronRight className="w-3 h-3" /></Button>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <div className="px-3 py-1 bg-blue-900 text-white rounded font-semibold text-xs min-w-[120px] text-center cursor-pointer hover:bg-blue-800 transition-colors h-7 flex items-center justify-center">
-                    {viewMode === "weekly" ? `שבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "d")}` : format(currentDate, "d.M.yyyy")}
-                  </div>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="center">
-                  <CalendarPicker mode="single" selected={currentDate} onSelect={(date) => date && setCurrentDate(date)} />
-                </PopoverContent>
-              </Popover>
-              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setCurrentDate(addDays(currentDate, viewMode === "weekly" ? 7 : 1))}><ChevronLeft className="w-3 h-3" /></Button>
-              <Button variant="outline" className="h-7 text-xs px-2" onClick={() => setCurrentDate(new Date())} dir="rtl">היום</Button>
-            </div>
-          </CardHeader>
+          <MatrixHeader
+            currentDate={currentDate}
+            setCurrentDate={setCurrentDate}
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            populationFilter={populationFilter}
+            setPopulationFilter={setPopulationFilter}
+            roleFilter={roleFilter}
+            setRoleFilter={setRoleFilter}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            populations={populations}
+            workerRoles={workerRoles}
+            shiftStatuses={shiftStatuses}
+            signupMode={signupMode}
+            saveSignupMode={saveSignupMode}
+            savingSignupMode={savingSignupMode}
+          />
         </Card>
 
         <Card className="border-none shadow-lg">
@@ -1539,10 +1492,15 @@ export default function Matrix() {
                   </div>
                   {/* Summary columns headers - only in weekly mode */}
                   {viewMode === 'weekly' && summaryColumns.map(col => (
-                    <div key={col.id} className="w-[50px] min-w-[50px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1" title={col.name}>
+                    <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1" title={col.name}>
                       <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
                     </div>
                   ))}
+                  {viewMode === 'weekly' && (
+                    <div className="w-[52px] min-w-[52px] border-r bg-blue-50 flex flex-col items-center justify-center text-center px-0.5 py-1" title="סה״כ שעות">
+                      <span className="text-[9px] font-semibold text-blue-700 leading-tight">שעות</span>
+                    </div>
+                  )}
                   {viewMode === 'weekly' && (
                     <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center">
                       <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום">
@@ -1620,12 +1578,31 @@ export default function Matrix() {
                            </div>
                         </div>
                         {/* Summary columns cells - weekly mode only */}
-                        {viewMode === 'weekly' && summaryColumns.map(col => (
-                          <div key={col.id} className={`w-[50px] min-w-[50px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                            <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
-                          </div>
-                        ))}
-                        {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
+                         {viewMode === 'weekly' && summaryColumns.map(col => (
+                           <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                             <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
+                           </div>
+                         ))}
+                         {viewMode === 'weekly' && (() => {
+                           const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+                           let totalHrs = 0;
+                           for (let i = 0; i < 7; i++) {
+                             const d = format(addDays(weekStart, i), "yyyy-MM-dd");
+                             getWorkerTemplateShifts(worker.id, d).forEach(s => {
+                               const [sh, sm] = s.start_time.split(':').map(Number);
+                               const [eh, em] = s.end_time.split(':').map(Number);
+                               let start = sh * 60 + sm, end = eh * 60 + em;
+                               if (end <= start) end += 24 * 60;
+                               totalHrs += Math.max(0, (end - start) / 60);
+                             });
+                           }
+                           return (
+                             <div className={`w-[52px] min-w-[52px] border-r flex items-center justify-center h-8 bg-blue-50`}>
+                               <span className="text-xs font-bold text-blue-800">{totalHrs > 0 ? `${Math.round(totalHrs * 10) / 10}h` : '-'}</span>
+                             </div>
+                           );
+                         })()}
+                         {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
                         <div 
                           data-worker-id={worker.id}
                           ref={el => {
@@ -1667,7 +1644,7 @@ export default function Matrix() {
                                     briefingTime={ts.briefing_time}
                                     shiftStartTime={ts.start_time}
                                     shiftEndTime={ts.end_time}
-                                    dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.date) : 0}
+                                    dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
                                     viewMode={viewMode}
                                     zoomRange={zoomRange}
                                     timeToPercentage={timeToPercentage}
