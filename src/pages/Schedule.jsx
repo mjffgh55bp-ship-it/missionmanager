@@ -392,6 +392,11 @@ export default function Schedule() {
               <div className="flex items-center gap-2 flex-wrap" dir="rtl">
                 <div className="flex items-center gap-2">
                   <CardTitle className="text-2xl">לוח</CardTitle>
+                  {(() => {
+                    const ws = startOfWeek(currentDate, { weekStartsOn: 0 });
+                    const wn = getCustomWeekNumber(ws);
+                    return <span className="text-sm font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">שב׳ {wn}</span>;
+                  })()}
                   {isDailyLoading && <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-700 rounded-full animate-spin" />}
                 </div>
 
@@ -424,10 +429,9 @@ export default function Schedule() {
                           <TooltipTrigger asChild>
                             <Button variant="destructive" size="icon" onClick={async () => {
                               if (confirm(`האם למחוק את כל ${templateRows.length} השורות מכל הקטגוריות?`)) {
-                                for (const row of templateRows) {
-                                  await base44.entities.TemplateRow.delete(row.id);
-                                }
-                                loadData();
+                                setTemplateRows([]);
+                                setTemplates([]);
+                                await Promise.all(templateRows.map(row => base44.entities.TemplateRow.delete(row.id)));
                               }
                             }}>
                               <Trash2 className="w-4 h-4" />
@@ -471,14 +475,8 @@ export default function Schedule() {
               {/* Week days navigation bar */}
               {(() => {
                 const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-                const weekNum = getCustomWeekNumber(weekStart);
                 return (
                   <div className="flex gap-1 pb-2" dir="rtl">
-                    {/* Week number label */}
-                    <div className="flex flex-col items-center justify-center px-2 text-[10px] text-gray-400 font-medium min-w-[32px]">
-                      <span>שב׳</span>
-                      <span className="text-gray-500 font-bold">{weekNum}</span>
-                    </div>
                     {Array.from({ length: 7 }).map((_, i) => {
                       const day = addDays(weekStart, i);
                       const dayStr = format(day, "yyyy-MM-dd");
@@ -641,18 +639,21 @@ export default function Schedule() {
                                   <Button size="icon" variant="destructive" className="h-7 w-7"
                                     onClick={async () => {
                                       if (confirm(`האם למחוק את המוקד "${template.name}" מהלוח?`)) {
-                                        for (const row of templateRowsForTemplate) {
-                                          await base44.entities.TemplateRow.delete(row.id);
-                                        }
+                                        // Optimistic update
+                                        const rowIdsToDelete = templateRowsForTemplate.map(r => r.id);
+                                        setTemplateRows(prev => prev.filter(r => !rowIdsToDelete.includes(r.id)));
                                         const updatedRegs = openRegistrations.filter(r => r && r.key !== group.key);
                                         if (updatedRegs.length !== openRegistrations.length) {
                                           setOpenRegistrations(updatedRegs);
+                                        }
+                                        // Persist in background
+                                        await Promise.all(templateRowsForTemplate.map(row => base44.entities.TemplateRow.delete(row.id)));
+                                        if (updatedRegs.length !== openRegistrations.length) {
                                           const regSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
                                           const regData = { setting_key: "open_registrations", setting_value: JSON.stringify(updatedRegs) };
                                           if (regSettings.length > 0) await base44.entities.AppSettings.update(regSettings[0].id, regData);
                                           else await base44.entities.AppSettings.create(regData);
                                         }
-                                        loadData();
                                       }
                                     }}>
                                     <Trash2 className="w-3 h-3" />
@@ -750,22 +751,24 @@ export default function Schedule() {
                                           <ChevronLeft className="w-3 h-3" />
                                         </Button>
                                         <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
-                                          onClick={async () => {
-                                            if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
-                                              const isDailyColumn = (dailyCustomColumns[template.id] || []).some((c) => c.name === col.name);
-                                              if (isDailyColumn) {
-                                                const updatedDailyColumns = { ...dailyCustomColumns, [template.id]: (dailyCustomColumns[template.id] || []).filter((c) => c.name !== col.name) };
-                                                setDailyCustomColumns(updatedDailyColumns);
-                                                const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
-                                                const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
-                                                if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                                              } else {
-                                                const updatedColumns = template.columns.filter((c) => c.name !== col.name);
-                                                await base44.entities.Template.update(template.id, { columns: updatedColumns });
-                                              }
-                                              loadData();
-                                            }
-                                          }}>
+                                           onClick={async () => {
+                                             if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
+                                               const isDailyColumn = (dailyCustomColumns[template.id] || []).some((c) => c.name === col.name);
+                                               if (isDailyColumn) {
+                                                 const updatedDailyColumns = { ...dailyCustomColumns, [template.id]: (dailyCustomColumns[template.id] || []).filter((c) => c.name !== col.name) };
+                                                 setDailyCustomColumns(updatedDailyColumns);
+                                                 const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
+                                                 const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
+                                                 if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+                                               } else {
+                                                 const updatedColumns = template.columns.filter((c) => c.name !== col.name);
+                                                 // Optimistic update — no need to reload
+                                                 setAllTemplates(prev => prev.map(t => t.id === template.id ? { ...t, columns: updatedColumns } : t));
+                                                 setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, columns: updatedColumns } : t));
+                                                 await base44.entities.Template.update(template.id, { columns: updatedColumns });
+                                               }
+                                             }
+                                           }}>
                                           <Trash2 className="w-3 h-3" />
                                         </Button>
                                       </div>

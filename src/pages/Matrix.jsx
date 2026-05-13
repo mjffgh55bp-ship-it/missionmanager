@@ -5,7 +5,7 @@ import { getCachedAllSettings, getCachedWorkers, getCachedTemplates } from "@/li
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { format, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
+import { format, addDays, subDays, startOfWeek, endOfWeek, differenceInDays } from "date-fns";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { ChevronLeft, ChevronRight, ChefHat, Send, Star, Check, Ban, Calendar, CalendarDays, Plus, Trash2, Lock, LockOpen, MessageCircle } from "lucide-react";
@@ -50,6 +50,16 @@ const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }, weekStartDate = 
   return allSlots.slice(startIdx, endIdx);
 };
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
+
+const getCustomWeekNumber = (date) => {
+  const year = date.getFullYear();
+  const dec28PrevYear = new Date(year - 1, 11, 28);
+  const weekStartDec28 = new Date(dec28PrevYear);
+  weekStartDec28.setDate(dec28PrevYear.getDate() - dec28PrevYear.getDay());
+  const diffDays = differenceInDays(date, weekStartDec28);
+  if (diffDays < 0) return 0;
+  return Math.floor(diffDays / 7) + 1;
+};
 
 
 
