@@ -10,6 +10,7 @@ import { base44 } from "@/api/base44Client";
 import ColumnConfigDialog from "./ColumnConfigDialog";
 import VisualAnalysisDialog, { getVisualColor } from "./VisualAnalysisDialog";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
+import { getOperationalStartDate } from "@/lib/operationalDate";
 
 // Pill-style worker filter — same pattern as Yearly participant filter
 // options: array of strings OR array of {value, label} objects
@@ -600,13 +601,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           includeItems.forEach(item => { total += parsed[item] || 0; });
         });
         templateRows.forEach(row => {
-          if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
           const tmpl = allTemplates.find(t => t.id === row.template_id);
           if (!tmpl) return;
-          if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
           const tmplTimeCols = (tmpl.columns || []).filter(tc => tc.type === "time");
           const rowStartTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || (tmplTimeCols[0] ? row.values?.[tmplTimeCols[0].name] : "") || "";
           const rowEndTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || (tmplTimeCols[1] ? row.values?.[tmplTimeCols[1].name] : "") || "";
+          const effectiveDate = getOperationalStartDate(row.date, rowStartTime || "06:00");
+          if (dateRange && (effectiveDate < dateRange.start || effectiveDate > dateRange.end)) return;
+          if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
           if (!checkTimeRange(rowStartTime, rowEndTime)) return;
           const raw = row.values?.[colName];
           if (!raw) return;
@@ -626,7 +628,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           }
         });
         templateRows.forEach(row => {
-          if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+          const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "";
+          const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || "";
+          const effectiveDate = getOperationalStartDate(row.date, startTime || "06:00");
+          if (dateRange && (effectiveDate < dateRange.start || effectiveDate > dateRange.end)) return;
           const tmpl = allTemplates.find(t => t.id === row.template_id);
           if (!tmpl) return;
           // Check if this row has the worker anywhere (not just one column)
@@ -638,9 +643,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           // Check if criteria match this row (as if it's an assignment)
           const rowAsAssignment = { qualification_id: row.values?.task || "" };
           if (!matchesCriteria(row.values, rowAsAssignment)) return;
-          
-          const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "";
-          const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || "";
           
           // If criteria include time range, only count hours within that range
           const timeRangeCriteria = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
@@ -664,7 +666,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         count++;
       });
       templateRows.forEach(row => {
-        if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
+        const st = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "";
+        const effectiveDate = getOperationalStartDate(row.date, st || "06:00");
+        if (dateRange && (effectiveDate < dateRange.start || effectiveDate > dateRange.end)) return;
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
@@ -746,19 +750,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
        });
 
       templateRows.forEach(row => {
-         if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
          const tmpl = allTemplates.find(t => t.id === row.template_id);
          if (!tmpl) return;
-         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
-
-         if (!checkQuantCriteria(row.values)) return;
-
          // Find time columns dynamically from template
          const tmplTimeCols = (tmpl.columns || []).filter(tc => tc.type === "time");
          const startTimeCol = tmplTimeCols[0];
          const endTimeCol = tmplTimeCols[1];
          const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || (startTimeCol ? row.values?.[startTimeCol.name] : "") || "";
          const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || (endTimeCol ? row.values?.[endTimeCol.name] : "") || "";
+         const effectiveDate = getOperationalStartDate(row.date, startTime || "06:00");
+         if (dateRange && (effectiveDate < dateRange.start || effectiveDate > dateRange.end)) return;
+         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
+
+         if (!checkQuantCriteria(row.values)) return;
          if (!checkTimeRangeCriteria(startTime, endTime)) return;
 
          const raw = row.values?.[col.schedule_col_name];
@@ -893,16 +897,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     });
 
     templateRows.forEach(row => {
-      if (dateRange && (row.date < dateRange.start || row.date > dateRange.end)) return;
       if (seenShiftIds.has(row.id)) return;
       const tmpl = allTemplates.find(t => t.id === row.template_id);
       if (!tmpl) return;
-      const rowAsAssignment = { qualification_id: row.values?.task || "" };
-      if (!matchesCriteriaForShift(row.values, rowAsAssignment)) return;
-      seenShiftIds.add(row.id);
       const tmplTimeCols = (tmpl.columns || []).filter(tc => tc.type === "time");
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"] || (tmplTimeCols[0] ? row.values?.[tmplTimeCols[0].name] : "") || "";
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || (tmplTimeCols[1] ? row.values?.[tmplTimeCols[1].name] : "") || "";
+      const effectiveDate = getOperationalStartDate(row.date, startTime || "06:00");
+      if (dateRange && (effectiveDate < dateRange.start || effectiveDate > dateRange.end)) return;
+      const rowAsAssignment = { qualification_id: row.values?.task || "" };
+      if (!matchesCriteriaForShift(row.values, rowAsAssignment)) return;
+      seenShiftIds.add(row.id);
       if (!checkTimeRange(startTime, endTime)) return;
       if (timeRangeC && timeRangeC.include?.length) {
         total += calculateHoursInRange(startTime, endTime, timeRangeC.include);

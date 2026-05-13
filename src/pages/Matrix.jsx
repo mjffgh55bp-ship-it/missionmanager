@@ -470,7 +470,10 @@ export default function Matrix() {
     for (let i = 0; i < 7; i++) {
       const d = format(addDays(weekStart, i), "yyyy-MM-dd");
       const hasTemplateShift = templateRows.some(row => {
-        if (row.date !== d || !row.values) return false;
+        if (!row.values) return false;
+        const st = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
+        const effectiveDate = getOperationalStartDate(row.date, st || "06:00");
+        if (effectiveDate !== d) return false;
         return Object.values(row.values).some(val => val === workerId);
       });
       days.push({ date: d, day: DAYS_OF_WEEK[i], working: hasTemplateShift });
