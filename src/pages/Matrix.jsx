@@ -187,9 +187,12 @@ export default function Matrix() {
       const findSetting = (key) => allSettings.find(s => s.setting_key === key);
       const parseSetting = (key) => { const s = findSetting(key); return s ? JSON.parse(s.setting_value) : null; };
 
-      setPopulations(parseSetting("worker_populations") || ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
-      setWorkerRoles(parseSetting("worker_roles") || ["שף", "סו-שף"]);
-      setShiftStatuses(parseSetting("shift_statuses") || []);
+      const rawPops = parseSetting("worker_populations") || ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
+      setPopulations(rawPops.map(p => (typeof p === "string" ? p : p.name)));
+      const rawRoles = parseSetting("worker_roles") || ["שף", "סו-שף"];
+      setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
+      const rawStatuses = parseSetting("shift_statuses") || [];
+      setShiftStatuses(rawStatuses.map(s => (typeof s === "string" ? s : s.name)));
       setSummaryColumns(parseSetting("matrix_summary_columns") || []);
       setScheduleParams(parseSetting("custom_schedule_params") || []);
       setSignupMode(parseSetting("availability_signup_mode") || "allow_over_sign_up");

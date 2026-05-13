@@ -70,8 +70,10 @@ export default function Workers() {
       const taskQualSettings = getSetting("task_qualifications");
 
       if (rolesSettings) setUserRoles(JSON.parse(rolesSettings.setting_value));
-      setPopulations(populationsSettings ? (JSON.parse(populationsSettings.setting_value) || []) : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
-      setWorkerRoles(workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : ["שף", "סו-שף"]);
+      const rawPops = populationsSettings ? (JSON.parse(populationsSettings.setting_value) || []) : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
+      setPopulations(rawPops.map(p => (typeof p === "string" ? p : p.name)));
+      const rawRoles = workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : ["שף", "סו-שף"];
+      setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
       if (tasksSettings) setTasks(JSON.parse(tasksSettings.setting_value) || []);
       if (taskQualSettings) setTaskQualifications(JSON.parse(taskQualSettings.setting_value) || {});
     } finally {

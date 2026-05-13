@@ -1176,8 +1176,8 @@ END:VEVENT
 
             {/* bottom padding */}
             <div className="h-6" />
-
-            {/* ── Dialogs ── */}
+          </>
+        {/* ── Dialogs ── */}
         <Dialog open={showUnavailabilityDialog} onOpenChange={setShowUnavailabilityDialog}>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader><DialogTitle className="text-right" dir="rtl">הוסף אילוץ</DialogTitle></DialogHeader>
@@ -1454,8 +1454,7 @@ END:VEVENT
             </DialogFooter>
           </DialogContent>
         </Dialog>
-          </>
-        )}
       </div>
+    </div>
   );
 }

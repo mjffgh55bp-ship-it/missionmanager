@@ -2,306 +2,265 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { AlertTriangle, Link, ChevronDown, ChevronUp } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangle, CheckCircle, Link, RefreshCw, ArrowLeft } from "lucide-react";
+import { normalizeItem } from "./MappableItemRow";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function genMappingId(name) {
-  return "col_" + name.toLowerCase().replace(/[^a-z0-9א-ת]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "").slice(0, 30);
-}
-function genTemplateMappingId(name) {
-  return "moked_" + name.toLowerCase().replace(/[^a-z0-9א-ת]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "").slice(0, 30);
-}
+const SECTION_LABELS = {
+  worker_roles: "תפקידי עובדים",
+  worker_populations: "אוכלוסיות עובדים",
+  shift_statuses: "סטטוסי משמרות",
+  custom_schedule_params: "עמודות לוח",
+};
 
-// ── Column mapping row ─────────────────────────────────────────────────────────
-function ColMappingRow({ col, allCols, onChange }) {
-  const isDuplicate = col.mapping_id &&
-    allCols.filter(c => c !== col && c.mapping_id === col.mapping_id).length > 0;
+const SECTION_TABS = {
+  worker_roles: "workers",
+  worker_populations: "workers",
+  shift_statuses: "schedule",
+  custom_schedule_params: "schedule",
+};
+
+export default function MappingSettings({ onNavigateToTab }) {
+  const [items, setItems] = useState([]); // flat list of { section, label, item }
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showMissingOnly, setShowMissingOnly] = useState(false);
+
+  useEffect(() => { loadData(); }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    const [allSettings, allTemplates] = await Promise.all([
+      base44.entities.AppSettings.list(),
+      base44.entities.Template.list(),
+    ]);
+
+    const flat = [];
+    for (const key of Object.keys(SECTION_LABELS)) {
+      const s = allSettings.find(s => s.setting_key === key);
+      if (!s) continue;
+      const raw = JSON.parse(s.setting_value) || [];
+      raw.forEach((item, idx) => {
+        const norm = normalizeItem(item);
+        flat.push({ section: key, label: SECTION_LABELS[key], idx, item: norm });
+      });
+    }
+
+    setItems(flat);
+    setTemplates(allTemplates);
+    setLoading(false);
+  };
+
+  if (loading) return <div className="text-sm text-gray-500 py-8 text-center" dir="rtl">טוען...</div>;
+
+  // --- Audit calculations ---
+  const missingMappingId = items.filter(e => !e.item.mapping_id);
+  const missingTemplates = templates.filter(t => !t.mapping_id);
+
+  // Duplicate mapping_id within same section
+  const sectionMap = {};
+  items.forEach(e => {
+    if (!e.item.mapping_id) return;
+    const k = `${e.section}::${e.item.mapping_id}`;
+    if (!sectionMap[k]) sectionMap[k] = [];
+    sectionMap[k].push(e);
+  });
+  const duplicates = Object.values(sectionMap).filter(arr => arr.length > 1).flat();
+
+  // Duplicate template mapping_id
+  const tmplIdMap = {};
+  templates.forEach(t => {
+    if (!t.mapping_id) return;
+    if (!tmplIdMap[t.mapping_id]) tmplIdMap[t.mapping_id] = [];
+    tmplIdMap[t.mapping_id].push(t);
+  });
+  const dupTemplates = Object.values(tmplIdMap).filter(arr => arr.length > 1).flat();
+
+  const disabledExport = items.filter(e => e.item.is_exportable === false);
+  const disabledImport = items.filter(e => e.item.is_importable === false);
+
+  const displayItems = showMissingOnly ? missingMappingId : items;
+
+  const totalIssues = missingMappingId.length + missingTemplates.length + duplicates.length + dupTemplates.length;
 
   return (
-    <div className={`border rounded-lg p-3 space-y-2 ${isDuplicate ? "border-orange-400 bg-orange-50" : "border-gray-200"}`} dir="rtl">
-      <div className="flex items-center gap-2 justify-between">
-        <span className="font-medium text-sm">{col.name}</span>
-        {isDuplicate && (
-          <Badge className="bg-orange-100 text-orange-700 text-xs">
-            <AlertTriangle className="w-3 h-3 mr-1" />מזהה כפול
-          </Badge>
-        )}
+    <div className="space-y-6" dir="rtl">
+      {/* Header */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Link className="w-4 h-4 text-blue-700" />
+          <h3 className="text-sm font-semibold text-blue-900">מפת מיפוי ובדיקות</h3>
+          <Button size="sm" variant="ghost" className="h-6 text-xs ml-auto" onClick={loadData}>
+            <RefreshCw className="w-3 h-3 mr-1" />רענן
+          </Button>
+        </div>
+        <p className="text-xs text-blue-700">
+          דף זה הוא לוח ביקורת בלבד. לעריכת מזהי מיפוי — פתח את הסעיף הרלוונטי בהגדרות והרחב את הפריט.
+        </p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">מזהה מיפוי (mapping_id)</label>
-          <div className="flex gap-1">
-            <Input
-              value={col.mapping_id || ""}
-              onChange={e => onChange({ ...col, mapping_id: e.target.value.trim() })}
-              placeholder="col_..."
-              className="h-7 text-xs font-mono"
-              dir="ltr"
-            />
-            {!col.mapping_id && (
-              <Button size="sm" variant="outline" className="h-7 text-xs px-2 shrink-0"
-                onClick={() => onChange({ ...col, mapping_id: genMappingId(col.name) })}>
-                הצע
-              </Button>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <SummaryCard
+          label="ללא מזהה מיפוי"
+          count={missingMappingId.length + missingTemplates.length}
+          color={missingMappingId.length + missingTemplates.length > 0 ? "orange" : "green"}
+          icon={missingMappingId.length + missingTemplates.length > 0 ? AlertTriangle : CheckCircle}
+        />
+        <SummaryCard
+          label="מזהים כפולים"
+          count={duplicates.length + dupTemplates.length}
+          color={duplicates.length + dupTemplates.length > 0 ? "red" : "green"}
+          icon={duplicates.length + dupTemplates.length > 0 ? AlertTriangle : CheckCircle}
+        />
+        <SummaryCard
+          label="ייצוא מושבת"
+          count={disabledExport.length}
+          color={disabledExport.length > 0 ? "gray" : "green"}
+          icon={disabledExport.length > 0 ? AlertTriangle : CheckCircle}
+        />
+        <SummaryCard
+          label="ייבוא מושבת"
+          count={disabledImport.length}
+          color={disabledImport.length > 0 ? "gray" : "green"}
+          icon={disabledImport.length > 0 ? AlertTriangle : CheckCircle}
+        />
+      </div>
+
+      {totalIssues === 0 && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg p-3">
+          <CheckCircle className="w-4 h-4 text-green-600 shrink-0" />
+          <p className="text-sm text-green-800 font-medium">הכל תקין — לכל הפריטים יש מזהה מיפוי ייחודי</p>
+        </div>
+      )}
+
+      {/* Duplicate warnings */}
+      {(duplicates.length > 0 || dupTemplates.length > 0) && (
+        <Card className="border-red-300 shadow-sm">
+          <CardHeader className="pb-2 pt-3 px-4">
+            <CardTitle className="text-sm text-red-700 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />מזהים כפולים
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-3 space-y-1">
+            {duplicates.map((e, i) => (
+              <DupRow key={i} label={e.label} name={e.item.name} mappingId={e.item.mapping_id}
+                tab={SECTION_TABS[e.section]} onNavigate={onNavigateToTab} />
+            ))}
+            {dupTemplates.map((t, i) => (
+              <DupRow key={`t${i}`} label="מוקד/תבנית" name={t.name} mappingId={t.mapping_id} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Missing mapping IDs */}
+      <Card className="border shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <span className="text-sm font-semibold text-gray-700">
+            פריטים ללא מזהה מיפוי
+            {missingMappingId.length + missingTemplates.length > 0 && (
+              <span className="text-orange-500 mr-2 text-xs">({missingMappingId.length + missingTemplates.length})</span>
             )}
+          </span>
+          <div className="flex items-center gap-2">
+            <Switch checked={showMissingOnly} onCheckedChange={setShowMissingOnly} />
+            <span className="text-xs text-gray-500">הצג רק ללא מזהה</span>
           </div>
         </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">שם ייצוא (export_name) — אופציונלי</label>
-          <Input
-            value={col.export_name || ""}
-            onChange={e => onChange({ ...col, export_name: e.target.value })}
-            placeholder={col.name + " (ברירת מחדל: שם מקומי)"}
-            className="h-7 text-xs"
-            dir="rtl"
-          />
-        </div>
-      </div>
-      <div className="flex items-center gap-4 flex-wrap">
-        <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">
-          <Switch
-            checked={col.is_exportable !== false}
-            onCheckedChange={v => onChange({ ...col, is_exportable: v })}
-          />
-          ייצוא מופעל
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">
-          <Switch
-            checked={col.is_importable !== false}
-            onCheckedChange={v => onChange({ ...col, is_importable: v })}
-          />
-          ייבוא מופעל
-        </label>
+        <CardContent className="px-4 py-3 space-y-1">
+          {(showMissingOnly ? missingMappingId : items).map((e, i) => (
+            <MissingRow
+              key={i}
+              label={e.label}
+              name={e.item.name}
+              hasMappingId={!!e.item.mapping_id}
+              mappingId={e.item.mapping_id}
+              tab={SECTION_TABS[e.section]}
+              onNavigate={onNavigateToTab}
+            />
+          ))}
+          {(showMissingOnly ? missingTemplates : templates).map((t, i) => (
+            <MissingRow
+              key={`t${i}`}
+              label="מוקד/תבנית"
+              name={t.name}
+              hasMappingId={!!t.mapping_id}
+              mappingId={t.mapping_id}
+              tab={null}
+            />
+          ))}
+          {(showMissingOnly ? missingMappingId.length + missingTemplates.length : items.length + templates.length) === 0 && (
+            <p className="text-xs text-gray-400">אין פריטים להצגה</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Template mapping note */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600" dir="rtl">
+        <strong>מוקדים/תבניות:</strong> מזהה מיפוי נערך ישירות בעמוד ניהול התבניות / הגדרות הלוח.
       </div>
     </div>
   );
 }
 
-// ── Template mapping row ───────────────────────────────────────────────────────
-function TmplMappingRow({ tmpl, allTmpls, onSave }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ mapping_id: tmpl.mapping_id || "", export_name: tmpl.export_name || "", is_exportable: tmpl.is_exportable !== false, is_importable: tmpl.is_importable !== false });
-  const [saving, setSaving] = useState(false);
-
-  const isDuplicate = draft.mapping_id && allTmpls.filter(t => t.id !== tmpl.id && t.mapping_id === draft.mapping_id).length > 0;
-
-  const handleSave = async () => {
-    setSaving(true);
-    await onSave(tmpl.id, draft);
-    setSaving(false);
-    setEditing(false);
+function SummaryCard({ label, count, color, icon: Icon }) {
+  const colors = {
+    orange: "bg-orange-50 border-orange-200 text-orange-700",
+    red: "bg-red-50 border-red-200 text-red-700",
+    green: "bg-green-50 border-green-200 text-green-700",
+    gray: "bg-gray-50 border-gray-200 text-gray-600",
   };
-
   return (
-    <div className={`border rounded-lg p-3 ${isDuplicate ? "border-orange-400 bg-orange-50" : "border-gray-200"}`} dir="rtl">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="font-medium text-sm truncate">{tmpl.name}</span>
-          {tmpl.mapping_id && (
-            <span className="text-xs font-mono text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">{tmpl.mapping_id}</span>
-          )}
-          {!tmpl.mapping_id && (
-            <span className="text-xs text-gray-400">ללא מזהה</span>
-          )}
-          {isDuplicate && <Badge className="bg-orange-100 text-orange-700 text-xs"><AlertTriangle className="w-3 h-3 mr-1" />כפול</Badge>}
-        </div>
-        <button
-          onClick={() => setEditing(v => !v)}
-          className="text-xs text-blue-600 hover:text-blue-800 shrink-0"
-        >
-          {editing ? "סגור" : "ערוך"}
-        </button>
+    <div className={`border rounded-lg p-3 ${colors[color] || colors.gray}`}>
+      <div className="flex items-center gap-1.5 mb-1">
+        <Icon className="w-3.5 h-3.5" />
+        <span className="text-xs font-medium">{label}</span>
       </div>
-      {editing && (
-        <div className="mt-3 space-y-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">מזהה מיפוי (mapping_id)</label>
-              <div className="flex gap-1">
-                <Input
-                  value={draft.mapping_id}
-                  onChange={e => setDraft(d => ({ ...d, mapping_id: e.target.value.trim() }))}
-                  placeholder="moked_..."
-                  className="h-7 text-xs font-mono"
-                  dir="ltr"
-                />
-                {!draft.mapping_id && (
-                  <Button size="sm" variant="outline" className="h-7 text-xs px-2 shrink-0"
-                    onClick={() => setDraft(d => ({ ...d, mapping_id: genTemplateMappingId(tmpl.name) }))}>
-                    הצע
-                  </Button>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">שם ייצוא (export_name)</label>
-              <Input
-                value={draft.export_name}
-                onChange={e => setDraft(d => ({ ...d, export_name: e.target.value }))}
-                placeholder={tmpl.name}
-                className="h-7 text-xs"
-                dir="rtl"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-4 flex-wrap">
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">
-              <Switch checked={draft.is_exportable} onCheckedChange={v => setDraft(d => ({ ...d, is_exportable: v }))} />
-              ייצוא מופעל
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">
-              <Switch checked={draft.is_importable} onCheckedChange={v => setDraft(d => ({ ...d, is_importable: v }))} />
-              ייבוא מופעל
-            </label>
-          </div>
-          <div className="flex gap-2 justify-end">
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setEditing(false)}>ביטול</Button>
-            <Button size="sm" className="h-7 text-xs bg-blue-900 hover:bg-blue-800" onClick={handleSave} disabled={saving || isDuplicate}>
-              {saving ? "שומר..." : "שמור"}
-            </Button>
-          </div>
-        </div>
+      <p className="text-2xl font-bold">{count}</p>
+    </div>
+  );
+}
+
+function MissingRow({ label, name, hasMappingId, mappingId, tab, onNavigate }) {
+  return (
+    <div className="flex items-center justify-between gap-2 py-1 border-b border-gray-100 last:border-0">
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <Badge variant="outline" className="text-[10px] shrink-0">{label}</Badge>
+        <span className="text-sm truncate">{name}</span>
+        {hasMappingId ? (
+          <span className="text-[10px] font-mono text-gray-400 shrink-0">{mappingId}</span>
+        ) : (
+          <span className="text-[10px] text-orange-500 flex items-center gap-0.5 shrink-0">
+            <AlertTriangle className="w-3 h-3" />חסר
+          </span>
+        )}
+      </div>
+      {tab && onNavigate && !hasMappingId && (
+        <Button size="sm" variant="ghost" className="h-6 text-xs text-blue-600 shrink-0"
+          onClick={() => onNavigate(tab)}>
+          עבור <ArrowLeft className="w-3 h-3 mr-1" />
+        </Button>
       )}
     </div>
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
-export default function MappingSettings() {
-  const [scheduleColumns, setScheduleColumns] = useState([]);
-  const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [showMissingOnly, setShowMissingOnly] = useState(false);
-  const [showTmpls, setShowTmpls] = useState(true);
-  const [showCols, setShowCols] = useState(true);
-
-  useEffect(() => { loadData(); }, []);
-
-  const loadData = async () => {
-    const [allSettings, allTemplates] = await Promise.all([
-      base44.entities.AppSettings.list(),
-      base44.entities.Template.list(),
-    ]);
-    const colsSetting = allSettings.find(s => s.setting_key === "custom_schedule_params");
-    setScheduleColumns(colsSetting ? (JSON.parse(colsSetting.setting_value) || []) : []);
-    setTemplates(allTemplates);
-    setLoading(false);
-  };
-
-  const saveColumns = async (updated) => {
-    setSaving(true);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
-    const data = { setting_key: "custom_schedule_params", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
-    setScheduleColumns(updated);
-    setSaving(false);
-  };
-
-  const handleColChange = (idx, updatedCol) => {
-    const updated = scheduleColumns.map((c, i) => i === idx ? updatedCol : c);
-    saveColumns(updated);
-  };
-
-  const handleTemplateSave = async (tmplId, draft) => {
-    await base44.entities.Template.update(tmplId, {
-      mapping_id:    draft.mapping_id || null,
-      export_name:   draft.export_name || null,
-      is_exportable: draft.is_exportable,
-      is_importable: draft.is_importable,
-    });
-    setTemplates(prev => prev.map(t => t.id === tmplId ? { ...t, ...draft } : t));
-  };
-
-  const colsMissingId = scheduleColumns.filter(c => !c.mapping_id);
-  const tmplsMissingId = templates.filter(t => !t.mapping_id);
-  const displayCols = showMissingOnly ? scheduleColumns.filter(c => !c.mapping_id) : scheduleColumns;
-  const displayTmpls = showMissingOnly ? templates.filter(t => !t.mapping_id) : templates;
-
-  if (loading) return <div className="text-sm text-gray-500 py-4 text-center" dir="rtl">טוען...</div>;
-
+function DupRow({ label, name, mappingId, tab, onNavigate }) {
   return (
-    <div className="space-y-6" dir="rtl">
-      {/* Summary */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-1">
-        <p className="text-sm font-semibold text-blue-900 flex items-center gap-2">
-          <Link className="w-4 h-4" />מזהי מיפוי לייצוא/ייבוא בין סביבות
-        </p>
-        <p className="text-xs text-blue-700">
-          מזהה מיפוי (mapping_id) מאפשר זיהוי עמודות ומוקדים לפי מזהה יציב גם אם שמות מקומיים שונים בין סביבות (אזרחי ↔ מאובטח).
-        </p>
-        {(colsMissingId.length > 0 || tmplsMissingId.length > 0) && (
-          <div className="flex items-center gap-2 mt-2 bg-orange-50 border border-orange-200 rounded p-2">
-            <AlertTriangle className="w-4 h-4 text-orange-600 shrink-0" />
-            <span className="text-xs text-orange-700">
-              {colsMissingId.length > 0 && `${colsMissingId.length} עמודות`}
-              {colsMissingId.length > 0 && tmplsMissingId.length > 0 && " ו-"}
-              {tmplsMissingId.length > 0 && `${tmplsMissingId.length} מוקדים`}
-              {" "}ללא מזהה מיפוי — ייצוא/ייבוא יתבסס על שם בלבד
-            </span>
-          </div>
-        )}
-        <div className="flex items-center gap-2 mt-2">
-          <Switch checked={showMissingOnly} onCheckedChange={setShowMissingOnly} />
-          <span className="text-xs text-gray-600">הצג רק ללא מזהה מיפוי</span>
-        </div>
+    <div className="flex items-center justify-between gap-2 py-1 border-b border-red-100 last:border-0">
+      <div className="flex items-center gap-2">
+        <Badge variant="outline" className="text-[10px] border-red-300 text-red-600 shrink-0">{label}</Badge>
+        <span className="text-sm">{name}</span>
+        <span className="text-[10px] font-mono text-red-500">{mappingId}</span>
       </div>
-
-      {/* Templates */}
-      <Card className="border shadow-sm">
-        <button
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          onClick={() => setShowTmpls(v => !v)}
-        >
-          <span>מוקדים / תבניות ({templates.length}){tmplsMissingId.length > 0 && <span className="text-orange-500 mr-2 text-xs">({tmplsMissingId.length} ללא מזהה)</span>}</span>
-          {showTmpls ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-        {showTmpls && (
-          <CardContent className="space-y-2 pb-4">
-            {displayTmpls.length === 0 && <p className="text-xs text-gray-400">אין תבניות להצגה</p>}
-            {displayTmpls.map(tmpl => (
-              <TmplMappingRow
-                key={tmpl.id}
-                tmpl={tmpl}
-                allTmpls={templates}
-                onSave={handleTemplateSave}
-              />
-            ))}
-          </CardContent>
-        )}
-      </Card>
-
-      {/* Schedule columns */}
-      <Card className="border shadow-sm">
-        <button
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          onClick={() => setShowCols(v => !v)}
-        >
-          <span>עמודות לוח ({scheduleColumns.length}){colsMissingId.length > 0 && <span className="text-orange-500 mr-2 text-xs">({colsMissingId.length} ללא מזהה)</span>}</span>
-          {showCols ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-        </button>
-        {showCols && (
-          <CardContent className="space-y-2 pb-4">
-            {displayCols.length === 0 && <p className="text-xs text-gray-400">אין עמודות להצגה</p>}
-            {displayCols.map((col, i) => {
-              const realIdx = scheduleColumns.indexOf(col);
-              return (
-                <ColMappingRow
-                  key={i}
-                  col={col}
-                  allCols={scheduleColumns}
-                  onChange={(updated) => handleColChange(realIdx, updated)}
-                />
-              );
-            })}
-            {saving && <p className="text-xs text-gray-500 text-center">שומר...</p>}
-          </CardContent>
-        )}
-      </Card>
+      {tab && onNavigate && (
+        <Button size="sm" variant="ghost" className="h-6 text-xs text-blue-600 shrink-0"
+          onClick={() => onNavigate(tab)}>
+          עבור <ArrowLeft className="w-3 h-3 mr-1" />
+        </Button>
+      )}
     </div>
   );
 }

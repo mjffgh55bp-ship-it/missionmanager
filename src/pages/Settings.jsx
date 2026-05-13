@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check, Calendar, UserCog, Link } from "lucide-react";
+import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check, Calendar, UserCog, Link, Wand2, AlertTriangle } from "lucide-react";
 import MappingSettings from "@/components/settings/MappingSettings";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import MappableItemRow, { normalizeItem, suggestMappingId } from "@/components/settings/MappableItemRow";
 
 
 export default function Settings() {
@@ -71,21 +72,20 @@ export default function Settings() {
 
     if (rolesSettings.length > 0) setUserRoles(JSON.parse(rolesSettings[0].setting_value));
     if (scheduleColsSettings.length > 0) setScheduleColumns(JSON.parse(scheduleColsSettings[0].setting_value) || []);
-    if (populationsSettings.length > 0) {
-      setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
-    } else {
-      setPopulations(["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
-    }
-    if (workerRolesSettings.length > 0) {
-      setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
-    } else {
-      setWorkerRoles(["שף", "סו-שף"]);
-    }
-    if (shiftStatusesSettings.length > 0) {
-      setShiftStatuses(JSON.parse(shiftStatusesSettings[0].setting_value) || []);
-    } else {
-      setShiftStatuses(["מתוכנן", "מאושר", "בוצע", "בוטל"]);
-    }
+    const rawPops = populationsSettings.length > 0
+      ? (JSON.parse(populationsSettings[0].setting_value) || [])
+      : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
+    setPopulations(rawPops.map(normalizeItem));
+
+    const rawRoles = workerRolesSettings.length > 0
+      ? (JSON.parse(workerRolesSettings[0].setting_value) || [])
+      : ["שף", "סו-שף"];
+    setWorkerRoles(rawRoles.map(normalizeItem));
+
+    const rawStatuses = shiftStatusesSettings.length > 0
+      ? (JSON.parse(shiftStatusesSettings[0].setting_value) || [])
+      : ["מתוכנן", "מאושר", "בוצע", "בוטל"];
+    setShiftStatuses(rawStatuses.map(normalizeItem));
     if (tasksSettings.length > 0) setTasks(JSON.parse(tasksSettings[0].setting_value) || []);
     if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
     setWorkers(workersData);
@@ -256,89 +256,98 @@ export default function Settings() {
     }
   };
 
-  const handleAddPopulation = async () => {
-    if (!newPopulation.trim()) return;
-    const updated = [...populations, newPopulation.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_populations" });
-    const data = { setting_key: "worker_populations", setting_value: JSON.stringify(updated) };
+  // Generic save for list settings
+  const saveListSetting = async (key, updated) => {
+    const settings = await base44.entities.AppSettings.filter({ setting_key: key });
+    const data = { setting_key: key, setting_value: JSON.stringify(updated) };
     if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
     else await base44.entities.AppSettings.create(data);
+  };
+
+  const handleAddPopulation = async () => {
+    if (!newPopulation.trim()) return;
+    const newItem = { name: newPopulation.trim(), mapping_id: "", export_name: "", is_importable: true, is_exportable: true };
+    const updated = [...populations, newItem];
+    await saveListSetting("worker_populations", updated);
     setPopulations(updated);
     setNewPopulation("");
   };
 
-  const handleRemovePopulation = async (population) => {
-    const updated = populations.filter(p => p !== population);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_populations" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+  const handleRemovePopulation = async (idx) => {
+    const updated = populations.filter((_, i) => i !== idx);
+    await saveListSetting("worker_populations", updated);
+    setPopulations(updated);
+  };
+
+  const handleSavePopulation = async (idx, updatedItem) => {
+    const updated = populations.map((p, i) => i === idx ? updatedItem : p);
+    await saveListSetting("worker_populations", updated);
     setPopulations(updated);
   };
 
   const handleAddWorkerRole = async () => {
     if (!newWorkerRole.trim()) return;
-    const updated = [...workerRoles, newWorkerRole.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
-    const data = { setting_key: "worker_roles", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
+    const newItem = { name: newWorkerRole.trim(), mapping_id: "", export_name: "", is_importable: true, is_exportable: true };
+    const updated = [...workerRoles, newItem];
+    await saveListSetting("worker_roles", updated);
     setWorkerRoles(updated);
     setNewWorkerRole("");
   };
 
-  const handleRemoveWorkerRole = async (role) => {
-    const updated = workerRoles.filter(r => r !== role);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+  const handleRemoveWorkerRole = async (idx) => {
+    const updated = workerRoles.filter((_, i) => i !== idx);
+    await saveListSetting("worker_roles", updated);
+    setWorkerRoles(updated);
+  };
+
+  const handleSaveWorkerRole = async (idx, updatedItem) => {
+    const updated = workerRoles.map((r, i) => i === idx ? updatedItem : r);
+    await saveListSetting("worker_roles", updated);
     setWorkerRoles(updated);
   };
 
   const handleAddShiftStatus = async () => {
     if (!newShiftStatus.trim()) return;
-    const updated = [...shiftStatuses, newShiftStatus.trim()];
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
-    const data = { setting_key: "shift_statuses", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
+    const newItem = { name: newShiftStatus.trim(), mapping_id: "", export_name: "", is_importable: true, is_exportable: true };
+    const updated = [...shiftStatuses, newItem];
+    await saveListSetting("shift_statuses", updated);
     setShiftStatuses(updated);
     setNewShiftStatus("");
   };
 
-  const handleRemoveShiftStatus = async (status) => {
-    const updated = shiftStatuses.filter(s => s !== status);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
-    await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
+  const handleRemoveShiftStatus = async (idx) => {
+    const updated = shiftStatuses.filter((_, i) => i !== idx);
+    await saveListSetting("shift_statuses", updated);
     setShiftStatuses(updated);
   };
 
+  const handleSaveShiftStatus = async (idx, updatedItem) => {
+    const updated = shiftStatuses.map((s, i) => i === idx ? updatedItem : s);
+    await saveListSetting("shift_statuses", updated);
+    setShiftStatuses(updated);
+  };
+
+  // Keep legacy rename handlers for tasks (still string-based)
   const handleRenameWorkerRole = async (idx, oldName, newName) => {
     if (!newName.trim() || newName.trim() === oldName) return;
-    const updated = workerRoles.map((r, i) => i === idx ? newName.trim() : r);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
-    const data = { setting_key: "worker_roles", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
+    const updated = workerRoles.map((r, i) => i === idx ? { ...normalizeItem(r), name: newName.trim() } : r);
+    await saveListSetting("worker_roles", updated);
     setWorkerRoles(updated);
     setRenamingWorkerRole(null);
   };
 
   const handleRenameShiftStatus = async (idx, oldName, newName) => {
     if (!newName.trim() || newName.trim() === oldName) return;
-    const updated = shiftStatuses.map((s, i) => i === idx ? newName.trim() : s);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
-    const data = { setting_key: "shift_statuses", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
+    const updated = shiftStatuses.map((s, i) => i === idx ? { ...normalizeItem(s), name: newName.trim() } : s);
+    await saveListSetting("shift_statuses", updated);
     setShiftStatuses(updated);
     setRenamingShiftStatus(null);
   };
 
   const handleRenamePopulation = async (idx, oldName, newName) => {
     if (!newName.trim() || newName.trim() === oldName) return;
-    const updated = populations.map((p, i) => i === idx ? newName.trim() : p);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "worker_populations" });
-    const data = { setting_key: "worker_populations", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
+    const updated = populations.map((p, i) => i === idx ? { ...normalizeItem(p), name: newName.trim() } : p);
+    await saveListSetting("worker_populations", updated);
     setPopulations(updated);
     setRenamingPopulation(null);
   };
@@ -478,7 +487,7 @@ export default function Settings() {
               {scheduleColumns.map((col, idx) => (
                 <div key={idx} className="border rounded-lg overflow-hidden">
                   <div className="flex items-center justify-between px-3 py-2 bg-gray-50" dir="rtl">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm">{col.name}</span>
                       <Badge variant="outline" className={`text-xs ${
                         col.report_type === "sum_hours" ? "border-purple-300 text-purple-700" :
@@ -488,8 +497,10 @@ export default function Settings() {
                       }`}>
                         {col.report_type === "sum_hours" ? "סיכום שעות לפי טקסט" : col.report_type === "count_by_text" ? "סיכום פעמים לפי טקסט" : col.report_type === "count_quantitative" ? `ספירה כמותית${col.quantitative_preset_name ? ` — ${col.quantitative_preset_name}` : ""}` : "סיכום מספרים"}
                       </Badge>
-                      {(col.options || []).length > 0 && (
-                        <span className="text-xs text-gray-500">{col.options.length} אפשרויות</span>
+                      {col.mapping_id ? (
+                        <span className="text-[10px] font-mono bg-white border rounded px-1 text-gray-500">{col.mapping_id}</span>
+                      ) : (
+                        <span className="text-[10px] text-orange-400 flex items-center gap-0.5"><AlertTriangle className="w-3 h-3" />ללא מזהה</span>
                       )}
                     </div>
                     <div className="flex gap-1">
@@ -501,6 +512,61 @@ export default function Settings() {
                   </div>
                   {expandedCol === idx && (
                    <div className="p-3 border-t space-y-4" dir="rtl">
+                     {/* Mapping fields — always visible at top of expanded panel */}
+                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                       <p className="text-xs font-semibold text-blue-800">מיפוי ייצוא/ייבוא</p>
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                         <div>
+                           <label className="text-xs text-gray-500 block mb-1">מזהה מיפוי (mapping_id)</label>
+                           <div className="flex gap-1">
+                             <Input
+                               value={col.mapping_id || ""}
+                               onChange={e => {
+                                 const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, mapping_id: e.target.value.trim().toLowerCase() } : c);
+                                 saveScheduleColumns(updated);
+                               }}
+                               placeholder="col_..."
+                               className="h-7 text-xs font-mono flex-1"
+                               dir="ltr"
+                             />
+                             <Button size="sm" variant="outline" className="h-7 text-xs px-2 shrink-0"
+                               onClick={() => {
+                                 const suggested = suggestMappingId(col.name, "col");
+                                 const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, mapping_id: suggested } : c);
+                                 saveScheduleColumns(updated);
+                               }}
+                               title="הצע מזהה"><Wand2 className="w-3 h-3" /></Button>
+                           </div>
+                         </div>
+                         <div>
+                           <label className="text-xs text-gray-500 block mb-1">שם ייצוא (export_name)</label>
+                           <Input
+                             value={col.export_name || ""}
+                             onChange={e => {
+                               const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, export_name: e.target.value } : c);
+                               saveScheduleColumns(updated);
+                             }}
+                             placeholder={col.name}
+                             className="h-7 text-xs"
+                             dir="rtl"
+                           />
+                         </div>
+                       </div>
+                       <div className="flex items-center gap-4 flex-wrap">
+                         <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">
+                           <Switch checked={col.is_exportable !== false} onCheckedChange={v => {
+                             const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, is_exportable: v } : c);
+                             saveScheduleColumns(updated);
+                           }} />ייצוא מופעל
+                         </label>
+                         <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">
+                           <Switch checked={col.is_importable !== false} onCheckedChange={v => {
+                             const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, is_importable: v } : c);
+                             saveScheduleColumns(updated);
+                           }} />ייבוא מופעל
+                         </label>
+                       </div>
+                     </div>
                      {col.report_type === "count_quantitative" ? (
                        /* Quantitative items editor */
                        <div>
@@ -674,35 +740,22 @@ export default function Settings() {
             <CardTitle className="flex items-center gap-2" dir="rtl"><SettingsIcon className="w-5 h-5 text-teal-600" />סטטוסי משמרות</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סטטוסים שניתן להקצות למשמרות בלוח</p>
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סטטוסים שניתן להקצות למשמרות בלוח. הרחב שורה לעריכת מזהה מיפוי.</p>
             <div className="flex gap-2 mb-4">
               <Input value={newShiftStatus} onChange={(e) => setNewShiftStatus(e.target.value)} placeholder="שם סטטוס חדש..." dir="rtl" onKeyDown={e => e.key === 'Enter' && handleAddShiftStatus()} />
               <Button onClick={handleAddShiftStatus}><Plus className="w-4 h-4" /></Button>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-2">
               {shiftStatuses.map((status, idx) => (
-                <div key={idx} className="flex items-center gap-1 bg-teal-100 text-teal-800 rounded-full px-2 py-1">
-                  {renamingShiftStatus?.idx === idx ? (
-                    <>
-                      <Input
-                        autoFocus
-                        value={renamingShiftStatus.value}
-                        onChange={e => setRenamingShiftStatus(prev => ({ ...prev, value: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') handleRenameShiftStatus(idx, status, renamingShiftStatus.value); if (e.key === 'Escape') setRenamingShiftStatus(null); }}
-                        className="h-6 text-xs w-28 bg-white"
-                        dir="rtl"
-                      />
-                      <button onClick={() => handleRenameShiftStatus(idx, status, renamingShiftStatus.value)} className="text-green-600 hover:text-green-700"><Check className="w-3 h-3" /></button>
-                      <button onClick={() => setRenamingShiftStatus(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm">{status}</span>
-                      <button onClick={() => setRenamingShiftStatus({ idx, value: status })} className="text-teal-500 hover:text-teal-700"><Pencil className="w-3 h-3" /></button>
-                      <ConfirmDeleteButton onConfirm={() => handleRemoveShiftStatus(status)} />
-                    </>
-                  )}
-                </div>
+                <MappableItemRow
+                  key={idx}
+                  item={normalizeItem(status)}
+                  allItems={shiftStatuses}
+                  prefix="status"
+                  color="teal"
+                  onSave={(updated) => handleSaveShiftStatus(idx, updated)}
+                  onDelete={() => handleRemoveShiftStatus(idx)}
+                />
               ))}
               {shiftStatuses.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו סטטוסים</p>}
             </div>
@@ -748,7 +801,8 @@ export default function Settings() {
                   {expandedTask === task && (
                     <div className="p-3 border-t space-y-3" dir="rtl">
                       <p className="text-xs text-gray-500">סמן עובדים כשירים למשימה לפי תפקיד:</p>
-                      {workerRoles.map(role => {
+                      {workerRoles.map(roleObj => {
+                        const role = normalizeItem(roleObj).name;
                         const roleWorkers = workers.filter(w => w.active !== false && (Array.isArray(w.role) ? w.role.includes(role) : w.role === role));
                         if (roleWorkers.length === 0) return null;
                         const taskRoleQuals = (taskQualifications[task] || {})[role] || [];
@@ -776,7 +830,7 @@ export default function Settings() {
                           </div>
                         );
                       })}
-                      {workerRoles.length === 0 && <p className="text-xs text-gray-400">הגדר תפקידי עובדים תחילה</p>}
+                      {workerRoles.length === 0 && <p className="text-xs text-gray-400">הגדר תפקידי עובדים תחילה בלשונית עובדים</p>}
                     </div>
                   )}
                 </div>
@@ -791,31 +845,22 @@ export default function Settings() {
             <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-indigo-600" />תפקידי עובדים</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר תפקידים שניתן לבחור בהם בעת הוספת/עריכת עובדים</p>
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר תפקידים שניתן לבחור בהם בעת הוספת/עריכת עובדים. הרחב שורה לעריכת מזהה מיפוי לייצוא/ייבוא.</p>
             <div className="flex gap-2 mb-4">
               <Input value={newWorkerRole} onChange={(e) => setNewWorkerRole(e.target.value)} placeholder="שם תפקיד חדש..." dir="rtl" onKeyDown={e => e.key === 'Enter' && handleAddWorkerRole()} />
               <Button onClick={handleAddWorkerRole}><Plus className="w-4 h-4" /></Button>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-2">
               {workerRoles.map((role, idx) => (
-                <div key={idx} className="flex items-center gap-1 bg-indigo-100 text-indigo-800 rounded-full px-2 py-1">
-                  {renamingWorkerRole?.idx === idx ? (
-                    <>
-                      <Input autoFocus value={renamingWorkerRole.value}
-                        onChange={e => setRenamingWorkerRole(prev => ({ ...prev, value: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') handleRenameWorkerRole(idx, role, renamingWorkerRole.value); if (e.key === 'Escape') setRenamingWorkerRole(null); }}
-                        className="h-6 text-xs w-28 bg-white" dir="rtl" />
-                      <button onClick={() => handleRenameWorkerRole(idx, role, renamingWorkerRole.value)} className="text-green-600 hover:text-green-700"><Check className="w-3 h-3" /></button>
-                      <button onClick={() => setRenamingWorkerRole(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm">{role}</span>
-                      <button onClick={() => setRenamingWorkerRole({ idx, value: role })} className="text-indigo-500 hover:text-indigo-700"><Pencil className="w-3 h-3" /></button>
-                      <ConfirmDeleteButton onConfirm={() => handleRemoveWorkerRole(role)} />
-                    </>
-                  )}
-                </div>
+                <MappableItemRow
+                  key={idx}
+                  item={normalizeItem(role)}
+                  allItems={workerRoles}
+                  prefix="role"
+                  color="indigo"
+                  onSave={(updated) => handleSaveWorkerRole(idx, updated)}
+                  onDelete={() => handleRemoveWorkerRole(idx)}
+                />
               ))}
               {workerRoles.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו תפקידים</p>}
             </div>
@@ -828,31 +873,22 @@ export default function Settings() {
             <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-orange-600" />אוכלוסיות עובדים</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר אוכלוסיות שניתן לבחור בהן בעת הוספת/עריכת עובדים</p>
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר אוכלוסיות שניתן לבחור בהן בעת הוספת/עריכת עובדים. הרחב שורה לעריכת מזהה מיפוי.</p>
             <div className="flex gap-2 mb-4">
               <Input value={newPopulation} onChange={(e) => setNewPopulation(e.target.value)} placeholder="שם אוכלוסייה חדשה..." dir="rtl" onKeyDown={e => e.key === 'Enter' && handleAddPopulation()} />
               <Button onClick={handleAddPopulation}><Plus className="w-4 h-4" /></Button>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="space-y-2">
               {populations.map((pop, idx) => (
-                <div key={idx} className="flex items-center gap-1 bg-orange-100 text-orange-800 rounded-full px-2 py-1">
-                  {renamingPopulation?.idx === idx ? (
-                    <>
-                      <Input autoFocus value={renamingPopulation.value}
-                        onChange={e => setRenamingPopulation(prev => ({ ...prev, value: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') handleRenamePopulation(idx, pop, renamingPopulation.value); if (e.key === 'Escape') setRenamingPopulation(null); }}
-                        className="h-6 text-xs w-28 bg-white" dir="rtl" />
-                      <button onClick={() => handleRenamePopulation(idx, pop, renamingPopulation.value)} className="text-green-600 hover:text-green-700"><Check className="w-3 h-3" /></button>
-                      <button onClick={() => setRenamingPopulation(null)} className="text-gray-400 hover:text-gray-600"><X className="w-3 h-3" /></button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm">{pop}</span>
-                      <button onClick={() => setRenamingPopulation({ idx, value: pop })} className="text-orange-500 hover:text-orange-700"><Pencil className="w-3 h-3" /></button>
-                      <ConfirmDeleteButton onConfirm={() => handleRemovePopulation(pop)} />
-                    </>
-                  )}
-                </div>
+                <MappableItemRow
+                  key={idx}
+                  item={normalizeItem(pop)}
+                  allItems={populations}
+                  prefix="pop"
+                  color="orange"
+                  onSave={(updated) => handleSavePopulation(idx, updated)}
+                  onDelete={() => handleRemovePopulation(idx)}
+                />
               ))}
               {populations.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו אוכלוסיות</p>}
             </div>
@@ -902,7 +938,7 @@ export default function Settings() {
 
         {/* === TAB: מיפוי ייצוא/ייבוא === */}
         {activeTab === "mapping" && (
-          <MappingSettings />
+          <MappingSettings onNavigateToTab={(tab) => setActiveTab(tab)} />
         )}
 
       </div>

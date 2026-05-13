@@ -74,6 +74,17 @@ export function parseSetting(allSettings, key, defaultValue = null) {
 }
 
 /**
+ * Parse a list setting (worker_roles, worker_populations, shift_statuses) and
+ * return an array of plain name strings — works whether items are strings or
+ * the new { name, mapping_id, ... } object format.
+ */
+export function parseListSetting(allSettings, key, defaultValue = []) {
+  const raw = parseSetting(allSettings, key, null);
+  if (!raw) return defaultValue;
+  return raw.map(item => (typeof item === "string" ? item : item.name));
+}
+
+/**
  * Invalidate reference data caches after edits.
  * Call this after saving Workers, Templates, or AppSettings.
  */
