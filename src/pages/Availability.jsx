@@ -850,330 +850,334 @@ END:VEVENT
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 md:p-4">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-2xl mx-auto space-y-0" dir="rtl">
 
-        {/* ── Top bar: greeting + week nav + status badge ── */}
-        <div className="flex items-center justify-between mb-3 px-1" dir="rtl">
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">
-              {currentWorker ? `שלום, ${currentWorker.nickname}!` : "שלום!"}
-            </h1>
-            <p className="text-xs text-gray-500">
-              {formatDateHebrew(weekStart)} – {formatDateHebrew(addDays(weekStart, 6))}
-              <span className="text-gray-400 mr-1">({formatHebrewDate(weekStart)})</span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {existingAvailability && (
-              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                existingAvailability.status === "approved" ? "bg-green-100 text-green-700" :
-                existingAvailability.status === "submitted" ? "bg-blue-100 text-blue-700" :
-                existingAvailability.status === "pending_change" ? "bg-orange-100 text-orange-700" :
-                "bg-gray-100 text-gray-600"
-              }`}>
-                {existingAvailability.status === "approved" ? "✓ אושר" :
-                 existingAvailability.status === "submitted" ? "נשלח" :
-                 existingAvailability.status === "pending_change" ? "ממתין לשינוי" : "טיוטה"}
-              </span>
-            )}
-            <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(addDays(weekStart, -7), { weekStartsOn: 0 }))}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(addDays(weekStart, 7), { weekStartsOn: 0 }))}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-          </div>
+        {/* ── 1. Top header: page title + greeting ── */}
+        <div className="px-1 py-3 border-b border-gray-200">
+          <h1 className="text-xl font-bold text-gray-900">
+            {currentWorker ? `שלום, ${currentWorker.nickname}! 👋` : "שלום!"}
+          </h1>
+          <p className="text-xs text-gray-400 mt-0.5">ניהול זמינות ומשמרות</p>
         </div>
 
-
         {!currentWorker ? (
-          <Card className="border-none shadow-lg">
+          <Card className="border-none shadow-lg mt-4">
             <CardContent className="py-16 text-center">
               <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2" dir="rtl">לא נמצא פרופיל עובד</h3>
-              <p className="text-gray-600" dir="rtl">האימייל שלך לא משויך לחשבון עובד.</p>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">לא נמצא פרופיל עובד</h3>
+              <p className="text-gray-600">האימייל שלך לא משויך לחשבון עובד.</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4" dir="rtl">
+          <>
+            {/* ── 2. יומן section ── */}
+            <div className="pt-4 pb-1 px-1">
+              <h2 className="text-base font-bold text-gray-700">יומן</h2>
+            </div>
 
-            {/* ── RIGHT COLUMN: calendar + tips — shown first on mobile via order ── */}
-            <div className="order-first lg:order-last space-y-3">
-              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide px-1" dir="rtl">יומן</h2>
-              <Card className="border-none shadow-sm lg:sticky lg:top-4">
-                <CardHeader className="border-b bg-white py-2 px-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
-                        <ChevronRight className="w-3 h-3" />
-                      </Button>
-                      <span className="text-sm font-semibold px-1" dir="rtl">{formatDateHebrew(calendarMonth, "monthYear")}</span>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
-                        <ChevronLeft className="w-3 h-3" />
-                      </Button>
-                    </div>
-                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={generateICSFile} title="סנכרן ללוח השנה">
-                      <Download className="w-3 h-3" />
+            {/* Calendar card */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="border-b bg-white py-2 px-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
+                      <ChevronRight className="w-3 h-3" />
+                    </Button>
+                    <span className="text-sm font-semibold px-1">{formatDateHebrew(calendarMonth, "monthYear")}</span>
+                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
+                      <ChevronLeft className="w-3 h-3" />
                     </Button>
                   </div>
-                </CardHeader>
-                <CardContent className="py-2 px-2">
-                  <div className="grid grid-cols-7 gap-0.5 text-center text-xs">
-                    {["א", "ב", "ג", "ד", "ה", "ו", "ש"].map((d, i) => (
-                      <div key={i} className="font-semibold text-gray-400 py-1 text-[10px]">{d}</div>
-                    ))}
-                    {calendarDays.map((day, idx) => {
-                      const dayAssignments = getAssignmentForDate(day);
-                      const event = getEventForDate(day);
-                      const workerYearlyEvents = getYearlyEventsForDate(day);
-                      const isCurrentMonth = isSameMonth(day, calendarMonth);
-                      const isToday = isSameDay(day, new Date());
-                      return (
-                        <button key={idx} onClick={() => handleDateClick(day)}
-                          className={`p-0.5 min-h-[40px] border rounded text-[10px] hover:bg-blue-50 transition-colors ${isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-300"} ${isToday ? "ring-2 ring-blue-500" : ""}`}>
-                          <div className={`font-medium ${isToday ? "text-blue-600" : ""}`}>{format(day, "d")}</div>
-                          {event && <div className="text-purple-500 text-[8px] leading-tight">🎉</div>}
-                          {workerYearlyEvents.slice(0, 1).map((e, i) => (
-                            <div key={i} className="bg-green-100 text-green-700 rounded text-[8px] leading-tight truncate mt-0.5" title={e.title}>●</div>
-                          ))}
-                          {dayAssignments.slice(0, 1).map((a, i) => {
-                            const displayTime = a.briefing_time || a.start_time;
-                            return (
-                              <div key={i} className="bg-blue-100 text-blue-700 rounded text-[8px] leading-tight mt-0.5">
-                                {displayTime.slice(0, 5)}
-                              </div>
-                            );
-                          })}
-                          {dayAssignments.length + workerYearlyEvents.length > 1 && (
-                            <div className="text-gray-400 text-[8px]">+{dayAssignments.length + workerYearlyEvents.length - 1}</div>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={generateICSFile} title="סנכרן ללוח השנה">
+                    <Download className="w-3 h-3" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="py-2 px-2">
+                <div className="grid grid-cols-7 gap-0.5 text-center text-xs">
+                  {["א", "ב", "ג", "ד", "ה", "ו", "ש"].map((d, i) => (
+                    <div key={i} className="font-semibold text-gray-400 py-1 text-[10px]">{d}</div>
+                  ))}
+                  {calendarDays.map((day, idx) => {
+                    const dayAssignments = getAssignmentForDate(day);
+                    const event = getEventForDate(day);
+                    const workerYearlyEvents = getYearlyEventsForDate(day);
+                    const isCurrentMonth = isSameMonth(day, calendarMonth);
+                    const isToday = isSameDay(day, new Date());
+                    return (
+                      <button key={idx} onClick={() => handleDateClick(day)}
+                        className={`p-0.5 min-h-[40px] border rounded text-[10px] hover:bg-blue-50 transition-colors ${isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-300"} ${isToday ? "ring-2 ring-blue-500" : ""}`}>
+                        <div className={`font-medium ${isToday ? "text-blue-600" : ""}`}>{format(day, "d")}</div>
+                        {event && <div className="text-purple-500 text-[8px] leading-tight">🎉</div>}
+                        {workerYearlyEvents.slice(0, 1).map((e, i) => (
+                          <div key={i} className="bg-green-100 text-green-700 rounded text-[8px] leading-tight truncate mt-0.5" title={e.title}>●</div>
+                        ))}
+                        {dayAssignments.slice(0, 1).map((a, i) => {
+                          const displayTime = a.briefing_time || a.start_time;
+                          return (
+                            <div key={i} className="bg-blue-100 text-blue-700 rounded text-[8px] leading-tight mt-0.5">
+                              {displayTime.slice(0, 5)}
+                            </div>
+                          );
+                        })}
+                        {dayAssignments.length + workerYearlyEvents.length > 1 && (
+                          <div className="text-gray-400 text-[8px]">+{dayAssignments.length + workerYearlyEvents.length - 1}</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ── 3. הרשמה section ── */}
+            <div className="pt-5 pb-1 px-1 flex items-center gap-2 border-t border-gray-200 mt-4">
+              <h2 className="text-base font-bold text-gray-700">הרשמה</h2>
+              {existingAvailability && (
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                  existingAvailability.status === "approved" ? "bg-green-100 text-green-700" :
+                  existingAvailability.status === "submitted" ? "bg-blue-100 text-blue-700" :
+                  existingAvailability.status === "pending_change" ? "bg-orange-100 text-orange-700" :
+                  "bg-gray-100 text-gray-600"
+                }`}>
+                  {existingAvailability.status === "approved" ? "✓ אושר" :
+                   existingAvailability.status === "submitted" ? "נשלח" :
+                   existingAvailability.status === "pending_change" ? "ממתין לשינוי" : "טיוטה"}
+                </span>
+              )}
+              {signupMode === "limit_sign_up" ? (
+                <span className="text-xs bg-orange-100 text-orange-700 font-medium px-2 py-0.5 rounded-full mr-auto">הגבלת הרשמה</span>
+              ) : (
+                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full mr-auto">הרשמה חופשית</span>
+              )}
+            </div>
+
+            {/* 3.1 Week navigation */}
+            <div className="flex items-center justify-between bg-white border rounded-xl px-3 py-2 shadow-sm">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(addDays(weekStart, -7), { weekStartsOn: 0 }))}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(addDays(weekStart, 7), { weekStartsOn: 0 }))}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-sm font-medium text-gray-700">
+                {formatDateHebrew(weekStart)} – {formatDateHebrew(addDays(weekStart, 6))}
+              </p>
+            </div>
+
+            {/* 3.2 Tips / policy */}
+            {(tipsMessage || isManager) && (
+              <Card className="border-none shadow-sm">
+                <CardContent className="py-2 px-4">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      {editingTips ? (
+                        <div className="space-y-2">
+                          <Textarea value={tipsEditValue} onChange={e => setTipsEditValue(e.target.value)} rows={4} dir="rtl" className="text-sm" placeholder="הכנס הודעה לעובדים..." />
+                          <div className="flex items-center gap-2 justify-end" dir="rtl">
+                            <Label className="text-xs text-gray-600">פופ-אפ שדורש אישור</Label>
+                            <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button size="sm" variant="outline" onClick={() => setEditingTips(false)} dir="rtl">ביטול</Button>
+                            <Button size="sm" className="bg-blue-900 hover:bg-blue-800" dir="rtl" onClick={async () => {
+                              const weekStartStr3 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
+                              const key = `availability_tips_${weekStartStr3}`;
+                              const existing = await base44.entities.AppSettings.filter({ setting_key: key });
+                              const data = { setting_key: key, setting_value: JSON.stringify({ message: tipsEditValue, showAsPopup: showTipsAsPopup }) };
+                              if (existing.length > 0) await base44.entities.AppSettings.update(existing[0].id, data);
+                              else await base44.entities.AppSettings.create(data);
+                              setTipsMessage(tipsEditValue);
+                              setEditingTips(false);
+                            }}>שמור</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs text-gray-600" dir="rtl">{tipsMessage || <span className="text-gray-400">לא הוגדרה הודעה</span>}</p>
+                          {isManager && (
+                            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs shrink-0" onClick={() => { setTipsEditValue(tipsMessage); setEditingTips(true); }} dir="rtl">
+                              <Pencil className="w-3 h-3" />
+                            </Button>
                           )}
-                        </button>
-                      );
-                    })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
+            )}
 
-              {/* ── Tips banner (moved below calendar) ── */}
-              {(tipsMessage || isManager) && (
-                <Card className="border-none shadow-sm">
-                  <CardContent className="py-2 px-4">
-                    <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1 min-w-0">
-                        {editingTips ? (
-                          <div className="space-y-2">
-                            <Textarea value={tipsEditValue} onChange={e => setTipsEditValue(e.target.value)} rows={4} dir="rtl" className="text-sm" placeholder="הכנס הודעה לעובדים..." />
-                            <div className="flex items-center gap-2 justify-end" dir="rtl">
-                              <Label className="text-xs text-gray-600">פופ-אפ שדורש אישור</Label>
-                              <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                              <Button size="sm" variant="outline" onClick={() => setEditingTips(false)} dir="rtl">ביטול</Button>
-                              <Button size="sm" className="bg-blue-900 hover:bg-blue-800" dir="rtl" onClick={async () => {
-                                const weekStartStr3 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
-                                const key = `availability_tips_${weekStartStr3}`;
-                                const existing = await base44.entities.AppSettings.filter({ setting_key: key });
-                                const data = { setting_key: key, setting_value: JSON.stringify({ message: tipsEditValue, showAsPopup: showTipsAsPopup }) };
-                                if (existing.length > 0) await base44.entities.AppSettings.update(existing[0].id, data);
-                                else await base44.entities.AppSettings.create(data);
-                                setTipsMessage(tipsEditValue);
-                                setEditingTips(false);
-                              }}>שמור</Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-xs text-gray-600 truncate" dir="rtl">{tipsMessage || <span className="text-gray-400">לא הוגדרה הודעה</span>}</p>
-                            {isManager && (
-                              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs shrink-0" onClick={() => { setTipsEditValue(tipsMessage); setEditingTips(true); }} dir="rtl">
-                                <Pencil className="w-3 h-3" />
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+            {/* 3.3 Desired shifts count + unavailability constraints */}
+            <div className="flex flex-wrap items-center gap-2 bg-white border rounded-xl px-3 py-2 shadow-sm">
+              <div className="flex items-center gap-1">
+                <Label className="text-xs text-gray-500 whitespace-nowrap">רצויות:</Label>
+                <Input type="number" className="w-14 h-6 text-xs px-1" value={desiredShiftsCount} onChange={(e) => setDesiredShiftsCount(e.target.value)} placeholder="#" />
+              </div>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowUnavailabilityDialog(true)}>
+                <Plus className="w-3 h-3 mr-1" />הוסף אילוץ
+              </Button>
+              {unavailabilities.length > 0 && unavailabilities.map((unavail) => (
+                <div key={unavail.id} className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1 text-xs">
+                  <span className="font-medium text-gray-800">{formatDateHebrew(unavail.date, "short")}</span>
+                  <span className="text-gray-500">{unavail.start_time}–{unavail.end_time}</span>
+                  <button onClick={() => handleDeleteUnavailability(unavail.id)} className="text-red-400 hover:text-red-600 ml-1">
+                    <XCircle className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
             </div>
 
-            {/* ── LEFT COLUMN: registration functions ── */}
-            <div className="space-y-4 order-last lg:order-first">
-              <div className="flex items-center gap-2 px-1" dir="rtl">
-                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide">הרשמה</h2>
-                {signupMode === "limit_sign_up" ? (
-                  <span className="text-xs bg-orange-100 text-orange-700 font-medium px-2 py-0.5 rounded-full">הגבלת הרשמה</span>
-                ) : (
-                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">הרשמה חופשית</span>
+            {/* 3.4 Shift demand panel */}
+            <ShiftDemandPanel
+              templateRows={templateRows}
+              allTemplates={allTemplates}
+              allAvailabilities={weekAvailabilities}
+              workers={workers}
+              currentWorker={currentWorker}
+              selectedShifts={selectedShifts}
+              signupMode={signupMode}
+              weekStart={weekStart}
+              onSignup={handleDemandSignup}
+              canEdit={canEdit && !currentWorker?.availability_locked}
+              isLocked={!!currentWorker?.availability_locked}
+              onAddConstraint={() => setShowUnavailabilityDialog(true)}
+            />
+
+            {/* Extra Tasks */}
+            {validOpenRegistrations.length > 0 && (
+              <Card className="border-none shadow-sm">
+                <CardHeader className="border-b bg-white py-2 px-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm">משימות נוספות</CardTitle>
+                    {isManager && (
+                      <Button size="sm" variant="ghost" className="text-orange-500 h-6 text-xs px-2" onClick={handleOpenCleanupDialog}>
+                        <Trash2 className="w-3 h-3 mr-1" />נקה ישנות
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="py-3 px-4 space-y-3">
+                  {validOpenRegistrations.map((reg) => {
+                    const regKey = reg?.key || reg;
+                    const regName = reg?.name || reg;
+                    const regDate = reg?.date || null;
+                    const regShifts = reg?.shifts || [];
+                    const parseTime = (t) => {
+                      if (!t) return { days: 0, time: t };
+                      const m = t.match(/^(\+(\d+))\s+(\d{2}:\d{2})$/);
+                      if (m) return { days: parseInt(m[2]), time: m[3] };
+                      return { days: 0, time: t };
+                    };
+                    return (
+                      <div key={regKey} className="border rounded-lg p-3">
+                        <div className="font-semibold text-sm mb-2">
+                          {regName}
+                          {regDate && <span className="text-xs text-gray-400 font-normal mr-2">{regDate}</span>}
+                        </div>
+                        {regShifts.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {regShifts.map((shift, si) => {
+                              const taskKey = `${regKey}__${si}`;
+                              const state = extraTaskStates[taskKey] || null;
+                              const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white" :
+                                state === "available" ? "bg-cyan-500 border-cyan-600 text-white" :
+                                state === "unavailable" ? "bg-red-500 border-red-600 text-white" :
+                                "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
+                              const stateIcon = state === "wanted" ? <Star className="w-3 h-3" /> :
+                                state === "available" ? <Check className="w-3 h-3" /> :
+                                state === "unavailable" ? <Ban className="w-3 h-3" /> : null;
+                              const endParsed = parseTime(shift.end_time);
+                              const isMultiDay = endParsed.days > 0 && endParsed.time >= "06:00";
+                              const disabled = !canEdit || currentWorker?.availability_locked;
+                              if (isMultiDay) {
+                                return (
+                                  <div key={si} className="flex items-stretch">
+                                    <button onClick={() => cycleExtraTask(taskKey)} disabled={disabled}
+                                      className={`flex flex-col items-start px-2 py-1.5 rounded-r-lg border-2 border-l-0 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                                      <div className="flex items-center gap-1">{stateIcon}<span>{shift.start_time} - 06:00</span></div>
+                                      <div className="text-[9px] opacity-70 mt-0.5">יום א׳</div>
+                                    </button>
+                                    <button onClick={() => cycleExtraTask(taskKey)} disabled={disabled}
+                                      className={`flex flex-col items-start px-2 py-1.5 rounded-l-lg border-2 border-dashed text-xs font-medium transition-all relative ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                                      <span className="absolute top-0.5 left-0.5 text-[9px] font-bold bg-orange-300 text-orange-900 rounded px-0.5">+1</span>
+                                      <div className="flex items-center gap-1">{stateIcon}<span>06:00 - {endParsed.time}</span></div>
+                                      <div className="text-[9px] opacity-70 mt-0.5">יום ב׳</div>
+                                    </button>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <button key={si} onClick={() => cycleExtraTask(taskKey)} disabled={disabled}
+                                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                                  {stateIcon}<span>{shift.start_time} - {shift.end_time}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : (() => {
+                          const taskKey = regKey;
+                          const state = extraTaskStates[taskKey] || null;
+                          const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white" :
+                            state === "available" ? "bg-cyan-500 border-cyan-600 text-white" :
+                            state === "unavailable" ? "bg-red-500 border-red-600 text-white" :
+                            "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
+                          const stateIcon = state === "wanted" ? <Star className="w-3 h-3 ml-1" /> :
+                            state === "available" ? <Check className="w-3 h-3 ml-1" /> :
+                            state === "unavailable" ? <Ban className="w-3 h-3 ml-1" /> : null;
+                          const stateLabel = state === "wanted" ? "רצוי" : state === "available" ? "זמין" : state === "unavailable" ? "לא זמין" : "לחץ לסימון";
+                          return (
+                            <button onClick={() => cycleExtraTask(taskKey)} disabled={!canEdit || currentWorker?.availability_locked}
+                              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
+                              {stateIcon}<span>{stateLabel}</span>
+                            </button>
+                          );
+                        })()}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 3.5 Submit form */}
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-white border rounded-xl px-3 py-2 shadow-sm">
+              <p className="text-xs text-gray-500">
+                {selectedShifts.filter(s => s.type === "wanted").length} רצויות,{" "}
+                {selectedShifts.filter(s => s.type === "available").length} זמינות
+              </p>
+              <div className="flex gap-2">
+                {isApproved && !showEditMode && (
+                  <Button variant="outline" size="sm" onClick={() => setShowEditMode(true)} className="h-7 text-xs">
+                    <Pencil className="w-3 h-3 mr-1" />ערוך
+                  </Button>
+                )}
+                {showEditMode && (
+                  <>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setShowEditMode(false); setSelectedShifts(originalShifts); }}>ביטול</Button>
+                    <Button size="sm" className="h-7 text-xs bg-blue-900 hover:bg-blue-800" onClick={() => setShowChangeRecap(true)}>סקור שינויים</Button>
+                  </>
+                )}
+                {!isApproved && !isPendingChange && (
+                  <>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelectedShifts([])} disabled={currentWorker?.availability_locked}>נקה</Button>
+                    <Button size="sm" className="h-7 text-xs bg-blue-900 hover:bg-blue-800"
+                      onClick={() => setShowSummary(true)}
+                      disabled={selectedShifts.filter(s => s.type !== "unavailable").length === 0 || currentWorker?.availability_locked}>
+                      סקור ושלח
+                    </Button>
+                  </>
                 )}
               </div>
-
-              {/* Action bar: desired count + submit/edit buttons */}
-              <div className="flex flex-wrap items-center gap-2 bg-white border rounded-xl px-3 py-2 shadow-sm">
-                <div className="flex items-center gap-1">
-                  <Label className="text-xs text-gray-500 whitespace-nowrap">רצויות:</Label>
-                  <Input type="number" className="w-14 h-6 text-xs px-1" value={desiredShiftsCount} onChange={(e) => setDesiredShiftsCount(e.target.value)} placeholder="#" />
-                </div>
-                <div className="mr-auto flex gap-2">
-                  {isApproved && !showEditMode && (
-                    <Button variant="outline" size="sm" onClick={() => setShowEditMode(true)} className="h-7 text-xs">
-                      <Pencil className="w-3 h-3 mr-1" />ערוך
-                    </Button>
-                  )}
-                  {showEditMode && (
-                    <>
-                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setShowEditMode(false); setSelectedShifts(originalShifts); }}>ביטול</Button>
-                      <Button size="sm" className="h-7 text-xs bg-blue-900 hover:bg-blue-800" onClick={() => setShowChangeRecap(true)}>סקור שינויים</Button>
-                    </>
-                  )}
-                  {!isApproved && !isPendingChange && (
-                    <>
-                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelectedShifts([])} disabled={currentWorker?.availability_locked}>נקה</Button>
-                      <Button size="sm" className="h-7 text-xs bg-blue-900 hover:bg-blue-800"
-                        onClick={() => setShowSummary(true)}
-                        disabled={selectedShifts.filter(s => s.type !== "unavailable").length === 0 || currentWorker?.availability_locked}>
-                        סקור ושלח
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Shift demand panel */}
-              <ShiftDemandPanel
-                templateRows={templateRows}
-                allTemplates={allTemplates}
-                allAvailabilities={weekAvailabilities}
-                workers={workers}
-                currentWorker={currentWorker}
-                selectedShifts={selectedShifts}
-                signupMode={signupMode}
-                weekStart={weekStart}
-                onSignup={handleDemandSignup}
-                canEdit={canEdit && !currentWorker?.availability_locked}
-                isLocked={!!currentWorker?.availability_locked}
-                onAddConstraint={() => setShowUnavailabilityDialog(true)}
-              />
-
-              {/* Extra Tasks */}
-              {validOpenRegistrations.length > 0 && (
-                <Card className="border-none shadow-sm">
-                  <CardHeader className="border-b bg-white py-2 px-4">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm">משימות נוספות</CardTitle>
-                      {isManager && (
-                        <Button size="sm" variant="ghost" className="text-orange-500 h-6 text-xs px-2" onClick={handleOpenCleanupDialog}>
-                          <Trash2 className="w-3 h-3 mr-1" />נקה ישנות
-                        </Button>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="py-3 px-4 space-y-3">
-                    {validOpenRegistrations.map((reg) => {
-                      const regKey = reg?.key || reg;
-                      const regName = reg?.name || reg;
-                      const regDate = reg?.date || null;
-                      const regShifts = reg?.shifts || [];
-                      const parseTime = (t) => {
-                        if (!t) return { days: 0, time: t };
-                        const m = t.match(/^(\+(\d+))\s+(\d{2}:\d{2})$/);
-                        if (m) return { days: parseInt(m[2]), time: m[3] };
-                        return { days: 0, time: t };
-                      };
-                      return (
-                        <div key={regKey} className="border rounded-lg p-3">
-                          <div className="font-semibold text-sm mb-2">
-                            {regName}
-                            {regDate && <span className="text-xs text-gray-400 font-normal mr-2">{regDate}</span>}
-                          </div>
-                          {regShifts.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                              {regShifts.map((shift, si) => {
-                                const taskKey = `${regKey}__${si}`;
-                                const state = extraTaskStates[taskKey] || null;
-                                const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white" :
-                                  state === "available" ? "bg-cyan-500 border-cyan-600 text-white" :
-                                  state === "unavailable" ? "bg-red-500 border-red-600 text-white" :
-                                  "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
-                                const stateIcon = state === "wanted" ? <Star className="w-3 h-3" /> :
-                                  state === "available" ? <Check className="w-3 h-3" /> :
-                                  state === "unavailable" ? <Ban className="w-3 h-3" /> : null;
-                                const endParsed = parseTime(shift.end_time);
-                                const isMultiDay = endParsed.days > 0 && endParsed.time >= "06:00";
-                                const disabled = !canEdit || currentWorker?.availability_locked;
-                                if (isMultiDay) {
-                                  return (
-                                    <div key={si} className="flex items-stretch">
-                                      <button onClick={() => cycleExtraTask(taskKey)} disabled={disabled}
-                                        className={`flex flex-col items-start px-2 py-1.5 rounded-r-lg border-2 border-l-0 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                                        <div className="flex items-center gap-1">{stateIcon}<span>{shift.start_time} - 06:00</span></div>
-                                        <div className="text-[9px] opacity-70 mt-0.5">יום א׳</div>
-                                      </button>
-                                      <button onClick={() => cycleExtraTask(taskKey)} disabled={disabled}
-                                        className={`flex flex-col items-start px-2 py-1.5 rounded-l-lg border-2 border-dashed text-xs font-medium transition-all relative ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                                        <span className="absolute top-0.5 left-0.5 text-[9px] font-bold bg-orange-300 text-orange-900 rounded px-0.5">+1</span>
-                                        <div className="flex items-center gap-1">{stateIcon}<span>06:00 - {endParsed.time}</span></div>
-                                        <div className="text-[9px] opacity-70 mt-0.5">יום ב׳</div>
-                                      </button>
-                                    </div>
-                                  );
-                                }
-                                return (
-                                  <button key={si} onClick={() => cycleExtraTask(taskKey)} disabled={disabled}
-                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                                    {stateIcon}<span>{shift.start_time} - {shift.end_time}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : (() => {
-                            const taskKey = regKey;
-                            const state = extraTaskStates[taskKey] || null;
-                            const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white" :
-                              state === "available" ? "bg-cyan-500 border-cyan-600 text-white" :
-                              state === "unavailable" ? "bg-red-500 border-red-600 text-white" :
-                              "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
-                            const stateIcon = state === "wanted" ? <Star className="w-3 h-3 ml-1" /> :
-                              state === "available" ? <Check className="w-3 h-3 ml-1" /> :
-                              state === "unavailable" ? <Ban className="w-3 h-3 ml-1" /> : null;
-                            const stateLabel = state === "wanted" ? "רצוי" : state === "available" ? "זמין" : state === "unavailable" ? "לא זמין" : "לחץ לסימון";
-                            return (
-                              <button onClick={() => cycleExtraTask(taskKey)} disabled={!canEdit || currentWorker?.availability_locked}
-                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                                {stateIcon}<span>{stateLabel}</span>
-                              </button>
-                            );
-                          })()}
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Constraints — shown only as tags if any exist */}
-              {unavailabilities.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-1" dir="rtl">
-                  {unavailabilities.map((unavail) => (
-                    <div key={unavail.id} className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1 text-xs">
-                      <span className="font-medium text-gray-800">{formatDateHebrew(unavail.date, "short")}</span>
-                      <span className="text-gray-500">{unavail.start_time}–{unavail.end_time}</span>
-                      <span className="text-gray-400">{unavail.reason === 'overseas' ? 'חו"ל' : 'תפוס'}</span>
-                      <button onClick={() => handleDeleteUnavailability(unavail.id)} className="text-red-400 hover:text-red-600 ml-1">
-                        <XCircle className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
-          </div>
-        )}
+            {/* bottom padding */}
+            <div className="h-6" />
 
-        {/* ── Dialogs ── */}
+            {/* ── Dialogs ── */}
         <Dialog open={showUnavailabilityDialog} onOpenChange={setShowUnavailabilityDialog}>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader><DialogTitle className="text-right" dir="rtl">הוסף אילוץ</DialogTitle></DialogHeader>
@@ -1450,7 +1454,8 @@ END:VEVENT
             </DialogFooter>
           </DialogContent>
         </Dialog>
+          </>
+        )}
       </div>
-    </div>
   );
 }
