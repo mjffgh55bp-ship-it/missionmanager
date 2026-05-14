@@ -16,22 +16,10 @@ import MatrixHeader from "../components/matrix/MatrixHeader";
 import { NotificationDialog, TypeChangeDialog, ManualShiftDialog } from "../components/matrix/MatrixDialogs";
 
 // ── Timeline constants ──────────────────────────────────────────────────────
-const DAILY_TOTAL_MINUTES = 24 * 60; // 1440 — operational day (06:00→06:00)
-const WEEKLY_TOTAL_MINUTES = 7 * 24 * 60; // 10080
+const DAILY_TOTAL_MINUTES = 24 * 60;        // 1440
+const WEEKLY_TOTAL_MINUTES = 7 * 24 * 60;  // 10080
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
-
-// pixelsPerMinute presets (daily view)
-// "התאם ליום" = auto (computed from container width)
-// "יום מלא" = 24h in ~1400px → 1400/1440 ≈ 0.97
-// "12h" = 12h in ~1400px → 1400/720 ≈ 1.94
-const PPM_FULL_DAY = 0.97;      // יום מלא / 24h
-const PPM_12H = 1.94;           // 12h
-const PPM_MIN = PPM_FULL_DAY;   // cannot zoom out more than full day
-const PPM_MAX = PPM_12H;        // cannot zoom in past 12h visible
-
-// For weekly: 7× as many minutes, so base ppm is ~7× smaller
-const WEEKLY_PPM_FULL = 0.14;   // 7 days ≈ 1400px
-const WEEKLY_PPM_12H = 0.97;    // ~12h visible
+const FIXED_COL_WIDTH = 220; // worker name column px (sticky left)
 
 // ── Time slot generators (for the header ruler) ─────────────────────────────
 // Daily: 06:00 → 05:00 next day (operational), returns array of clock hours
@@ -118,8 +106,27 @@ export default function Matrix() {
   const [roleFilter, setRoleFilter] = usePageState("matrix", "roleFilter", "__all__");
   const [statusFilter, setStatusFilter] = usePageState("matrix", "statusFilter", "__all__");
 
-  // NEW: separate zoom (pixelsPerMinute) — no more zoomRange
-  const [ppm, setPpm] = useState(PPM_FULL_DAY);
+  // ── Container width tracking (for dynamic ppm calculation) ──────────────────
+  const [containerWidth, setContainerWidth] = useState(0);
+  const containerWidthRef = useRef(0);
+
+  // ppm = null means "fit" (auto-calculated from containerWidth)
+  // We store a "preset" separately to know which mode we're in
+  const [zoomPreset, setZoomPreset] = useState('fit'); // 'fit' | '24h' | '12h' | 'custom'
+  const [customPpm, setCustomPpm] = useState(null);
+
+  // Computed ppm: always derived from containerWidth + preset
+  const totalMins = viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES;
+  const fitPpm = containerWidth > 0 ? (containerWidth - FIXED_COL_WIDTH) / totalMins : 1;
+  const ppm = (() => {
+    if (!containerWidth) return 1;
+    const fit = (containerWidth - FIXED_COL_WIDTH) / totalMins;
+    const max12h = (containerWidth - FIXED_COL_WIDTH) / (viewMode === 'daily' ? 720 : (7 * 720));
+    if (zoomPreset === 'fit' || zoomPreset === '24h') return fit;
+    if (zoomPreset === '12h') return max12h;
+    if (zoomPreset === 'custom' && customPpm) return Math.max(fit, Math.min(max12h, customPpm));
+    return fit;
+  })();
 
   const [workers, setWorkers] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -161,56 +168,64 @@ export default function Matrix() {
 
   // ── Scroll container ref (for middle-mouse drag + wheel zoom) ───────────────
   const scrollContainerRef = useRef(null);
-  const midMouseDragRef = useRef(null); // { startX, startY, initScrollLeft, initScrollTop }
+  const midMouseDragRef = useRef(null);
   const ppmRef = useRef(ppm);
   ppmRef.current = ppm;
 
   // ── Derived: total timeline pixel width ─────────────────────────────────────
-  const timelineWidth = useMemo(() => getTimelineWidth(viewMode, ppm), [viewMode, ppm]);
+  const timelineWidth = useMemo(() => totalMins * ppm, [totalMins, ppm]);
 
-  // Clamp ppm to allowed range for current viewMode
-  const clampPpm = useCallback((value, vm) => {
-    if (vm === 'weekly') return Math.max(WEEKLY_PPM_FULL, Math.min(WEEKLY_PPM_12H, value));
-    return Math.max(PPM_MIN, Math.min(PPM_MAX, value));
+  // Track scroll container width with ResizeObserver
+  useEffect(() => {
+    const sc = scrollContainerRef.current;
+    if (!sc) return;
+    const update = () => {
+      const w = sc.clientWidth;
+      if (w !== containerWidthRef.current) {
+        containerWidthRef.current = w;
+        setContainerWidth(w);
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(sc);
+    return () => ro.disconnect();
   }, []);
 
-  // ── Zoom helpers (zoom around a focal pixel in the scroll container) ─────────
+  // Clamp custom ppm to fit..12h range
+  const clampCustomPpm = useCallback((value) => {
+    if (!containerWidth) return value;
+    const fit = (containerWidth - FIXED_COL_WIDTH) / totalMins;
+    const max12h = (containerWidth - FIXED_COL_WIDTH) / (viewMode === 'daily' ? 720 : 7 * 720);
+    return Math.max(fit, Math.min(max12h, value));
+  }, [containerWidth, totalMins, viewMode]);
+
+  // ── Zoom helpers ─────────────────────────────────────────────────────────────
   const applyZoom = useCallback((newPpmRaw, focalScrollX = null) => {
     const sc = scrollContainerRef.current;
     const oldPpm = ppmRef.current;
-    const newPpm = clampPpm(newPpmRaw, viewMode);
-    if (newPpm === oldPpm) return;
+    const newPpm = clampCustomPpm(newPpmRaw);
+    if (Math.abs(newPpm - oldPpm) < 0.0001) return;
 
-    // If we have a focal point (cursor X relative to scrollContainer), keep that
-    // timeline position under the cursor.
+    setZoomPreset('custom');
+    setCustomPpm(newPpm);
+
     if (sc && focalScrollX !== null) {
-      const oldTimelineX = sc.scrollLeft + focalScrollX; // px into timeline
+      const oldTimelineX = sc.scrollLeft + focalScrollX;
       const ratio = newPpm / oldPpm;
       const newScrollLeft = oldTimelineX * ratio - focalScrollX;
-      setPpm(newPpm);
-      // Apply scroll after state update
       requestAnimationFrame(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollLeft = Math.max(0, newScrollLeft);
-        }
+        if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = Math.max(0, newScrollLeft);
       });
-    } else {
-      // Zoom around center
-      if (sc) {
-        const centerX = sc.scrollLeft + sc.clientWidth / 2;
-        const ratio = newPpm / oldPpm;
-        const newScrollLeft = centerX * ratio - sc.clientWidth / 2;
-        setPpm(newPpm);
-        requestAnimationFrame(() => {
-          if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollLeft = Math.max(0, newScrollLeft);
-          }
-        });
-      } else {
-        setPpm(newPpm);
-      }
+    } else if (sc) {
+      const centerX = sc.scrollLeft + sc.clientWidth / 2;
+      const ratio = newPpm / oldPpm;
+      const newScrollLeft = centerX * ratio - sc.clientWidth / 2;
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = Math.max(0, newScrollLeft);
+      });
     }
-  }, [clampPpm, viewMode]);
+  }, [clampCustomPpm]);
 
   // ── Wheel handler: Ctrl/Cmd+wheel = zoom, plain wheel = native scroll ────────
   const handleWheel = useCallback((e) => {
@@ -275,27 +290,20 @@ export default function Matrix() {
 
   const applyPreset = (preset) => {
     const sc = scrollContainerRef.current;
-    if (preset === 'auto') {
-      // "התאם ליום" — fit to container
-      const containerWidth = sc ? sc.clientWidth : 1400;
-      const totalMins = viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES;
-      const fitPpm = containerWidth / totalMins;
-      setPpm(clampPpm(fitPpm, viewMode));
-      if (sc) requestAnimationFrame(() => { sc.scrollLeft = 0; });
-    } else if (preset === 'full') {
-      const newPpm = viewMode === 'daily' ? PPM_FULL_DAY : WEEKLY_PPM_FULL;
-      setPpm(clampPpm(newPpm, viewMode));
-      if (sc) requestAnimationFrame(() => { sc.scrollLeft = 0; });
+    if (preset === 'auto' || preset === 'full' || preset === '24h') {
+      setZoomPreset('fit');
+      setCustomPpm(null);
     } else if (preset === '12h') {
-      const newPpm = viewMode === 'daily' ? PPM_12H : WEEKLY_PPM_12H;
-      setPpm(clampPpm(newPpm, viewMode));
-      if (sc) requestAnimationFrame(() => { sc.scrollLeft = 0; });
+      setZoomPreset('12h');
+      setCustomPpm(null);
     }
+    if (sc) requestAnimationFrame(() => { sc.scrollLeft = 0; });
   };
 
-  // Reset ppm when viewMode changes
+  // Reset preset when viewMode changes
   useEffect(() => {
-    setPpm(viewMode === 'daily' ? PPM_FULL_DAY : WEEKLY_PPM_FULL);
+    setZoomPreset('fit');
+    setCustomPpm(null);
     if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = 0;
   }, [viewMode]);
 
@@ -959,16 +967,15 @@ export default function Matrix() {
   const fakeZoomRange = { start: 0, end: 100 };
 
   return (
-    <>
     <div
-      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8"
+      className="h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 p-2"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       dir="rtl"
     >
-      <div className="max-w-screen-2xl mx-auto">
-        <Card className="border-none shadow-lg mb-3">
+      <div className="flex flex-col flex-1 min-h-0 w-full">
+        <Card className="border-none shadow-lg mb-2 flex-shrink-0">
           <MatrixHeader
             currentDate={currentDate} setCurrentDate={setCurrentDate}
             viewMode={viewMode} setViewMode={setViewMode}
@@ -981,7 +988,7 @@ export default function Matrix() {
         </Card>
 
         {/* Zoom controls bar */}
-        <div className="flex items-center gap-2 mb-2 px-1" dir="rtl">
+        <div className="flex items-center gap-2 mb-1 px-1 flex-shrink-0" dir="rtl">
           <span className="text-xs text-gray-500 font-medium">רזולוציה:</span>
           <button
             onClick={zoomOut}
@@ -1000,21 +1007,20 @@ export default function Matrix() {
           <span className="text-[10px] text-gray-400 mr-2">Ctrl+גלגל לזום · גרירת גלגל לגלילה</span>
         </div>
 
-        <Card className="border-none shadow-lg">
-          <CardContent className="p-0">
+        <Card className="border-none shadow-lg flex-1 min-h-0 flex flex-col">
+          <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
             {/* Outer scroll container — this is the native scrollable area */}
             <div
               ref={scrollContainerRef}
-              className="overflow-x-auto overflow-y-auto"
-              style={{ maxHeight: 'calc(100vh - 220px)' }}
+              className="overflow-x-auto overflow-y-auto flex-1 min-h-0"
               onMouseDown={handlePointerDown}
               onMouseMove={handlePointerMove}
               onMouseUp={handlePointerUp}
             >
               {/* Inner fixed-width timeline */}
-              <div style={{ width: `${timelineWidth}px`, minWidth: `${timelineWidth}px` }}>
+              <div style={{ width: `${FIXED_COL_WIDTH + timelineWidth}px`, minWidth: `${FIXED_COL_WIDTH + timelineWidth}px` }}>
                 {/* Sticky header row */}
-                <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${timelineWidth}px` }}>
+                <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${FIXED_COL_WIDTH + timelineWidth}px` }}>
                   {/* Worker name column — sticky left */}
                   <div className="w-[220px] min-w-[220px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
                     <MasterControls
@@ -1036,17 +1042,17 @@ export default function Matrix() {
                       <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
                     </div>
                   )}
-                  {/* Time ruler — flex, each slot gets equal share of remaining width */}
-                  <div className="flex-1 flex relative" dir="rtl">
+                  {/* Time ruler — exact fixed slot widths, no flex-1 stretching */}
+                  <div className="flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
                     {viewMode === 'daily' ? (
                       dailySlots.map((hour) => (
-                        <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium" style={{ minWidth: `${60 * ppm}px` }}>
+                        <div key={hour} className="shrink-0 text-xs text-gray-600 py-3 border-l text-center font-medium overflow-hidden" style={{ width: `${60 * ppm}px` }}>
                           {String(hour).padStart(2, '0')}:00
                         </div>
                       ))
                     ) : (
                       weeklySlots.map((slot, idx) => (
-                        <div key={idx} className={`flex-1 text-xs text-gray-600 py-1 text-center font-medium ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : 'border-l border-l-gray-200'}`} style={{ minWidth: `${60 * ppm}px` }}>
+                        <div key={idx} className={`shrink-0 text-xs text-gray-600 py-1 text-center font-medium overflow-hidden ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : 'border-l border-l-gray-200'}`} style={{ width: `${60 * ppm}px` }}>
                           {slot.label && <div className="font-bold text-gray-800 text-[10px] leading-tight">{slot.label}</div>}
                           {slot.dateLabel && <div className="text-[8px] text-gray-500 leading-tight">{slot.dateLabel}</div>}
                           <div className={`text-[8px] leading-tight ${slot.hour === 0 ? 'text-gray-800 font-semibold' : 'text-gray-400'}`}>
@@ -1084,7 +1090,7 @@ export default function Matrix() {
 
                     return (
                       <React.Fragment key={worker.id}>
-                      <div className={`flex border-b h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                      <div className={`flex border-b h-8 shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ width: `${FIXED_COL_WIDTH + timelineWidth}px` }}>
                         {/* Worker name cell — sticky left */}
                         <div className="w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-8">
                           <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
@@ -1110,20 +1116,20 @@ export default function Matrix() {
                         ))}
                         {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
 
-                        {/* Timeline area */}
+                        {/* Timeline area — exact width matching ruler */}
                         <div
                           data-worker-id={worker.id}
                           ref={el => { if (el) timelineRefs.current[worker.id] = el; }}
-                          className="flex-1 relative border-r cursor-crosshair h-8"
+                          className="relative border-r cursor-crosshair h-8 shrink-0"
                           dir="rtl"
-                          style={{ width: `${timelineWidth}px`, minWidth: `${timelineWidth}px` }}
+                          style={{ width: `${timelineWidth}px` }}
                           onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
                         >
-                          {/* Grid lines */}
+                          {/* Grid lines — exact fixed slot widths matching ruler */}
                           <div className="absolute inset-0 flex h-8" dir="rtl">
                             {viewMode === 'daily'
-                              ? dailySlots.map(hour => <div key={hour} className="flex-1 border-l time-slot h-8" style={{ minWidth: `${60 * ppm}px` }} />)
-                              : weeklySlots.map((slot, idx) => <div key={idx} className="flex-1 border-l time-slot h-8" style={{ minWidth: `${60 * ppm}px` }} />)
+                              ? dailySlots.map(hour => <div key={hour} className="shrink-0 border-l time-slot h-8" style={{ width: `${60 * ppm}px` }} />)
+                              : weeklySlots.map((slot, idx) => <div key={idx} className="shrink-0 border-l time-slot h-8" style={{ width: `${60 * ppm}px` }} />)
                             }
                           </div>
                           {/* Day boundary lines (weekly) */}
@@ -1170,6 +1176,5 @@ export default function Matrix() {
         <ManualShiftDialog open={showManualDialog} onOpenChange={(v) => { setShowManualDialog(v); if (!v) { setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null); } }} editingShift={editingShift} selectedWorkerForManual={selectedWorkerForManual} manualShiftData={manualShiftData} setManualShiftData={setManualShiftData} submitManualShift={submitManualShift} deleteShift={deleteManualShift} />
       </div>
     </div>
-    </>
   );
 }
