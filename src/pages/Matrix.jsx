@@ -2,28 +2,23 @@ import React, { useState, useEffect, useRef } from "react";
 import { usePageState } from "@/hooks/usePageState";
 import { base44 } from "@/api/base44Client";
 import { getCachedAllSettings, getCachedWorkers, getCachedTemplates } from "@/lib/appDataCache";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { format, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
-import { getOperationalStartDate } from "@/lib/operationalDate";
-// Popover/Calendar moved to MatrixHeader component
-import { ChevronLeft, ChevronRight, ChefHat, Send, Star, Check, Ban, Plus, Trash2, Lock, LockOpen, MessageCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
+import { getOperationalStartDate, getOperationalMinutes } from "@/lib/operationalDate";
+import { Send, Star, Check, Ban, Plus, MessageCircle } from "lucide-react";
 import BriefingBar from "../components/matrix/BriefingBar";
 import WorkerLockButton from "../components/matrix/WorkerLockButton";
 import MasterControls from "../components/matrix/MasterControls";
 import SummaryColumnsDialog from "../components/matrix/SummaryColumnsDialog";
 import MatrixHeader from "../components/matrix/MatrixHeader";
+import { NotificationDialog, TypeChangeDialog, ManualShiftDialog } from "../components/matrix/MatrixDialogs";
 
-// Timeline: 00:00 → 24:00 (right to left in RTL)
+// Operational timeline: 06:00 → next-day 06:00 (24 slots, RTL)
+// Each slot value is the clock-hour to display: 6, 7, …, 23, 0, 1, 2, 3, 4, 5
 const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
-  const allSlots = Array.from({ length: 30 }, (_, i) => i); // 0..29 (0-23 = today, 24-29 = next day 00-05)
+  const allSlots = Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
   const startIdx = Math.floor((zoomRange.start / 100) * allSlots.length);
   const endIdx = Math.ceil((zoomRange.end / 100) * allSlots.length);
   return allSlots.slice(startIdx, endIdx);
@@ -37,12 +32,7 @@ const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }, weekStartDate = 
       dateLabel = format(date, 'd.M');
     }
     for (let hour = 0; hour < 24; hour++) {
-      allSlots.push({ 
-        day, 
-        hour: hour, 
-        label: hour === 0 ? DAYS_OF_WEEK[day] : null,
-        dateLabel: hour === 0 ? dateLabel : null
-      });
+      allSlots.push({ day, hour, label: hour === 0 ? DAYS_OF_WEEK[day] : null, dateLabel: hour === 0 ? dateLabel : null });
     }
   }
   const startIdx = Math.floor((zoomRange.start / 100) * allSlots.length);
@@ -51,26 +41,18 @@ const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }, weekStartDate = 
 };
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
-// Timeline: 00:00 (right, 0%) → 24:00 (left, 100%) in RTL
+// Daily: 06:00 (right, 0%) → next-day 06:00 (left, 100%) — operational day, RTL
+// Weekly: plain day*24h grid
 const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
   if (!timeStr) return 0;
-  const parts = timeStr.split(':').map(Number);
-  const hours = parts[0]; // 0-24
-  const minutes = parts[1] || 0;
+  const [hours, minutes] = timeStr.split(':').map(Number);
   let basePercent;
   if (viewMode === 'weekly') {
-    const totalMinutes = (day * 24 + hours) * 60 + minutes;
-    basePercent = (totalMinutes / (7 * 24 * 60)) * 100;
+    basePercent = ((day * 24 + hours) * 60 + (minutes || 0)) / (7 * 24 * 60) * 100;
   } else {
-    // 00:00 = 0%, 06:00 next day = 100% (30 hours total)
-    const totalMinutes = hours * 60 + minutes;
-    basePercent = (totalMinutes / (30 * 60)) * 100;
+    basePercent = getOperationalMinutes(timeStr) / (24 * 60) * 100;
   }
-  
-  if (basePercent < zoomRange.start || basePercent > zoomRange.end) {
-    return basePercent < zoomRange.start ? -1 : 101;
-  }
-  
+  if (basePercent < zoomRange.start || basePercent > zoomRange.end) return basePercent < zoomRange.start ? -1 : 101;
   const zoomWidth = zoomRange.end - zoomRange.start;
   return ((basePercent - zoomRange.start) / zoomWidth) * 100;
 };
@@ -78,18 +60,21 @@ const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { st
 const percentageToTime = (percentage, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
   const zoomWidth = zoomRange.end - zoomRange.start;
   const basePercent = (percentage / 100) * zoomWidth + zoomRange.start;
-  const totalMinutes = (basePercent / 100) * (viewMode === 'weekly' ? 7 * 24 * 60 : 30 * 60);
-  
   if (viewMode === 'weekly') {
+    const totalMinutes = (basePercent / 100) * (7 * 24 * 60);
     const day = Math.floor(totalMinutes / (24 * 60));
     const minutesInDay = totalMinutes % (24 * 60);
     const hours = Math.floor(minutesInDay / 60);
     const mins = Math.round((minutesInDay % 60) / 15) * 15;
     return { day: Math.max(0, Math.min(6, day)), time: `${String(hours).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}` };
   } else {
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = Math.round((totalMinutes % 60) / 15) * 15;
-    return { day: 0, time: `${String(hours).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}` };
+    const opMins = (basePercent / 100) * (24 * 60);
+    const clockMins = (opMins + 6 * 60) % (24 * 60);
+    const hours = Math.floor(clockMins / 60);
+    const rawMins = Math.round((clockMins % 60) / 15) * 15;
+    const finalMins = rawMins >= 60 ? 0 : rawMins;
+    const finalHours = rawMins >= 60 ? (hours + 1) % 24 : hours;
+    return { day: 0, time: `${String(finalHours).padStart(2, '0')}:${String(finalMins).padStart(2, '0')}` };
   }
 };
 
@@ -140,54 +125,34 @@ export default function Matrix() {
   const [trackerEntries, setTrackerEntries] = useState([]);
   const [signupMode, setSignupMode] = useState("allow_over_sign_up");
   const [savingSignupMode, setSavingSignupMode] = useState(false);
-  // Cache settings record IDs to avoid extra filter() calls during save
   const settingsIdCache = useRef({});
 
-  // Load static data once on mount
   useEffect(() => { loadStaticData(); }, []);
-
-  // Load dynamic data when date/viewMode changes — but only after static data loaded
-  // We use a ref to avoid double-loading on mount
   useEffect(() => {
-    if (!initialLoadDoneRef.current) return; // wait for static data to finish first
+    if (!initialLoadDoneRef.current) return;
     loadDynamicData(false);
   }, [currentDate, viewMode]);
-
-  // Real-time subscriptions — register once on mount only
   useEffect(() => {
-    const unsubAssignment = base44.entities.Assignment.subscribe(() => {
-      debouncedLoadDataRef.current(true);
-    });
-    const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
-      debouncedLoadDataRef.current(true);
-    });
-    return () => {
-      unsubAssignment();
-      unsubTemplateRow();
-    };
+    const unsubAssignment = base44.entities.Assignment.subscribe(() => { debouncedLoadDataRef.current(true); });
+    const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => { debouncedLoadDataRef.current(true); });
+    return () => { unsubAssignment(); unsubTemplateRow(); };
   }, []);
 
   const refreshWorkers = async () => {
     try {
       const workersData = await getCachedWorkers(base44.entities);
       setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
-    } catch (error) {
-      console.error('Error refreshing workers:', error);
-    }
+    } catch (error) { console.error('Error refreshing workers:', error); }
   };
 
   const loadStaticData = async () => {
     try {
-      // Use shared cache — avoids redundant API calls when navigating between pages
       const [workersData, allSettings, trackersData] = await Promise.all([
         getCachedWorkers(base44.entities),
         getCachedAllSettings(base44.entities),
         base44.entities.Tracker.list()
       ]);
-
-      const findSetting = (key) => allSettings.find(s => s.setting_key === key);
-      const parseSetting = (key) => { const s = findSetting(key); return s ? JSON.parse(s.setting_value) : null; };
-
+      const parseSetting = (key) => { const s = allSettings.find(x => x.setting_key === key); return s ? JSON.parse(s.setting_value) : null; };
       const rawPops = parseSetting("worker_populations") || ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
       setPopulations(rawPops.map(p => (typeof p === "string" ? p : p.name)));
       const rawRoles = parseSetting("worker_roles") || ["שף", "סו-שף"];
@@ -197,14 +162,10 @@ export default function Matrix() {
       setSummaryColumns(parseSetting("matrix_summary_columns") || []);
       setScheduleParams(parseSetting("custom_schedule_params") || []);
       setSignupMode(parseSetting("availability_signup_mode") || "allow_over_sign_up");
-      // Cache setting record IDs for use in save functions (avoids extra filter() calls)
       allSettings.forEach(s => { settingsIdCache.current[s.setting_key] = s.id; });
       setTrackers(trackersData);
       setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
-    } catch (error) {
-      console.error('Error loading static matrix data:', error);
-    }
-    // After static data is done, trigger the first dynamic load
+    } catch (error) { console.error('Error loading static matrix data:', error); }
     initialLoadDoneRef.current = true;
     loadDynamicData(false);
   };
@@ -217,31 +178,21 @@ export default function Matrix() {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
       const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
-      
       const dateStr = format(currentDate, "yyyy-MM-dd");
 
-      // Batch 1: assignments (sequential to reduce rate limit pressure)
       const assignmentsData = viewMode === "daily"
         ? await base44.entities.Assignment.filter({ date: dateStr })
         : await base44.entities.Assignment.list();
-
-      // Batch 2: availability + unavailabilities (sequential to reduce burst)
       const availabilitiesData = await base44.entities.Availability.list();
       await new Promise(r => setTimeout(r, 100));
       const unavailabilitiesData = await (viewMode === "daily"
         ? base44.entities.Unavailability.filter({ date: dateStr })
         : base44.entities.Unavailability.list());
-
-      // Batch 3: template rows + templates (templates served from cache)
       await new Promise(r => setTimeout(r, 100));
       const [templateRowsData, allTemplatesData] = await Promise.all([
-        viewMode === "daily"
-          ? base44.entities.TemplateRow.filter({ date: dateStr })
-          : base44.entities.TemplateRow.list(),
+        viewMode === "daily" ? base44.entities.TemplateRow.filter({ date: dateStr }) : base44.entities.TemplateRow.list(),
         getCachedTemplates(base44.entities)
       ]);
-      
-      // Filter weekly assignments and template rows
       let filteredAssignments = assignmentsData;
       let filteredTemplateRows = templateRowsData;
       if (viewMode === "weekly") {
@@ -249,24 +200,17 @@ export default function Matrix() {
         filteredAssignments = assignmentsData.filter(a => a.date >= weekStartStr && a.date <= weekEndStr);
         filteredTemplateRows = templateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
       }
-      
-      // For continuation rows in daily mode, also fetch their source rows
       if (viewMode === "daily") {
         const continuationRows = filteredTemplateRows.filter(r => r.values?.is_continuation && r.values?.continuation_source_row_id);
-        const sourceRowIds = continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean);
-        const uniqueSourceIds = [...new Set(sourceRowIds)];
-        
+        const uniqueSourceIds = [...new Set(continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean))];
         if (uniqueSourceIds.length > 0) {
           const missingSourceIds = uniqueSourceIds.filter(id => !filteredTemplateRows.some(r => r.id === id));
           if (missingSourceIds.length > 0) {
-            const sourceRows = await Promise.all(
-              missingSourceIds.map(id => base44.entities.TemplateRow.get(id).catch(() => null))
-            );
+            const sourceRows = await Promise.all(missingSourceIds.map(id => base44.entities.TemplateRow.get(id).catch(() => null)));
             filteredTemplateRows = [...filteredTemplateRows, ...sourceRows.filter(Boolean)];
           }
         }
       }
-      
       const trackerEntriesData = await base44.entities.TrackerEntry.list();
       setAssignments(filteredAssignments);
       setAvailabilities(availabilitiesData);
@@ -275,93 +219,47 @@ export default function Matrix() {
       setAllTemplates(allTemplatesData);
       setTrackerEntries(trackerEntriesData);
       setInitialLoaded(true);
-    } catch (error) {
-      console.error('Error loading matrix data:', error);
-    } finally {
-      setLoading(false);
-      isLoadingRef.current = false;
-    }
+    } catch (error) { console.error('Error loading matrix data:', error); }
+    finally { setLoading(false); isLoadingRef.current = false; }
   };
 
   const debouncedLoadData = (silent = false) => {
     if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
     loadingTimeoutRef.current = setTimeout(() => loadDynamicData(silent), 2500);
   };
-
-  // Keep a ref to debouncedLoadData so subscriptions always call the latest version
   const debouncedLoadDataRef = useRef(null);
   debouncedLoadDataRef.current = debouncedLoadData;
 
   const dateString = format(currentDate, "yyyy-MM-dd");
   const weekStartDate = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-  const getWorkerAssignments = (workerId, date = null) => {
-    const targetDate = date || dateString;
-    let filtered = assignments.filter(a => 
-      (a.chef_id === workerId || a.sous_chef_id === workerId || a.additional_chef_id === workerId) &&
-      (!date || a.date === targetDate)
-    );
-    
-    // Apply status filter
-    if (statusFilter !== "__all__") {
-      filtered = filtered.filter(a => a.status === statusFilter);
-    }
-    
-    return filtered;
-  };
-
-  // Get template row shifts for a worker (from worker-type columns in TemplateRow)
   const getWorkerTemplateShifts = (workerId, date = null) => {
     const targetDate = date || dateString;
     const shifts = [];
-
-    // Don't filter templateRows early - check all rows to find continuation relationships
     templateRows.forEach(row => {
       if (!row.values) return;
-      
-      // Check if this is a continuation row
       const isContinuation = row.values.is_continuation;
       const sourceRowId = row.values.continuation_source_row_id;
-      
       let isAssigned = false;
-      let shouldInclude = false;
       let briefingTime = row.values?.["תדריך"];
-      
       if (isContinuation && sourceRowId) {
-        // For continuation rows, check if worker is assigned in the source row
         const sourceRow = templateRows.find(r => r.id === sourceRowId);
         if (sourceRow && sourceRow.values) {
           isAssigned = Object.values(sourceRow.values).some(val => val === workerId);
-          // Get briefing time from source row if not in continuation
-          if (!briefingTime) {
-            briefingTime = sourceRow.values?.["תדריך"];
-          }
+          if (!briefingTime) briefingTime = sourceRow.values?.["תדריך"];
         }
-        // CRITICAL: match by schedule_date ONLY — never use OR with operational date.
-        // Using operationalDate in the condition causes 02:00 rows on adjacent days to collide.
-        shouldInclude = row.date === targetDate;
       } else {
-        // For regular rows, check if worker is assigned directly
         isAssigned = Object.values(row.values).some(val => val === workerId);
-        // CRITICAL: match by schedule_date ONLY — never use OR with operational date.
-        shouldInclude = row.date === targetDate;
       }
-      
-      if (!isAssigned || !shouldInclude) return;
-
-      // Find the template to get worker-type columns
+      if (!isAssigned || row.date !== targetDate) return;
       const template = allTemplates.find(t => t.id === row.template_id);
       if (!template) return;
-
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
-
       if (startTime && endTime) {
-        // Use operational date: shifts 00:00-05:59 belong to the next calendar day
-        const effectiveDate = getOperationalStartDate(row.date, startTime);
         shifts.push({
           id: `template_${row.id}`,
-          date: effectiveDate,
+          date: getOperationalStartDate(row.date, startTime),
           schedule_date: row.date,
           start_time: startTime,
           end_time: endTime,
@@ -373,562 +271,246 @@ export default function Matrix() {
         });
       }
     });
-
     return shifts;
   };
 
-  // Get extra task registrations for a worker
   const getWorkerExtraTaskShifts = (workerId, date = null) => {
     const targetDate = date || dateString;
     const shifts = [];
-
-    // Find worker's availability
-    const workerAvail = availabilities.find(a => 
-      a.worker_id === workerId && 
-      a.week_start_date === weekStartDate &&
-      (a.status === "approved" || a.status === "submitted")
-    );
-
+    const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate && (a.status === "approved" || a.status === "submitted"));
     if (!workerAvail || !workerAvail.extra_tasks) return shifts;
-
-    // Parse extra_tasks object - keys are like "template_123_group_456__shiftIndex" or just "template_123_group_456"
     Object.entries(workerAvail.extra_tasks).forEach(([taskKey, taskState]) => {
-      if (taskState !== 'wanted' && taskState !== 'available') return; // Only show wanted/available
-      
-      // Parse the task key
+      if (taskState !== 'wanted' && taskState !== 'available') return;
       const keyParts = taskKey.split('__');
-      const groupKey = keyParts[0]; // e.g., "template_123_group_456"
+      const groupKey = keyParts[0];
       const shiftIndex = keyParts.length > 1 ? parseInt(keyParts[1]) : null;
-
-      // Extract template_id and group_id from the key
-      // Key format: "template_id_group_id" or with shift index "template_id_group_id__index"
       const groupParts = groupKey.split('_');
-      
-      // Find where "group" starts in the array
       const groupIndex = groupParts.indexOf('group');
-      if (groupIndex === -1) return; // Invalid key format
-      
-      const templateId = groupParts.slice(0, groupIndex).join('_');
-      const groupId = groupParts.slice(groupIndex + 1).join('_');
-      
+      if (groupIndex === -1) return;
       const matchingRows = templateRows.filter(r => {
         const rowKey = `${r.template_id}_${r.group_id || 'default'}`;
-        const matches = rowKey === groupKey && (!date || r.date === targetDate);
-        return matches;
+        return rowKey === groupKey && (!date || r.date === targetDate);
       });
-
       matchingRows.forEach((row, idx) => {
-        // If shiftIndex is specified, only include that specific shift
         if (shiftIndex !== null && idx !== shiftIndex) return;
-
         const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
         const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
-
         if (startTime && endTime) {
           const template = allTemplates.find(t => t.id === row.template_id);
-          shifts.push({
-            id: `extratask_${row.id}_${workerId}`,
-            date: row.date,
-            start_time: startTime,
-            end_time: endTime,
-            food_cart_name: `${template?.name || row.template_name} (משימה נוספת)`,
-            hours: null,
-            status: row.values?.status || null,
-            isTemplateShift: true,
-            isExtraTask: true
-          });
+          shifts.push({ id: `extratask_${row.id}_${workerId}`, date: row.date, start_time: startTime, end_time: endTime, food_cart_name: `${template?.name || row.template_name} (משימה נוספת)`, hours: null, status: row.values?.status || null, isTemplateShift: true, isExtraTask: true });
         }
       });
     });
-
     return shifts;
   };
 
   const getWorkerAvailabilityForDate = (workerId, date = null) => {
     const targetDate = date || dateString;
-    const workerAvail = availabilities.find(a => 
-      a.worker_id === workerId && 
-      a.week_start_date === weekStartDate &&
-      (a.status === "approved" || a.status === "submitted")
-    );
+    const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate && (a.status === "approved" || a.status === "submitted"));
     if (!workerAvail || !workerAvail.shifts) return [];
-    if (viewMode === 'weekly') {
-      return workerAvail.shifts || [];
-    }
+    if (viewMode === 'weekly') return workerAvail.shifts || [];
     return workerAvail.shifts.filter(s => s.date === targetDate);
   };
 
   const getWorkerUnavailabilityForDate = (workerId, date = null) => {
     const targetDate = date || dateString;
-    if (viewMode === 'weekly') {
-      return unavailabilities.filter(u => u.worker_id === workerId);
-    }
+    if (viewMode === 'weekly') return unavailabilities.filter(u => u.worker_id === workerId);
     return unavailabilities.filter(u => u.worker_id === workerId && u.date === targetDate);
   };
 
-  const getWorkerWeeklySummary = (workerId) => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const d = format(addDays(weekStart, i), "yyyy-MM-dd");
-      const hasTemplateShift = templateRows.some(row => {
-        if (!row.values) return false;
-        const st = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
-        const effectiveDate = getOperationalStartDate(row.date, st || "06:00");
-        if (effectiveDate !== d) return false;
-        return Object.values(row.values).some(val => val === workerId);
-      });
-      days.push({ date: d, day: DAYS_OF_WEEK[i], working: hasTemplateShift });
-    }
-    return days;
-  };
+  const isStandbyStatus = (status) => /^\d+[׳']/.test(status || '');
 
-  const handleSendNotification = (worker) => {
-    setSelectedWorkerForNotification(worker);
-    setNotificationNotes("");
-    setShowNotificationDialog(true);
-  };
-
-  // Returns: 'none' | 'needs_update' | 'synced'
   const getWorkerSendStatus = (worker) => {
-    const workerTemplateShifts = getWorkerTemplateShifts(worker.id);
-    const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
-    const allAssigned = [...workerTemplateShifts, ...workerExtraTaskShifts];
+    const allAssigned = [...getWorkerTemplateShifts(worker.id), ...getWorkerExtraTaskShifts(worker.id)];
     if (allAssigned.length === 0) return 'none';
     const sent = sentState[worker.id];
     if (!sent) return 'needs_update';
     const currentIds = allAssigned.map(a => a.id).sort().join(',');
-    if (sent.assignmentIds === currentIds && sent.date === dateString) return 'synced';
-    return 'needs_update';
+    return (sent.assignmentIds === currentIds && sent.date === dateString) ? 'synced' : 'needs_update';
   };
 
   const sendWhatsAppNotification = async (worker) => {
     setSendingWhatsApp(true);
     try {
       let message = `שלום ${worker.nickname}!\n\n`;
-      
       const getBriefingTime = (shift) => {
-        if (shift && shift.briefing_time) return shift.briefing_time;
-        const startTime = shift?.start_time || shift;
-        const [hours, minutes] = startTime.split(':').map(Number);
-        const briefingMinutes = hours * 60 + minutes - 15;
-        const briefingHours = Math.floor(briefingMinutes / 60);
-        const briefingMins = briefingMinutes % 60;
-        return `${String(briefingHours).padStart(2, '0')}:${String(briefingMins).padStart(2, '0')}`;
+        if (shift?.briefing_time) return shift.briefing_time;
+        const [h, m] = (shift?.start_time || shift).split(':').map(Number);
+        const bm = h * 60 + m - 15;
+        return `${String(Math.floor(bm / 60)).padStart(2, '0')}:${String(bm % 60).padStart(2, '0')}`;
       };
-      
-      // Generate ICS calendar events
       let icsEvents = [];
-      
       if (viewMode === "weekly") {
         const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
         message += `הנה לוח המשמרות שלך לשבוע של ${format(weekStart, "d.M.yyyy")}:\n\n`;
-        
         for (let i = 0; i < 7; i++) {
           const d = addDays(weekStart, i);
           const dStr = format(d, "yyyy-MM-dd");
-          const dayTemplateShifts = getWorkerTemplateShifts(worker.id, dStr);
-          const dayExtraTaskShifts = getWorkerExtraTaskShifts(worker.id, dStr);
-          const allDayShifts = [...dayTemplateShifts, ...dayExtraTaskShifts];
+          const allDayShifts = [...getWorkerTemplateShifts(worker.id, dStr), ...getWorkerExtraTaskShifts(worker.id, dStr)];
           const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
           message += `*${hebrewDays[d.getDay()]}, ${format(d, "d.M")}:*\n`;
-          if (allDayShifts.length === 0) {
-            message += "  אין משמרות\n";
-          } else {
-            allDayShifts.forEach(a => {
-              const briefingTime = getBriefingTime(a);
-              const standby = isStandbyStatus(a.status);
-              const label = standby ? `כוננות (${a.status})` : a.food_cart_name;
-              const statusText = a.status ? ` [${a.status}]` : '';
-              message += `  ${label}${statusText}: תדריך ${briefingTime}, משמרת ${a.start_time} - ${a.end_time}\n`;
-              icsEvents.push({ shift: a, date: dStr });
-            });
-          }
+          if (allDayShifts.length === 0) { message += "  אין משמרות\n"; }
+          else { allDayShifts.forEach(a => { const bt = getBriefingTime(a); const standby = isStandbyStatus(a.status); message += `  ${standby ? `כוננות (${a.status})` : a.food_cart_name}${a.status ? ` [${a.status}]` : ''}: תדריך ${bt}, משמרת ${a.start_time} - ${a.end_time}\n`; icsEvents.push({ shift: a, date: dStr }); }); }
           message += "\n";
         }
       } else {
-        const workerTemplateShifts = getWorkerTemplateShifts(worker.id);
-        const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
-        const allShifts = [...workerTemplateShifts, ...workerExtraTaskShifts];
+        const allShifts = [...getWorkerTemplateShifts(worker.id), ...getWorkerExtraTaskShifts(worker.id)];
         const dStr = format(currentDate, "yyyy-MM-dd");
         message += `הנה לוח המשמרות שלך ל-${format(currentDate, "d.M.yyyy")}:\n\n`;
-        if (allShifts.length === 0) {
-          message += "אין משמרות מתוכננות ליום זה.\n\n";
-        } else {
-          allShifts.forEach((a, i) => {
-            const briefingTime = getBriefingTime(a);
-            const standby = isStandbyStatus(a.status);
-            const statusText = a.status ? ` [${a.status}]` : '';
-            message += `*משמרת ${i + 1}:* ${standby ? `כוננות (${a.status})` : a.food_cart_name}${statusText}\n  תדריך: ${briefingTime}\n  משמרת: ${a.start_time} - ${a.end_time}\n\n`;
-            icsEvents.push({ shift: a, date: dStr });
-          });
-        }
+        if (allShifts.length === 0) { message += "אין משמרות מתוכננות ליום זה.\n\n"; }
+        else { allShifts.forEach((a, i) => { const bt = getBriefingTime(a); const standby = isStandbyStatus(a.status); message += `*משמרת ${i + 1}:* ${standby ? `כוננות (${a.status})` : a.food_cart_name}${a.status ? ` [${a.status}]` : ''}\n  תדריך: ${bt}\n  משמרת: ${a.start_time} - ${a.end_time}\n\n`; icsEvents.push({ shift: a, date: dStr }); }); }
       }
-      
-      // Create and upload ICS file if there are shifts
       if (icsEvents.length > 0) {
-        // Create ICS file content
         let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Kitchen Shifts//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
-        
         icsEvents.forEach((evt, idx) => {
           const { shift, date } = evt;
-          const briefingTime = getBriefingTime(shift);
-          const startDateTime = `${date.replace(/-/g, '')}T${briefingTime.replace(':', '')}00`;
-          const endDateTime = `${date.replace(/-/g, '')}T${shift.end_time.replace(':', '')}00`;
-          const standby = isStandbyStatus(shift.status);
-          const title = standby ? `כוננות ${shift.status}` : shift.food_cart_name;
-          const statusText = shift.status ? ` - ${shift.status}` : '';
-          
-          icsContent += `BEGIN:VEVENT\n`;
-          icsContent += `UID:shift-${idx}-${Date.now()}@kitchen\n`;
-          icsContent += `DTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\n`;
-          icsContent += `DTSTART:${startDateTime}\n`;
-          icsContent += `DTEND:${endDateTime}\n`;
-          icsContent += `SUMMARY:${title}${statusText}\n`;
-          icsContent += `DESCRIPTION:תדריך: ${briefingTime}\\nמשמרת: ${shift.start_time} - ${shift.end_time}\n`;
-          icsContent += `END:VEVENT\n`;
+          const bt = getBriefingTime(shift);
+          icsContent += `BEGIN:VEVENT\nUID:shift-${idx}-${Date.now()}@kitchen\nDTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\nDTSTART:${date.replace(/-/g, '')}T${bt.replace(':', '')}00\nDTEND:${date.replace(/-/g, '')}T${shift.end_time.replace(':', '')}00\nSUMMARY:${isStandbyStatus(shift.status) ? `כוננות ${shift.status}` : shift.food_cart_name}${shift.status ? ` - ${shift.status}` : ''}\nDESCRIPTION:תדריך: ${bt}\\nמשמרת: ${shift.start_time} - ${shift.end_time}\nEND:VEVENT\n`;
         });
-        
         icsContent += 'END:VCALENDAR';
-        
-        // Upload ICS file and wait for URL
-        const icsBlob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-        const icsFile = new File([icsBlob], 'shifts.ics', { type: 'text/calendar' });
-        const uploadResult = await base44.integrations.Core.UploadFile({ file: icsFile });
-        
-        if (uploadResult && uploadResult.file_url) {
-          message += `\n📅 *להוספת המשמרות ליומן הדיגיטלי שלך:*\nלחץ על הקישור הבא להורדת קובץ ICS:\n${uploadResult.file_url}\n\nלאחר ההורדה, פתח את הקובץ והמשמרות יתווספו ליומן שלך אוטומטית.\n\n`;
-        }
+        const uploadResult = await base44.integrations.Core.UploadFile({ file: new File([new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })], 'shifts.ics', { type: 'text/calendar' }) });
+        if (uploadResult?.file_url) message += `\n📅 *להוספת המשמרות ליומן:*\n${uploadResult.file_url}\n\n`;
       }
-      
       message += "בהצלחה! 👨‍🍳";
-      
-      const encodedMessage = encodeURIComponent(message);
       const phoneNumber = worker.phone?.replace(/[^0-9]/g, '');
-      const whatsappUrl = phoneNumber 
-        ? `https://wa.me/972${phoneNumber.startsWith('0') ? phoneNumber.slice(1) : phoneNumber}?text=${encodedMessage}`
-        : `https://wa.me/?text=${encodedMessage}`;
-      
-      window.open(whatsappUrl, '_blank');
-    } catch (error) {
-      console.error('Error sending WhatsApp notification:', error);
-      alert('שגיאה בשליחת ההודעה. אנא נסה שוב.');
-    } finally {
-      setSendingWhatsApp(false);
-    }
+      window.open(phoneNumber ? `https://wa.me/972${phoneNumber.startsWith('0') ? phoneNumber.slice(1) : phoneNumber}?text=${encodeURIComponent(message)}` : `https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+    } catch (error) { console.error('Error sending WhatsApp:', error); alert('שגיאה בשליחת ההודעה. אנא נסה שוב.'); }
+    finally { setSendingWhatsApp(false); }
   };
 
   const sendNotification = async () => {
     if (!selectedWorkerForNotification) return;
-    
-    let emailBody = `שלום ${selectedWorkerForNotification.nickname},\n\n`;
-    
     const getBriefingTime = (shift) => {
-      // Use briefing_time from template if available
-      if (shift && shift.briefing_time) return shift.briefing_time;
-      
-      // Fallback: calculate 15 minutes before start
-      const startTime = shift?.start_time || shift;
-      const [hours, minutes] = startTime.split(':').map(Number);
-      const briefingMinutes = hours * 60 + minutes - 15;
-      const briefingHours = Math.floor(briefingMinutes / 60);
-      const briefingMins = briefingMinutes % 60;
-      return `${String(briefingHours).padStart(2, '0')}:${String(briefingMins).padStart(2, '0')}`;
+      if (shift?.briefing_time) return shift.briefing_time;
+      const [h, m] = (shift?.start_time || shift).split(':').map(Number);
+      const bm = h * 60 + m - 15;
+      return `${String(Math.floor(bm / 60)).padStart(2, '0')}:${String(bm % 60).padStart(2, '0')}`;
     };
-    
-    const formatShiftLine = (a, date, prefix = '  ') => {
-      const standby = isStandbyStatus(a.status);
-      const label = standby ? `כוننות (${a.status})` : a.food_cart_name;
-      const duration = standby ? a.status : (a.hours ? `${a.hours}h` : '');
-      const briefingTime = a.briefing_time || getBriefingTime(a);
-      const statusText = a.status ? ` [${a.status}]` : '';
-      return `${prefix}${label}${statusText}: תדריך ${briefingTime}, משמרת ${a.start_time} - ${a.end_time}${duration && !standby ? ` (${duration})` : ''}\n`;
-    };
-
-    // Generate ICS calendar events
+    let emailBody = `שלום ${selectedWorkerForNotification.nickname},\n\n`;
     let icsEvents = [];
-    
     if (viewMode === "weekly") {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
       emailBody += `הנה לוח המשמרות שלך לשבוע של ${format(weekStart, "d.M.yyyy")}:\n\n`;
-      
       for (let i = 0; i < 7; i++) {
         const d = addDays(weekStart, i);
         const dStr = format(d, "yyyy-MM-dd");
-        const dayTemplateShifts = getWorkerTemplateShifts(selectedWorkerForNotification.id, dStr);
-        const dayExtraTaskShifts = getWorkerExtraTaskShifts(selectedWorkerForNotification.id, dStr);
-        const allDayShifts = [...dayTemplateShifts, ...dayExtraTaskShifts];
+        const allDayShifts = [...getWorkerTemplateShifts(selectedWorkerForNotification.id, dStr), ...getWorkerExtraTaskShifts(selectedWorkerForNotification.id, dStr)];
         const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
         emailBody += `${hebrewDays[d.getDay()]}, ${format(d, "d.M")}:\n`;
-        if (allDayShifts.length === 0) {
-          emailBody += "  אין משמרות\n";
-        } else {
-          allDayShifts.forEach(a => {
-            emailBody += formatShiftLine(a, dStr);
-            icsEvents.push({ shift: a, date: dStr });
-          });
-        }
+        if (allDayShifts.length === 0) { emailBody += "  אין משמרות\n"; }
+        else { allDayShifts.forEach(a => { emailBody += `  ${isStandbyStatus(a.status) ? `כוננות (${a.status})` : a.food_cart_name}${a.status ? ` [${a.status}]` : ''}: תדריך ${getBriefingTime(a)}, משמרת ${a.start_time} - ${a.end_time}\n`; icsEvents.push({ shift: a, date: dStr }); }); }
         emailBody += "\n";
       }
     } else {
-      const workerTemplateShifts = getWorkerTemplateShifts(selectedWorkerForNotification.id);
-      const workerExtraTaskShifts = getWorkerExtraTaskShifts(selectedWorkerForNotification.id);
-      const allShifts = [...workerTemplateShifts, ...workerExtraTaskShifts];
+      const allShifts = [...getWorkerTemplateShifts(selectedWorkerForNotification.id), ...getWorkerExtraTaskShifts(selectedWorkerForNotification.id)];
       const dStr = format(currentDate, "yyyy-MM-dd");
       emailBody += `הנה לוח המשמרות שלך ל-${format(currentDate, "d.M.yyyy")}:\n\n`;
-      if (allShifts.length === 0) {
-        emailBody += "אין משמרות מתוכננות ליום זה.\n\n";
-      } else {
-        allShifts.forEach((a, i) => {
-          const briefingTime = getBriefingTime(a);
-          const standby = isStandbyStatus(a.status);
-          const statusText = a.status ? ` [${a.status}]` : '';
-          emailBody += `משמרת ${i + 1}: ${standby ? `כוננות (${a.status})` : a.food_cart_name}${statusText}\n  תדריך: ${briefingTime}\n  משמרת: ${a.start_time} - ${a.end_time}${a.hours && !standby ? ` (${a.hours}h)` : ''}\n\n`;
-          icsEvents.push({ shift: a, date: dStr });
-        });
-      }
+      if (allShifts.length === 0) { emailBody += "אין משמרות מתוכננות ליום זה.\n\n"; }
+      else { allShifts.forEach((a, i) => { emailBody += `משמרת ${i + 1}: ${isStandbyStatus(a.status) ? `כוננות (${a.status})` : a.food_cart_name}${a.status ? ` [${a.status}]` : ''}\n  תדריך: ${getBriefingTime(a)}\n  משמרת: ${a.start_time} - ${a.end_time}\n\n`; icsEvents.push({ shift: a, date: dStr }); }); }
     }
-    
-    // Create ICS file content
-    const createICS = () => {
-      let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Kitchen Shifts//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
-      
-      icsEvents.forEach((evt, idx) => {
-        const { shift, date } = evt;
-        const briefingTime = getBriefingTime(shift);
-        const startDateTime = `${date.replace(/-/g, '')}T${briefingTime.replace(':', '')}00`;
-        const endDateTime = `${date.replace(/-/g, '')}T${shift.end_time.replace(':', '')}00`;
-        const standby = isStandbyStatus(shift.status);
-        const title = standby ? `כוננות ${shift.status}` : shift.food_cart_name;
-        const statusText = shift.status ? ` - ${shift.status}` : '';
-        
-        icsContent += `BEGIN:VEVENT\n`;
-        icsContent += `UID:shift-${idx}-${Date.now()}@kitchen\n`;
-        icsContent += `DTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\n`;
-        icsContent += `DTSTART:${startDateTime}\n`;
-        icsContent += `DTEND:${endDateTime}\n`;
-        icsContent += `SUMMARY:${title}${statusText}\n`;
-        icsContent += `DESCRIPTION:תדריך: ${briefingTime}\\nמשמרת: ${shift.start_time} - ${shift.end_time}\n`;
-        icsContent += `END:VEVENT\n`;
-      });
-      
-      icsContent += 'END:VCALENDAR';
-      return icsContent;
-    };
-    
-    const icsContent = createICS();
-    const icsBlob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-    const icsFile = new File([icsBlob], 'shifts.ics', { type: 'text/calendar' });
-    
-    // Upload ICS file
-    const { file_url: icsUrl } = await base44.integrations.Core.UploadFile({ file: icsFile });
-    
-    emailBody += `\n📅 להוספת המשמרות ליומן הדיגיטלי שלך, לחץ על הקישור:\n${icsUrl}\n\n`;
-    
+    let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Kitchen Shifts//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
+    icsEvents.forEach((evt, idx) => {
+      const { shift, date } = evt;
+      const bt = getBriefingTime(shift);
+      icsContent += `BEGIN:VEVENT\nUID:shift-${idx}-${Date.now()}@kitchen\nDTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\nDTSTART:${date.replace(/-/g, '')}T${bt.replace(':', '')}00\nDTEND:${date.replace(/-/g, '')}T${shift.end_time.replace(':', '')}00\nSUMMARY:${isStandbyStatus(shift.status) ? `כוננות ${shift.status}` : shift.food_cart_name}\nEND:VEVENT\n`;
+    });
+    icsContent += 'END:VCALENDAR';
+    const { file_url: icsUrl } = await base44.integrations.Core.UploadFile({ file: new File([new Blob([icsContent], { type: 'text/calendar' })], 'shifts.ics', { type: 'text/calendar' }) });
+    emailBody += `\n📅 להוספת המשמרות ליומן:\n${icsUrl}\n\n`;
     if (notificationNotes.trim()) emailBody += `הערות מההנהלה:\n${notificationNotes}\n\n`;
     emailBody += "בברכה,\nההנהלה";
-    
     if (selectedWorkerForNotification.email) {
       await base44.integrations.Core.SendEmail({
         to: selectedWorkerForNotification.email,
-        subject: viewMode === "weekly" 
-          ? `לוח משמרות שבועי - שבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "d.M.yyyy")}`
-          : `לוח משמרות - ${format(currentDate, "d.M.yyyy")}`,
+        subject: viewMode === "weekly" ? `לוח משמרות שבועי - שבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "d.M.yyyy")}` : `לוח משמרות - ${format(currentDate, "d.M.yyyy")}`,
         body: emailBody
       });
     }
-    
-    // Mark as sent
     const sentWorker = selectedWorkerForNotification;
     const allAssigned = [...getWorkerTemplateShifts(sentWorker.id), ...getWorkerExtraTaskShifts(sentWorker.id)];
-    const currentIds = allAssigned.map(a => a.id).sort().join(',');
-    setSentState(prev => ({ ...prev, [sentWorker.id]: { assignmentIds: currentIds, date: dateString } }));
-
+    setSentState(prev => ({ ...prev, [sentWorker.id]: { assignmentIds: allAssigned.map(a => a.id).sort().join(','), date: dateString } }));
     setShowNotificationDialog(false);
     setSelectedWorkerForNotification(null);
     setNotificationNotes("");
   };
 
-  const handleMouseDown = (e, worker, shift, action, dayIndex = 0) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Don't start dragging if it's a double-click on an existing shift
-    if (action === 'move' && e.detail === 2) return;
-    
-    const timeline = timelineRefs.current[worker.id];
-    if (!timeline) return;
-    
-    const rect = timeline.getBoundingClientRect();
-    const startX = e.clientX - rect.left;
-    // RTL: timeline right edge = 0% (06:00), left edge = 100% (next 06:00)
-    // So invert: percent from left → percent from right
-    const startPercent = 100 - (startX / rect.width) * 100;
-    
-    setDragging({
-      workerId: worker.id,
-      worker,
-      shift,
-      action,
-      startPercent,
-      originalStart: shift?.start_time,
-      originalEnd: shift?.end_time,
-      originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0,
-      originalType: shift?.type,
-      rect
-    });
-  };
-  
   const getDayIndexFromDate = (dateStr) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const date = new Date(dateStr);
-    const diff = Math.floor((date - weekStart) / (1000 * 60 * 60 * 24));
+    const diff = Math.floor((new Date(dateStr) - weekStart) / (1000 * 60 * 60 * 24));
     return Math.max(0, Math.min(6, diff));
+  };
+
+  const handleMouseDown = (e, worker, shift, action, dayIndex = 0) => {
+    e.preventDefault(); e.stopPropagation();
+    if (action === 'move' && e.detail === 2) return;
+    const timeline = timelineRefs.current[worker.id];
+    if (!timeline) return;
+    const rect = timeline.getBoundingClientRect();
+    const startPercent = 100 - ((e.clientX - rect.left) / rect.width) * 100;
+    setDragging({ workerId: worker.id, worker, shift, action, startPercent, originalStart: shift?.start_time, originalEnd: shift?.end_time, originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0, originalType: shift?.type, rect });
   };
 
   const handleMouseMove = (e) => {
     if (!dragging) return;
-    
-    const { workerId, worker, shift, action, startPercent, originalStart, originalEnd, originalDay, rect } = dragging;
-    const currentX = e.clientX - rect.left;
-    // RTL: invert so right side = 0% (06:00)
-    const currentPercent = Math.max(0, Math.min(100, 100 - (currentX / rect.width) * 100));
-    
-    let newStart = originalStart;
-    let newEnd = originalEnd;
-    let newDay = originalDay || 0;
-    
+    const { worker, shift, action, startPercent, originalStart, originalEnd, originalDay, rect } = dragging;
+    const currentPercent = Math.max(0, Math.min(100, 100 - ((e.clientX - rect.left) / rect.width) * 100));
+    let newStart = originalStart, newEnd = originalEnd, newDay = originalDay || 0;
     if (action === 'create') {
-      const minP = Math.min(startPercent, currentPercent);
-      const maxP = Math.max(startPercent, currentPercent);
-      const startData = percentageToTime(minP, viewMode, zoomRange);
-      const endData = percentageToTime(maxP, viewMode, zoomRange);
-      newStart = startData.time;
-      newEnd = endData.time;
-      newDay = startData.day;
+      const [minP, maxP] = [Math.min(startPercent, currentPercent), Math.max(startPercent, currentPercent)];
+      const sd = percentageToTime(minP, viewMode, zoomRange), ed = percentageToTime(maxP, viewMode, zoomRange);
+      newStart = sd.time; newEnd = ed.time; newDay = sd.day;
     } else if (action === 'resize-start') {
-      const data = percentageToTime(currentPercent, viewMode, zoomRange);
-      newStart = data.time;
-      newDay = data.day;
+      const d = percentageToTime(currentPercent, viewMode, zoomRange); newStart = d.time; newDay = d.day;
     } else if (action === 'resize-end') {
-      const data = percentageToTime(currentPercent, viewMode, zoomRange);
-      newEnd = data.time;
+      newEnd = percentageToTime(currentPercent, viewMode, zoomRange).time;
     } else if (action === 'move') {
       const origStartP = timeToPercentage(originalStart, originalDay || 0, viewMode, zoomRange);
       const origEndP = timeToPercentage(originalEnd, originalDay || 0, viewMode, zoomRange);
       const width = origEndP - origStartP;
-      const diff = currentPercent - startPercent;
-      const newStartP = Math.max(0, Math.min(100 - width, origStartP + diff));
-      const startData = percentageToTime(newStartP, viewMode, zoomRange);
-      const endData = percentageToTime(newStartP + width, viewMode, zoomRange);
-      newStart = startData.time;
-      newEnd = endData.time;
-      newDay = startData.day;
+      const newStartP = Math.max(0, Math.min(100 - width, origStartP + currentPercent - startPercent));
+      const sd = percentageToTime(newStartP, viewMode, zoomRange), ed = percentageToTime(newStartP + width, viewMode, zoomRange);
+      newStart = sd.time; newEnd = ed.time; newDay = sd.day;
     }
-    
-    setDragPreview({ workerId, start: newStart, end: newEnd, day: newDay, type: shift?.type || 'available' });
+    setDragPreview({ workerId: dragging.workerId, start: newStart, end: newEnd, day: newDay, type: shift?.type || 'available' });
   };
 
   const handleMouseUp = async () => {
-    if (!dragging || !dragPreview) {
-      setDragging(null);
-      setDragPreview(null);
-      return;
-    }
-    
+    if (!dragging || !dragPreview) { setDragging(null); setDragPreview(null); return; }
     const { workerId, worker, shift, action } = dragging;
     const { start, end, day } = dragPreview;
-    
-    if (start === end) {
-      setDragging(null);
-      setDragPreview(null);
-      return;
-    }
-    
+    if (start === end) { setDragging(null); setDragPreview(null); return; }
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const targetDate = viewMode === 'weekly' ? format(addDays(weekStart, day || 0), 'yyyy-MM-dd') : dateString;
-    
     const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
-    
     if (action === 'create') {
-      const newShift = { 
-        date: targetDate, 
-        start_time: start, 
-        end_time: end, 
-        type: 'available', 
-        priority: updatedShifts.length + 1 
-      };
-      
-      updatedShifts.push(newShift);
+      updatedShifts.push({ date: targetDate, start_time: start, end_time: end, type: 'available', priority: updatedShifts.length + 1 });
     } else if (shift) {
-      updatedShifts = updatedShifts.map(s => {
-        if (s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time) {
-          return { ...s, date: targetDate, start_time: start, end_time: end };
-        }
-        return s;
-      });
+      updatedShifts = updatedShifts.map(s => s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time ? { ...s, date: targetDate, start_time: start, end_time: end } : s);
     }
-    
-    const availData = {
-      worker_id: workerId,
-      worker_name: worker.nickname,
-      week_start_date: weekStartDate,
-      shifts: updatedShifts,
-      status: workerAvail?.status || "approved"
-    };
-    
+    const availData = { worker_id: workerId, worker_name: worker.nickname, week_start_date: weekStartDate, shifts: updatedShifts, status: workerAvail?.status || "approved" };
     if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
     else await base44.entities.Availability.create(availData);
-    
-    setDragging(null);
-    setDragPreview(null);
-    debouncedLoadData();
+    setDragging(null); setDragPreview(null); debouncedLoadData();
   };
 
   const handleTypeClick = async (e, worker, shift) => {
-    e.stopPropagation();
-    e.preventDefault();
-    
-    // Cycle through types directly without dialog
+    e.stopPropagation(); e.preventDefault();
     const workerAvail = availabilities.find(a => a.worker_id === worker.id && a.week_start_date === weekStartDate);
     if (!workerAvail) return;
-    
-    const currentType = shift.type || 'available';
-    let newType = 'available';
-    if (currentType === 'available') newType = 'wanted';
-    else if (currentType === 'wanted') newType = 'unavailable';
-    else if (currentType === 'unavailable') newType = 'available';
-    
-    const updatedShifts = workerAvail.shifts.map(s => {
-      if (s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time) {
-        return { ...s, type: newType };
-      }
-      return s;
-    });
-    
+    const typeMap = { available: 'wanted', wanted: 'unavailable', unavailable: 'available' };
+    const updatedShifts = workerAvail.shifts.map(s => s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time ? { ...s, type: typeMap[shift.type || 'available'] } : s);
     await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
     debouncedLoadData();
   };
 
   const handleChangeType = async (newType) => {
     if (!selectedWorkerForType || !selectedShiftForType) return;
-    
     const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForType.id && a.week_start_date === weekStartDate);
     if (!workerAvail) return;
-    
-    const updatedShifts = workerAvail.shifts.map(s => {
-      if (s.date === selectedShiftForType.date && s.start_time === selectedShiftForType.start_time && s.end_time === selectedShiftForType.end_time) {
-        return { ...s, type: newType };
-      }
-      return s;
-    });
-    
+    const updatedShifts = workerAvail.shifts.map(s => s.date === selectedShiftForType.date && s.start_time === selectedShiftForType.start_time && s.end_time === selectedShiftForType.end_time ? { ...s, type: newType } : s);
     await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
-    setShowTypeDialog(false);
-    setSelectedShiftForType(null);
-    setSelectedWorkerForType(null);
-    debouncedLoadData();
+    setShowTypeDialog(false); setSelectedShiftForType(null); setSelectedWorkerForType(null); debouncedLoadData();
   };
 
   const handleManualShiftAdd = (worker) => {
@@ -939,199 +521,69 @@ export default function Matrix() {
   };
 
   const handleShiftDoubleClick = (e, worker, shift) => {
-    e.stopPropagation();
-    e.preventDefault();
+    e.stopPropagation(); e.preventDefault();
     setSelectedWorkerForManual(worker);
-    setManualShiftData({ 
-      start_time: shift.start_time, 
-      end_time: shift.end_time, 
-      type: shift.type
-    });
+    setManualShiftData({ start_time: shift.start_time, end_time: shift.end_time, type: shift.type });
     setEditingShift(shift);
     setShowManualDialog(true);
   };
 
   const submitManualShift = async () => {
     if (!selectedWorkerForManual || !manualShiftData.start_time || !manualShiftData.end_time) return;
-
     const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForManual.id && a.week_start_date === weekStartDate);
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
-
-    // Ensure date is in correct format without timezone issues
     const targetDate = format(currentDate, "yyyy-MM-dd");
-
     if (editingShift) {
-      // Update existing shift
-      updatedShifts = updatedShifts.map(s => {
-        if (s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type) {
-          return {
-            ...s,
-            date: targetDate,
-            start_time: manualShiftData.start_time,
-            end_time: manualShiftData.end_time,
-            type: manualShiftData.type
-          };
-        }
-        return s;
-      });
+      updatedShifts = updatedShifts.map(s => s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type ? { ...s, date: targetDate, start_time: manualShiftData.start_time, end_time: manualShiftData.end_time, type: manualShiftData.type } : s);
     } else {
-      // Add new shift
-      updatedShifts.push({
-        date: targetDate,
-        start_time: manualShiftData.start_time,
-        end_time: manualShiftData.end_time,
-        type: manualShiftData.type,
-        priority: updatedShifts.length + 1
-      });
+      updatedShifts.push({ date: targetDate, start_time: manualShiftData.start_time, end_time: manualShiftData.end_time, type: manualShiftData.type, priority: updatedShifts.length + 1 });
     }
-
-    const availData = {
-      worker_id: selectedWorkerForManual.id,
-      worker_name: selectedWorkerForManual.nickname,
-      week_start_date: weekStartDate,
-      shifts: updatedShifts,
-      status: workerAvail?.status || "approved"
-    };
-
+    const availData = { worker_id: selectedWorkerForManual.id, worker_name: selectedWorkerForManual.nickname, week_start_date: weekStartDate, shifts: updatedShifts, status: workerAvail?.status || "approved" };
     if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
     else await base44.entities.Availability.create(availData);
-
-    setShowManualDialog(false);
-    setSelectedWorkerForManual(null);
-    setManualShiftData({ start_time: '', end_time: '', type: 'available' });
-    setEditingShift(null);
-    debouncedLoadData();
+    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null); debouncedLoadData();
   };
 
-  const calculateWorkerSummary = (workerId) => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
-    
-    const workerShifts = availabilities
-      .filter(a => a.worker_id === workerId)
-      .flatMap(a => a.shifts || [])
-      .filter(s => {
-        const shiftDate = new Date(s.date);
-        return shiftDate >= weekStart && shiftDate <= weekEnd;
-      });
-
-    const calculateHours = (startTime, endTime) => {
-      const [startHour, startMin] = startTime.split(':').map(Number);
-      const [endHour, endMin] = endTime.split(':').map(Number);
-      let hours = endHour - startHour;
-      if (endHour < startHour) hours += 24;
-      hours += (endMin - startMin) / 60;
-      return Math.max(0, hours);
-    };
-
-    let totalShifts = 0;
-    let standbyHours = 0;
-    let regularShiftCount = 0;
-    let trainingHours = 0;
-    let otherCount = 0;
-    let coreHours = 0;
-    let extremeHours = 0;
-
-    workerShifts.forEach(shift => {
-      const hours = calculateHours(shift.start_time, shift.end_time);
-      
-      // Count all shifts for total
-      totalShifts++;
-      regularShiftCount++;
-        
-      // Core hours (6:00-18:00) - every 4 hours = 1 shift
-      const [startHour, startMin] = shift.start_time.split(':').map(Number);
-      const [endHour, endMin] = shift.end_time.split(':').map(Number);
-      
-      // Check if shift is within core hours
-      const startInCore = startHour >= 6 && startHour < 18;
-      const endInCore = endHour > 6 && endHour <= 18;
-      
-      if (startInCore || endInCore) {
-        // Calculate overlap with core hours
-        const coreStart = Math.max(startHour + startMin / 60, 6);
-        const coreEnd = Math.min(endHour + endMin / 60, 18);
-        if (coreEnd > coreStart) {
-          coreHours += Math.max(0, coreEnd - coreStart);
-        }
-      }
-      
-      // Extreme hours (2:00-6:00) - every 4 hours = 1 shift
-      const startInExtreme = startHour >= 2 && startHour < 6;
-      const endInExtreme = endHour > 2 && endHour <= 6;
-      
-      if (startInExtreme || endInExtreme) {
-        // Calculate overlap with extreme hours
-        const extremeStart = Math.max(startHour + startMin / 60, 2);
-        const extremeEnd = Math.min(endHour + endMin / 60, 6);
-        if (extremeEnd > extremeStart) {
-          extremeHours += Math.max(0, extremeEnd - extremeStart);
-        }
-      }
-    });
-
-    return {
-      total: totalShifts,
-      regularShift: regularShiftCount,
-      core: Math.round((coreHours / 4) * 10) / 10,
-      extreme: Math.round((extremeHours / 4) * 10) / 10
-    };
+  const deleteManualShift = async () => {
+    if (!selectedWorkerForManual || !editingShift) return;
+    const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForManual.id && a.week_start_date === weekStartDate);
+    if (!workerAvail) return;
+    const updatedShifts = workerAvail.shifts.filter(s => !(s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type));
+    await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
+    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null); debouncedLoadData();
   };
-
-  const isStandbyStatus = (status) => /^\d+[׳']/.test(status || '');
 
   const saveSignupMode = async (newMode) => {
     setSavingSignupMode(true);
     const existingId = settingsIdCache.current["availability_signup_mode"];
-    if (existingId) {
-      await base44.entities.AppSettings.update(existingId, { setting_value: JSON.stringify(newMode) });
-    } else {
-      const created = await base44.entities.AppSettings.create({ setting_key: "availability_signup_mode", setting_value: JSON.stringify(newMode) });
-      settingsIdCache.current["availability_signup_mode"] = created.id;
-    }
-    setSignupMode(newMode);
-    setSavingSignupMode(false);
+    if (existingId) await base44.entities.AppSettings.update(existingId, { setting_value: JSON.stringify(newMode) });
+    else { const created = await base44.entities.AppSettings.create({ setting_key: "availability_signup_mode", setting_value: JSON.stringify(newMode) }); settingsIdCache.current["availability_signup_mode"] = created.id; }
+    setSignupMode(newMode); setSavingSignupMode(false);
   };
 
   const saveSummaryColumns = async (cols) => {
     const existingId = settingsIdCache.current["matrix_summary_columns"];
-    if (existingId) {
-      await base44.entities.AppSettings.update(existingId, { setting_value: JSON.stringify(cols) });
-    } else {
-      const created = await base44.entities.AppSettings.create({ setting_key: 'matrix_summary_columns', setting_value: JSON.stringify(cols) });
-      settingsIdCache.current["matrix_summary_columns"] = created.id;
-    }
+    if (existingId) await base44.entities.AppSettings.update(existingId, { setting_value: JSON.stringify(cols) });
+    else { const created = await base44.entities.AppSettings.create({ setting_key: 'matrix_summary_columns', setting_value: JSON.stringify(cols) }); settingsIdCache.current["matrix_summary_columns"] = created.id; }
     setSummaryColumns(cols);
   };
 
   const getWorkerColumnCount = (workerId, column) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, 'yyyy-MM-dd');
-    const weekEndStr = format(weekEnd, 'yyyy-MM-dd');
-
-    // Get all template row shifts for this worker in this week (using operational date)
+    const weekEndStr = format(endOfWeek(currentDate, { weekStartsOn: 0 }), 'yyyy-MM-dd');
     const weeklyShifts = [];
     templateRows.forEach(row => {
       if (!row.values) return;
-      const isAssigned = Object.values(row.values).some(val => val === workerId);
-      if (!isAssigned) return;
+      if (!Object.values(row.values).some(val => val === workerId)) return;
       const st = row.values?.['התחלה'] || row.values?.['שעת התחלה'];
       const et = row.values?.['סיום'] || row.values?.['שעת סיום'];
       if (st && et) {
-        // Operational date: 00:00-05:59 shifts belong to next calendar day
         const effectiveDate = getOperationalStartDate(row.date, st);
         if (effectiveDate < weekStartStr || effectiveDate > weekEndStr) return;
-        weeklyShifts.push({
-          date: effectiveDate,
-          start_time: st,
-          end_time: et,
-          status: row.values?.status || null,
-          food_cart_name: allTemplates.find(t => t.id === row.template_id)?.name || row.template_name || ''
-        });
+        weeklyShifts.push({ date: effectiveDate, start_time: st, end_time: et, status: row.values?.status || null, food_cart_name: allTemplates.find(t => t.id === row.template_id)?.name || row.template_name || '' });
       }
     });
-
     if (column.criteria_type === 'total_shifts') return weeklyShifts.length;
     if (column.criteria_type === 'status') return weeklyShifts.filter(s => s.status === column.criteria_value).length;
     if (column.criteria_type === 'food_cart') return weeklyShifts.filter(s => s.food_cart_name === column.criteria_value).length;
@@ -1139,13 +591,7 @@ export default function Matrix() {
       const [from, to] = (column.criteria_value || '').split('-');
       if (!from || !to) return 0;
       const toMins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-      const fromMins = toMins(from);
-      const toMinsVal = toMins(to);
-      return weeklyShifts.filter(s => {
-        const shiftStart = toMins(s.start_time);
-        const shiftEnd = toMins(s.end_time);
-        return shiftStart < toMinsVal && shiftEnd > fromMins;
-      }).length;
+      return weeklyShifts.filter(s => toMins(s.start_time) < toMins(to) && toMins(s.end_time) > toMins(from)).length;
     }
     if (column.criteria_type === 'schedule_col') {
       const [colName, criterion] = (column.criteria_value || '').split('|||');
@@ -1156,10 +602,7 @@ export default function Matrix() {
         if (!Object.values(row.values).some(val => val === workerId)) return;
         const cellVal = row.values[colName];
         if (!criterion) { if (cellVal) count++; }
-        else {
-          const valStr = Array.isArray(cellVal) ? cellVal.join(',') : (cellVal || '');
-          if (valStr.includes(criterion)) count++;
-        }
+        else { const valStr = Array.isArray(cellVal) ? cellVal.join(',') : (cellVal || ''); if (valStr.includes(criterion)) count++; }
       });
       return count;
     }
@@ -1172,80 +615,50 @@ export default function Matrix() {
     return 0;
   };
 
+  // ── Bar Components ─────────────────────────────────────────────────────────
   const AssignmentBar = ({ assignment }) => {
-    // For timeline position: use schedule_date (original date on schedule) if available, else date
     const positionDate = assignment.schedule_date || assignment.date;
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(positionDate) : 0;
     const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
-    // Handle overnight shifts: if end hour < start hour, treat end as next day (+24h)
-    const [startH] = assignment.start_time.split(':').map(Number);
-    const [endH] = assignment.end_time.split(':').map(Number);
-    const adjustedEndTime = endH < startH ? `${String(endH + 24).padStart(2, '0')}:${assignment.end_time.split(':')[1]}` : assignment.end_time;
-    const endPercent = timeToPercentage(adjustedEndTime, dayIndex, viewMode, zoomRange);
+    // Use operational minutes for correct end position (handles 02:00–06:00)
+    const startOpMins = getOperationalMinutes(assignment.start_time);
+    const rawEndOpMins = getOperationalMinutes(assignment.end_time);
+    const endOpMins = rawEndOpMins <= startOpMins ? rawEndOpMins + 1440 : rawEndOpMins;
+    const endPercent = viewMode === 'daily'
+      ? (() => {
+          const bp = (Math.min(endOpMins, 1440) / (24 * 60)) * 100;
+          if (bp < zoomRange.start || bp > zoomRange.end) return bp < zoomRange.start ? -1 : 101;
+          return ((bp - zoomRange.start) / (zoomRange.end - zoomRange.start)) * 100;
+        })()
+      : timeToPercentage(assignment.end_time, dayIndex, viewMode, zoomRange);
     const width = endPercent >= startPercent ? endPercent - startPercent : 0;
-    
     if (startPercent < 0 || startPercent > 100) return null;
-
     const isTemplate = assignment.isTemplateShift;
-    const rightPercent = startPercent;
     const standby = isStandbyStatus(assignment.status);
-
-    // Standby shifts: render as empty outline bar (like availability window)
     if (standby) {
       const borderColor = isTemplate ? '#a855f7' : '#3b82f6';
       return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div
-                className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden"
-                style={{
-                  right: `${rightPercent}%`,
-                  width: `${Math.max(width, 0.5)}%`,
-                  backgroundColor: 'transparent',
-                  border: `2px dashed ${borderColor}`,
-                }}
-              >
-                <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{assignment.status}</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent className="bg-gray-800 text-white border-none">
-              <p className="font-bold">{assignment.food_cart_name}</p>
-              <p>זמן: {assignment.start_time} - {assignment.end_time}</p>
-              <p>סטטוס כוננות: {assignment.status}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <TooltipProvider><Tooltip><TooltipTrigger asChild>
+          <div className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden" style={{ right: `${startPercent}%`, width: `${Math.max(width, 0.5)}%`, backgroundColor: 'transparent', border: `2px dashed ${borderColor}` }}>
+            <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{assignment.status}</span>
+          </div>
+        </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
+          <p className="font-bold">{assignment.food_cart_name}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p><p>סטטוס כוננות: {assignment.status}</p>
+        </TooltipContent></Tooltip></TooltipProvider>
       );
     }
-
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div
-              className={`absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${
-                isTemplate 
-                  ? "bg-purple-400 border-purple-600" 
-                  : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"
-              }`}
-              style={{ right: `${rightPercent}%`, width: `${Math.max(width, 0.5)}%` }}
-            >
-              {!isTemplate && <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>}
-              {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent className="bg-gray-800 text-white border-none">
-            <p className="font-bold">{assignment.food_cart_name}</p>
-            <p>זמן: {assignment.start_time} - {assignment.end_time}</p>
-            {assignment.status && <p>סטטוס: {assignment.status}</p>}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <TooltipProvider><Tooltip><TooltipTrigger asChild>
+        <div className={`absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${startPercent}%`, width: `${Math.max(width, 0.5)}%` }}>
+          {!isTemplate && <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>}
+          {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
+        </div>
+      </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
+        <p className="font-bold">{assignment.food_cart_name}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p>{assignment.status && <p>סטטוס: {assignment.status}</p>}
+      </TooltipContent></Tooltip></TooltipProvider>
     );
   };
 
-  // Helper: check if two time ranges overlap (handles overnight)
   const timesOverlap = (aStart, aEnd, bStart, bEnd) => {
     const toMins = t => { const [h,m] = t.split(':').map(Number); return h * 60 + m; };
     const as = toMins(aStart), ae = toMins(aEnd) || toMins(aStart) + 24*60;
@@ -1255,93 +668,37 @@ export default function Matrix() {
 
   const AvailabilityBar = ({ shift, worker }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
-    const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode, zoomRange);
     const [startH] = shift.start_time.split(':').map(Number);
     const [endH] = shift.end_time.split(':').map(Number);
     const adjustedEndTime = endH < startH ? `${String(endH + 24).padStart(2, '0')}:${shift.end_time.split(':')[1]}` : shift.end_time;
+    const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode, zoomRange);
     const endPercent = timeToPercentage(adjustedEndTime, dayIndex, viewMode, zoomRange);
     const width = endPercent >= startPercent ? endPercent - startPercent : 0;
-    
     if (startPercent < 0 || startPercent > 100) return null;
-
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
     const borderColors = { wanted: '#16a34a', available: '#3b82f6', unavailable: '#dc2626' };
     const borderColor = borderColors[shift.type] || '#3b82f6';
-    const rightPercent = startPercent;
-
-    // Find template shifts that overlap this availability window (for this worker on this date)
-    const shiftDate = shift.date;
-    const overlappingAssignments = [
-      ...templateRows.filter(r => {
-        if (r.date !== shiftDate) return false;
-        if (!r.values) return false;
-        const isAssigned = Object.values(r.values).some(val => val === worker.id);
-        if (!isAssigned) return false;
-        const st = r.values?.["התחלה"] || r.values?.["שעת התחלה"];
-        const et = r.values?.["סיום"] || r.values?.["שעת סיום"];
-        return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
-      }).map(r => ({
-        start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"],
-        end_time: r.values?.["סיום"] || r.values?.["שעת סיום"],
-        status: r.values?.status || null,
-        isTemplateShift: true
-      }))
-    ];
-
+    const overlappingAssignments = templateRows.filter(r => {
+      if (r.date !== shift.date || !r.values) return false;
+      if (!Object.values(r.values).some(val => val === worker.id)) return false;
+      const st = r.values?.["התחלה"] || r.values?.["שעת התחלה"];
+      const et = r.values?.["סיום"] || r.values?.["שעת סיום"];
+      return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
+    }).map(r => ({ start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"], end_time: r.values?.["סיום"] || r.values?.["שעת סיום"], status: r.values?.status || null }));
     return (
-      <div
-        className="absolute h-full rounded-sm z-10 cursor-move overflow-visible"
-        style={{ 
-          right: `${rightPercent}%`, 
-          width: `${width}%`,
-          backgroundColor: 'transparent',
-          border: `2px solid ${borderColor}`,
-        }}
-        onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }}
-        onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
-      >
-        {/* Resize handles */}
+      <div className="absolute h-full rounded-sm z-10 cursor-move overflow-visible" style={{ right: `${startPercent}%`, width: `${width}%`, backgroundColor: 'transparent', border: `2px solid ${borderColor}` }} onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }} onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}>
         <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start', dayIndex); }} />
         <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end', dayIndex); }} />
-
-        {/* Type indicator circle */}
-        <button
-          className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform"
-          style={{ borderColor }}
-          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-          onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }}
-        >
+        <button className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform" style={{ borderColor }} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }} onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }}>
           {typeLabels[shift.type] || "A"}
         </button>
-
-        {/* Filled segments for overlapping assignments */}
         {overlappingAssignments.map((ass, i) => {
-          const overlapStart = (() => {
-            const toMins = t => { const [h,m] = t.split(':').map(Number); return h * 60 + m; };
-            const avS = toMins(shift.start_time), avE = toMins(shift.end_time) || toMins(shift.start_time)+24*60;
-            const assS = toMins(ass.start_time), assE = toMins(ass.end_time) || toMins(ass.start_time)+24*60;
-            const overS = Math.max(avS, assS);
-            const overE = Math.min(avE, assE);
-            const totalMins = avE - avS;
-            const leftPct = ((overS - avS) / totalMins) * 100;
-            const widthPct = ((overE - overS) / totalMins) * 100;
-            return { leftPct, widthPct };
-          })();
-          const standby = isStandbyStatus(ass.status);
-          return (
-            <div
-              key={i}
-              className="absolute top-0 h-full"
-              style={{
-                left: `${overlapStart.leftPct}%`,
-                width: `${overlapStart.widthPct}%`,
-                backgroundColor: standby
-                  ? 'rgba(200,200,210,0.55)'
-                  : 'rgba(192,132,252,0.55)',
-                pointerEvents: 'none'
-              }}
-            />
-          );
+          const toMins = t => { const [h,m] = t.split(':').map(Number); return h * 60 + m; };
+          const avS = toMins(shift.start_time), avE = toMins(shift.end_time) || avS + 24*60;
+          const assS = toMins(ass.start_time), assE = toMins(ass.end_time) || assS + 24*60;
+          const overS = Math.max(avS, assS), overE = Math.min(avE, assE);
+          const totalMins = avE - avS;
+          return <div key={i} className="absolute top-0 h-full" style={{ left: `${((overS - avS) / totalMins) * 100}%`, width: `${((overE - overS) / totalMins) * 100}%`, backgroundColor: isStandbyStatus(ass.status) ? 'rgba(200,200,210,0.55)' : 'rgba(192,132,252,0.55)', pointerEvents: 'none' }} />;
         })}
       </div>
     );
@@ -1352,26 +709,15 @@ export default function Matrix() {
     const startPercent = timeToPercentage(unavail.start_time, dayIndex, viewMode, zoomRange);
     const endPercent = timeToPercentage(unavail.end_time, dayIndex, viewMode, zoomRange);
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
-    
-    // Hide if outside zoom range
     if (startPercent < 0 || startPercent > 100) return null;
-    // In RTL layout: 0% from timeToPercentage = 06:00 = rightmost side.
-    const rightPercent = startPercent;
-
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${rightPercent}%`, width: `${width}%` }}>
-              <Ban className="w-3 h-3 text-gray-600" />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent className="bg-gray-800 text-white border-none">
-            <p className="font-bold capitalize">{unavail.reason}</p>
-            <p>{unavail.start_time} - {unavail.end_time}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <TooltipProvider><Tooltip><TooltipTrigger asChild>
+        <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${startPercent}%`, width: `${width}%` }}>
+          <Ban className="w-3 h-3 text-gray-600" />
+        </div>
+      </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
+        <p className="font-bold capitalize">{unavail.reason}</p><p>{unavail.start_time} - {unavail.end_time}</p>
+      </TooltipContent></Tooltip></TooltipProvider>
     );
   };
 
@@ -1380,29 +726,15 @@ export default function Matrix() {
     const startPercent = timeToPercentage(preview.start, preview.day || 0, viewMode, zoomRange);
     const endPercent = timeToPercentage(preview.end, preview.day || 0, viewMode, zoomRange);
     const width = endPercent > startPercent ? endPercent - startPercent : 0;
-    const rightPercent = startPercent;
-
-    return (
-      <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80" style={{ right: `${rightPercent}%`, width: `${width}%` }}>
-        <span className="text-xs font-bold">{preview.start} - {preview.end}</span>
-      </div>
-    );
+    return <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80" style={{ right: `${startPercent}%`, width: `${width}%` }}><span className="text-xs font-bold">{preview.start} - {preview.end}</span></div>;
   };
 
-  const calcHours = (startTime, endTime) => {
-    if (!startTime || !endTime) return 0;
-    const [sh, sm] = startTime.split(':').map(Number);
-    const [eh, em] = endTime.split(':').map(Number);
-    let s = sh * 60 + sm, e = eh * 60 + em;
-    if (e <= s) e += 24 * 60;
-    return Math.max(0, (e - s) / 60);
-  };
+  const calcHours = (s, e) => { if (!s || !e) return 0; const [sh,sm] = s.split(':').map(Number), [eh,em] = e.split(':').map(Number); let start = sh*60+sm, end = eh*60+em; if (end <= start) end += 24*60; return Math.max(0, (end-start)/60); };
 
   const WeeklySummary = ({ worker }) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const days = [];
     let totalWeeklyHours = 0;
-    
     for (let i = 0; i < 7; i++) {
       const d = format(addDays(weekStart, i), "yyyy-MM-dd");
       const dayShifts = getWorkerTemplateShifts(worker.id, d);
@@ -1410,31 +742,8 @@ export default function Matrix() {
       totalWeeklyHours += dayHours;
       days.push({ date: d, day: DAYS_OF_WEEK[i], hours: dayHours, working: dayShifts.length > 0 });
     }
-    
-    if (viewMode === 'weekly') {
-      // In weekly view, show total hours prominently
-      return (
-        <div className="flex items-center gap-1">
-          <span className={`text-[10px] font-bold ${totalWeeklyHours > 0 ? 'text-blue-700' : 'text-gray-300'}`}>
-            {totalWeeklyHours > 0 ? `${Math.round(totalWeeklyHours * 10) / 10}h` : ''}
-          </span>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex gap-0.5 items-center">
-        {days.map((d, i) => (
-          <div
-            key={i}
-            className={`text-[9px] font-medium leading-tight ${d.working ? 'text-green-600' : 'text-gray-300'}`}
-            title={`${d.day}: ${d.working ? d.hours.toFixed(1) + 'h' : 'חופש'}`}
-          >
-            {d.day}
-          </div>
-        ))}
-      </div>
-    );
+    if (viewMode === 'weekly') return <div className="flex items-center gap-1"><span className={`text-[10px] font-bold ${totalWeeklyHours > 0 ? 'text-blue-700' : 'text-gray-300'}`}>{totalWeeklyHours > 0 ? `${Math.round(totalWeeklyHours * 10) / 10}h` : ''}</span></div>;
+    return <div className="flex gap-0.5 items-center">{days.map((d, i) => <div key={i} className={`text-[9px] font-medium leading-tight ${d.working ? 'text-green-600' : 'text-gray-300'}`} title={`${d.day}: ${d.working ? d.hours.toFixed(1) + 'h' : 'חופש'}`}>{d.day}</div>)}</div>;
   };
 
   return (
@@ -1442,60 +751,21 @@ export default function Matrix() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} dir="rtl">
       <div className="max-w-screen-2xl mx-auto">
         <Card className="border-none shadow-lg mb-3">
-          <MatrixHeader
-            currentDate={currentDate}
-            setCurrentDate={setCurrentDate}
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            populationFilter={populationFilter}
-            setPopulationFilter={setPopulationFilter}
-            roleFilter={roleFilter}
-            setRoleFilter={setRoleFilter}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            populations={populations}
-            workerRoles={workerRoles}
-            shiftStatuses={shiftStatuses}
-            signupMode={signupMode}
-            saveSignupMode={saveSignupMode}
-            savingSignupMode={savingSignupMode}
-          />
+          <MatrixHeader currentDate={currentDate} setCurrentDate={setCurrentDate} viewMode={viewMode} setViewMode={setViewMode} populationFilter={populationFilter} setPopulationFilter={setPopulationFilter} roleFilter={roleFilter} setRoleFilter={setRoleFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} populations={populations} workerRoles={workerRoles} shiftStatuses={shiftStatuses} signupMode={signupMode} saveSignupMode={saveSignupMode} savingSignupMode={savingSignupMode} />
         </Card>
 
         <Card className="border-none shadow-lg">
           <CardContent className="p-0">
-            
             <div className="overflow-x-auto pb-16">
               <div className="min-w-[1400px]">
+                {/* Header row */}
                 <div className="flex sticky top-0 bg-gray-100 z-30 border-b">
                   <div className="w-[220px] min-w-[220px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
-                    <MasterControls
-                      workers={workers}
-                      populationFilter={populationFilter}
-                      roleFilter={roleFilter}
-                      getWorkerSendStatus={getWorkerSendStatus}
-                      onSendWhatsApp={async (visibleWorkers) => {
-                        for (const worker of visibleWorkers) {
-                          await sendWhatsAppNotification(worker);
-                          await new Promise(resolve => setTimeout(resolve, 500));
-                        }
-                      }}
-                      onSendEmail={async (visibleWorkers) => {
-                        for (const worker of visibleWorkers) {
-                          await new Promise(resolve => {
-                            setSelectedWorkerForNotification(worker);
-                            setNotificationNotes("");
-                            setShowNotificationDialog(true);
-                            resolve();
-                          });
-                          await new Promise(resolve => setTimeout(resolve, 100));
-                        }
-                      }}
-                      sendingWhatsApp={sendingWhatsApp}
-                      onUpdate={refreshWorkers}
-                    />
+                    <MasterControls workers={workers} populationFilter={populationFilter} roleFilter={roleFilter} getWorkerSendStatus={getWorkerSendStatus}
+                      onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
+                      onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
+                      sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers} />
                   </div>
-                  {/* Summary columns headers - only in weekly mode */}
                   {viewMode === 'weekly' && summaryColumns.map(col => (
                     <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1" title={col.name}>
                       <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
@@ -1508,49 +778,39 @@ export default function Matrix() {
                   )}
                   {viewMode === 'weekly' && (
                     <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center">
-                      <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום">
-                        <Plus className="w-3 h-3" />
-                      </button>
+                      <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
                     </div>
                   )}
                   <div className="flex-1 relative flex" dir="rtl">
                     {viewMode === 'daily' ? (
-                     getDailyTimeSlots(zoomRange).map((hour) => {
-                       const displayHour = hour >= 24 ? hour - 24 : hour;
-                       return (
-                         <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium">
-                           {String(displayHour).padStart(2, '0')}:00
-                         </div>
-                       );
-                     })
+                      getDailyTimeSlots(zoomRange).map((hour) => (
+                        <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium">
+                          {String(hour).padStart(2, '0')}:00
+                        </div>
+                      ))
                     ) : (
-                     getWeeklyTimeSlots(zoomRange, startOfWeek(currentDate, { weekStartsOn: 0 })).map((slot, idx) => (
-                       <div key={idx} className={`flex-1 text-xs text-gray-600 py-3 text-center font-medium ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : ''}`}>
-                         {slot.label && <div className="font-bold">{slot.label}</div>}
-                         {slot.dateLabel && <div className="text-[9px] text-gray-500">{slot.dateLabel}</div>}
-                       </div>
-                     ))
+                      getWeeklyTimeSlots(zoomRange, startOfWeek(currentDate, { weekStartsOn: 0 })).map((slot, idx) => (
+                        <div key={idx} className={`flex-1 text-xs text-gray-600 py-3 text-center font-medium ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : ''}`}>
+                          {slot.label && <div className="font-bold">{slot.label}</div>}
+                          {slot.dateLabel && <div className="text-[9px] text-gray-500">{slot.dateLabel}</div>}
+                        </div>
+                      ))
                     )}
                   </div>
                 </div>
 
+                {/* Worker rows */}
                 {loading && !initialLoaded ? (
                   <div className="text-center p-8" dir="rtl">טוען...</div>
                 ) : workers.length === 0 ? (
                   <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
                 ) : (
-                  workers
-                    .filter(w => {
-                      if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
-                      if (roleFilter !== "__all__") {
-                        const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
-                        if (!roles.includes(roleFilter)) return false;
-                      }
-                      return true;
-                    })
-                    .map((worker, index) => {
+                  workers.filter(w => {
+                    if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+                    if (roleFilter !== "__all__") { const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []); if (!roles.includes(roleFilter)) return false; }
+                    return true;
+                  }).map((worker, index) => {
                     const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
-                    // weekly: scan all 7 schedule dates; daily: use the selected date only
                     const workerTemplateShifts = (() => {
                       if (viewMode !== 'weekly') return getWorkerTemplateShifts(worker.id, dateString);
                       const wS = startOfWeek(currentDate, { weekStartsOn: 0 });
@@ -1560,116 +820,68 @@ export default function Matrix() {
                     })();
                     const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
+                    const sendStatus = getWorkerSendStatus(worker);
+                    const actionClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
 
                     return (
                       <React.Fragment key={worker.id}>
                       <div className={`flex border-b h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                         <div className="w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-8">
                           <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
-                          {(() => {
-                            const sendStatus = getWorkerSendStatus(worker);
-                            const whatsappClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
-                            const emailClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
-                            return (
-                              <>
-                                <button onClick={() => sendWhatsAppNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${whatsappClass}`} title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}>
-                                  {sendingWhatsApp ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /> : <MessageCircle className="w-4 h-4" />}
-                                </button>
-                                <button onClick={() => handleSendNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 ${emailClass}`} title="שלח לוח משמרות באימייל">
-                                  <Send className="w-4 h-4" />
-                                </button>
-                              </>
-                            );
-                          })()}
+                          <button onClick={() => sendWhatsAppNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${actionClass}`} title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}>
+                            {sendingWhatsApp ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                          </button>
+                          <button onClick={() => { setSelectedWorkerForNotification(worker); setNotificationNotes(""); setShowNotificationDialog(true); }} className={`rounded p-1 transition-colors hover:bg-gray-100 ${actionClass}`} title="שלח לוח משמרות באימייל">
+                            <Send className="w-4 h-4" />
+                          </button>
                           <div className="flex items-center flex-1 min-w-0">
-                             <div className="min-w-0 flex-1">
-                               <span className="truncate block text-sm leading-tight">{worker.nickname}</span>
-                               <WeeklySummary worker={worker} />
-                             </div>
-                             <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
-                           </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="truncate block text-sm leading-tight">{worker.nickname}</span>
+                              <WeeklySummary worker={worker} />
+                            </div>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
+                          </div>
                         </div>
-                        {/* Summary columns cells - weekly mode only */}
-                         {viewMode === 'weekly' && summaryColumns.map(col => (
-                           <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                             <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
-                           </div>
-                         ))}
-                         {viewMode === 'weekly' && (() => {
-                           // Use operational date for hour totals — 02:00 shifts count toward next calendar day
-                           const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-                           let totalHrs = 0;
-                           templateRows.forEach(row => {
-                             if (!row.values) return;
-                             const isAssigned = Object.values(row.values).some(val => val === worker.id);
-                             if (!isAssigned) return;
-                             const st = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
-                             const et = row.values?.["סיום"] || row.values?.["שעת סיום"];
-                             if (!st || !et) return;
-                             const opDate = getOperationalStartDate(row.date, st);
-                             const weekStartStr = format(weekStart, "yyyy-MM-dd");
-                             const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-                             if (opDate < weekStartStr || opDate > weekEndStr) return;
-                             const [sh, sm] = st.split(':').map(Number);
-                             const [eh, em] = et.split(':').map(Number);
-                             let start = sh * 60 + sm, end = eh * 60 + em;
-                             if (end <= start) end += 24 * 60;
-                             totalHrs += Math.max(0, (end - start) / 60);
-                           });
-                           return (
-                             <div className={`w-[52px] min-w-[52px] border-r flex items-center justify-center h-8 bg-blue-50`}>
-                               <span className="text-xs font-bold text-blue-800">{totalHrs > 0 ? `${Math.round(totalHrs * 10) / 10}h` : '-'}</span>
-                             </div>
-                           );
-                         })()}
-                         {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
-                        <div 
-                          data-worker-id={worker.id}
-                          ref={el => {
-                            if (el) {
-                              timelineRefs.current[worker.id] = el;
-                            }
-                          }}
-                          className="flex-1 relative border-r cursor-crosshair h-8"
-                          dir="rtl"
-                          onMouseDown={(e) => {
-                            handleMouseDown(e, worker, null, 'create');
-                          }}
-                        >
+                        {viewMode === 'weekly' && summaryColumns.map(col => (
+                          <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                            <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
+                          </div>
+                        ))}
+                        {viewMode === 'weekly' && (() => {
+                          const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+                          let totalHrs = 0;
+                          templateRows.forEach(row => {
+                            if (!row.values || !Object.values(row.values).some(val => val === worker.id)) return;
+                            const st = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
+                            const et = row.values?.["סיום"] || row.values?.["שעת סיום"];
+                            if (!st || !et) return;
+                            const opDate = getOperationalStartDate(row.date, st);
+                            const weekStartStr = format(weekStart, "yyyy-MM-dd");
+                            const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
+                            if (opDate < weekStartStr || opDate > weekEndStr) return;
+                            const [sh,sm] = st.split(':').map(Number), [eh,em] = et.split(':').map(Number);
+                            let s = sh*60+sm, e = eh*60+em; if (e <= s) e += 24*60;
+                            totalHrs += Math.max(0, (e-s)/60);
+                          });
+                          return <div className="w-[52px] min-w-[52px] border-r flex items-center justify-center h-8 bg-blue-50"><span className="text-xs font-bold text-blue-800">{totalHrs > 0 ? `${Math.round(totalHrs * 10) / 10}h` : '-'}</span></div>;
+                        })()}
+                        {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
+                        <div data-worker-id={worker.id} ref={el => { if (el) timelineRefs.current[worker.id] = el; }} className="flex-1 relative border-r cursor-crosshair h-8" dir="rtl" onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}>
                           <div className="absolute inset-0 flex h-8" dir="rtl">
-                            {viewMode === 'daily' ? (
-                              getDailyTimeSlots(zoomRange).map(hour => (<div key={hour} className="flex-1 border-l time-slot h-8"></div>))
-                            ) : (
-                              getWeeklyTimeSlots(zoomRange).map((slot, idx) => (<div key={idx} className="flex-1 border-l time-slot h-8"></div>))
-                            )}
+                            {viewMode === 'daily' ? getDailyTimeSlots(zoomRange).map(hour => <div key={hour} className="flex-1 border-l time-slot h-8" />) : getWeeklyTimeSlots(zoomRange).map((slot, idx) => <div key={idx} className="flex-1 border-l time-slot h-8" />)}
                           </div>
                           <div className="absolute inset-0">
-                            {/* Day boundary line at 06:00 */}
-                            {viewMode === 'daily' ? (() => {
-                              const pos = timeToPercentage("06:00", 0, 'daily', zoomRange);
-                              if (pos < 0 || pos > 100) return null;
-                              return <div key="day-boundary" className="absolute top-0 h-full pointer-events-none" style={{ right: `${pos}%`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
-                            })() : [0,1,2,3,4,5,6].map(day => {
+                            {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
                               const pos = timeToPercentage("06:00", day, 'weekly', zoomRange);
                               if (pos < 0 || pos > 100) return null;
-                              return <div key={`day-boundary-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${pos}%`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
+                              return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${pos}%`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
                             })}
-                            {availabilityShifts.map((shift, idx) => (<AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />))}
-                            {workerUnavailabilities.map(unavail => (<UnavailabilityBar key={unavail.id} unavail={unavail} />))}
+                            {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
+                            {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
                             {workerTemplateShifts.map(ts => (
                               <React.Fragment key={ts.id}>
                                 <AssignmentBar assignment={ts} />
-                                {ts.briefing_time && (
-                                  <BriefingBar 
-                                    briefingTime={ts.briefing_time}
-                                    shiftStartTime={ts.start_time}
-                                    shiftEndTime={ts.end_time}
-                                    dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
-                                    viewMode={viewMode}
-                                    zoomRange={zoomRange}
-                                    timeToPercentage={timeToPercentage}
-                                  />
-                                )}
+                                {ts.briefing_time && <BriefingBar briefingTime={ts.briefing_time} shiftStartTime={ts.start_time} shiftEndTime={ts.end_time} dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0} viewMode={viewMode} zoomRange={zoomRange} timeToPercentage={timeToPercentage} />}
                               </React.Fragment>
                             ))}
                             {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
@@ -1686,310 +898,46 @@ export default function Matrix() {
           </CardContent>
         </Card>
 
-        <SummaryColumnsDialog
-          open={showSummaryColumnsDialog}
-          onOpenChange={setShowSummaryColumnsDialog}
-          summaryColumns={summaryColumns}
-          saveSummaryColumns={saveSummaryColumns}
-          shiftStatuses={shiftStatuses}
-          scheduleParams={scheduleParams}
-          trackers={trackers}
-        />
-
-        {/* Notification Dialog */}
-        <Dialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">שלח לוח זמנים {viewMode === "weekly" ? "שבועי" : "יומי"} - {selectedWorkerForNotification?.nickname}</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-h-60 overflow-y-auto" dir="rtl">
-                <p className="text-sm font-semibold mb-2">
-                  {viewMode === "weekly" ? `משמרות לשבוע של ${format(startOfWeek(currentDate, { weekStartsOn: 0 }), "d.M.yyyy")}:` : `משמרות ל-${format(currentDate, "d.M.yyyy")}:`}
-                </p>
-                {viewMode === "weekly" && selectedWorkerForNotification ? (
-                  Array.from({ length: 7 }).map((_, i) => {
-                    const d = addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), i);
-                    const dStr = format(d, "yyyy-MM-dd");
-                    const dayTemplateShifts = getWorkerTemplateShifts(selectedWorkerForNotification.id, dStr);
-                    const dayExtraTaskShifts = getWorkerExtraTaskShifts(selectedWorkerForNotification.id, dStr);
-                    const allDayShifts = [...dayTemplateShifts, ...dayExtraTaskShifts];
-                    return (
-                     <div key={i} className="mb-2" dir="rtl">
-                      <p className="text-xs font-semibold">{(() => {
-                        const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-                        return `${hebrewDays[d.getDay()]}, ${format(d, "d.M")}`;
-                      })()}</p>
-                      {allDayShifts.length === 0 ? (
-                        <p className="text-xs text-gray-500 mr-2">אין משמרות</p>
-                       ) : allDayShifts.map((a, idx) => {
-                         const briefingTime = a.briefing_time || (() => {
-                           const [hours, minutes] = a.start_time.split(':').map(Number);
-                           const briefingMinutes = hours * 60 + minutes - 15;
-                           const briefingHours = Math.floor(briefingMinutes / 60);
-                           const briefingMins = briefingMinutes % 60;
-                           return `${String(briefingHours).padStart(2, '0')}:${String(briefingMins).padStart(2, '0')}`;
-                         })();
-                         return (
-                           <div key={idx} className="text-xs bg-white p-1 rounded border ml-2 mt-1" dir="rtl">
-                             <div className="font-semibold">{a.food_cart_name}</div>
-                             <div className="text-amber-600">תדריך: {briefingTime}</div>
-                             <div className="text-gray-600">משמרת: {a.start_time} - {a.end_time}</div>
-                             {a.status && <div className="text-blue-600 font-medium">סטטוס: {a.status}</div>}
-                           </div>
-                         );
-                       })}
-                     </div>
-                    );
-                  })
-                ) : selectedWorkerForNotification ? (() => {
-                  const allShifts = [
-                    ...getWorkerTemplateShifts(selectedWorkerForNotification.id),
-                    ...getWorkerExtraTaskShifts(selectedWorkerForNotification.id)
-                  ];
-                  return allShifts.length > 0 ? allShifts.map((a, idx) => {
-                    const briefingTime = a.briefing_time || (() => {
-                      const [hours, minutes] = a.start_time.split(':').map(Number);
-                      const briefingMinutes = hours * 60 + minutes - 15;
-                      const briefingHours = Math.floor(briefingMinutes / 60);
-                      const briefingMins = briefingMinutes % 60;
-                      return `${String(briefingHours).padStart(2, '0')}:${String(briefingMins).padStart(2, '0')}`;
-                    })();
-                    return (
-                      <div key={idx} className="text-xs bg-white p-2 rounded border mb-1" dir="rtl">
-                        <p className="font-semibold">{a.food_cart_name}</p>
-                        <p className="text-amber-600">תדריך: {briefingTime}</p>
-                        <p className="text-gray-600">משמרת: {a.start_time} - {a.end_time} {a.hours ? `(${a.hours}h)` : ''}</p>
-                        {a.status && <p className="text-blue-600 font-medium">סטטוס: {a.status}</p>}
-                      </div>
-                    );
-                  }) : <p className="text-sm text-gray-600" dir="rtl">אין משמרות מתוכננות</p>;
-                })() : (
-                  <p className="text-sm text-gray-600">אין משמרות מתוכננות</p>
-                )}
-              </div>
-              <div><Label dir="rtl">הערות נוספות</Label><Textarea value={notificationNotes} onChange={(e) => setNotificationNotes(e.target.value)} rows={4} dir="rtl" /></div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowNotificationDialog(false)} dir="rtl">ביטול</Button>
-              <Button onClick={sendNotification} className="bg-blue-900 hover:bg-blue-800" disabled={!selectedWorkerForNotification?.email} dir="rtl"><Send className="w-4 h-4 mr-2" />שלח</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Type Change Dialog */}
-        <Dialog open={showTypeDialog} onOpenChange={setShowTypeDialog}>
-          <DialogContent className="sm:max-w-xs">
-            <DialogHeader><DialogTitle dir="rtl">שינוי סוג זמינות</DialogTitle></DialogHeader>
-            <div className="py-4 space-y-2" dir="rtl">
-              <Button variant="outline" className="w-full justify-start" onClick={() => handleChangeType('wanted')}>
-                <Star className="w-4 h-4 ml-2 text-green-600 fill-green-600" />רצוי
-              </Button>
-              <Button variant="outline" className="w-full justify-start" onClick={() => handleChangeType('available')}>
-                <Check className="w-4 h-4 ml-2 text-blue-600" />זמין
-              </Button>
-              <Button variant="outline" className="w-full justify-start" onClick={() => handleChangeType('unavailable')}>
-                <Ban className="w-4 h-4 ml-2 text-red-600" />לא זמין
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Manual Shift Add/Edit Dialog */}
-        <Dialog open={showManualDialog} onOpenChange={setShowManualDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle className="text-right" dir="rtl">{editingShift ? 'עריכת' : 'הוספת'} חלון זמינות - {selectedWorkerForManual?.nickname}</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4" dir="rtl">
-                <div>
-                  <Label className="text-center block mb-2" dir="rtl">שעת סיום (HH:MM)</Label>
-                  <Input 
-                    type="time" 
-                    value={manualShiftData.end_time} 
-                    onChange={(e) => setManualShiftData({ ...manualShiftData, end_time: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-center block mb-2" dir="rtl">שעת התחלה (HH:MM)</Label>
-                  <Input 
-                    type="time" 
-                    value={manualShiftData.start_time} 
-                    onChange={(e) => setManualShiftData({ ...manualShiftData, start_time: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-center block mb-2" dir="rtl">סוג זמינות</Label>
-                <div className="flex gap-2 justify-center">
-                  <Button
-                    variant={manualShiftData.type === "wanted" ? "default" : "outline"}
-                    className={manualShiftData.type === "wanted" ? "bg-green-500 hover:bg-green-600" : ""}
-                    onClick={() => setManualShiftData({ ...manualShiftData, type: "wanted" })}
-                    dir="rtl"
-                  >
-                    <Star className="w-4 h-4 ml-1" />
-                    רצוי
-                  </Button>
-                  <Button
-                    variant={manualShiftData.type === "available" ? "default" : "outline"}
-                    className={manualShiftData.type === "available" ? "bg-blue-500 hover:bg-blue-600" : ""}
-                    onClick={() => setManualShiftData({ ...manualShiftData, type: "available" })}
-                    dir="rtl"
-                  >
-                    <Check className="w-4 h-4 ml-1" />
-                    זמין
-                  </Button>
-                  <Button
-                    variant={manualShiftData.type === "unavailable" ? "default" : "outline"}
-                    className={manualShiftData.type === "unavailable" ? "bg-red-500 hover:bg-red-600" : ""}
-                    onClick={() => setManualShiftData({ ...manualShiftData, type: "unavailable" })}
-                    dir="rtl"
-                  >
-                    <Ban className="w-4 h-4 ml-1" />
-                    לא זמין
-                  </Button>
-                </div>
-              </div>
-
-            </div>
-            <DialogFooter className="flex justify-between" dir="rtl">
-              <div>
-                {editingShift && (
-                  <Button 
-                    variant="destructive" 
-                    onClick={async () => {
-                      if (!selectedWorkerForManual || !editingShift) return;
-                      const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForManual.id && a.week_start_date === weekStartDate);
-                      if (!workerAvail) return;
-                      const updatedShifts = workerAvail.shifts.filter(s => 
-                        !(s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type)
-                      );
-                      await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
-                      setShowManualDialog(false);
-                      setSelectedWorkerForManual(null);
-                      setManualShiftData({ start_time: '', end_time: '', type: 'available' });
-                      setEditingShift(null);
-                      debouncedLoadData();
-                    }}
-                    dir="rtl"
-                  >
-                    מחק
-                  </Button>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => {
-                  setShowManualDialog(false);
-                  setSelectedWorkerForManual(null);
-                  setManualShiftData({ start_time: '', end_time: '', type: 'available' });
-                  setEditingShift(null);
-                }} dir="rtl">ביטול</Button>
-                <Button 
-                  onClick={submitManualShift} 
-                  className="bg-blue-900 hover:bg-blue-800"
-                  disabled={!manualShiftData.start_time || !manualShiftData.end_time}
-                  dir="rtl"
-                >
-                  {editingShift ? 'עדכן' : <><Plus className="w-4 h-4 mr-2" />הוסף</>}
-                </Button>
-              </div>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
+        <SummaryColumnsDialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog} summaryColumns={summaryColumns} saveSummaryColumns={saveSummaryColumns} shiftStatuses={shiftStatuses} scheduleParams={scheduleParams} trackers={trackers} />
+        <NotificationDialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog} viewMode={viewMode} currentDate={currentDate} selectedWorkerForNotification={selectedWorkerForNotification} notificationNotes={notificationNotes} setNotificationNotes={setNotificationNotes} getWorkerTemplateShifts={getWorkerTemplateShifts} getWorkerExtraTaskShifts={getWorkerExtraTaskShifts} sendNotification={sendNotification} />
+        <TypeChangeDialog open={showTypeDialog} onOpenChange={setShowTypeDialog} handleChangeType={handleChangeType} />
+        <ManualShiftDialog open={showManualDialog} onOpenChange={(v) => { setShowManualDialog(v); if (!v) { setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null); } }} editingShift={editingShift} selectedWorkerForManual={selectedWorkerForManual} manualShiftData={manualShiftData} setManualShiftData={setManualShiftData} submitManualShift={submitManualShift} deleteShift={deleteManualShift} />
       </div>
     </div>
+
     {/* Fixed Zoom Control at Bottom */}
-    <div 
-      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg"
-      style={{ direction: 'ltr', zIndex: 50, width: '100%', padding: '8px' }}
-    >
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg" style={{ direction: 'ltr', zIndex: 50, width: '100%', padding: '8px' }}>
       <div className="flex items-center gap-4 max-w-screen-2xl mx-auto">
         <div className="flex-1 relative bg-gray-200 rounded-full" style={{ height: '16px', minHeight: '16px' }}>
-          {/* Main drag bar */}
-          <div 
-            className="absolute top-0 h-full bg-blue-400 rounded-full cursor-move hover:bg-blue-500 transition-colors"
-            style={{ left: `${zoomRange.start}%`, width: `${zoomRange.end - zoomRange.start}%` }}
+          <div className="absolute top-0 h-full bg-blue-400 rounded-full cursor-move hover:bg-blue-500 transition-colors" style={{ left: `${zoomRange.start}%`, width: `${zoomRange.end - zoomRange.start}%` }}
             onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const startX = e.clientX;
-              const startRangeStart = zoomRange.start;
-              const startRangeEnd = zoomRange.end;
-              const rangeWidth = startRangeEnd - startRangeStart;
+              e.preventDefault(); e.stopPropagation();
+              const startX = e.clientX, srs = zoomRange.start, sre = zoomRange.end, rw = sre - srs;
               const rect = e.currentTarget.parentElement.getBoundingClientRect();
-              const handleMove = (moveE) => {
-                const delta = ((moveE.clientX - startX) / rect.width) * 100;
-                let newStart = startRangeStart + delta;
-                let newEnd = startRangeEnd + delta;
-                if (newStart < 0) { newStart = 0; newEnd = rangeWidth; }
-                else if (newEnd > 100) { newEnd = 100; newStart = 100 - rangeWidth; }
-                setZoomRange({ start: newStart, end: newEnd });
-              };
-              const handleUp = () => {
-                document.removeEventListener('mousemove', handleMove);
-                document.removeEventListener('mouseup', handleUp);
-              };
-              document.addEventListener('mousemove', handleMove);
-              document.addEventListener('mouseup', handleUp);
-            }}
-          />
-          {/* Left handle */}
-          <div 
-            className="absolute bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors"
-            style={{ left: `${zoomRange.start}%`, top: '-2px', width: '16px', height: '20px', zIndex: 10 }}
+              const hm = (me) => { const d = ((me.clientX - startX) / rect.width) * 100; let ns = srs + d, ne = sre + d; if (ns < 0) { ns = 0; ne = rw; } else if (ne > 100) { ne = 100; ns = 100 - rw; } setZoomRange({ start: ns, end: ne }); };
+              const hu = () => { document.removeEventListener('mousemove', hm); document.removeEventListener('mouseup', hu); };
+              document.addEventListener('mousemove', hm); document.addEventListener('mouseup', hu);
+            }} />
+          <div className="absolute bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors" style={{ left: `${zoomRange.start}%`, top: '-2px', width: '16px', height: '20px', zIndex: 10 }}
             onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const startX = e.clientX;
-              const capturedEnd = zoomRange.end;
-              const startValue = zoomRange.start;
+              e.preventDefault(); e.stopPropagation();
+              const startX = e.clientX, ce = zoomRange.end, sv = zoomRange.start;
               const rect = e.currentTarget.parentElement.getBoundingClientRect();
-              const handleMove = (moveE) => {
-                const deltaPercent = ((moveE.clientX - startX) / rect.width) * 100;
-                const newStart = Math.max(0, Math.min(capturedEnd - 5, startValue + deltaPercent));
-                setZoomRange(prev => ({ start: newStart, end: prev.end }));
-              };
-              const handleUp = () => {
-                document.removeEventListener('mousemove', handleMove);
-                document.removeEventListener('mouseup', handleUp);
-              };
-              document.addEventListener('mousemove', handleMove);
-              document.addEventListener('mouseup', handleUp);
-            }}
-          />
-          {/* Right handle */}
-          <div 
-            className="absolute bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors"
-            style={{ left: `${zoomRange.end}%`, top: '-2px', width: '16px', height: '20px', transform: 'translateX(-100%)', zIndex: 10 }}
+              const hm = (me) => { const ns = Math.max(0, Math.min(ce - 5, sv + ((me.clientX - startX) / rect.width) * 100)); setZoomRange(prev => ({ start: ns, end: prev.end })); };
+              const hu = () => { document.removeEventListener('mousemove', hm); document.removeEventListener('mouseup', hu); };
+              document.addEventListener('mousemove', hm); document.addEventListener('mouseup', hu);
+            }} />
+          <div className="absolute bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors" style={{ left: `${zoomRange.end}%`, top: '-2px', width: '16px', height: '20px', transform: 'translateX(-100%)', zIndex: 10 }}
             onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const startX = e.clientX;
-              const capturedStart = zoomRange.start;
-              const startValue = zoomRange.end;
+              e.preventDefault(); e.stopPropagation();
+              const startX = e.clientX, cs = zoomRange.start, sv = zoomRange.end;
               const rect = e.currentTarget.parentElement.getBoundingClientRect();
-              const handleMove = (moveE) => {
-                const deltaPercent = ((moveE.clientX - startX) / rect.width) * 100;
-                const newEnd = Math.max(capturedStart + 5, Math.min(100, startValue + deltaPercent));
-                setZoomRange(prev => ({ start: prev.start, end: newEnd }));
-              };
-              const handleUp = () => {
-                document.removeEventListener('mousemove', handleMove);
-                document.removeEventListener('mouseup', handleUp);
-              };
-              document.addEventListener('mousemove', handleMove);
-              document.addEventListener('mouseup', handleUp);
-            }}
-          />
+              const hm = (me) => { const ne = Math.max(cs + 5, Math.min(100, sv + ((me.clientX - startX) / rect.width) * 100)); setZoomRange(prev => ({ start: prev.start, end: ne })); };
+              const hu = () => { document.removeEventListener('mousemove', hm); document.removeEventListener('mouseup', hu); };
+              document.addEventListener('mousemove', hm); document.addEventListener('mouseup', hu);
+            }} />
         </div>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => setZoomRange({ start: 0, end: 100 })}
-          disabled={zoomRange.start === 0 && zoomRange.end === 100}
-          className="shrink-0"
-        >
-          איפוס
-        </Button>
+        <Button variant="outline" size="sm" onClick={() => setZoomRange({ start: 0, end: 100 })} disabled={zoomRange.start === 0 && zoomRange.end === 100} className="shrink-0">איפוס</Button>
       </div>
     </div>
     </>

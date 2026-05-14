@@ -53,3 +53,31 @@ export function isNextDayShift(startTime) {
   const [h] = startTime.split(":").map(Number);
   return h < 6;
 }
+
+/**
+ * Convert a clock time to operational minutes since 06:00.
+ *
+ * The operational day runs 06:00 → next-day 06:00 (1440 minutes total).
+ *
+ *   06:00 →    0
+ *   07:00 →   60
+ *   22:00 →  960
+ *   23:00 → 1020
+ *   00:00 → 1080
+ *   01:00 → 1140
+ *   02:00 → 1200
+ *   05:00 → 1380
+ *   06:00 → 1440  (end boundary)
+ *
+ * @param {string} time - "HH:MM"
+ * @returns {number} minutes since operational day start (0–1440)
+ */
+export function getOperationalMinutes(time) {
+  if (!time) return 0;
+  const [h, m] = time.split(":").map(Number);
+  const total = h * 60 + (m || 0);
+  // 06:00–23:59: subtract the 6-hour offset
+  if (total >= 6 * 60) return total - 6 * 60;
+  // 00:00–05:59: wrap to end of operational day (after midnight segment)
+  return total + 18 * 60;
+}
