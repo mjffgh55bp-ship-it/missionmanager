@@ -785,11 +785,6 @@ export default function Matrix() {
                     </div>
                   ))}
                   {viewMode === 'weekly' && (
-                    <div className="w-[52px] min-w-[52px] border-r bg-blue-50 flex flex-col items-center justify-center text-center px-0.5 py-1" title="סה״כ שעות">
-                      <span className="text-[9px] font-semibold text-blue-700 leading-tight">שעות</span>
-                    </div>
-                  )}
-                  {viewMode === 'weekly' && (
                     <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center">
                       <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
                     </div>
@@ -803,9 +798,12 @@ export default function Matrix() {
                       ))
                     ) : (
                       getWeeklyTimeSlots(zoomRange, startOfWeek(currentDate, { weekStartsOn: 0 })).map((slot, idx) => (
-                        <div key={idx} className={`flex-1 text-xs text-gray-600 py-3 text-center font-medium ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : ''}`}>
-                          {slot.label && <div className="font-bold">{slot.label}</div>}
-                          {slot.dateLabel && <div className="text-[9px] text-gray-500">{slot.dateLabel}</div>}
+                        <div key={idx} className={`flex-1 text-xs text-gray-600 py-1 text-center font-medium ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : 'border-l border-l-gray-200'}`}>
+                          {slot.label && <div className="font-bold text-gray-800 text-[10px] leading-tight">{slot.label}</div>}
+                          {slot.dateLabel && <div className="text-[8px] text-gray-500 leading-tight">{slot.dateLabel}</div>}
+                          <div className={`text-[8px] leading-tight ${slot.hour === 0 ? 'text-gray-800 font-semibold' : 'text-gray-400'}`}>
+                            {String(slot.hour).padStart(2, '0')}
+                          </div>
                         </div>
                       ))
                     )}
@@ -860,24 +858,7 @@ export default function Matrix() {
                             <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
                           </div>
                         ))}
-                        {viewMode === 'weekly' && (() => {
-                          const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-                          let totalHrs = 0;
-                          templateRows.forEach(row => {
-                            if (!row.values || !Object.values(row.values).some(val => val === worker.id)) return;
-                            const st = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
-                            const et = row.values?.["סיום"] || row.values?.["שעת סיום"];
-                            if (!st || !et) return;
-                            const opDate = getOperationalStartDate(row.date, st);
-                            const weekStartStr = format(weekStart, "yyyy-MM-dd");
-                            const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-                            if (opDate < weekStartStr || opDate > weekEndStr) return;
-                            const s = getOperationalMinutes(st);
-                            const e = getOperationalEndMinutes(st, et);
-                            totalHrs += Math.max(0, (e - s) / 60);
-                          });
-                          return <div className="w-[52px] min-w-[52px] border-r flex items-center justify-center h-8 bg-blue-50"><span className="text-xs font-bold text-blue-800">{totalHrs > 0 ? `${Math.round(totalHrs * 10) / 10}h` : '-'}</span></div>;
-                        })()}
+
                         {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
                         <div data-worker-id={worker.id} ref={el => { if (el) timelineRefs.current[worker.id] = el; }} className="flex-1 relative border-r cursor-crosshair h-8" dir="rtl" onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}>
                           <div className="absolute inset-0 flex h-8" dir="rtl">
