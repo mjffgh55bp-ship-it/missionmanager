@@ -805,8 +805,20 @@ export default function Matrix() {
     if (!workerAvail) return;
     const typeMap = { available: 'wanted', wanted: 'unavailable', unavailable: 'available' };
     const updatedShifts = workerAvail.shifts.map(s => s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time ? { ...s, type: typeMap[shift.type || 'available'] } : s);
-    await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
-    debouncedLoadData();
+    try {
+      await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
+      debouncedLoadData();
+    } catch (error) {
+      console.error('Error updating shift type:', error);
+      // Retry after delay
+      await new Promise(r => setTimeout(r, 500));
+      try {
+        await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
+        debouncedLoadData();
+      } catch (retryError) {
+        console.error('Retry failed:', retryError);
+      }
+    }
   };
 
   const handleChangeType = async (newType) => {
