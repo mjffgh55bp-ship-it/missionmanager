@@ -963,31 +963,40 @@ END:VEVENT
             </div>
 
             {/* 3.2 Desired shifts + add constraint + lock/open status */}
-            <div className="flex flex-wrap items-center gap-2 bg-white border rounded-xl px-3 py-2 shadow-sm">
-              <div className="flex items-center gap-1">
-                <Label className="text-xs text-gray-500 whitespace-nowrap">רצויות:</Label>
-                <Input type="number" className="w-14 h-6 text-xs px-1" value={desiredShiftsCount} onChange={(e) => setDesiredShiftsCount(e.target.value)} placeholder="#" />
-              </div>
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowUnavailabilityDialog(true)}>
-                <Plus className="w-3 h-3 mr-1" />הוסף אילוץ
-              </Button>
-              {/* Registration status: locked / open */}
-              {currentWorker?.availability_locked ? (
-                <span className="flex items-center gap-1 text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full mr-auto">
-                  <Lock className="w-3 h-3" />נעול
-                </span>
-              ) : (
-                <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full mr-auto">פתוח</span>
-              )}
-              {unavailabilities.length > 0 && unavailabilities.map((unavail) => (
-                <div key={unavail.id} className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1 text-xs">
-                  <span className="font-medium text-gray-800">{formatDateHebrew(unavail.date, "short")}</span>
-                  <span className="text-gray-500">{unavail.start_time}–{unavail.end_time}</span>
-                  <button onClick={() => handleDeleteUnavailability(unavail.id)} className="text-red-400 hover:text-red-600 ml-1">
-                    <XCircle className="w-3.5 h-3.5" />
-                  </button>
+            <div className="bg-white border rounded-xl px-3 py-1.5 shadow-sm space-y-1.5">
+              {/* Compact single-line control row */}
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-gray-500 whitespace-nowrap shrink-0">רצויות:</Label>
+                <Input type="number" className="w-12 h-6 text-xs px-1.5 py-0" value={desiredShiftsCount} onChange={(e) => setDesiredShiftsCount(e.target.value)} placeholder="#" />
+                <Button variant="outline" size="sm" className="h-6 text-xs px-2 py-0" onClick={() => setShowUnavailabilityDialog(true)}>
+                  <Plus className="w-3 h-3 ml-0.5" />הוסף אילוץ
+                </Button>
+                <div className="mr-auto">
+                  {currentWorker?.availability_locked ? (
+                    <span className="flex items-center gap-1 text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full">
+                      <Lock className="w-3 h-3" />נעול
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
+                      <Check className="w-3 h-3" />פתוח
+                    </span>
+                  )}
                 </div>
-              ))}
+              </div>
+              {/* Constraints list — only shown when there are constraints */}
+              {unavailabilities.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-0.5 border-t border-gray-100">
+                  {unavailabilities.map((unavail) => (
+                    <div key={unavail.id} className="flex items-center gap-1 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 text-xs">
+                      <span className="font-medium text-gray-700">{formatDateHebrew(unavail.date, "short")}</span>
+                      <span className="text-gray-400">{unavail.start_time}–{unavail.end_time}</span>
+                      <button onClick={() => handleDeleteUnavailability(unavail.id)} className="text-red-400 hover:text-red-600">
+                        <XCircle className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* 3.3 Registration policy / tips */}
