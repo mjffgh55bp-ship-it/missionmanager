@@ -156,7 +156,6 @@ export default function Matrix() {
   }, [containerWidth, fixedColumnsWidth, totalMins, zoomPreset, customPpm]);
 
   const [workers, setWorkers] = useState([]);
-  const [assignments, setAssignments] = useState([]);
   const [availabilities, setAvailabilities] = useState([]);
   const [unavailabilities, setUnavailabilities] = useState([]);
   const [initialLoaded, setInitialLoaded] = useState(false);
@@ -340,9 +339,18 @@ export default function Matrix() {
     loadDynamicData(false);
   }, [currentDate, viewMode]);
   useEffect(() => {
-    const unsubAssignment = base44.entities.Assignment.subscribe(() => { debouncedLoadDataRef.current(true); });
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => { debouncedLoadDataRef.current(true); });
-    return () => { unsubAssignment(); unsubTemplateRow(); };
+    // Refresh when tab regains focus (catches Schedule changes made in another tab)
+    const onVisibility = () => { if (document.visibilityState === 'visible') debouncedLoadDataRef.current(true); };
+    document.addEventListener('visibilitychange', onVisibility);
+    // Refresh on explicit event dispatched by WorkerCell after saving
+    const onTemplateRowsUpdated = () => { debouncedLoadDataRef.current(true); };
+    window.addEventListener('templateRowsUpdated', onTemplateRowsUpdated);
+    return () => {
+      unsubTemplateRow();
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('templateRowsUpdated', onTemplateRowsUpdated);
+    };
   }, []);
 
   const refreshWorkers = async () => {
@@ -385,28 +393,29 @@ export default function Matrix() {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
       const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
+      const weekEndStr = format(weekEnd, "yyyy-MM-dd");
       const dateStr = format(currentDate, "yyyy-MM-dd");
 
-      const assignmentsData = viewMode === "daily"
-        ? await base44.entities.Assignment.filter({ date: dateStr })
-        : await base44.entities.Assignment.list();
+      // Load availability / unavailability
       const availabilitiesData = await base44.entities.Availability.list();
       await new Promise(r => setTimeout(r, 100));
-      const unavailabilitiesData = await (viewMode === "daily"
-        ? base44.entities.Unavailability.filter({ date: dateStr })
-        : base44.entities.Unavailability.list());
+      const unavailabilitiesData = viewMode === "daily"
+        ? await base44.entities.Unavailability.filter({ date: dateStr })
+        : await base44.entities.Unavailability.list();
       await new Promise(r => setTimeout(r, 100));
-      const [templateRowsData, allTemplatesData] = await Promise.all([
-        viewMode === "daily" ? base44.entities.TemplateRow.filter({ date: dateStr }) : base44.entities.TemplateRow.list(),
-        getCachedTemplates(base44.entities)
-      ]);
-      let filteredAssignments = assignmentsData;
-      let filteredTemplateRows = templateRowsData;
-      if (viewMode === "weekly") {
-        const weekEndStr = format(weekEnd, "yyyy-MM-dd");
-        filteredAssignments = assignmentsData.filter(a => a.date >= weekStartStr && a.date <= weekEndStr);
-        filteredTemplateRows = templateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
+
+      // Load TemplateRows: always fetch per-date (never use .list() for schedule bars)
+      let filteredTemplateRows = [];
+      if (viewMode === "daily") {
+        filteredTemplateRows = await base44.entities.TemplateRow.filter({ date: dateStr });
+      } else {
+        // Weekly: fetch each date in the week individually to avoid stale/unrelated rows
+        const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
+        const perDayRows = await Promise.all(weekDates.map(d => base44.entities.TemplateRow.filter({ date: d })));
+        filteredTemplateRows = perDayRows.flat();
       }
+
+      // For daily: also fetch continuation source rows that may live on a different date
       if (viewMode === "daily") {
         const continuationRows = filteredTemplateRows.filter(r => r.values?.is_continuation && r.values?.continuation_source_row_id);
         const uniqueSourceIds = [...new Set(continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean))];
@@ -418,8 +427,11 @@ export default function Matrix() {
           }
         }
       }
+
+      const allTemplatesData = await getCachedTemplates(base44.entities);
+      await new Promise(r => setTimeout(r, 100));
       const trackerEntriesData = await base44.entities.TrackerEntry.list();
-      setAssignments(filteredAssignments);
+
       setAvailabilities(availabilitiesData);
       setUnavailabilities(unavailabilitiesData);
       setTemplateRows(filteredTemplateRows);
@@ -441,43 +453,95 @@ export default function Matrix() {
   const weekStartDate = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
   // ── Data helpers (unchanged) ─────────────────────────────────────────────────
+  // Check if a worker is assigned to a row by scanning ONLY worker-type columns
+  const isWorkerAssignedToRow = (row, workerId, template) => {
+    if (!row.values || !workerId) return { assigned: false, workerColumnName: null };
+    const columns = template?.columns || [];
+    for (const col of columns) {
+      if (col.type !== "worker") continue;
+      const val = row.values[col.name];
+      if (val === workerId) return { assigned: true, workerColumnName: col.name };
+      if (Array.isArray(val) && val.includes(workerId)) return { assigned: true, workerColumnName: col.name };
+    }
+    return { assigned: false, workerColumnName: null };
+  };
+
   const getWorkerTemplateShifts = (workerId, date = null) => {
     const targetDate = date || dateString;
     const shifts = [];
     templateRows.forEach(row => {
-      if (!row.values) return;
+      if (!row.values) {
+        console.log("MATRIX SKIPPED ROW", { rowId: row.id, rowDate: row.date, reason: "no values" });
+        return;
+      }
+      // Only show rows for the exact selected date
+      if (row.date !== targetDate) return;
+
+      const template = allTemplates.find(t => t.id === row.template_id);
+      if (!template) {
+        console.log("MATRIX SKIPPED ROW", { rowId: row.id, rowDate: row.date, reason: "template not found" });
+        return;
+      }
+
       const isContinuation = row.values.is_continuation;
       const sourceRowId = row.values.continuation_source_row_id;
-      let isAssigned = false;
+      let assignedResult = { assigned: false, workerColumnName: null };
       let briefingTime = row.values?.["תדריך"];
+
       if (isContinuation && sourceRowId) {
+        // For continuation rows, check workers from the SOURCE row
         const sourceRow = templateRows.find(r => r.id === sourceRowId);
         if (sourceRow && sourceRow.values) {
-          isAssigned = Object.values(sourceRow.values).some(val => val === workerId);
+          const sourceTemplate = allTemplates.find(t => t.id === sourceRow.template_id) || template;
+          assignedResult = isWorkerAssignedToRow(sourceRow, workerId, sourceTemplate);
           if (!briefingTime) briefingTime = sourceRow.values?.["תדריך"];
         }
       } else {
-        isAssigned = Object.values(row.values).some(val => val === workerId);
+        assignedResult = isWorkerAssignedToRow(row, workerId, template);
       }
-      if (!isAssigned || row.date !== targetDate) return;
-      const template = allTemplates.find(t => t.id === row.template_id);
-      if (!template) return;
+
+      if (!assignedResult.assigned) return;
+
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
-      if (startTime && endTime) {
-        shifts.push({
-          id: `template_${row.id}`,
-          date: getOperationalStartDate(row.date, startTime),
-          schedule_date: row.date,
-          start_time: startTime,
-          end_time: endTime,
-          briefing_time: briefingTime,
-          food_cart_name: template.name || row.template_name,
-          hours: null,
-          status: row.values?.status || null,
-          isTemplateShift: true
-        });
+      if (!startTime || !endTime) {
+        console.log("MATRIX SKIPPED ROW", { rowId: row.id, rowDate: row.date, reason: "no start/end time" });
+        return;
       }
+
+      console.log("MATRIX SCHEDULE BAR", {
+        rowId: row.id,
+        rowDate: row.date,
+        selectedDate: targetDate,
+        templateId: row.template_id,
+        groupId: row.group_id,
+        workerId,
+        workerName: workers.find(w => w.id === workerId)?.nickname,
+        workerColumnName: assignedResult.workerColumnName,
+        startTime,
+        endTime,
+        status: row.values?.status || null,
+        source: "schedule"
+      });
+
+      shifts.push({
+        id: `schedule_${row.id}_${assignedResult.workerColumnName}_${workerId}`,
+        source: "schedule",
+        template_row_id: row.id,
+        template_id: row.template_id,
+        group_id: row.group_id || "default",
+        schedule_date: row.date,
+        date: getOperationalStartDate(row.date, startTime),
+        worker_id: workerId,
+        worker_column_name: assignedResult.workerColumnName,
+        start_time: startTime,
+        end_time: endTime,
+        briefing_time: briefingTime,
+        food_cart_name: template.name || row.template_name,
+        hours: null,
+        status: row.values?.status || null,
+        isTemplateShift: true
+      });
     });
     return shifts;
   };
@@ -807,7 +871,10 @@ export default function Matrix() {
     const weeklyShifts = [];
     templateRows.forEach(row => {
       if (!row.values) return;
-      if (!Object.values(row.values).some(val => val === workerId)) return;
+      const tmpl = allTemplates.find(t => t.id === row.template_id);
+      if (!tmpl) return;
+      const { assigned } = isWorkerAssignedToRow(row, workerId, tmpl);
+      if (!assigned) return;
       const st = row.values?.['התחלה'] || row.values?.['שעת התחלה'];
       const et = row.values?.['סיום'] || row.values?.['שעת סיום'];
       if (st && et) {
@@ -831,7 +898,10 @@ export default function Matrix() {
       let count = 0;
       templateRows.forEach(row => {
         if (!row.values || row.date < weekStartStr || row.date > weekEndStr) return;
-        if (!Object.values(row.values).some(val => val === workerId)) return;
+        const tmpl = allTemplates.find(t => t.id === row.template_id);
+        if (!tmpl) return;
+        const { assigned } = isWorkerAssignedToRow(row, workerId, tmpl);
+        if (!assigned) return;
         const cellVal = row.values[colName];
         if (!criterion) { if (cellVal) count++; }
         else { const valStr = Array.isArray(cellVal) ? cellVal.join(',') : (cellVal || ''); if (valStr.includes(criterion)) count++; }
@@ -902,7 +972,10 @@ export default function Matrix() {
     const borderColor = borderColors[shift.type] || '#3b82f6';
     const overlappingAssignments = templateRows.filter(r => {
       if (r.date !== shift.date || !r.values) return false;
-      if (!Object.values(r.values).some(val => val === worker.id)) return false;
+      const tmpl = allTemplates.find(t => t.id === r.template_id);
+      if (!tmpl) return false;
+      const { assigned } = isWorkerAssignedToRow(r, worker.id, tmpl);
+      if (!assigned) return false;
       const st = r.values?.["התחלה"] || r.values?.["שעת התחלה"];
       const et = r.values?.["סיום"] || r.values?.["שעת סיום"];
       return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);

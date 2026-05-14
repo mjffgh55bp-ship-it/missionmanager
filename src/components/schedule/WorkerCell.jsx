@@ -82,6 +82,7 @@ export default function WorkerCell({
     setEditing(false);
     setSearchQuery("");
     if (onSaved) onSaved(workerId);
+    window.dispatchEvent(new CustomEvent("templateRowsUpdated", { detail: { rowId, date: dateString } }));
   };
 
   const handleRemoveWorker = async () => {
@@ -90,6 +91,7 @@ export default function WorkerCell({
     setEditing(false);
     setSearchQuery("");
     if (onSaved) onSaved(null);
+    window.dispatchEvent(new CustomEvent("templateRowsUpdated", { detail: { rowId, date: dateString } }));
   };
 
   const isWorkerQualified = (workerId) => {
