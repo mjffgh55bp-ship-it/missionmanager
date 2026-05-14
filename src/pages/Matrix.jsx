@@ -339,13 +339,14 @@ export default function Matrix() {
             briefingTime = sourceRow.values?.["תדריך"];
           }
         }
-        // Include if this continuation row is for the target date (operational date aware)
-        shouldInclude = row.date === targetDate || getOperationalStartDate(row.date, row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "06:00") === targetDate;
+        // CRITICAL: match by schedule_date ONLY — never use OR with operational date.
+        // Using operationalDate in the condition causes 02:00 rows on adjacent days to collide.
+        shouldInclude = row.date === targetDate;
       } else {
         // For regular rows, check if worker is assigned directly
         isAssigned = Object.values(row.values).some(val => val === workerId);
-        // Include if this regular row is for the target date (use schedule date, not operational date)
-        shouldInclude = row.date === targetDate || getOperationalStartDate(row.date, row.values?.["התחלה"] || row.values?.["שעת התחלה"] || "06:00") === targetDate;
+        // CRITICAL: match by schedule_date ONLY — never use OR with operational date.
+        shouldInclude = row.date === targetDate;
       }
       
       if (!isAssigned || !shouldInclude) return;
@@ -1551,7 +1552,14 @@ export default function Matrix() {
                     })
                     .map((worker, index) => {
                     const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
-                    const workerTemplateShifts = getWorkerTemplateShifts(worker.id, viewMode === 'daily' ? dateString : null);
+                    // weekly: scan all 7 schedule dates; daily: use the selected date only
+                    const workerTemplateShifts = (() => {
+                      if (viewMode !== 'weekly') return getWorkerTemplateShifts(worker.id, dateString);
+                      const wS = startOfWeek(currentDate, { weekStartsOn: 0 });
+                      const all = [];
+                      for (let _i = 0; _i < 7; _i++) all.push(...getWorkerTemplateShifts(worker.id, format(addDays(wS, _i), "yyyy-MM-dd")));
+                      return all;
+                    })();
                     const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
                     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
 
@@ -1590,18 +1598,26 @@ export default function Matrix() {
                            </div>
                          ))}
                          {viewMode === 'weekly' && (() => {
+                           // Use operational date for hour totals — 02:00 shifts count toward next calendar day
                            const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
                            let totalHrs = 0;
-                           for (let i = 0; i < 7; i++) {
-                             const d = format(addDays(weekStart, i), "yyyy-MM-dd");
-                             getWorkerTemplateShifts(worker.id, d).forEach(s => {
-                               const [sh, sm] = s.start_time.split(':').map(Number);
-                               const [eh, em] = s.end_time.split(':').map(Number);
-                               let start = sh * 60 + sm, end = eh * 60 + em;
-                               if (end <= start) end += 24 * 60;
-                               totalHrs += Math.max(0, (end - start) / 60);
-                             });
-                           }
+                           templateRows.forEach(row => {
+                             if (!row.values) return;
+                             const isAssigned = Object.values(row.values).some(val => val === worker.id);
+                             if (!isAssigned) return;
+                             const st = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
+                             const et = row.values?.["סיום"] || row.values?.["שעת סיום"];
+                             if (!st || !et) return;
+                             const opDate = getOperationalStartDate(row.date, st);
+                             const weekStartStr = format(weekStart, "yyyy-MM-dd");
+                             const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
+                             if (opDate < weekStartStr || opDate > weekEndStr) return;
+                             const [sh, sm] = st.split(':').map(Number);
+                             const [eh, em] = et.split(':').map(Number);
+                             let start = sh * 60 + sm, end = eh * 60 + em;
+                             if (end <= start) end += 24 * 60;
+                             totalHrs += Math.max(0, (end - start) / 60);
+                           });
                            return (
                              <div className={`w-[52px] min-w-[52px] border-r flex items-center justify-center h-8 bg-blue-50`}>
                                <span className="text-xs font-bold text-blue-800">{totalHrs > 0 ? `${Math.round(totalHrs * 10) / 10}h` : '-'}</span>
