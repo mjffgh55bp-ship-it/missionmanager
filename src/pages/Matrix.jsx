@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue } from "@/lib/operationalDate";
+import { getTimelineRangeStyle, getTimelinePointStyle } from "@/lib/matrixTimeUtils";
 import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut } from "lucide-react";
 import BriefingBar from "../components/matrix/BriefingBar";
 import WorkerLockButton from "../components/matrix/WorkerLockButton";
@@ -52,11 +53,11 @@ const getWeeklyTimeSlots = (weekStartDate = null) => {
 
 const timeToPixels = (timeStr, day = 0, viewMode = 'daily', ppm) => {
   if (!timeStr) return 0;
-  const { hour, minute } = parseTimeCellValue(timeStr);
-  if (isNaN(hour)) return 0;
+  const parsed = parseTimeCellValue(timeStr);
+  if (isNaN(parsed.hour)) return 0;
   let totalMins;
   if (viewMode === 'weekly') {
-    totalMins = day * 24 * 60 + hour * 60 + (minute || 0);
+    totalMins = (day + parsed.dayOffset) * 24 * 60 + parsed.hour * 60 + (parsed.minute || 0);
   } else {
     totalMins = getOperationalMinutes(timeStr); // 0 = 06:00, 1440 = next 06:00
   }
@@ -65,11 +66,19 @@ const timeToPixels = (timeStr, day = 0, viewMode = 'daily', ppm) => {
 
 // Operational end minutes → pixels (handles overnight shifts correctly)
 const endTimeToPixels = (startTimeStr, endTimeStr, viewMode = 'daily', ppm, dayIndex = 0) => {
-  if (viewMode === 'weekly') {
-    return timeToPixels(endTimeStr, dayIndex, 'weekly', ppm);
+  let endPx = timeToPixels(endTimeStr, dayIndex, viewMode, ppm);
+  const startPx = timeToPixels(startTimeStr, dayIndex, viewMode, ppm);
+
+  // If end <= start, shift moved to next cycle (overnight or next day in weekly)
+  if (endPx <= startPx) {
+    if (viewMode === 'weekly') {
+      endPx += 7 * 24 * 60 * ppm; // add one week
+    } else {
+      endPx += DAILY_TOTAL_MINUTES * ppm;
+    }
   }
-  const endOpMins = getOperationalEndMinutes(startTimeStr, endTimeStr);
-  return Math.min(endOpMins, DAILY_TOTAL_MINUTES) * ppm;
+
+  return endPx;
 };
 
 // Total timeline width in pixels
@@ -924,11 +933,23 @@ export default function Matrix() {
     const startPx = timeToPixels(assignment.start_time, dayIndex, viewMode, ppm);
     const endPx = endTimeToPixels(assignment.start_time, assignment.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 2);
-    // In RTL layout, "right" = timelineWidth - endPx
-    const rightPx = timelineWidth - endPx;
+    // RTL: right = startPx (position from right edge)
+    const rightPx = startPx;
+    const workerName = workers.find(w => w.id === assignment.worker_id)?.nickname || '';
     if (startPx < 0 || startPx > timelineWidth) return null;
     const isTemplate = assignment.isTemplateShift;
     const standby = isStandbyStatus(assignment.status);
+    console.log("MATRIX ASSIGNMENT POSITION", {
+      workerName,
+      startTime: assignment.start_time,
+      endTime: assignment.end_time,
+      dayIndex,
+      startPx,
+      endPx,
+      widthPx,
+      rightPx,
+      expected: "rightPx should equal startPx"
+    });
     if (standby) {
       const borderColor = isTemplate ? '#a855f7' : '#3b82f6';
       return (
@@ -954,10 +975,11 @@ export default function Matrix() {
   };
 
   const timesOverlap = (aStart, aEnd, bStart, bEnd) => {
-    const toMins = t => { const [h,m] = t.split(':').map(Number); return h * 60 + m; };
-    const as = toMins(aStart), ae = toMins(aEnd) || toMins(aStart) + 24*60;
-    const bs = toMins(bStart), be = toMins(bEnd) || toMins(bStart) + 24*60;
-    return as < be && ae > bs;
+    const aStartMin = getOperationalMinutes(aStart);
+    const aEndMin = getOperationalEndMinutes(aStart, aEnd);
+    const bStartMin = getOperationalMinutes(bStart);
+    const bEndMin = getOperationalEndMinutes(bStart, bEnd);
+    return aStartMin < bEndMin && aEndMin > bStartMin;
   };
 
   const AvailabilityBar = ({ shift, worker }) => {
@@ -965,7 +987,17 @@ export default function Matrix() {
     const startPx = timeToPixels(shift.start_time, dayIndex, viewMode, ppm);
     const endPx = endTimeToPixels(shift.start_time, shift.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 0);
-    const rightPx = timelineWidth - endPx;
+    const rightPx = startPx;
+    console.log("MATRIX AVAILABILITY POSITION", {
+      workerName: worker.nickname,
+      startTime: shift.start_time,
+      endTime: shift.end_time,
+      dayIndex,
+      startPx,
+      endPx,
+      widthPx,
+      rightPx
+    });
     if (startPx < 0 || startPx > timelineWidth) return null;
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
     const borderColors = { wanted: '#16a34a', available: '#3b82f6', unavailable: '#dc2626' };
@@ -1002,9 +1034,9 @@ export default function Matrix() {
   const UnavailabilityBar = ({ unavail }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(unavail.date) : 0;
     const startPx = timeToPixels(unavail.start_time, dayIndex, viewMode, ppm);
-    const endPx = timeToPixels(unavail.end_time, dayIndex, viewMode, ppm);
+    const endPx = endTimeToPixels(unavail.start_time, unavail.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 0);
-    const rightPx = timelineWidth - endPx;
+    const rightPx = startPx;
     if (startPx < 0 || startPx > timelineWidth) return null;
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
@@ -1021,9 +1053,9 @@ export default function Matrix() {
     if (!preview || preview.workerId !== workerId) return null;
     const dayIndex = preview.day || 0;
     const startPx = timeToPixels(preview.start, dayIndex, viewMode, ppm);
-    const endPx = timeToPixels(preview.end, dayIndex, viewMode, ppm);
+    const endPx = endTimeToPixels(preview.start, preview.end, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 0);
-    const rightPx = timelineWidth - endPx;
+    const rightPx = startPx;
     return <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80" style={{ right: `${rightPx}px`, width: `${widthPx}px` }}><span className="text-xs font-bold">{preview.start} - {preview.end}</span></div>;
   };
 
@@ -1055,15 +1087,7 @@ export default function Matrix() {
     [currentDate]
   );
 
-  // ── BriefingBar adapter (it receives timeToPercentage; we adapt to pixels) ───
-  // BriefingBar component uses timeToPercentage internally. We pass a pixel-based adapter.
-  const ppmTimeToPercentage = useCallback((timeStr, dayIndex, vm, _zr) => {
-    const px = timeToPixels(timeStr, dayIndex, vm, ppm);
-    return (px / timelineWidth) * 100;
-  }, [ppm, timelineWidth]);
 
-  // fake zoomRange for BriefingBar (it won't be used for clipping, just percentage)
-  const fakeZoomRange = { start: 0, end: 100 };
 
   return (
     <div
@@ -1237,7 +1261,7 @@ export default function Matrix() {
                             {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
                               // 06:00 of each day in weekly pixel coords
                               const px = timeToPixels("06:00", day, 'weekly', ppm);
-                              const rightPx = timelineWidth - px;
+                              const rightPx = px;
                               return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${rightPx}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
                             })}
                             {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
@@ -1246,14 +1270,14 @@ export default function Matrix() {
                               <React.Fragment key={ts.id}>
                                 <AssignmentBar assignment={ts} />
                                 {ts.briefing_time && <BriefingBar
-                                  briefingTime={ts.briefing_time}
-                                  shiftStartTime={ts.start_time}
-                                  shiftEndTime={ts.end_time}
-                                  dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
-                                  viewMode={viewMode}
-                                  zoomRange={fakeZoomRange}
-                                  timeToPercentage={ppmTimeToPercentage}
-                                />}
+                                   briefingTime={ts.briefing_time}
+                                   shiftStartTime={ts.start_time}
+                                   shiftEndTime={ts.end_time}
+                                   dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
+                                   viewMode={viewMode}
+                                   ppm={ppm}
+                                   timeToPixels={timeToPixels}
+                                 />}
                               </React.Fragment>
                             ))}
                             {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}

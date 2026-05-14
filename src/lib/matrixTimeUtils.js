@@ -2,8 +2,23 @@
  * Matrix timeline utility functions.
  * Operational day: 06:00 → next-day 06:00 (1440 minutes total).
  * RTL layout: right edge = 06:00 (0%), left edge = next-day 06:00 (100%).
+ *
+ * ========== PIXEL-BASED RTL POSITIONING (NEW) ==========
+ * All visual elements use the same coordinate system:
+ *
+ * For a bar (range):
+ *   right = startPx  (position from right edge of timeline)
+ *   width = endPx - startPx
+ *
+ * For a point marker:
+ *   right = pointPx  (position from right edge of timeline)
+ *
+ * This ensures:
+ * - 06:00 appears at right edge (startPx=0, rightPx=0)
+ * - 10:00 appears to the left (startPx=240*ppm, rightPx=240*ppm)
+ * - bars and points use consistent RTL logic
  */
-import { getOperationalMinutes } from "@/lib/operationalDate";
+import { getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue } from "@/lib/operationalDate";
 
 export const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
@@ -97,4 +112,81 @@ export const percentageToTime = (percentage, viewMode = 'daily', zoomRange = { s
     const finalHours = rawMins >= 60 ? (hours + 1) % 24 : hours;
     return { day: 0, time: `${String(finalHours).padStart(2, '0')}:${String(finalMins).padStart(2, '0')}` };
   }
+};
+
+/**
+ * ========== PIXEL-BASED POSITIONING HELPERS ==========
+ * Convert time to pixel position from RIGHT edge of timeline.
+ * Used for all Matrix visual elements: bars, markers, boundaries.
+ */
+
+/**
+ * timeToPixels: Convert clock time to pixel offset from RIGHT edge (RTL).
+ * Daily: operational minutes * ppm
+ * Weekly: (day * 1440 + operational minutes) * ppm, with day offset support
+ */
+export const timeToPixels = (timeStr, dayIndex = 0, viewMode = 'daily', ppm = 1) => {
+  if (!timeStr) return 0;
+  const parsed = parseTimeCellValue(timeStr);
+  const clockMins = parsed.hour * 60 + parsed.minute;
+
+  if (viewMode === 'weekly') {
+    const totalMins = (dayIndex + parsed.dayOffset) * 1440 + clockMins;
+    return totalMins * ppm;
+  } else {
+    // Daily: operational minutes (06:00=0, 10:00=240, etc.)
+    const opMins = (clockMins - 6 * 60 + 24 * 60) % (24 * 60);
+    return opMins * ppm;
+  }
+};
+
+/**
+ * endTimeToPixels: Convert end time to pixel offset, handling overnight shifts.
+ * If end <= start, add 24h (1440 mins).
+ */
+export const endTimeToPixels = (startTime, endTime, viewMode = 'daily', ppm = 1, dayIndex = 0) => {
+  let endPx = timeToPixels(endTime, dayIndex, viewMode, ppm);
+  const startPx = timeToPixels(startTime, dayIndex, viewMode, ppm);
+
+  if (endPx <= startPx) {
+    endPx += 1440 * ppm;
+  }
+
+  return endPx;
+};
+
+/**
+ * getTimelineRangeStyle: Get RTL positioning for a bar (range).
+ * Returns { rightPx, widthPx, style: { right, width } }
+ * Used for assignment, availability, unavailability, drag preview bars.
+ */
+export const getTimelineRangeStyle = (startTime, endTime, dayIndex = 0, viewMode = 'daily', ppm = 1) => {
+  const startPx = timeToPixels(startTime, dayIndex, viewMode, ppm);
+  const endPx = endTimeToPixels(startTime, endTime, viewMode, ppm, dayIndex);
+  const widthPx = Math.max(endPx - startPx, 2);
+
+  return {
+    rightPx: startPx,
+    widthPx,
+    style: {
+      right: `${startPx}px`,
+      width: `${widthPx}px`
+    }
+  };
+};
+
+/**
+ * getTimelinePointStyle: Get RTL positioning for a marker (point).
+ * Returns { rightPx, style: { right } }
+ * Used for briefing markers, day boundaries.
+ */
+export const getTimelinePointStyle = (timeStr, dayIndex = 0, viewMode = 'daily', ppm = 1) => {
+  const pointPx = timeToPixels(timeStr, dayIndex, viewMode, ppm);
+
+  return {
+    rightPx: pointPx,
+    style: {
+      right: `${pointPx}px`
+    }
+  };
 };

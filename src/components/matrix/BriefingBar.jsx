@@ -1,17 +1,25 @@
 import React from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-export default function BriefingBar({ briefingTime, shiftStartTime, shiftEndTime, dayIndex, viewMode, zoomRange, timeToPercentage }) {
+export default function BriefingBar({ briefingTime, shiftStartTime, shiftEndTime, dayIndex, viewMode, ppm, timeToPixels }) {
   if (!briefingTime) return null;
   
-  // Calculate the percentage position for the briefing time
-  const briefingPercent = timeToPercentage(briefingTime, dayIndex, viewMode, zoomRange);
+  // Calculate the pixel position for the briefing time
+  const pointPx = timeToPixels(briefingTime, dayIndex, viewMode, ppm);
   
-  // Hide if outside zoom range
-  if (briefingPercent < 0 || briefingPercent > 100) return null;
+  // Hide if position is invalid
+  if (pointPx < 0 || pointPx === undefined) return null;
   
-  const rightPercent = briefingPercent;
-  
+  const rightPx = pointPx;
+
+  console.log("MATRIX BRIEFING POSITION", {
+    briefingTime,
+    dayIndex,
+    pointPx,
+    rightPx,
+    expected: "rightPx should equal pointPx"
+  });
+
   return (
     <TooltipProvider>
       <Tooltip>
@@ -19,9 +27,8 @@ export default function BriefingBar({ briefingTime, shiftStartTime, shiftEndTime
           <div
             className="absolute h-full rounded-sm z-15 flex items-center justify-center px-1 overflow-hidden"
             style={{
-              right: `${rightPercent}%`,
-              width: '0.5%',
-              minWidth: '2px',
+              right: `${rightPx}px`,
+              width: '6px',
               backgroundColor: 'rgba(251, 191, 36, 0.3)',
               border: '2px solid #f59e0b',
             }}
