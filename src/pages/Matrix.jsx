@@ -117,6 +117,9 @@ export default function Matrix() {
   const [zoomPreset, setZoomPreset] = useState('fit'); // 'fit' | '24h' | '12h' | 'custom'
   const [customPpm, setCustomPpm] = useState(null);
 
+  // ── summaryColumns must be declared BEFORE fixedColumnsWidth useMemo ─────────
+  const [summaryColumns, setSummaryColumns] = useState([]);
+
   // ── Derived: total timeline minutes ─────────────────────────────────────────
   const totalMins = viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES;
 
@@ -181,7 +184,6 @@ export default function Matrix() {
   const [allTemplates, setAllTemplates] = useState([]);
   const [sentState, setSentState] = useState({});
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
-  const [summaryColumns, setSummaryColumns] = useState([]);
   const [showSummaryColumnsDialog, setShowSummaryColumnsDialog] = useState(false);
   const [scheduleParams, setScheduleParams] = useState([]);
   const [trackers, setTrackers] = useState([]);
