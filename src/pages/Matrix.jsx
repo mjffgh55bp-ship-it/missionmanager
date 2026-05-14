@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { usePageState } from "@/hooks/usePageState";
 import { base44 } from "@/api/base44Client";
 import { getCachedAllSettings, getCachedWorkers, getCachedTemplates } from "@/lib/appDataCache";
@@ -6,8 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
-import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, getClockTime } from "@/lib/operationalDate";
-import { Send, Star, Check, Ban, Plus, MessageCircle } from "lucide-react";
+import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue } from "@/lib/operationalDate";
+import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut } from "lucide-react";
 import BriefingBar from "../components/matrix/BriefingBar";
 import WorkerLockButton from "../components/matrix/WorkerLockButton";
 import MasterControls from "../components/matrix/MasterControls";
@@ -15,68 +15,96 @@ import SummaryColumnsDialog from "../components/matrix/SummaryColumnsDialog";
 import MatrixHeader from "../components/matrix/MatrixHeader";
 import { NotificationDialog, TypeChangeDialog, ManualShiftDialog } from "../components/matrix/MatrixDialogs";
 
-// Operational timeline: 06:00 → next-day 06:00 (24 slots, RTL)
-// Each slot value is the clock-hour to display: 6, 7, …, 23, 0, 1, 2, 3, 4, 5
-const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
-  const allSlots = Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
-  const startIdx = Math.floor((zoomRange.start / 100) * allSlots.length);
-  const endIdx = Math.ceil((zoomRange.end / 100) * allSlots.length);
-  return allSlots.slice(startIdx, endIdx);
-};
-const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }, weekStartDate = null) => {
-  const allSlots = [];
-  for (let day = 0; day < 7; day++) {
-    let dateLabel = null;
-    if (weekStartDate && day < 7) {
-      const date = addDays(weekStartDate, day);
-      dateLabel = format(date, 'd.M');
-    }
-    for (let hour = 0; hour < 24; hour++) {
-      allSlots.push({ day, hour, label: hour === 0 ? DAYS_OF_WEEK[day] : null, dateLabel: hour === 0 ? dateLabel : null });
-    }
-  }
-  const startIdx = Math.floor((zoomRange.start / 100) * allSlots.length);
-  const endIdx = Math.ceil((zoomRange.end / 100) * allSlots.length);
-  return allSlots.slice(startIdx, endIdx);
-};
+// ── Timeline constants ──────────────────────────────────────────────────────
+const DAILY_TOTAL_MINUTES = 24 * 60; // 1440 — operational day (06:00→06:00)
+const WEEKLY_TOTAL_MINUTES = 7 * 24 * 60; // 10080
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
-// Daily: 06:00 (right, 0%) → next-day 06:00 (left, 100%) — operational day, RTL
-// Weekly: plain day*24h grid
-// Supports plain "HH:MM" and "+N HH:MM" format from TimeCell.
-const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
+// pixelsPerMinute presets (daily view)
+// "התאם ליום" = auto (computed from container width)
+// "יום מלא" = 24h in ~1400px → 1400/1440 ≈ 0.97
+// "12h" = 12h in ~1400px → 1400/720 ≈ 1.94
+const PPM_FULL_DAY = 0.97;      // יום מלא / 24h
+const PPM_12H = 1.94;           // 12h
+const PPM_MIN = PPM_FULL_DAY;   // cannot zoom out more than full day
+const PPM_MAX = PPM_12H;        // cannot zoom in past 12h visible
+
+// For weekly: 7× as many minutes, so base ppm is ~7× smaller
+const WEEKLY_PPM_FULL = 0.14;   // 7 days ≈ 1400px
+const WEEKLY_PPM_12H = 0.97;    // ~12h visible
+
+// ── Time slot generators (for the header ruler) ─────────────────────────────
+// Daily: 06:00 → 05:00 next day (operational), returns array of clock hours
+const getDailyTimeSlots = () =>
+  Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
+
+// Weekly: day×24h, returns slots with day/hour metadata
+const getWeeklyTimeSlots = (weekStartDate = null) => {
+  const slots = [];
+  for (let day = 0; day < 7; day++) {
+    let dateLabel = null;
+    if (weekStartDate) {
+      const d = addDays(weekStartDate, day);
+      dateLabel = format(d, 'd.M');
+    }
+    for (let hour = 0; hour < 24; hour++) {
+      slots.push({ day, hour, label: hour === 0 ? DAYS_OF_WEEK[day] : null, dateLabel: hour === 0 ? dateLabel : null });
+    }
+  }
+  return slots;
+};
+
+// ── Core pixel mapping ───────────────────────────────────────────────────────
+// Returns pixel offset from the LEFT edge of the timeline (LTR internally,
+// we flip to RTL via "right" in CSS because the layout is RTL).
+// Actually: since the grid is flex RTL, bars use "right" offset.
+// We compute the PERCENTAGE position in the FULL timeline, then multiply by totalWidth.
+
+const timeToPixels = (timeStr, day = 0, viewMode = 'daily', ppm) => {
   if (!timeStr) return 0;
   const { hour, minute } = parseTimeCellValue(timeStr);
   if (isNaN(hour)) return 0;
-  let basePercent;
+  let totalMins;
   if (viewMode === 'weekly') {
-    basePercent = ((day * 24 + hour) * 60 + (minute || 0)) / (7 * 24 * 60) * 100;
+    totalMins = day * 24 * 60 + hour * 60 + (minute || 0);
   } else {
-    basePercent = getOperationalMinutes(timeStr) / (24 * 60) * 100;
+    totalMins = getOperationalMinutes(timeStr); // 0 = 06:00, 1440 = next 06:00
   }
-  if (basePercent < zoomRange.start || basePercent > zoomRange.end) return basePercent < zoomRange.start ? -1 : 101;
-  const zoomWidth = zoomRange.end - zoomRange.start;
-  return ((basePercent - zoomRange.start) / zoomWidth) * 100;
+  return totalMins * ppm;
 };
 
-const percentageToTime = (percentage, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
-  const zoomWidth = zoomRange.end - zoomRange.start;
-  const basePercent = (percentage / 100) * zoomWidth + zoomRange.start;
+// Operational end minutes → pixels (handles overnight shifts correctly)
+const endTimeToPixels = (startTimeStr, endTimeStr, viewMode = 'daily', ppm, dayIndex = 0) => {
   if (viewMode === 'weekly') {
-    const totalMinutes = (basePercent / 100) * (7 * 24 * 60);
-    const day = Math.floor(totalMinutes / (24 * 60));
-    const minutesInDay = totalMinutes % (24 * 60);
-    const hours = Math.floor(minutesInDay / 60);
-    const mins = Math.round((minutesInDay % 60) / 15) * 15;
-    return { day: Math.max(0, Math.min(6, day)), time: `${String(hours).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}` };
+    return timeToPixels(endTimeStr, dayIndex, 'weekly', ppm);
+  }
+  const endOpMins = getOperationalEndMinutes(startTimeStr, endTimeStr);
+  return Math.min(endOpMins, DAILY_TOTAL_MINUTES) * ppm;
+};
+
+// Total timeline width in pixels
+const getTimelineWidth = (viewMode, ppm) =>
+  (viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES) * ppm;
+
+// Convert a pixel offset within the timeline back to {day, time}
+const pixelsToTime = (px, viewMode = 'daily', ppm) => {
+  const totalMins = px / ppm;
+  if (viewMode === 'weekly') {
+    const day = Math.min(6, Math.max(0, Math.floor(totalMins / (24 * 60))));
+    const minsInDay = totalMins % (24 * 60);
+    const h = Math.floor(minsInDay / 60);
+    const m = Math.round((minsInDay % 60) / 15) * 15;
+    const mf = m >= 60 ? 0 : m;
+    const hf = m >= 60 ? (h + 1) % 24 : h;
+    return { day, time: `${String(hf).padStart(2,'0')}:${String(mf).padStart(2,'0')}` };
   } else {
-    const opMins = (basePercent / 100) * (24 * 60);
-    const clockMins = (opMins + 6 * 60) % (24 * 60);
-    const hours = Math.floor(clockMins / 60);
-    const rawMins = Math.round((clockMins % 60) / 15) * 15;
-    const finalMins = rawMins >= 60 ? 0 : rawMins;
-    const finalHours = rawMins >= 60 ? (hours + 1) % 24 : hours;
-    return { day: 0, time: `${String(finalHours).padStart(2, '0')}:${String(finalMins).padStart(2, '0')}` };
+    // Operational: 0min=06:00
+    const clockMins = (totalMins + 6 * 60) % (24 * 60);
+    const h = Math.floor(clockMins / 60);
+    const m = Math.round((clockMins % 60) / 15) * 15;
+    const mf = m >= 60 ? 0 : m;
+    const hf = m >= 60 ? (h + 1) % 24 : h;
+    return { day: 0, time: `${String(hf).padStart(2,'0')}:${String(mf).padStart(2,'0')}` };
   }
 };
 
@@ -89,7 +117,9 @@ export default function Matrix() {
   const [populationFilter, setPopulationFilter] = usePageState("matrix", "populationFilter", "__all__");
   const [roleFilter, setRoleFilter] = usePageState("matrix", "roleFilter", "__all__");
   const [statusFilter, setStatusFilter] = usePageState("matrix", "statusFilter", "__all__");
-  const [zoomRange, setZoomRange] = usePageState("matrix", "zoomRange", { start: 0, end: 100 });
+
+  // NEW: separate zoom (pixelsPerMinute) — no more zoomRange
+  const [ppm, setPpm] = useState(PPM_FULL_DAY);
 
   const [workers, setWorkers] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -129,6 +159,147 @@ export default function Matrix() {
   const [savingSignupMode, setSavingSignupMode] = useState(false);
   const settingsIdCache = useRef({});
 
+  // ── Scroll container ref (for middle-mouse drag + wheel zoom) ───────────────
+  const scrollContainerRef = useRef(null);
+  const midMouseDragRef = useRef(null); // { startX, startY, initScrollLeft, initScrollTop }
+  const ppmRef = useRef(ppm);
+  ppmRef.current = ppm;
+
+  // ── Derived: total timeline pixel width ─────────────────────────────────────
+  const timelineWidth = useMemo(() => getTimelineWidth(viewMode, ppm), [viewMode, ppm]);
+
+  // Clamp ppm to allowed range for current viewMode
+  const clampPpm = useCallback((value, vm) => {
+    if (vm === 'weekly') return Math.max(WEEKLY_PPM_FULL, Math.min(WEEKLY_PPM_12H, value));
+    return Math.max(PPM_MIN, Math.min(PPM_MAX, value));
+  }, []);
+
+  // ── Zoom helpers (zoom around a focal pixel in the scroll container) ─────────
+  const applyZoom = useCallback((newPpmRaw, focalScrollX = null) => {
+    const sc = scrollContainerRef.current;
+    const oldPpm = ppmRef.current;
+    const newPpm = clampPpm(newPpmRaw, viewMode);
+    if (newPpm === oldPpm) return;
+
+    // If we have a focal point (cursor X relative to scrollContainer), keep that
+    // timeline position under the cursor.
+    if (sc && focalScrollX !== null) {
+      const oldTimelineX = sc.scrollLeft + focalScrollX; // px into timeline
+      const ratio = newPpm / oldPpm;
+      const newScrollLeft = oldTimelineX * ratio - focalScrollX;
+      setPpm(newPpm);
+      // Apply scroll after state update
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollLeft = Math.max(0, newScrollLeft);
+        }
+      });
+    } else {
+      // Zoom around center
+      if (sc) {
+        const centerX = sc.scrollLeft + sc.clientWidth / 2;
+        const ratio = newPpm / oldPpm;
+        const newScrollLeft = centerX * ratio - sc.clientWidth / 2;
+        setPpm(newPpm);
+        requestAnimationFrame(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollLeft = Math.max(0, newScrollLeft);
+          }
+        });
+      } else {
+        setPpm(newPpm);
+      }
+    }
+  }, [clampPpm, viewMode]);
+
+  // ── Wheel handler: Ctrl/Cmd+wheel = zoom, plain wheel = native scroll ────────
+  const handleWheel = useCallback((e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const sc = scrollContainerRef.current;
+      const focalX = sc ? e.clientX - sc.getBoundingClientRect().left : null;
+      // delta > 0 = zoom out, < 0 = zoom in
+      const factor = e.deltaY > 0 ? 0.9 : 1.1;
+      applyZoom(ppmRef.current * factor, focalX);
+    }
+    // All other wheel events: let the browser handle naturally
+    // (vertical scroll = native, horizontal swipe = native via overflow-x: auto)
+  }, [applyZoom]);
+
+  // Pinch (wheel with ctrlKey set by browser for trackpad pinch)
+  // Already handled above via ctrlKey check.
+
+  // ── Middle mouse drag ────────────────────────────────────────────────────────
+  const handlePointerDown = useCallback((e) => {
+    if (e.button !== 1) return; // middle button only
+    e.preventDefault();
+    const sc = scrollContainerRef.current;
+    if (!sc) return;
+    midMouseDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initScrollLeft: sc.scrollLeft,
+      initScrollTop: sc.scrollTop,
+    };
+    sc.style.cursor = 'grabbing';
+  }, []);
+
+  const handlePointerMove = useCallback((e) => {
+    if (!midMouseDragRef.current) return;
+    const sc = scrollContainerRef.current;
+    if (!sc) return;
+    const { startX, startY, initScrollLeft, initScrollTop } = midMouseDragRef.current;
+    sc.scrollLeft = initScrollLeft - (e.clientX - startX);
+    sc.scrollTop = initScrollTop - (e.clientY - startY);
+  }, []);
+
+  const handlePointerUp = useCallback((e) => {
+    if (e.button !== 1) return;
+    midMouseDragRef.current = null;
+    const sc = scrollContainerRef.current;
+    if (sc) sc.style.cursor = '';
+  }, []);
+
+  // Attach wheel listener (non-passive to allow preventDefault for zoom)
+  useEffect(() => {
+    const sc = scrollContainerRef.current;
+    if (!sc) return;
+    const onWheel = (e) => handleWheel(e);
+    sc.addEventListener('wheel', onWheel, { passive: false });
+    return () => sc.removeEventListener('wheel', onWheel);
+  }, [handleWheel]);
+
+  // ── Zoom preset buttons ──────────────────────────────────────────────────────
+  const zoomIn = () => applyZoom(ppmRef.current * 1.25);
+  const zoomOut = () => applyZoom(ppmRef.current * 0.8);
+
+  const applyPreset = (preset) => {
+    const sc = scrollContainerRef.current;
+    if (preset === 'auto') {
+      // "התאם ליום" — fit to container
+      const containerWidth = sc ? sc.clientWidth : 1400;
+      const totalMins = viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES;
+      const fitPpm = containerWidth / totalMins;
+      setPpm(clampPpm(fitPpm, viewMode));
+      if (sc) requestAnimationFrame(() => { sc.scrollLeft = 0; });
+    } else if (preset === 'full') {
+      const newPpm = viewMode === 'daily' ? PPM_FULL_DAY : WEEKLY_PPM_FULL;
+      setPpm(clampPpm(newPpm, viewMode));
+      if (sc) requestAnimationFrame(() => { sc.scrollLeft = 0; });
+    } else if (preset === '12h') {
+      const newPpm = viewMode === 'daily' ? PPM_12H : WEEKLY_PPM_12H;
+      setPpm(clampPpm(newPpm, viewMode));
+      if (sc) requestAnimationFrame(() => { sc.scrollLeft = 0; });
+    }
+  };
+
+  // Reset ppm when viewMode changes
+  useEffect(() => {
+    setPpm(viewMode === 'daily' ? PPM_FULL_DAY : WEEKLY_PPM_FULL);
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = 0;
+  }, [viewMode]);
+
+  // ── Data loading (unchanged) ─────────────────────────────────────────────────
   useEffect(() => { loadStaticData(); }, []);
   useEffect(() => {
     if (!initialLoadDoneRef.current) return;
@@ -235,6 +406,7 @@ export default function Matrix() {
   const dateString = format(currentDate, "yyyy-MM-dd");
   const weekStartDate = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
+  // ── Data helpers (unchanged) ─────────────────────────────────────────────────
   const getWorkerTemplateShifts = (workerId, date = null) => {
     const targetDate = date || dateString;
     const shifts = [];
@@ -442,35 +614,59 @@ export default function Matrix() {
     return Math.max(0, Math.min(6, diff));
   };
 
+  // ── Drag handlers — now use pixel positions ──────────────────────────────────
   const handleMouseDown = (e, worker, shift, action, dayIndex = 0) => {
     e.preventDefault(); e.stopPropagation();
     if (action === 'move' && e.detail === 2) return;
     const timeline = timelineRefs.current[worker.id];
     if (!timeline) return;
     const rect = timeline.getBoundingClientRect();
-    const startPercent = 100 - ((e.clientX - rect.left) / rect.width) * 100;
-    setDragging({ workerId: worker.id, worker, shift, action, startPercent, originalStart: shift?.start_time, originalEnd: shift?.end_time, originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0, originalType: shift?.type, rect });
+    // In RTL layout, right edge = 0, left edge = timelineWidth
+    // clientX - rect.left = distance from left edge of timeline element
+    // RTL pixel offset from right = rect.width - (clientX - rect.left)
+    const pxFromRight = rect.width - (e.clientX - rect.left);
+    // But bars use "right" % of their parent element (which is the timeline).
+    // Let's store raw clientX and rect for computing in move.
+    const startPxFromRight = Math.max(0, Math.min(timelineWidth, pxFromRight));
+    setDragging({ workerId: worker.id, worker, shift, action, startPxFromRight, originalStart: shift?.start_time, originalEnd: shift?.end_time, originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0, rect });
   };
 
   const handleMouseMove = (e) => {
     if (!dragging) return;
-    const { worker, shift, action, startPercent, originalStart, originalEnd, originalDay, rect } = dragging;
-    const currentPercent = Math.max(0, Math.min(100, 100 - ((e.clientX - rect.left) / rect.width) * 100));
+    const { worker, shift, action, startPxFromRight, originalStart, originalEnd, originalDay, rect } = dragging;
+    const currentPxFromRight = Math.max(0, Math.min(timelineWidth, rect.width - (e.clientX - rect.left)));
+
+    // Convert pixel-from-right to "operational minutes from right edge" = pxFromRight / ppm
+    const pxToOpMins = (px) => px / ppm;
+
     let newStart = originalStart, newEnd = originalEnd, newDay = originalDay || 0;
+
+    const pxToTime = (px) => pixelsToTime(px / ppm * ppm, viewMode, ppm);
+
+    // Convert px-from-right to timeline-pixel-from-left (for pixelsToTime)
+    const rightToTimelinePx = (pxR) => Math.max(0, timelineWidth - pxR);
+
     if (action === 'create') {
-      const [minP, maxP] = [Math.min(startPercent, currentPercent), Math.max(startPercent, currentPercent)];
-      const sd = percentageToTime(minP, viewMode, zoomRange), ed = percentageToTime(maxP, viewMode, zoomRange);
+      const [minPx, maxPx] = [Math.min(startPxFromRight, currentPxFromRight), Math.max(startPxFromRight, currentPxFromRight)];
+      const sd = pixelsToTime(rightToTimelinePx(maxPx), viewMode, ppm);
+      const ed = pixelsToTime(rightToTimelinePx(minPx), viewMode, ppm);
       newStart = sd.time; newEnd = ed.time; newDay = sd.day;
     } else if (action === 'resize-start') {
-      const d = percentageToTime(currentPercent, viewMode, zoomRange); newStart = d.time; newDay = d.day;
+      const d = pixelsToTime(rightToTimelinePx(currentPxFromRight), viewMode, ppm);
+      newStart = d.time; newDay = d.day;
     } else if (action === 'resize-end') {
-      newEnd = percentageToTime(currentPercent, viewMode, zoomRange).time;
+      newEnd = pixelsToTime(rightToTimelinePx(currentPxFromRight), viewMode, ppm).time;
     } else if (action === 'move') {
-      const origStartP = timeToPercentage(originalStart, originalDay || 0, viewMode, zoomRange);
-      const origEndP = timeToPercentage(originalEnd, originalDay || 0, viewMode, zoomRange);
-      const width = origEndP - origStartP;
-      const newStartP = Math.max(0, Math.min(100 - width, origStartP + currentPercent - startPercent));
-      const sd = percentageToTime(newStartP, viewMode, zoomRange), ed = percentageToTime(newStartP + width, viewMode, zoomRange);
+      const origStartPx = timeToPixels(originalStart, originalDay || 0, viewMode, ppm);
+      const origEndPx = endTimeToPixels(originalStart, originalEnd, viewMode, ppm, originalDay || 0);
+      const widthPx = origEndPx - origStartPx;
+      // origStartPx is from timeline left; "from right" = timelineWidth - origStartPx
+      const origStartPxFromRight = timelineWidth - origStartPx;
+      const delta = currentPxFromRight - startPxFromRight;
+      const newStartPxFromRight = origStartPxFromRight + delta;
+      const newStartPxFromLeft = Math.max(0, Math.min(timelineWidth - widthPx, timelineWidth - newStartPxFromRight));
+      const sd = pixelsToTime(newStartPxFromLeft, viewMode, ppm);
+      const ed = pixelsToTime(Math.min(timelineWidth, newStartPxFromLeft + widthPx), viewMode, ppm);
       newStart = sd.time; newEnd = ed.time; newDay = sd.day;
     }
     setDragPreview({ workerId: dragging.workerId, start: newStart, end: newEnd, day: newDay, type: shift?.type || 'available' });
@@ -617,32 +813,23 @@ export default function Matrix() {
     return 0;
   };
 
-  // ── Bar Components ─────────────────────────────────────────────────────────
+  // ── Bar Components (now use pixel positions via timeToPixels) ─────────────────
   const AssignmentBar = ({ assignment }) => {
     const positionDate = assignment.schedule_date || assignment.date;
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(positionDate) : 0;
-    const startOpMins = getOperationalMinutes(assignment.start_time);
-    const endOpMins = getOperationalEndMinutes(assignment.start_time, assignment.end_time);
-    // startPercent: position in the zoomed view (RTL: right edge = 06:00 = 0%)
-    const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
-    // endPercent: in daily mode, compute directly from operational minutes to avoid +N parsing issues
-    const endPercent = viewMode === 'daily'
-      ? (() => {
-          const bp = (Math.min(endOpMins, 1440) / (24 * 60)) * 100;
-          if (bp < zoomRange.start || bp > zoomRange.end) return bp < zoomRange.start ? -1 : 101;
-          return ((bp - zoomRange.start) / (zoomRange.end - zoomRange.start)) * 100;
-        })()
-      : timeToPercentage(assignment.end_time, dayIndex, viewMode, zoomRange);
-    const width = endPercent >= startPercent ? endPercent - startPercent : 0;
-    console.log("MATRIX BAR DEBUG", { worker_id: assignment.food_cart_name, start_time: assignment.start_time, end_time: assignment.end_time, startOpMins, endOpMins, duration: endOpMins - startOpMins, startPercent, endPercent, width });
-    if (startPercent < 0 || startPercent > 100) return null;
+    const startPx = timeToPixels(assignment.start_time, dayIndex, viewMode, ppm);
+    const endPx = endTimeToPixels(assignment.start_time, assignment.end_time, viewMode, ppm, dayIndex);
+    const widthPx = Math.max(endPx - startPx, 2);
+    // In RTL layout, "right" = timelineWidth - endPx
+    const rightPx = timelineWidth - endPx;
+    if (startPx < 0 || startPx > timelineWidth) return null;
     const isTemplate = assignment.isTemplateShift;
     const standby = isStandbyStatus(assignment.status);
     if (standby) {
       const borderColor = isTemplate ? '#a855f7' : '#3b82f6';
       return (
         <TooltipProvider><Tooltip><TooltipTrigger asChild>
-          <div className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden" style={{ right: `${startPercent}%`, width: `${Math.max(width, 0.5)}%`, backgroundColor: 'transparent', border: `2px dashed ${borderColor}` }}>
+          <div className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden" style={{ right: `${rightPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px dashed ${borderColor}` }}>
             <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{assignment.status}</span>
           </div>
         </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
@@ -652,7 +839,7 @@ export default function Matrix() {
     }
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <div className={`absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${startPercent}%`, width: `${Math.max(width, 0.5)}%` }}>
+        <div className={`absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${rightPx}px`, width: `${widthPx}px` }}>
           {!isTemplate && <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>}
           {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
         </div>
@@ -671,18 +858,11 @@ export default function Matrix() {
 
   const AvailabilityBar = ({ shift, worker }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
-    const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode, zoomRange);
-    // Use robust end-minute calculation (handles overnight, +N, 06:00 boundary)
-    const avEndOpMins = getOperationalEndMinutes(shift.start_time, shift.end_time);
-    const endPercent = viewMode === 'daily'
-      ? (() => {
-          const bp = (Math.min(avEndOpMins, 1440) / (24 * 60)) * 100;
-          if (bp < zoomRange.start || bp > zoomRange.end) return bp < zoomRange.start ? -1 : 101;
-          return ((bp - zoomRange.start) / (zoomRange.end - zoomRange.start)) * 100;
-        })()
-      : timeToPercentage(shift.end_time, dayIndex, viewMode, zoomRange);
-    const width = endPercent >= startPercent ? endPercent - startPercent : 0;
-    if (startPercent < 0 || startPercent > 100) return null;
+    const startPx = timeToPixels(shift.start_time, dayIndex, viewMode, ppm);
+    const endPx = endTimeToPixels(shift.start_time, shift.end_time, viewMode, ppm, dayIndex);
+    const widthPx = Math.max(endPx - startPx, 0);
+    const rightPx = timelineWidth - endPx;
+    if (startPx < 0 || startPx > timelineWidth) return null;
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
     const borderColors = { wanted: '#16a34a', available: '#3b82f6', unavailable: '#dc2626' };
     const borderColor = borderColors[shift.type] || '#3b82f6';
@@ -694,7 +874,7 @@ export default function Matrix() {
       return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
     }).map(r => ({ start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"], end_time: r.values?.["סיום"] || r.values?.["שעת סיום"], status: r.values?.status || null }));
     return (
-      <div className="absolute h-full rounded-sm z-10 cursor-move overflow-visible" style={{ right: `${startPercent}%`, width: `${width}%`, backgroundColor: 'transparent', border: `2px solid ${borderColor}` }} onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }} onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}>
+      <div className="absolute h-full rounded-sm z-10 cursor-move overflow-visible" style={{ right: `${rightPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px solid ${borderColor}` }} onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }} onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}>
         <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start', dayIndex); }} />
         <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end', dayIndex); }} />
         <button className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform" style={{ borderColor }} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }} onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }}>
@@ -714,13 +894,14 @@ export default function Matrix() {
 
   const UnavailabilityBar = ({ unavail }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(unavail.date) : 0;
-    const startPercent = timeToPercentage(unavail.start_time, dayIndex, viewMode, zoomRange);
-    const endPercent = timeToPercentage(unavail.end_time, dayIndex, viewMode, zoomRange);
-    const width = endPercent > startPercent ? endPercent - startPercent : 0;
-    if (startPercent < 0 || startPercent > 100) return null;
+    const startPx = timeToPixels(unavail.start_time, dayIndex, viewMode, ppm);
+    const endPx = timeToPixels(unavail.end_time, dayIndex, viewMode, ppm);
+    const widthPx = Math.max(endPx - startPx, 0);
+    const rightPx = timelineWidth - endPx;
+    if (startPx < 0 || startPx > timelineWidth) return null;
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${startPercent}%`, width: `${width}%` }}>
+        <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${rightPx}px`, width: `${widthPx}px` }}>
           <Ban className="w-3 h-3 text-gray-600" />
         </div>
       </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
@@ -731,10 +912,12 @@ export default function Matrix() {
 
   const DragPreviewBar = ({ preview, workerId }) => {
     if (!preview || preview.workerId !== workerId) return null;
-    const startPercent = timeToPercentage(preview.start, preview.day || 0, viewMode, zoomRange);
-    const endPercent = timeToPercentage(preview.end, preview.day || 0, viewMode, zoomRange);
-    const width = endPercent > startPercent ? endPercent - startPercent : 0;
-    return <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80" style={{ right: `${startPercent}%`, width: `${width}%` }}><span className="text-xs font-bold">{preview.start} - {preview.end}</span></div>;
+    const dayIndex = preview.day || 0;
+    const startPx = timeToPixels(preview.start, dayIndex, viewMode, ppm);
+    const endPx = timeToPixels(preview.end, dayIndex, viewMode, ppm);
+    const widthPx = Math.max(endPx - startPx, 0);
+    const rightPx = timelineWidth - endPx;
+    return <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80" style={{ right: `${rightPx}px`, width: `${widthPx}px` }}><span className="text-xs font-bold">{preview.start} - {preview.end}</span></div>;
   };
 
   const calcHours = (s, e) => {
@@ -758,26 +941,91 @@ export default function Matrix() {
     return <div className="flex gap-0.5 items-center">{days.map((d, i) => <div key={i} className={`text-[9px] font-medium leading-tight ${d.working ? 'text-green-600' : 'text-gray-300'}`} title={`${d.day}: ${d.working ? d.hours.toFixed(1) + 'h' : 'חופש'}`}>{d.day}</div>)}</div>;
   };
 
+  // ── Hour ruler slots for the header ──────────────────────────────────────────
+  const dailySlots = useMemo(() => getDailyTimeSlots(), []);
+  const weeklySlots = useMemo(
+    () => getWeeklyTimeSlots(startOfWeek(currentDate, { weekStartsOn: 0 })),
+    [currentDate]
+  );
+
+  // ── BriefingBar adapter (it receives timeToPercentage; we adapt to pixels) ───
+  // BriefingBar component uses timeToPercentage internally. We pass a pixel-based adapter.
+  const ppmTimeToPercentage = useCallback((timeStr, dayIndex, vm, _zr) => {
+    const px = timeToPixels(timeStr, dayIndex, vm, ppm);
+    return (px / timelineWidth) * 100;
+  }, [ppm, timelineWidth]);
+
+  // fake zoomRange for BriefingBar (it won't be used for clipping, just percentage)
+  const fakeZoomRange = { start: 0, end: 100 };
+
   return (
     <>
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} dir="rtl">
+    <div
+      className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8"
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      dir="rtl"
+    >
       <div className="max-w-screen-2xl mx-auto">
         <Card className="border-none shadow-lg mb-3">
-          <MatrixHeader currentDate={currentDate} setCurrentDate={setCurrentDate} viewMode={viewMode} setViewMode={setViewMode} populationFilter={populationFilter} setPopulationFilter={setPopulationFilter} roleFilter={roleFilter} setRoleFilter={setRoleFilter} statusFilter={statusFilter} setStatusFilter={setStatusFilter} populations={populations} workerRoles={workerRoles} shiftStatuses={shiftStatuses} signupMode={signupMode} saveSignupMode={saveSignupMode} savingSignupMode={savingSignupMode} />
+          <MatrixHeader
+            currentDate={currentDate} setCurrentDate={setCurrentDate}
+            viewMode={viewMode} setViewMode={setViewMode}
+            populationFilter={populationFilter} setPopulationFilter={setPopulationFilter}
+            roleFilter={roleFilter} setRoleFilter={setRoleFilter}
+            statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+            populations={populations} workerRoles={workerRoles} shiftStatuses={shiftStatuses}
+            signupMode={signupMode} saveSignupMode={saveSignupMode} savingSignupMode={savingSignupMode}
+          />
         </Card>
+
+        {/* Zoom controls bar */}
+        <div className="flex items-center gap-2 mb-2 px-1" dir="rtl">
+          <span className="text-xs text-gray-500 font-medium">רזולוציה:</span>
+          <button
+            onClick={zoomOut}
+            className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors"
+            title="הקטן רזולוציית זמן"
+          >−</button>
+          <button
+            onClick={zoomIn}
+            className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors"
+            title="הגדל רזולוציית זמן"
+          >+</button>
+          <div className="w-px h-5 bg-gray-300 mx-1" />
+          <button onClick={() => applyPreset('auto')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">התאם ליום</button>
+          <button onClick={() => applyPreset('full')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">24h</button>
+          <button onClick={() => applyPreset('12h')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">12h</button>
+          <span className="text-[10px] text-gray-400 mr-2">Ctrl+גלגל לזום · גרירת גלגל לגלילה</span>
+        </div>
 
         <Card className="border-none shadow-lg">
           <CardContent className="p-0">
-            <div className="overflow-x-auto pb-16">
-              <div className="min-w-[1400px]">
-                {/* Header row */}
-                <div className="flex sticky top-0 bg-gray-100 z-30 border-b">
+            {/* Outer scroll container — this is the native scrollable area */}
+            <div
+              ref={scrollContainerRef}
+              className="overflow-x-auto overflow-y-auto"
+              style={{ maxHeight: 'calc(100vh - 220px)' }}
+              onMouseDown={handlePointerDown}
+              onMouseMove={handlePointerMove}
+              onMouseUp={handlePointerUp}
+            >
+              {/* Inner fixed-width timeline */}
+              <div style={{ width: `${timelineWidth}px`, minWidth: `${timelineWidth}px` }}>
+                {/* Sticky header row */}
+                <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${timelineWidth}px` }}>
+                  {/* Worker name column — sticky left */}
                   <div className="w-[220px] min-w-[220px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
-                    <MasterControls workers={workers} populationFilter={populationFilter} roleFilter={roleFilter} getWorkerSendStatus={getWorkerSendStatus}
+                    <MasterControls
+                      workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
+                      getWorkerSendStatus={getWorkerSendStatus}
                       onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
                       onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
-                      sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers} />
+                      sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
+                    />
                   </div>
+                  {/* Summary columns (weekly) */}
                   {viewMode === 'weekly' && summaryColumns.map(col => (
                     <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1" title={col.name}>
                       <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
@@ -788,16 +1036,17 @@ export default function Matrix() {
                       <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
                     </div>
                   )}
-                  <div className="flex-1 relative flex" dir="rtl">
+                  {/* Time ruler — flex, each slot gets equal share of remaining width */}
+                  <div className="flex-1 flex relative" dir="rtl">
                     {viewMode === 'daily' ? (
-                      getDailyTimeSlots(zoomRange).map((hour) => (
-                        <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium">
+                      dailySlots.map((hour) => (
+                        <div key={hour} className="flex-1 text-xs text-gray-600 py-3 border-l text-center font-medium" style={{ minWidth: `${60 * ppm}px` }}>
                           {String(hour).padStart(2, '0')}:00
                         </div>
                       ))
                     ) : (
-                      getWeeklyTimeSlots(zoomRange, startOfWeek(currentDate, { weekStartsOn: 0 })).map((slot, idx) => (
-                        <div key={idx} className={`flex-1 text-xs text-gray-600 py-1 text-center font-medium ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : 'border-l border-l-gray-200'}`}>
+                      weeklySlots.map((slot, idx) => (
+                        <div key={idx} className={`flex-1 text-xs text-gray-600 py-1 text-center font-medium ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : 'border-l border-l-gray-200'}`} style={{ minWidth: `${60 * ppm}px` }}>
                           {slot.label && <div className="font-bold text-gray-800 text-[10px] leading-tight">{slot.label}</div>}
                           {slot.dateLabel && <div className="text-[8px] text-gray-500 leading-tight">{slot.dateLabel}</div>}
                           <div className={`text-[8px] leading-tight ${slot.hour === 0 ? 'text-gray-800 font-semibold' : 'text-gray-400'}`}>
@@ -836,6 +1085,7 @@ export default function Matrix() {
                     return (
                       <React.Fragment key={worker.id}>
                       <div className={`flex border-b h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                        {/* Worker name cell — sticky left */}
                         <div className="w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-8">
                           <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
                           <button onClick={() => sendWhatsAppNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${actionClass}`} title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}>
@@ -852,29 +1102,52 @@ export default function Matrix() {
                             <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
                           </div>
                         </div>
+                        {/* Summary columns (weekly) */}
                         {viewMode === 'weekly' && summaryColumns.map(col => (
                           <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                             <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
                           </div>
                         ))}
-
                         {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
-                        <div data-worker-id={worker.id} ref={el => { if (el) timelineRefs.current[worker.id] = el; }} className="flex-1 relative border-r cursor-crosshair h-8" dir="rtl" onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}>
+
+                        {/* Timeline area */}
+                        <div
+                          data-worker-id={worker.id}
+                          ref={el => { if (el) timelineRefs.current[worker.id] = el; }}
+                          className="flex-1 relative border-r cursor-crosshair h-8"
+                          dir="rtl"
+                          style={{ width: `${timelineWidth}px`, minWidth: `${timelineWidth}px` }}
+                          onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
+                        >
+                          {/* Grid lines */}
                           <div className="absolute inset-0 flex h-8" dir="rtl">
-                            {viewMode === 'daily' ? getDailyTimeSlots(zoomRange).map(hour => <div key={hour} className="flex-1 border-l time-slot h-8" />) : getWeeklyTimeSlots(zoomRange).map((slot, idx) => <div key={idx} className="flex-1 border-l time-slot h-8" />)}
+                            {viewMode === 'daily'
+                              ? dailySlots.map(hour => <div key={hour} className="flex-1 border-l time-slot h-8" style={{ minWidth: `${60 * ppm}px` }} />)
+                              : weeklySlots.map((slot, idx) => <div key={idx} className="flex-1 border-l time-slot h-8" style={{ minWidth: `${60 * ppm}px` }} />)
+                            }
                           </div>
+                          {/* Day boundary lines (weekly) */}
                           <div className="absolute inset-0">
                             {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
-                              const pos = timeToPercentage("06:00", day, 'weekly', zoomRange);
-                              if (pos < 0 || pos > 100) return null;
-                              return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${pos}%`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
+                              // 06:00 of each day in weekly pixel coords
+                              const px = timeToPixels("06:00", day, 'weekly', ppm);
+                              const rightPx = timelineWidth - px;
+                              return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${rightPx}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
                             })}
                             {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
                             {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
                             {workerTemplateShifts.map(ts => (
                               <React.Fragment key={ts.id}>
                                 <AssignmentBar assignment={ts} />
-                                {ts.briefing_time && <BriefingBar briefingTime={ts.briefing_time} shiftStartTime={ts.start_time} shiftEndTime={ts.end_time} dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0} viewMode={viewMode} zoomRange={zoomRange} timeToPercentage={timeToPercentage} />}
+                                {ts.briefing_time && <BriefingBar
+                                  briefingTime={ts.briefing_time}
+                                  shiftStartTime={ts.start_time}
+                                  shiftEndTime={ts.end_time}
+                                  dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
+                                  viewMode={viewMode}
+                                  zoomRange={fakeZoomRange}
+                                  timeToPercentage={ppmTimeToPercentage}
+                                />}
                               </React.Fragment>
                             ))}
                             {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
@@ -895,42 +1168,6 @@ export default function Matrix() {
         <NotificationDialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog} viewMode={viewMode} currentDate={currentDate} selectedWorkerForNotification={selectedWorkerForNotification} notificationNotes={notificationNotes} setNotificationNotes={setNotificationNotes} getWorkerTemplateShifts={getWorkerTemplateShifts} getWorkerExtraTaskShifts={getWorkerExtraTaskShifts} sendNotification={sendNotification} />
         <TypeChangeDialog open={showTypeDialog} onOpenChange={setShowTypeDialog} handleChangeType={handleChangeType} />
         <ManualShiftDialog open={showManualDialog} onOpenChange={(v) => { setShowManualDialog(v); if (!v) { setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null); } }} editingShift={editingShift} selectedWorkerForManual={selectedWorkerForManual} manualShiftData={manualShiftData} setManualShiftData={setManualShiftData} submitManualShift={submitManualShift} deleteShift={deleteManualShift} />
-      </div>
-    </div>
-
-    {/* Fixed Zoom Control at Bottom */}
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg" style={{ direction: 'ltr', zIndex: 50, width: '100%', padding: '8px' }}>
-      <div className="flex items-center gap-4 max-w-screen-2xl mx-auto">
-        <div className="flex-1 relative bg-gray-200 rounded-full" style={{ height: '16px', minHeight: '16px' }}>
-          <div className="absolute top-0 h-full bg-blue-400 rounded-full cursor-move hover:bg-blue-500 transition-colors" style={{ left: `${zoomRange.start}%`, width: `${zoomRange.end - zoomRange.start}%` }}
-            onMouseDown={(e) => {
-              e.preventDefault(); e.stopPropagation();
-              const startX = e.clientX, srs = zoomRange.start, sre = zoomRange.end, rw = sre - srs;
-              const rect = e.currentTarget.parentElement.getBoundingClientRect();
-              const hm = (me) => { const d = ((me.clientX - startX) / rect.width) * 100; let ns = srs + d, ne = sre + d; if (ns < 0) { ns = 0; ne = rw; } else if (ne > 100) { ne = 100; ns = 100 - rw; } setZoomRange({ start: ns, end: ne }); };
-              const hu = () => { document.removeEventListener('mousemove', hm); document.removeEventListener('mouseup', hu); };
-              document.addEventListener('mousemove', hm); document.addEventListener('mouseup', hu);
-            }} />
-          <div className="absolute bg-blue-600 rounded-l-full cursor-ew-resize hover:bg-blue-700 transition-colors" style={{ left: `${zoomRange.start}%`, top: '-2px', width: '16px', height: '20px', zIndex: 10 }}
-            onMouseDown={(e) => {
-              e.preventDefault(); e.stopPropagation();
-              const startX = e.clientX, ce = zoomRange.end, sv = zoomRange.start;
-              const rect = e.currentTarget.parentElement.getBoundingClientRect();
-              const hm = (me) => { const ns = Math.max(0, Math.min(ce - 5, sv + ((me.clientX - startX) / rect.width) * 100)); setZoomRange(prev => ({ start: ns, end: prev.end })); };
-              const hu = () => { document.removeEventListener('mousemove', hm); document.removeEventListener('mouseup', hu); };
-              document.addEventListener('mousemove', hm); document.addEventListener('mouseup', hu);
-            }} />
-          <div className="absolute bg-blue-600 rounded-r-full cursor-ew-resize hover:bg-blue-700 transition-colors" style={{ left: `${zoomRange.end}%`, top: '-2px', width: '16px', height: '20px', transform: 'translateX(-100%)', zIndex: 10 }}
-            onMouseDown={(e) => {
-              e.preventDefault(); e.stopPropagation();
-              const startX = e.clientX, cs = zoomRange.start, sv = zoomRange.end;
-              const rect = e.currentTarget.parentElement.getBoundingClientRect();
-              const hm = (me) => { const ne = Math.max(cs + 5, Math.min(100, sv + ((me.clientX - startX) / rect.width) * 100)); setZoomRange(prev => ({ start: prev.start, end: ne })); };
-              const hu = () => { document.removeEventListener('mousemove', hm); document.removeEventListener('mouseup', hu); };
-              document.addEventListener('mousemove', hm); document.addEventListener('mouseup', hu);
-            }} />
-        </div>
-        <Button variant="outline" size="sm" onClick={() => setZoomRange({ start: 0, end: 100 })} disabled={zoomRange.start === 0 && zoomRange.end === 100} className="shrink-0">איפוס</Button>
       </div>
     </div>
     </>
