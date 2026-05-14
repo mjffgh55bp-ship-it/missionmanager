@@ -81,3 +81,32 @@ export function getOperationalMinutes(time) {
   // 00:00–05:59: wrap to end of operational day (after midnight segment)
   return total + 18 * 60;
 }
+
+/**
+ * Calculate the operational END minutes for a shift, ensuring 06:00 end time
+ * is treated as 1440 (end of operational day) rather than 0 (start of next day).
+ *
+ * For 02:00–06:00:
+ *   start = 1200, end = 1440, duration = 240
+ *
+ * @param {string} startTime - "HH:MM"
+ * @param {string} endTime   - "HH:MM"
+ * @returns {number} operational end minutes (always > operationalMinutes(startTime))
+ */
+export function getOperationalEndMinutes(startTime, endTime) {
+  const start = getOperationalMinutes(startTime);
+  let end = getOperationalMinutes(endTime);
+
+  // 06:00 as an end time must be treated as 1440 (the far boundary),
+  // not 0 (the near boundary), whenever start > 0.
+  if (endTime === "06:00" && start > 0) {
+    return 1440;
+  }
+
+  // General safety: if end <= start, the shift crosses midnight in operational space
+  if (end <= start) {
+    end += 1440;
+  }
+
+  return end;
+}

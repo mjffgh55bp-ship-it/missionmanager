@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
-import { getOperationalStartDate, getOperationalMinutes } from "@/lib/operationalDate";
+import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes } from "@/lib/operationalDate";
 import { Send, Star, Check, Ban, Plus, MessageCircle } from "lucide-react";
 import BriefingBar from "../components/matrix/BriefingBar";
 import WorkerLockButton from "../components/matrix/WorkerLockButton";
@@ -622,8 +622,7 @@ export default function Matrix() {
     const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
     // Use operational minutes for correct end position (handles 02:00–06:00)
     const startOpMins = getOperationalMinutes(assignment.start_time);
-    const rawEndOpMins = getOperationalMinutes(assignment.end_time);
-    const endOpMins = rawEndOpMins <= startOpMins ? rawEndOpMins + 1440 : rawEndOpMins;
+    const endOpMins = getOperationalEndMinutes(assignment.start_time, assignment.end_time);
     const endPercent = viewMode === 'daily'
       ? (() => {
           const bp = (Math.min(endOpMins, 1440) / (24 * 60)) * 100;
