@@ -127,6 +127,7 @@ export default function Matrix() {
   const timelineRefs = useRef({});
   const loadingTimeoutRef = useRef(null);
   const initialLoadDoneRef = useRef(false);
+  const isLoadingRef = useRef(false);
   const [shiftStatuses, setShiftStatuses] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
@@ -209,9 +210,9 @@ export default function Matrix() {
   };
 
   const loadDynamicData = async (silent = false) => {
-    // Only show spinner on the very first load (before we have any data)
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
     if (!silent && !initialLoaded) setLoading(true);
-    
     try {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
       const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
@@ -278,16 +279,13 @@ export default function Matrix() {
       console.error('Error loading matrix data:', error);
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   };
 
   const debouncedLoadData = (silent = false) => {
-    if (loadingTimeoutRef.current) {
-      clearTimeout(loadingTimeoutRef.current);
-    }
-    loadingTimeoutRef.current = setTimeout(() => {
-      loadDynamicData(silent);
-    }, 1500);
+    if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
+    loadingTimeoutRef.current = setTimeout(() => loadDynamicData(silent), 2500);
   };
 
   // Keep a ref to debouncedLoadData so subscriptions always call the latest version
