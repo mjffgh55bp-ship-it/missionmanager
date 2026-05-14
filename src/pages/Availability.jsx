@@ -857,7 +857,6 @@ END:VEVENT
           <h1 className="text-xl font-bold text-gray-900">
             {currentWorker ? `שלום, ${currentWorker.nickname}! 👋` : "שלום!"}
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">ניהול זמינות ומשמרות</p>
         </div>
 
         {!currentWorker ? (

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { ChevronDown, ChevronUp, Users, Star, Check, Ban, Lock } from "lucide-react";
+import { Star, Check, Ban } from "lucide-react";
 import { format, addDays } from "date-fns";
 import {
   buildUnifiedShiftDemand,
@@ -213,8 +213,6 @@ export default function ShiftDemandPanel({
   isLocked,
   onAddConstraint,
 }) {
-  const [collapsed, setCollapsed] = useState(false);
-
   const weekTemplateRows = useMemo(() => {
     const dates = new Set();
     for (let i = 0; i < 7; i++) dates.add(format(addDays(weekStart, i), "yyyy-MM-dd"));
@@ -258,55 +256,38 @@ export default function ShiftDemandPanel({
 
   return (
     <Card className={`border-none shadow-lg mb-4 ${isLocked ? "opacity-60" : ""}`}>
-      <CardHeader className="border-b bg-white py-2 px-4">
-        <div className="flex items-center justify-between" dir="rtl">
-          <button
-            className="flex items-center gap-2 flex-1"
-            onClick={() => setCollapsed(v => !v)}
-          >
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-600" />
-              משמרות
-            </CardTitle>
-            {isLocked && <Lock className="w-3.5 h-3.5 text-red-500" />}
-            {collapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
-          </button>
-        </div>
-      </CardHeader>
-      {!collapsed && (
-        <CardContent className="py-3 px-4" dir="rtl">
-          {weekDemand.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">אין משמרות שהוגדרו בלוח לשבוע זה</p>
-          ) : (
-            <>
-              {/* Text instructions */}
-              <div className="flex items-center gap-3 mb-3 bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-xs text-gray-600" dir="rtl">
-                <span><span className="font-semibold text-green-700">רצוי</span> – לחיצה אחת</span>
-                <span className="text-gray-300">|</span>
-                <span><span className="font-semibold text-cyan-700">זמין</span> – שתי לחיצות</span>
-                <span className="text-gray-300">|</span>
-                <span><span className="font-semibold text-red-600">לא זמין</span> – 3 לחיצות</span>
-              </div>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {dates.map(date => (
-                  <DayColumn
-                    key={date}
-                    dateStr={date}
-                    shifts={byDate[date]}
-                    allAvailabilities={allAvailabilities}
-                    workers={workers}
-                    myRoles={myRoles}
-                    selectedShifts={selectedShifts}
-                    signupMode={signupMode || "allow_over_sign_up"}
-                    onSignup={onSignup}
-                    canEdit={canEdit}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </CardContent>
-      )}
+      <CardContent className="py-3 px-4" dir="rtl">
+        {weekDemand.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">אין משמרות שהוגדרו בלוח לשבוע זה</p>
+        ) : (
+          <>
+            {/* Text instructions */}
+            <div className="flex items-center gap-3 mb-3 bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-xs text-gray-600" dir="rtl">
+              <span><span className="font-semibold text-green-700">רצוי</span> – לחיצה אחת</span>
+              <span className="text-gray-300">|</span>
+              <span><span className="font-semibold text-cyan-700">זמין</span> – שתי לחיצות</span>
+              <span className="text-gray-300">|</span>
+              <span><span className="font-semibold text-red-600">לא זמין</span> – 3 לחיצות</span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {dates.map(date => (
+                <DayColumn
+                  key={date}
+                  dateStr={date}
+                  shifts={byDate[date]}
+                  allAvailabilities={allAvailabilities}
+                  workers={workers}
+                  myRoles={myRoles}
+                  selectedShifts={selectedShifts}
+                  signupMode={signupMode || "allow_over_sign_up"}
+                  onSignup={onSignup}
+                  canEdit={canEdit}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </CardContent>
     </Card>
   );
 }
