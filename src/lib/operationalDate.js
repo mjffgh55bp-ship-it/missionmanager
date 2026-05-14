@@ -3,110 +3,205 @@
  * The operational day starts at 06:00.
  * Times between 00:00 and 05:59 belong to the NEXT calendar day.
  *
- * @param {string} scheduleDate - "yyyy-MM-dd" — the date shown on the schedule
- * @param {string} time         - "HH:MM" — the clock time of the shift start/end
- * @returns {string} "yyyy-MM-dd" — the actual calendar date this time belongs to
+ * TimeCell stores values as:
+ *   "HH:MM"        plain same-day time
+ *   "+1 HH:MM"     next-day time
+ *   "+2 HH:MM"     two-days-out time
  */
-export function getOperationalDate(scheduleDate, time) {
-  if (!scheduleDate || !time) return scheduleDate;
-  const [h, m] = time.split(":").map(Number);
-  const totalMinutes = h * 60 + (m || 0);
-  // 00:00–05:59 → belongs to the next calendar day
-  if (totalMinutes < 6 * 60) {
-    const base = new Date(scheduleDate + "T12:00:00");
-    base.setDate(base.getDate() + 1);
-    return base.toISOString().slice(0, 10);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CORE PARSER
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Parse a TimeCell value (plain or +N prefixed) into its components.
+ *
+ * Examples:
+ *   "06:00"    → { dayOffset: 0, hour: 6,  minute: 0,  clockTime: "06:00" }
+ *   "02:00"    → { dayOffset: 0, hour: 2,  minute: 0,  clockTime: "02:00" }
+ *   "+1 06:00" → { dayOffset: 1, hour: 6,  minute: 0,  clockTime: "06:00" }
+ *   "+1 02:00" → { dayOffset: 1, hour: 2,  minute: 0,  clockTime: "02:00" }
+ *   "+2 06:00" → { dayOffset: 2, hour: 6,  minute: 0,  clockTime: "06:00" }
+ *
+ * @param {string} value
+ * @returns {{ dayOffset: number, hour: number, minute: number, clockTime: string }}
+ */
+export function parseTimeCellValue(value) {
+  if (!value) return { dayOffset: 0, hour: NaN, minute: NaN, clockTime: "" };
+
+  const str = String(value).trim();
+
+  // "+N HH:MM" format
+  const plusMatch = str.match(/^\+(\d+)\s+(\d{1,2}):(\d{2})$/);
+  if (plusMatch) {
+    const hour = parseInt(plusMatch[2], 10);
+    const minute = parseInt(plusMatch[3], 10);
+    return {
+      dayOffset: parseInt(plusMatch[1], 10),
+      hour,
+      minute,
+      clockTime: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+    };
   }
-  return scheduleDate;
+
+  // Plain "HH:MM" format
+  const plainMatch = str.match(/^(\d{1,2}):(\d{2})$/);
+  if (plainMatch) {
+    const hour = parseInt(plainMatch[1], 10);
+    const minute = parseInt(plainMatch[2], 10);
+    return {
+      dayOffset: 0,
+      hour,
+      minute,
+      clockTime: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+    };
+  }
+
+  return { dayOffset: 0, hour: NaN, minute: NaN, clockTime: str };
 }
 
 /**
- * Returns the "operational start date" for a shift.
- * For hour counting / matrix placement, use the start time to determine the operational day.
+ * Extract just the plain "HH:MM" clock time from a TimeCell value.
+ * "+1 06:00" → "06:00"
+ * "02:00"    → "02:00"
  */
+export function getClockTime(value) {
+  return parseTimeCellValue(value).clockTime;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OPERATIONAL DATE HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Given a schedule date string and a time value (plain or +N prefixed),
+ * return the calendar date this time actually belongs to.
+ *
+ * Rules:
+ *  - +N prefix: add N days to the schedule date
+ *  - plain 00:00–05:59: next calendar day (same rule as before)
+ *  - plain 06:00–23:59: same calendar day
+ */
+export function getOperationalDate(scheduleDate, timeValue) {
+  if (!scheduleDate || !timeValue) return scheduleDate;
+  const { dayOffset, hour } = parseTimeCellValue(timeValue);
+
+  const base = new Date(scheduleDate + "T12:00:00");
+
+  if (dayOffset > 0) {
+    base.setDate(base.getDate() + dayOffset);
+    return base.toISOString().slice(0, 10);
+  }
+
+  // Plain time: 00:00–05:59 belongs to next calendar day
+  if (!isNaN(hour) && hour < 6) {
+    base.setDate(base.getDate() + 1);
+    return base.toISOString().slice(0, 10);
+  }
+
+  return scheduleDate;
+}
+
 export function getOperationalStartDate(scheduleDate, startTime) {
   return getOperationalDate(scheduleDate, startTime);
 }
 
-/**
- * Calculate hours for a shift, handling overnight correctly.
- * @param {string} startTime - "HH:MM"
- * @param {string} endTime   - "HH:MM"
- * @returns {number} hours (float)
- */
-export function calcShiftHours(startTime, endTime) {
-  if (!startTime || !endTime) return 0;
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  let startMins = sh * 60 + sm;
-  let endMins = eh * 60 + em;
-  if (endMins <= startMins) endMins += 24 * 60; // overnight
-  return Math.max(0, (endMins - startMins) / 60);
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// OPERATIONAL MINUTE HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Given a schedule date + start time, returns true if this shift's start
- * is in the 00:00–05:59 window (i.e., it belongs operationally to the next day).
- */
-export function isNextDayShift(startTime) {
-  if (!startTime) return false;
-  const [h] = startTime.split(":").map(Number);
-  return h < 6;
-}
-
-/**
- * Convert a clock time to operational minutes since 06:00.
+ * Convert any TimeCell value to operational minutes since 06:00.
  *
  * The operational day runs 06:00 → next-day 06:00 (1440 minutes total).
  *
- *   06:00 →    0
- *   07:00 →   60
- *   22:00 →  960
- *   23:00 → 1020
- *   00:00 → 1080
- *   01:00 → 1140
- *   02:00 → 1200
- *   05:00 → 1380
- *   06:00 → 1440  (end boundary)
+ *   06:00 / +1 06:00  →    0   (start of operational day)
+ *   07:00             →   60
+ *   22:00             →  960
+ *   23:00             → 1020
+ *   00:00             → 1080
+ *   01:00             → 1140
+ *   02:00 / +1 02:00  → 1200
+ *   05:00             → 1380
  *
- * @param {string} time - "HH:MM"
- * @returns {number} minutes since operational day start (0–1440)
+ * NOTE: 06:00 returns 0 here. For END-time logic use getOperationalEndMinutes.
+ *
+ * @param {string} value - "HH:MM" or "+N HH:MM"
+ * @returns {number} 0–1379
  */
-export function getOperationalMinutes(time) {
-  if (!time) return 0;
-  const [h, m] = time.split(":").map(Number);
-  const total = h * 60 + (m || 0);
-  // 06:00–23:59: subtract the 6-hour offset
+export function getOperationalMinutes(value) {
+  const { hour, minute } = parseTimeCellValue(value);
+  if (isNaN(hour) || isNaN(minute)) return 0;
+
+  const total = hour * 60 + minute;
+
+  // 06:00–23:59 → 0–1079
   if (total >= 6 * 60) return total - 6 * 60;
-  // 00:00–05:59: wrap to end of operational day (after midnight segment)
+
+  // 00:00–05:59 → 1080–1379
   return total + 18 * 60;
 }
 
 /**
- * Calculate the operational END minutes for a shift, ensuring 06:00 end time
- * is treated as 1440 (end of operational day) rather than 0 (start of next day).
+ * Calculate the operational END minutes for a shift.
  *
- * For 02:00–06:00:
- *   start = 1200, end = 1440, duration = 240
+ * Handles all cases:
+ *  - Plain overnight: "22:00" → "02:00"
+ *  - Plain 02:00 → "06:00" (end boundary = 1440, NOT 0)
+ *  - "+1 06:00" end (explicit next-day boundary = 1440)
+ *  - "+1 02:00" end for a shift starting same day
  *
- * @param {string} startTime - "HH:MM"
- * @param {string} endTime   - "HH:MM"
- * @returns {number} operational end minutes (always > operationalMinutes(startTime))
+ * For 02:00–06:00 (or 02:00–+1 06:00):
+ *   start = 1200, end = 1440, duration = 240 ✓
+ *
+ * @param {string} startValue - "HH:MM" or "+N HH:MM"
+ * @param {string} endValue   - "HH:MM" or "+N HH:MM"
+ * @returns {number} operational minutes for end (always > start)
  */
-export function getOperationalEndMinutes(startTime, endTime) {
-  const start = getOperationalMinutes(startTime);
-  let end = getOperationalMinutes(endTime);
+export function getOperationalEndMinutes(startValue, endValue) {
+  const parsedEnd = parseTimeCellValue(endValue);
+  const start = getOperationalMinutes(startValue);
+  let end = getOperationalMinutes(endValue);
 
-  // 06:00 as an end time must be treated as 1440 (the far boundary),
-  // not 0 (the near boundary), whenever start > 0.
-  if (endTime === "06:00" && start > 0) {
+  // Explicit +N end: the +N tells us it's definitely after the start day.
+  // If the clock time of the end is 06:00, it is the operational day boundary → 1440.
+  if (parsedEnd.dayOffset > 0 && parsedEnd.hour === 6 && parsedEnd.minute === 0) {
     return 1440;
   }
 
-  // General safety: if end <= start, the shift crosses midnight in operational space
+  // Plain "06:00" as end time AND shift started after midnight (op-mins > 0):
+  // This is the end-of-operational-day boundary → 1440.
+  if (parsedEnd.dayOffset === 0 && parsedEnd.hour === 6 && parsedEnd.minute === 0 && start > 0) {
+    return 1440;
+  }
+
+  // General safety: if end <= start, move it forward one full operational cycle.
   if (end <= start) {
     end += 1440;
   }
 
   return end;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OTHER SHARED HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Calculate hours for a shift (supports +N format).
+ */
+export function calcShiftHours(startValue, endValue) {
+  if (!startValue || !endValue) return 0;
+  const startMins = getOperationalMinutes(startValue);
+  const endMins = getOperationalEndMinutes(startValue, endValue);
+  return Math.max(0, (endMins - startMins) / 60);
+}
+
+/**
+ * Returns true if a shift start time is in the 00:00–05:59 window.
+ */
+export function isNextDayShift(startValue) {
+  if (!startValue) return false;
+  const { hour } = parseTimeCellValue(startValue);
+  return !isNaN(hour) && hour < 6;
 }

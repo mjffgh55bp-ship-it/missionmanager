@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
-import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes } from "@/lib/operationalDate";
+import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, getClockTime } from "@/lib/operationalDate";
 import { Send, Star, Check, Ban, Plus, MessageCircle } from "lucide-react";
 import BriefingBar from "../components/matrix/BriefingBar";
 import WorkerLockButton from "../components/matrix/WorkerLockButton";
@@ -43,12 +43,14 @@ const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
 // Daily: 06:00 (right, 0%) → next-day 06:00 (left, 100%) — operational day, RTL
 // Weekly: plain day*24h grid
+// Supports plain "HH:MM" and "+N HH:MM" format from TimeCell.
 const timeToPercentage = (timeStr, day = 0, viewMode = 'daily', zoomRange = { start: 0, end: 100 }) => {
   if (!timeStr) return 0;
-  const [hours, minutes] = timeStr.split(':').map(Number);
+  const { hour, minute } = parseTimeCellValue(timeStr);
+  if (isNaN(hour)) return 0;
   let basePercent;
   if (viewMode === 'weekly') {
-    basePercent = ((day * 24 + hours) * 60 + (minutes || 0)) / (7 * 24 * 60) * 100;
+    basePercent = ((day * 24 + hour) * 60 + (minute || 0)) / (7 * 24 * 60) * 100;
   } else {
     basePercent = getOperationalMinutes(timeStr) / (24 * 60) * 100;
   }
@@ -619,10 +621,11 @@ export default function Matrix() {
   const AssignmentBar = ({ assignment }) => {
     const positionDate = assignment.schedule_date || assignment.date;
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(positionDate) : 0;
-    const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
-    // Use operational minutes for correct end position (handles 02:00–06:00)
     const startOpMins = getOperationalMinutes(assignment.start_time);
     const endOpMins = getOperationalEndMinutes(assignment.start_time, assignment.end_time);
+    // startPercent: position in the zoomed view (RTL: right edge = 06:00 = 0%)
+    const startPercent = timeToPercentage(assignment.start_time, dayIndex, viewMode, zoomRange);
+    // endPercent: in daily mode, compute directly from operational minutes to avoid +N parsing issues
     const endPercent = viewMode === 'daily'
       ? (() => {
           const bp = (Math.min(endOpMins, 1440) / (24 * 60)) * 100;
@@ -631,6 +634,7 @@ export default function Matrix() {
         })()
       : timeToPercentage(assignment.end_time, dayIndex, viewMode, zoomRange);
     const width = endPercent >= startPercent ? endPercent - startPercent : 0;
+    console.log("MATRIX BAR DEBUG", { worker_id: assignment.food_cart_name, start_time: assignment.start_time, end_time: assignment.end_time, startOpMins, endOpMins, duration: endOpMins - startOpMins, startPercent, endPercent, width });
     if (startPercent < 0 || startPercent > 100) return null;
     const isTemplate = assignment.isTemplateShift;
     const standby = isStandbyStatus(assignment.status);
@@ -667,11 +671,16 @@ export default function Matrix() {
 
   const AvailabilityBar = ({ shift, worker }) => {
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
-    const [startH] = shift.start_time.split(':').map(Number);
-    const [endH] = shift.end_time.split(':').map(Number);
-    const adjustedEndTime = endH < startH ? `${String(endH + 24).padStart(2, '0')}:${shift.end_time.split(':')[1]}` : shift.end_time;
     const startPercent = timeToPercentage(shift.start_time, dayIndex, viewMode, zoomRange);
-    const endPercent = timeToPercentage(adjustedEndTime, dayIndex, viewMode, zoomRange);
+    // Use robust end-minute calculation (handles overnight, +N, 06:00 boundary)
+    const avEndOpMins = getOperationalEndMinutes(shift.start_time, shift.end_time);
+    const endPercent = viewMode === 'daily'
+      ? (() => {
+          const bp = (Math.min(avEndOpMins, 1440) / (24 * 60)) * 100;
+          if (bp < zoomRange.start || bp > zoomRange.end) return bp < zoomRange.start ? -1 : 101;
+          return ((bp - zoomRange.start) / (zoomRange.end - zoomRange.start)) * 100;
+        })()
+      : timeToPercentage(shift.end_time, dayIndex, viewMode, zoomRange);
     const width = endPercent >= startPercent ? endPercent - startPercent : 0;
     if (startPercent < 0 || startPercent > 100) return null;
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
@@ -728,7 +737,12 @@ export default function Matrix() {
     return <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80" style={{ right: `${startPercent}%`, width: `${width}%` }}><span className="text-xs font-bold">{preview.start} - {preview.end}</span></div>;
   };
 
-  const calcHours = (s, e) => { if (!s || !e) return 0; const [sh,sm] = s.split(':').map(Number), [eh,em] = e.split(':').map(Number); let start = sh*60+sm, end = eh*60+em; if (end <= start) end += 24*60; return Math.max(0, (end-start)/60); };
+  const calcHours = (s, e) => {
+    if (!s || !e) return 0;
+    const start = getOperationalMinutes(s);
+    const end = getOperationalEndMinutes(s, e);
+    return Math.max(0, (end - start) / 60);
+  };
 
   const WeeklySummary = ({ worker }) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
@@ -858,9 +872,9 @@ export default function Matrix() {
                             const weekStartStr = format(weekStart, "yyyy-MM-dd");
                             const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
                             if (opDate < weekStartStr || opDate > weekEndStr) return;
-                            const [sh,sm] = st.split(':').map(Number), [eh,em] = et.split(':').map(Number);
-                            let s = sh*60+sm, e = eh*60+em; if (e <= s) e += 24*60;
-                            totalHrs += Math.max(0, (e-s)/60);
+                            const s = getOperationalMinutes(st);
+                            const e = getOperationalEndMinutes(st, et);
+                            totalHrs += Math.max(0, (e - s) / 60);
                           });
                           return <div className="w-[52px] min-w-[52px] border-r flex items-center justify-center h-8 bg-blue-50"><span className="text-xs font-bold text-blue-800">{totalHrs > 0 ? `${Math.round(totalHrs * 10) / 10}h` : '-'}</span></div>;
                         })()}
