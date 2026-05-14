@@ -19,7 +19,9 @@ import { NotificationDialog, TypeChangeDialog, ManualShiftDialog } from "../comp
 const DAILY_TOTAL_MINUTES = 24 * 60;        // 1440
 const WEEKLY_TOTAL_MINUTES = 7 * 24 * 60;  // 10080
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
-const FIXED_COL_WIDTH = 220; // worker name column px (sticky left)
+const FIXED_COL_WIDTH = 220;      // worker name column px (sticky left)
+const SUMMARY_COL_WIDTH = 60;     // each summary column
+const SUMMARY_ADD_COL_WIDTH = 28; // the "+column" button
 
 // ── Time slot generators (for the header ruler) ─────────────────────────────
 // Daily: 06:00 → 05:00 next day (operational), returns array of clock hours
@@ -115,18 +117,40 @@ export default function Matrix() {
   const [zoomPreset, setZoomPreset] = useState('fit'); // 'fit' | '24h' | '12h' | 'custom'
   const [customPpm, setCustomPpm] = useState(null);
 
-  // Computed ppm: always derived from containerWidth + preset
+  // ── Derived: total timeline minutes ─────────────────────────────────────────
   const totalMins = viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES;
-  const fitPpm = containerWidth > 0 ? (containerWidth - FIXED_COL_WIDTH) / totalMins : 1;
-  const ppm = (() => {
+
+  // ── Fixed columns total width (depends on summaryColumns + viewMode) ─────────
+  // Must be computed BEFORE ppm so ppm can use it for available width
+  // summaryColumns may not be loaded yet (empty array default), so this is safe.
+  const fixedColumnsWidth = useMemo(() => {
+    return FIXED_COL_WIDTH +
+      (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH : 0) +
+      (viewMode === 'weekly' ? SUMMARY_ADD_COL_WIDTH : 0);
+  }, [viewMode, summaryColumns]);
+
+  // ── PPM calculation ──────────────────────────────────────────────────────────
+  // availableTimelineWidth = scroll container width minus all fixed columns
+  // ppm presets:
+  //   fit  = full week (weekly) or full day (daily) fits the screen
+  //   24h  = one full day (1440 min) fills the screen — same as fit for daily
+  //   12h  = 720 minutes fill the screen (zoomed in, same formula for both modes)
+  const ppm = useMemo(() => {
     if (!containerWidth) return 1;
-    const fit = (containerWidth - FIXED_COL_WIDTH) / totalMins;
-    const max12h = (containerWidth - FIXED_COL_WIDTH) / (viewMode === 'daily' ? 720 : (7 * 720));
-    if (zoomPreset === 'fit' || zoomPreset === '24h') return fit;
-    if (zoomPreset === '12h') return max12h;
-    if (zoomPreset === 'custom' && customPpm) return Math.max(fit, Math.min(max12h, customPpm));
-    return fit;
-  })();
+    const available = Math.max(300, containerWidth - fixedColumnsWidth);
+    const ppmFit  = available / totalMins;          // full period fits screen
+    const ppm24h  = available / DAILY_TOTAL_MINUTES; // one day fills screen
+    const ppm12h  = available / 720;                 // 12 hours fills screen
+
+    if (zoomPreset === 'fit')    return ppmFit;
+    if (zoomPreset === '24h')    return ppm24h;
+    if (zoomPreset === '12h')    return ppm12h;
+    if (zoomPreset === 'custom' && customPpm !== null) {
+      // clamp: never smaller than fit, no upper hard limit (free zoom in)
+      return Math.max(ppmFit, customPpm);
+    }
+    return ppmFit;
+  }, [containerWidth, fixedColumnsWidth, totalMins, zoomPreset, customPpm]);
 
   const [workers, setWorkers] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -172,8 +196,9 @@ export default function Matrix() {
   const ppmRef = useRef(ppm);
   ppmRef.current = ppm;
 
-  // ── Derived: total timeline pixel width ─────────────────────────────────────
+  // ── Derived widths ───────────────────────────────────────────────────────────
   const timelineWidth = useMemo(() => totalMins * ppm, [totalMins, ppm]);
+  const totalMatrixWidth = useMemo(() => fixedColumnsWidth + timelineWidth, [fixedColumnsWidth, timelineWidth]);
 
   // Track scroll container width with ResizeObserver
   useEffect(() => {
@@ -192,53 +217,50 @@ export default function Matrix() {
     return () => ro.disconnect();
   }, []);
 
-  // Clamp custom ppm to fit..12h range
-  const clampCustomPpm = useCallback((value) => {
-    if (!containerWidth) return value;
-    const fit = (containerWidth - FIXED_COL_WIDTH) / totalMins;
-    const max12h = (containerWidth - FIXED_COL_WIDTH) / (viewMode === 'daily' ? 720 : 7 * 720);
-    return Math.max(fit, Math.min(max12h, value));
-  }, [containerWidth, totalMins, viewMode]);
-
   // ── Zoom helpers ─────────────────────────────────────────────────────────────
-  const applyZoom = useCallback((newPpmRaw, focalScrollX = null) => {
+  // NOTE: scroll container is dir="ltr" so scrollLeft=0 is the LEFT edge and
+  // increases to the right — standard LTR math, no RTL flip needed.
+  const applyZoom = useCallback((newPpmRaw, focalClientX = null) => {
     const sc = scrollContainerRef.current;
     const oldPpm = ppmRef.current;
-    const newPpm = clampCustomPpm(newPpmRaw);
+    if (!containerWidth) return;
+    const fixedW = FIXED_COL_WIDTH +
+      (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH + SUMMARY_ADD_COL_WIDTH : 0);
+    const available = Math.max(300, containerWidth - fixedW);
+    const ppmFit = available / totalMins;
+    const newPpm = Math.max(ppmFit, newPpmRaw); // never zoom out beyond fit
+
     if (Math.abs(newPpm - oldPpm) < 0.0001) return;
 
     setZoomPreset('custom');
     setCustomPpm(newPpm);
 
-    if (sc && focalScrollX !== null) {
-      const oldTimelineX = sc.scrollLeft + focalScrollX;
-      const ratio = newPpm / oldPpm;
-      const newScrollLeft = oldTimelineX * ratio - focalScrollX;
+    if (sc) {
+      // focalClientX is the mouse X relative to the scroll container (LTR)
+      const rect = sc.getBoundingClientRect();
+      const focalX = focalClientX !== null ? (focalClientX - rect.left) : sc.clientWidth / 2;
+      // Which minute is currently under the focal point?
+      const minuteUnderCursor = (sc.scrollLeft + focalX) / oldPpm;
+      // After zoom, scroll so that same minute stays under focal point
+      const newScrollLeft = minuteUnderCursor * newPpm - focalX;
       requestAnimationFrame(() => {
-        if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = Math.max(0, newScrollLeft);
-      });
-    } else if (sc) {
-      const centerX = sc.scrollLeft + sc.clientWidth / 2;
-      const ratio = newPpm / oldPpm;
-      const newScrollLeft = centerX * ratio - sc.clientWidth / 2;
-      requestAnimationFrame(() => {
-        if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = Math.max(0, newScrollLeft);
+        const s = scrollContainerRef.current;
+        if (!s) return;
+        const maxScroll = s.scrollWidth - s.clientWidth;
+        s.scrollLeft = Math.max(0, Math.min(newScrollLeft, maxScroll));
       });
     }
-  }, [clampCustomPpm]);
+  }, [containerWidth, totalMins, viewMode, summaryColumns]);
 
   // ── Wheel handler: Ctrl/Cmd+wheel = zoom, plain wheel = native scroll ────────
   const handleWheel = useCallback((e) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
-      const sc = scrollContainerRef.current;
-      const focalX = sc ? e.clientX - sc.getBoundingClientRect().left : null;
       // delta > 0 = zoom out, < 0 = zoom in
-      const factor = e.deltaY > 0 ? 0.9 : 1.1;
-      applyZoom(ppmRef.current * factor, focalX);
+      const factor = e.deltaY > 0 ? 0.85 : 1.18;
+      applyZoom(ppmRef.current * factor, e.clientX);
     }
     // All other wheel events: let the browser handle naturally
-    // (vertical scroll = native, horizontal swipe = native via overflow-x: auto)
   }, [applyZoom]);
 
   // Pinch (wheel with ctrlKey set by browser for trackpad pinch)
@@ -264,8 +286,9 @@ export default function Matrix() {
     const sc = scrollContainerRef.current;
     if (!sc) return;
     const { startX, startY, initScrollLeft, initScrollTop } = midMouseDragRef.current;
+    // LTR container: dragging right means scrollLeft decreases (we move content right)
     sc.scrollLeft = initScrollLeft - (e.clientX - startX);
-    sc.scrollTop = initScrollTop - (e.clientY - startY);
+    sc.scrollTop  = initScrollTop  - (e.clientY - startY);
   }, []);
 
   const handlePointerUp = useCallback((e) => {
@@ -285,18 +308,19 @@ export default function Matrix() {
   }, [handleWheel]);
 
   // ── Zoom preset buttons ──────────────────────────────────────────────────────
-  const zoomIn = () => applyZoom(ppmRef.current * 1.25);
+  const zoomIn  = () => applyZoom(ppmRef.current * 1.25);
   const zoomOut = () => applyZoom(ppmRef.current * 0.8);
 
   const applyPreset = (preset) => {
     const sc = scrollContainerRef.current;
-    if (preset === 'auto' || preset === 'full' || preset === '24h') {
+    if (preset === 'auto' || preset === 'fit') {
       setZoomPreset('fit');
-      setCustomPpm(null);
+    } else if (preset === 'full' || preset === '24h') {
+      setZoomPreset('24h');
     } else if (preset === '12h') {
       setZoomPreset('12h');
-      setCustomPpm(null);
     }
+    setCustomPpm(null);
     if (sc) requestAnimationFrame(() => { sc.scrollLeft = 0; });
   };
 
@@ -1009,18 +1033,19 @@ export default function Matrix() {
 
         <Card className="border-none shadow-lg flex-1 min-h-0 flex flex-col">
           <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
-            {/* Outer scroll container — this is the native scrollable area */}
+            {/* Outer scroll container — dir="ltr" so scrollLeft is always 0→right (LTR math) */}
             <div
               ref={scrollContainerRef}
+              dir="ltr"
               className="overflow-x-auto overflow-y-auto flex-1 min-h-0"
               onMouseDown={handlePointerDown}
               onMouseMove={handlePointerMove}
               onMouseUp={handlePointerUp}
             >
-              {/* Inner fixed-width timeline */}
-              <div style={{ width: `${FIXED_COL_WIDTH + timelineWidth}px`, minWidth: `${FIXED_COL_WIDTH + timelineWidth}px` }}>
+              {/* Inner fixed-width wrapper — RTL content direction restored here */}
+              <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
                 {/* Sticky header row */}
-                <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${FIXED_COL_WIDTH + timelineWidth}px` }}>
+                <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
                   {/* Worker name column — sticky left */}
                   <div className="w-[220px] min-w-[220px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
                     <MasterControls
@@ -1090,7 +1115,7 @@ export default function Matrix() {
 
                     return (
                       <React.Fragment key={worker.id}>
-                      <div className={`flex border-b h-8 shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ width: `${FIXED_COL_WIDTH + timelineWidth}px` }}>
+                      <div className={`flex border-b h-8 shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ width: `${totalMatrixWidth}px` }}>
                         {/* Worker name cell — sticky left */}
                         <div className="w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-8">
                           <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
