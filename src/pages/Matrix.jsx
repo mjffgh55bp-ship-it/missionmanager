@@ -755,7 +755,6 @@ export default function Matrix() {
       totalWeeklyHours += dayHours;
       days.push({ date: d, day: DAYS_OF_WEEK[i], hours: dayHours, working: dayShifts.length > 0 });
     }
-    if (viewMode === 'weekly') return <div className="flex items-center gap-1"><span className={`text-[10px] font-bold ${totalWeeklyHours > 0 ? 'text-blue-700' : 'text-gray-300'}`}>{totalWeeklyHours > 0 ? `${Math.round(totalWeeklyHours * 10) / 10}h` : ''}</span></div>;
     return <div className="flex gap-0.5 items-center">{days.map((d, i) => <div key={i} className={`text-[9px] font-medium leading-tight ${d.working ? 'text-green-600' : 'text-gray-300'}`} title={`${d.day}: ${d.working ? d.hours.toFixed(1) + 'h' : 'חופש'}`}>{d.day}</div>)}</div>;
   };
 
