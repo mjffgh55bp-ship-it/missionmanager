@@ -225,11 +225,11 @@ export default function Availability() {
     await new Promise(r => setTimeout(r, 120));
     const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
     await new Promise(r => setTimeout(r, 120));
-    const [assignmentsData, sousAssignments, additionalAssignments] = await Promise.all([
-      base44.entities.Assignment.filter({ chef_id: worker.id }),
-      base44.entities.Assignment.filter({ sous_chef_id: worker.id }),
-      base44.entities.Assignment.filter({ additional_chef_id: worker.id }),
-    ]);
+    const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
+    await new Promise(r => setTimeout(r, 120));
+    const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
+    await new Promise(r => setTimeout(r, 120));
+    const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
     await new Promise(r => setTimeout(r, 120));
     const allTemplateRowsData = await base44.entities.TemplateRow.list();
 
