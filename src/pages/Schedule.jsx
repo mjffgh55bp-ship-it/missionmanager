@@ -104,6 +104,18 @@ export default function Schedule() {
     loadDailyData(weekChanged);
   }, [currentDate]);
 
+  // Retry helper for rate-limited calls
+  const fetchWithRetry = async (fn, retries = 3, delay = 600) => {
+    for (let i = 0; i < retries; i++) {
+      try { return await fn(); }
+      catch (e) {
+        if (i < retries - 1 && e?.message?.includes('Rate limit')) {
+          await new Promise(r => setTimeout(r, delay * (i + 1)));
+        } else throw e;
+      }
+    }
+  };
+
   // Load everything on first render
   const loadAllData = async () => {
     setLoading(true);
@@ -112,23 +124,21 @@ export default function Schedule() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     lastWeekStart.current = weekStartStr;
 
-    // Batch 1: static reference data (cached) — max 3 concurrent
-    console.time("Schedule initial load");
+    // Batch 1: static reference data (cached + deduplicated)
     const [workersData, allTemplatesData, allSettings] = await Promise.all([
       getCachedWorkers(base44.entities),
       getCachedTemplates(base44.entities),
       getCachedAllSettings(base44.entities),
     ]);
 
-    // Batch 2 & 3: staggered to avoid rate limits when multiple pages load concurrently
-    await new Promise(r => setTimeout(r, 150));
-    const availabilitiesData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-    await new Promise(r => setTimeout(r, 150));
+    // Batch 2 & 3: staggered + retry to survive rate limits on concurrent page loads
+    await new Promise(r => setTimeout(r, 200));
+    const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
+    await new Promise(r => setTimeout(r, 200));
     const [unavailabilitiesData, templateRowsData] = await Promise.all([
-      base44.entities.Unavailability.filter({ date: dateString }),
-      base44.entities.TemplateRow.filter({ date: dateString }),
+      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
+      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
     ]);
-    console.timeEnd("Schedule initial load");
 
     // Filter settings client-side
     const colTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
