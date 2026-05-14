@@ -945,11 +945,6 @@ END:VEVENT
                    existingAvailability.status === "pending_change" ? "ממתין לשינוי" : "טיוטה"}
                 </span>
               )}
-              {signupMode === "limit_sign_up" ? (
-                <span className="text-xs bg-orange-100 text-orange-700 font-medium px-2 py-0.5 rounded-full mr-auto">הגבלת הרשמה</span>
-              ) : (
-                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full mr-auto">הרשמה חופשית</span>
-              )}
             </div>
 
             {/* 3.1 Week navigation */}
@@ -967,7 +962,35 @@ END:VEVENT
               </p>
             </div>
 
-            {/* 3.2 Tips / policy */}
+            {/* 3.2 Desired shifts + add constraint + lock/open status */}
+            <div className="flex flex-wrap items-center gap-2 bg-white border rounded-xl px-3 py-2 shadow-sm">
+              <div className="flex items-center gap-1">
+                <Label className="text-xs text-gray-500 whitespace-nowrap">רצויות:</Label>
+                <Input type="number" className="w-14 h-6 text-xs px-1" value={desiredShiftsCount} onChange={(e) => setDesiredShiftsCount(e.target.value)} placeholder="#" />
+              </div>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowUnavailabilityDialog(true)}>
+                <Plus className="w-3 h-3 mr-1" />הוסף אילוץ
+              </Button>
+              {/* Registration status: locked / open */}
+              {currentWorker?.availability_locked ? (
+                <span className="flex items-center gap-1 text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full mr-auto">
+                  <Lock className="w-3 h-3" />נעול
+                </span>
+              ) : (
+                <span className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full mr-auto">פתוח</span>
+              )}
+              {unavailabilities.length > 0 && unavailabilities.map((unavail) => (
+                <div key={unavail.id} className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1 text-xs">
+                  <span className="font-medium text-gray-800">{formatDateHebrew(unavail.date, "short")}</span>
+                  <span className="text-gray-500">{unavail.start_time}–{unavail.end_time}</span>
+                  <button onClick={() => handleDeleteUnavailability(unavail.id)} className="text-red-400 hover:text-red-600 ml-1">
+                    <XCircle className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* 3.3 Registration policy / tips */}
             {(tipsMessage || isManager) && (
               <Card className="border-none shadow-sm">
                 <CardContent className="py-2 px-4">
@@ -1010,26 +1033,6 @@ END:VEVENT
                 </CardContent>
               </Card>
             )}
-
-            {/* 3.3 Desired shifts count + unavailability constraints */}
-            <div className="flex flex-wrap items-center gap-2 bg-white border rounded-xl px-3 py-2 shadow-sm">
-              <div className="flex items-center gap-1">
-                <Label className="text-xs text-gray-500 whitespace-nowrap">רצויות:</Label>
-                <Input type="number" className="w-14 h-6 text-xs px-1" value={desiredShiftsCount} onChange={(e) => setDesiredShiftsCount(e.target.value)} placeholder="#" />
-              </div>
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowUnavailabilityDialog(true)}>
-                <Plus className="w-3 h-3 mr-1" />הוסף אילוץ
-              </Button>
-              {unavailabilities.length > 0 && unavailabilities.map((unavail) => (
-                <div key={unavail.id} className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-lg px-2 py-1 text-xs">
-                  <span className="font-medium text-gray-800">{formatDateHebrew(unavail.date, "short")}</span>
-                  <span className="text-gray-500">{unavail.start_time}–{unavail.end_time}</span>
-                  <button onClick={() => handleDeleteUnavailability(unavail.id)} className="text-red-400 hover:text-red-600 ml-1">
-                    <XCircle className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
 
             {/* 3.4 Shift demand panel */}
             <ShiftDemandPanel

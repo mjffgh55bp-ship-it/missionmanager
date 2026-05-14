@@ -266,35 +266,11 @@ export default function ShiftDemandPanel({
           >
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-4 h-4 text-blue-600" />
-              בחר משמרות
+              משמרות
             </CardTitle>
             {isLocked && <Lock className="w-3.5 h-3.5 text-red-500" />}
-            {isLimitMode && (
-              <span className="text-xs text-orange-600 font-medium">הגבלת הרשמה</span>
-            )}
             {collapsed ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
           </button>
-          {onAddConstraint && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onAddConstraint(); }}
-              title="הוסף אילוץ"
-              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded hover:bg-red-50 transition-colors"
-            >
-              <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-4 h-4">
-                {/* Calendar body */}
-                <rect x="1" y="3" width="14" height="12" rx="1.5" stroke="#dc2626" strokeWidth="1.4"/>
-                {/* Header bar */}
-                <rect x="1" y="3" width="14" height="4" rx="1.5" fill="#dc2626" opacity="0.15"/>
-                <line x1="1" y1="7" x2="15" y2="7" stroke="#dc2626" strokeWidth="1.4"/>
-                {/* Binding pegs */}
-                <line x1="5" y1="1.5" x2="5" y2="4.5" stroke="#dc2626" strokeWidth="1.4" strokeLinecap="round"/>
-                <line x1="11" y1="1.5" x2="11" y2="4.5" stroke="#dc2626" strokeWidth="1.4" strokeLinecap="round"/>
-                {/* X in body */}
-                <line x1="5.5" y1="9.5" x2="10.5" y2="13.5" stroke="#dc2626" strokeWidth="1.4" strokeLinecap="round"/>
-                <line x1="10.5" y1="9.5" x2="5.5" y2="13.5" stroke="#dc2626" strokeWidth="1.4" strokeLinecap="round"/>
-              </svg>
-            </button>
-          )}
         </div>
       </CardHeader>
       {!collapsed && (
@@ -303,19 +279,13 @@ export default function ShiftDemandPanel({
             <p className="text-sm text-gray-400 text-center py-4">אין משמרות שהוגדרו בלוח לשבוע זה</p>
           ) : (
             <>
-              {/* Tap infographic — RTL: רצוי right → לא זמין left */}
-              <div className="flex items-center justify-center gap-4 mb-3 bg-gray-50 rounded-lg px-3 py-2" dir="rtl">
-                {[
-                  { index: 0, label: "רצוי", color: "#16a34a" },
-                  { index: 1, label: "זמין", color: "#0891b2" },
-                  { index: 2, label: "לא זמין", color: "#dc2626" },
-                ].map(({ index, label, color }) => (
-                  <div key={index} className="flex items-center gap-1.5">
-                    <TapIcon index={index} />
-                    <span className="text-[10px] text-gray-500">{label}</span>
-                  </div>
-                ))}
-                {isLimitMode && <span className="text-[10px] text-orange-600">· מלאות חסומות</span>}
+              {/* Text instructions */}
+              <div className="flex items-center gap-3 mb-3 bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-xs text-gray-600" dir="rtl">
+                <span><span className="font-semibold text-green-700">רצוי</span> – לחיצה אחת</span>
+                <span className="text-gray-300">|</span>
+                <span><span className="font-semibold text-cyan-700">זמין</span> – שתי לחיצות</span>
+                <span className="text-gray-300">|</span>
+                <span><span className="font-semibold text-red-600">לא זמין</span> – 3 לחיצות</span>
               </div>
               <div className="flex gap-3 overflow-x-auto pb-2">
                 {dates.map(date => (
