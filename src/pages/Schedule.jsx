@@ -167,19 +167,18 @@ export default function Schedule() {
     // Fetch daily AppSettings in one batch by fetching all settings with date suffix
     // then filter client-side — avoids 3 separate rate-limited calls
     console.time("Schedule date change");
-    const promises = [
-      base44.entities.TemplateRow.filter({ date: dateString }),
-      base44.entities.Unavailability.filter({ date: dateString }),
-      getCachedAllSettings(base44.entities), // served from cache if fresh
-    ];
+    // Sequential fetches with delays to avoid rate limits
+    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
+    await new Promise(r => setTimeout(r, 150));
+    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
+    await new Promise(r => setTimeout(r, 150));
+    const allSettings = await getCachedAllSettings(base44.entities);
+    let availabilitiesData = null;
     if (weekChanged) {
-      promises.push(base44.entities.Availability.filter({ week_start_date: weekStartStr }));
+      await new Promise(r => setTimeout(r, 150));
+      availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
       lastWeekStart.current = weekStartStr;
     }
-
-    const results = await Promise.all(promises);
-    const [templateRowsData, unavailabilitiesData, allSettings] = results;
-    const availabilitiesData = weekChanged ? results[3] : null;
 
     const mokedOrderSettings = allSettings.filter(s => s.setting_key === `moked_order_${dateString}`);
     const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
