@@ -135,10 +135,9 @@ export default function Schedule() {
     await new Promise(r => setTimeout(r, 200));
     const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
     await new Promise(r => setTimeout(r, 200));
-    const [unavailabilitiesData, templateRowsData] = await Promise.all([
-      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
-      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
-    ]);
+    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
+    await new Promise(r => setTimeout(r, 200));
+    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
 
     // Filter settings client-side
     const colTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
