@@ -78,6 +78,7 @@ export default function WorkerCell({
 
   const handleWorkerSelect = async (workerId) => {
     const updatedValues = { ...(currentRowValues || {}), [columnName]: workerId };
+    console.log("SCHEDULE CELL SAVE", { rowId, columnName, value: workerId, updatedValues });
     await base44.entities.TemplateRow.update(rowId, { values: updatedValues });
     setEditing(false);
     setSearchQuery("");

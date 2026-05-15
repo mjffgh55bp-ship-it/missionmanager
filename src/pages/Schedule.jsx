@@ -316,16 +316,45 @@ export default function Schedule() {
   };
 
   const handleDuplicateMoked = async (group) => {
-    const newGroupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-    const rowsToCreate = group.rows.map((row) => ({
-      template_id: row.template_id,
-      template_name: row.template_name,
-      date: dateString,
-      values: row.values,
-      group_id: newGroupId
-    }));
-    await base44.entities.TemplateRow.bulkCreate(rowsToCreate);
-    await loadData();
+    const originalGroupId = group.group_id;
+    const newGroupId = crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString() + Math.random().toString(36).substr(2, 9));
+
+    const createdRows = await Promise.all(
+      group.rows.map((row) => {
+        const clonedValues = JSON.parse(JSON.stringify(row.values || {}));
+
+        // Remove stale identity metadata that links to the original row
+        delete clonedValues._row_id;
+        delete clonedValues._source_row_id;
+        delete clonedValues._created_from_row_id;
+        delete clonedValues.continuation_source_row_id;
+        delete clonedValues.continuation_from_date;
+        delete clonedValues.is_continuation;
+
+        return base44.entities.TemplateRow.create({
+          template_id: row.template_id,
+          template_name: row.template_name,
+          date: row.date || dateString,
+          group_id: newGroupId,
+          values: clonedValues
+        });
+      })
+    );
+
+    console.log("DUPLICATE MOKED", {
+      originalGroupId,
+      newGroupId,
+      originalRowIds: group.rows.map(r => r.id),
+      createdRowIds: createdRows.map(r => r.id),
+      copiedValues: true
+    });
+
+    setTemplateRows(prev => [...prev, ...createdRows]);
+    setTemplates(prev => {
+      const template = allTemplates.find(t => t.id === group.template_id);
+      if (template && !prev.find(t => t.id === template.id)) return [...prev, template];
+      return prev;
+    });
     toast.success('מוקד שוכפל בהצלחה');
   };
 
