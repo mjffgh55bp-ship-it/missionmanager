@@ -317,44 +317,91 @@ export default function Schedule() {
 
   const handleDuplicateMoked = async (group) => {
     const originalGroupId = group.group_id;
-    const newGroupId = crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString() + Math.random().toString(36).substr(2, 9));
+    // Always generate a truly unique new group_id
+    const newGroupId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `group_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 
-    const createdRows = await Promise.all(
-      group.rows.map((row) => {
-        const clonedValues = JSON.parse(JSON.stringify(row.values || {}));
-
-        // Remove stale identity metadata that links to the original row
-        delete clonedValues._row_id;
-        delete clonedValues._source_row_id;
-        delete clonedValues._created_from_row_id;
-        delete clonedValues.continuation_source_row_id;
-        delete clonedValues.continuation_from_date;
-        delete clonedValues.is_continuation;
-
-        return base44.entities.TemplateRow.create({
-          template_id: row.template_id,
-          template_name: row.template_name,
-          date: row.date || dateString,
-          group_id: newGroupId,
-          values: clonedValues
-        });
-      })
-    );
-
-    console.log("DUPLICATE MOKED", {
-      originalGroupId,
-      newGroupId,
-      originalRowIds: group.rows.map(r => r.id),
-      createdRowIds: createdRows.map(r => r.id),
-      copiedValues: true
+    // Sort source rows by their stored _order (same logic as render)
+    const sourceRows = [...group.rows].sort((a, b) => {
+      const aO = a.values?._order ?? new Date(a.created_date || 0).getTime();
+      const bO = b.values?._order ?? new Date(b.created_date || 0).getTime();
+      return aO - bO;
     });
 
+    console.log("DUPLICATE MOKED SOURCE", {
+      templateId: group.template_id,
+      sourceGroupId: originalGroupId,
+      newGroupId,
+      sourceRowCount: sourceRows.length,
+      sourceRows: sourceRows.map((r, i) => ({
+        id: r.id,
+        group_id: r.group_id,
+        date: r.date,
+        order: r.values?._order,
+        index: i,
+        values: r.values
+      }))
+    });
+
+    // Create rows sequentially (not in parallel) to preserve order and avoid rate limits
+    const createdRows = [];
+    for (let index = 0; index < sourceRows.length; index++) {
+      const row = sourceRows[index];
+
+      // Deep-clone values — never share object references with original
+      const clonedValues = JSON.parse(JSON.stringify(row.values || {}));
+
+      // Remove ALL identity/linkage metadata that connects to the original row
+      delete clonedValues._row_id;
+      delete clonedValues._source_row_id;
+      delete clonedValues._created_from_row_id;
+      delete clonedValues._original_row_id;
+      delete clonedValues.original_row_id;
+      delete clonedValues.parent_row_id;
+      delete clonedValues.continuation_source_row_id;
+      delete clonedValues.continuation_from_date;
+      delete clonedValues.is_continuation;
+
+      // Assign a fresh, independent _order within the new group
+      clonedValues._order = index;
+
+      // Debug marker (harmless, shows which original row this came from)
+      clonedValues._duplicated_from_row_id = row.id;
+
+      const created = await base44.entities.TemplateRow.create({
+        template_id: row.template_id,
+        template_name: row.template_name,
+        date: row.date || dateString,
+        group_id: newGroupId,
+        values: clonedValues
+      });
+      createdRows.push(created);
+    }
+
+    console.log("DUPLICATE MOKED CREATED", {
+      newGroupId,
+      createdRowCount: createdRows.length,
+      createdRows: createdRows.map(r => ({
+        id: r.id,
+        group_id: r.group_id,
+        date: r.date,
+        order: r.values?._order,
+        duplicatedFrom: r.values?._duplicated_from_row_id,
+        values: r.values
+      }))
+    });
+
+    // Add duplicated rows to state using only the real DB-returned rows
     setTemplateRows(prev => [...prev, ...createdRows]);
+
+    // Ensure template is in the templates list (should already be there)
     setTemplates(prev => {
       const template = allTemplates.find(t => t.id === group.template_id);
       if (template && !prev.find(t => t.id === template.id)) return [...prev, template];
       return prev;
     });
+
     toast.success('מוקד שוכפל בהצלחה');
   };
 
@@ -919,8 +966,9 @@ export default function Schedule() {
                                             rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
                                             taskQualifiedWorkerIds={col.task_name ? Object.values(taskQualifications[col.task_name] || {}).flat() : (row.values?.task ? Object.values(taskQualifications[row.values.task] || {}).flat() : undefined)}
                                             onSaved={(workerId) => {
-                                              const newValues = { ...row.values, [col.name]: workerId };
-                                              setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                             const newValues = { ...row.values, [col.name]: workerId };
+                                             console.log("SCHEDULE CELL SAVE", { rowId: row.id, columnName: col.name, value: workerId, updatedValues: newValues });
+                                             setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                             }} />
                                         ) : col.type === "time" ? (
                                           <TimeCell
@@ -929,8 +977,9 @@ export default function Schedule() {
                                             value={row.values?.[col.name] || ""}
                                             defaultValue={col.default_value || ""}
                                             onSaved={(newValues) => {
-                                              setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
-                                              handleTimeSaved(row, newValues);
+                                             console.log("SCHEDULE CELL SAVE", { rowId: row.id, columnName: col.name, value: newValues[col.name], updatedValues: newValues });
+                                             setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                             handleTimeSaved(row, newValues);
                                             }}
                                             rowValues={row.values || {}} />
                                         ) : col.type === 'task' ? (
@@ -959,9 +1008,10 @@ export default function Schedule() {
                                             isTemplateRow={true}
                                             isQuantitative={!!columnQuantitative[col.name]}
                                             onSaved={(updatedColumnValues) => {
-                                              const newValues = { ...row.values, ...updatedColumnValues };
-                                              base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                              setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                             const newValues = { ...row.values, ...updatedColumnValues };
+                                             console.log("SCHEDULE CELL SAVE", { rowId: row.id, columnName: col.name, value: updatedColumnValues, updatedValues: newValues });
+                                             base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                             setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                             }} />
                                         ) : (
                                           <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
@@ -987,7 +1037,10 @@ export default function Schedule() {
                                       </SelectTrigger>
                                       <SelectContent>
                                         <SelectItem value={null}>ללא</SelectItem>
-                                        {shiftStatuses.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                        {shiftStatuses.map((s) => {
+                                          const label = typeof s === 'string' ? s : (s?.name || '');
+                                          return <SelectItem key={label} value={label}>{label}</SelectItem>;
+                                        })}
                                       </SelectContent>
                                     </Select>
                                   </TableCell>
