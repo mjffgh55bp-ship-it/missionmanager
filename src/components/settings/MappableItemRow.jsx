@@ -90,9 +90,7 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
               <AlertTriangle className="w-2.5 h-2.5 mr-0.5" />כפול
             </Badge>
           )}
-          {item.export_name && (
-            <span className="text-[10px] text-gray-400 truncate shrink-0">→ {item.export_name}</span>
-          )}
+
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
@@ -137,18 +135,8 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
                 </Button>
               </div>
             </div>
-            {/* export_name */}
-            <div className="sm:col-span-2">
-              <label className="text-xs text-gray-500 block mb-1">שם ייצוא (export_name) — אופציונלי</label>
-              <Input
-                value={draft.export_name}
-                onChange={e => setDraft(d => ({ ...d, export_name: e.target.value }))}
-                placeholder={`${draft.name} (ברירת מחדל: שם מקומי)`}
-                className="h-7 text-sm"
-                dir="rtl"
-              />
-            </div>
           </div>
+          <p className="text-xs text-gray-400">הID הוא שפת ההעברה. השם המקומי הוא תצוגה פנימית בלבד.</p>
           {/* Toggles */}
           <div className="flex items-center gap-4 flex-wrap">
             <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">

@@ -161,19 +161,15 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     const usedTemplates = allTemplates.filter(t => usedTemplateIds.has(t.id) && t.is_exportable !== false);
 
     const tmplHeader = [
-      "template_id", "template_name", "color", "is_default", "active",
-      "template_mapping_id", "exported_template_name", "local_template_name",
+      "template_id", "template_mapping_id", "color", "is_default", "active",
       "is_importable", "is_exportable",
     ];
     const tmplRows = usedTemplates.map(t => [
       t.id,
-      sanitizeText(t.export_name || t.name),  // use export_name if set (security)
+      sanitizeText(t.mapping_id || ""),
       t.color || "#3b82f6",
       t.is_default ? "true" : "false",
       t.active !== false ? "true" : "false",
-      sanitizeText(t.mapping_id || ""),
-      sanitizeText(t.export_name || t.name),
-      sanitizeText(t.name),
       t.is_importable !== false ? "true" : "false",
       t.is_exportable !== false ? "true" : "false",
     ]);
@@ -182,12 +178,10 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     // ── Sheet 3: MokedColumns ─────────────────────────────────────────────────
     // One row per effective column per template, using the first date the template appears on
     const colHeader = [
-      "template_id", "template_name", "column_index", "column_name",
-      "display_name", "internal_value_key", "type", "width",
+      "template_id", "template_mapping_id", "column_index",
+      "column_mapping_id", "internal_value_key", "type", "width",
       "default_value", "options_json", "role_filter", "is_worker_column",
-      "is_task_column",
-      "column_mapping_id", "exported_column_name", "local_column_name",
-      "is_importable", "is_exportable",
+      "is_task_column", "is_importable", "is_exportable",
     ];
     const colRows = [];
     // Find the first date each template appears on (for effective column resolution)
@@ -203,13 +197,11 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
         const isTask = col.type === "task";
         const internalKey = isTask ? "task" : getInternalValueKey(col);
         const isWorker = !isTask && (col.type === "worker" || isKnownWorkerCol(col.name));
-        const exportedColName = col.export_name || col.name;
         colRows.push([
           t.id,
-          sanitizeText(t.export_name || t.name),
+          sanitizeText(t.mapping_id || ""),
           idx,
-          sanitizeText(isTask ? "משימה" : exportedColName),  // column_name (exported)
-          sanitizeText(isTask ? "משימה" : exportedColName),  // display_name
+          sanitizeText(isTask ? "__task__" : (col.mapping_id || "")),
           sanitizeText(internalKey),
           sanitizeText(isTask ? "task" : col.type || "text"),
           col.width || 120,
@@ -218,20 +210,17 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
           sanitizeText(col.role_filter || ""),
           isWorker ? "true" : "false",
           isTask   ? "true" : "false",
-          sanitizeText(col.mapping_id || ""),
-          sanitizeText(isTask ? "משימה" : exportedColName),
-          sanitizeText(isTask ? "משימה" : col.name),
           col.is_importable !== false ? "true" : "false",
           col.is_exportable !== false ? "true" : "false",
         ]);
       });
       // Always add the implicit "status" column at the end
       colRows.push([
-        t.id, sanitizeText(t.export_name || t.name),
+        t.id, sanitizeText(t.mapping_id || ""),
         effectiveCols.length,
-        "status", "סטטוס", "status", "select", 100,
+        "__status__", "status", "select", 100,
         "", "", "", "false", "false",
-        "", "status", "status", "true", "true",
+        "true", "true",
       ]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([colHeader, ...colRows]), SHEET_MOKED_COLUMNS);
@@ -253,15 +242,14 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([rowHeader, ...rowData]), SHEET_MOKED_ROWS);
 
     // ── Sheet 5: MokedValues ──────────────────────────────────────────────────
-    // One row per (row × column) cell value — even empty ones from template columns
+    // One row per (row × column) cell value
+    // Identity uses mapping_id only — no local/exported display names
     const valHeader = [
-      "row_id", "template_id", "template_name", "date",
-      "group_id", "_order", "column_name", "display_name",
-      "internal_value_key", "column_type", "is_worker_column", "is_task_column",
-      "value_raw", "value_exported",
+      "row_id", "template_id", "date",
+      "group_id", "_order",
       "template_mapping_id", "column_mapping_id",
-      "exported_template_name", "exported_column_name",
-      "local_template_name", "local_column_name",
+      "internal_value_key", "column_type", "is_worker_column", "is_task_column",
+      "value_raw",
     ];
     const valRows = [];
 
@@ -279,22 +267,21 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
         if (!col._isStatusCol && col.is_exportable === false) return; // skip non-exportable
         const isTask   = !col._isStatusCol && col.type === "task";
         const internalKey = col._isStatusCol ? "status" : (isTask ? "task" : getInternalValueKey(col));
-        const exportedColName = col._isStatusCol ? "status" : (col.export_name || (isTask ? "משימה" : col.name));
-        const localColName    = col._isStatusCol ? "status" : (isTask ? "משימה" : col.name);
-        const columnName  = exportedColName;  // use exported name in the file
-        const displayName = exportedColName;
         const isWorker = !col._isStatusCol && !isTask && (col.type === "worker" || isKnownWorkerCol(col.name));
+        // Use fixed sentinel for status/task, or mapping_id for regular cols
+        const colMappingId = col._isStatusCol ? "__status__" : (isTask ? "__task__" : (col.mapping_id || ""));
 
         const rawVal = values[internalKey];
 
-        let exportedVal = "";
+        // For worker columns: export mapping_id if available, fallback to worker_id
+        let exportValue = "";
         if (!isEmpty(rawVal)) {
           if (isWorker) {
             const w = workerById[rawVal];
-            exportedVal = w ? sanitizeText(w.nickname || w.id) : sanitizeText(String(rawVal));
+            exportValue = w ? sanitizeText(w.mapping_id || w.id) : sanitizeText(String(rawVal));
             if (!w) console.warn(`[Export] Worker ID not found: ${rawVal} in col ${col.name}`);
           } else {
-            exportedVal = serializeForExport(rawVal);
+            exportValue = serializeForExport(rawVal);
           }
         }
 
@@ -306,46 +293,30 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
         valRows.push([
           row.id,
           row.template_id,
-          sanitizeText(tmpl.export_name || row.template_name || tmpl.name),
           row.date,
           sanitizeText(row.group_id || ""),
           row._stableOrder,
-          sanitizeText(columnName),
-          sanitizeText(displayName),
+          sanitizeText(tmpl.mapping_id || ""),
+          sanitizeText(colMappingId),
           sanitizeText(internalKey),
           sanitizeText(isTask ? "task" : col.type || "text"),
           isWorker ? "true" : "false",
           isTask   ? "true" : "false",
-          sanitizeText(String(rawVal ?? "")),
-          exportedVal,
-          sanitizeText(tmpl.mapping_id || ""),
-          sanitizeText(col._isStatusCol ? "" : (col.mapping_id || "")),
-          sanitizeText(tmpl.export_name || tmpl.name),
-          sanitizeText(exportedColName),
-          sanitizeText(tmpl.name),
-          sanitizeText(localColName),
+          exportValue,
         ]);
 
         // Export subTypes as a separate row if present
         if (subTypesExported) {
           valRows.push([
             row.id, row.template_id,
-            sanitizeText(tmpl.export_name || row.template_name || tmpl.name),
             row.date,
             sanitizeText(row.group_id || ""),
             row._stableOrder,
-            sanitizeText(`${columnName}_subTypes`),
-            sanitizeText(`${displayName} (סוגים)`),
+            sanitizeText(tmpl.mapping_id || ""),
+            sanitizeText(colMappingId ? `${colMappingId}_subTypes` : ""),
             sanitizeText(subTypesKey),
             "subtypes", "false", "false",
-            sanitizeText(String(subTypesVal ?? "")),
             subTypesExported,
-            sanitizeText(tmpl.mapping_id || ""),
-            sanitizeText(col._isStatusCol ? "" : (col.mapping_id || "")),
-            sanitizeText(tmpl.export_name || tmpl.name),
-            sanitizeText(`${exportedColName}_subTypes`),
-            sanitizeText(tmpl.name),
-            sanitizeText(`${localColName}_subTypes`),
           ]);
         }
       });
@@ -353,11 +324,11 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([valHeader, ...valRows]), SHEET_MOKED_VALUES);
 
     // ── Sheet 6: WorkersMap ───────────────────────────────────────────────────
-    const workerHeader = ["worker_id", "nickname", "full_name", "roles", "active"];
+    const workerHeader = ["worker_id", "worker_mapping_id", "nickname", "roles", "active"];
     const workerRows = workers.map(w => [
       w.id,
+      sanitizeText(w.mapping_id || ""),
       sanitizeText(w.nickname || ""),
-      sanitizeText(w.full_name || ""),
       Array.isArray(w.role) ? w.role.join(", ") : (w.role || ""),
       w.active !== false ? "true" : "false",
     ]);

@@ -43,8 +43,18 @@ function parseSheet(ws) {
 function matchColumn(importedCol, liveColumns) {
   const { column_name, display_name, internal_value_key, column_mapping_id, local_column_name } = importedCol;
 
+  // Sentinels for system columns (new format)
+  if (column_mapping_id === "__status__" || column_name === "status" || internal_value_key === "status") {
+    return { col: null, matchMethod: "implicit_status" }; // handled separately by caller
+  }
+  if (column_mapping_id === "__task__" || internal_value_key === "task") {
+    const match = liveColumns.find(c => c.type === "task");
+    if (match) return { col: match, matchMethod: "internal_value_key" };
+    return { col: null, matchMethod: null };
+  }
+
   // 0. mapping_id — highest priority (cross-environment stable match)
-  if (column_mapping_id && column_mapping_id.trim()) {
+  if (column_mapping_id && column_mapping_id.trim() && !column_mapping_id.endsWith("_subTypes")) {
     const mid = column_mapping_id.trim();
     const match = liveColumns.find(c => c.mapping_id && c.mapping_id === mid);
     if (match) return { col: match, matchMethod: "mapping_id" };
@@ -52,39 +62,32 @@ function matchColumn(importedCol, liveColumns) {
     return { col: null, matchMethod: "mapping_id_missing", mappingId: mid };
   }
 
-  // 1. Exact column_name match (backward compat)
-  let match = liveColumns.find(c => c.name === column_name);
-  if (match) return { col: match, matchMethod: "name" };
-
-  // Also try local_column_name if present (from newer exports)
-  if (local_column_name && local_column_name !== column_name) {
-    match = liveColumns.find(c => c.name === local_column_name);
-    if (match) return { col: match, matchMethod: "name" };
-  }
-
-  // 2. Exact internal_value_key match — handles task type
-  if (internal_value_key === "task") {
-    match = liveColumns.find(c => c.type === "task");
-    if (match) return { col: match, matchMethod: "internal_value_key" };
-  }
-
-  // 3. Normalized column_name match
-  const nColName = normalizeForMatch(column_name);
-  match = liveColumns.find(c => normalizeForMatch(c.name) === nColName);
-  if (match) return { col: match, matchMethod: "name" };
-
-  // 4. Normalized display_name match
-  if (display_name) {
-    const nDisp = normalizeForMatch(display_name);
-    match = liveColumns.find(c => normalizeForMatch(c.name) === nDisp);
-    if (match) return { col: match, matchMethod: "name" };
-  }
-
-  // 5. Alias: internal_value_key normalization
+  // 1. Exact internal_value_key match (legacy compat)
   if (internal_value_key) {
-    const nKey = normalizeForMatch(internal_value_key);
-    match = liveColumns.find(c => normalizeForMatch(getInternalValueKey(c)) === nKey);
+    let match = liveColumns.find(c => getInternalValueKey(c) === internal_value_key);
     if (match) return { col: match, matchMethod: "internal_value_key" };
+  }
+
+  // 2. Exact column_name match (legacy compat)
+  if (column_name) {
+    let match = liveColumns.find(c => c.name === column_name);
+    if (match) return { col: match, matchMethod: "legacy_name_fallback" };
+
+    if (local_column_name && local_column_name !== column_name) {
+      match = liveColumns.find(c => c.name === local_column_name);
+      if (match) return { col: match, matchMethod: "legacy_name_fallback" };
+    }
+
+    // 3. Normalized name match (legacy compat)
+    const nColName = normalizeForMatch(column_name);
+    match = liveColumns.find(c => normalizeForMatch(c.name) === nColName);
+    if (match) return { col: match, matchMethod: "legacy_name_fallback" };
+
+    if (display_name) {
+      const nDisp = normalizeForMatch(display_name);
+      match = liveColumns.find(c => normalizeForMatch(c.name) === nDisp);
+      if (match) return { col: match, matchMethod: "legacy_name_fallback" };
+    }
   }
 
   return { col: null, matchMethod: null };
@@ -250,13 +253,16 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     workers.forEach(w => { if (w.nickname) workerByNickname[w.nickname] = w.id; });
     const workerIdSet = new Set(workers.map(w => w.id).filter(Boolean));
 
-    // Also use imported WorkersMap for nickname→id mapping
+    // mapping_id → local worker_id (primary resolution method for new exports)
+    const workerByMappingId = {};
+    workers.forEach(w => { if (w.mapping_id) workerByMappingId[w.mapping_id] = w.id; });
+
+    // Also use imported WorkersMap for nickname→id fallback (legacy)
     const { rows: importedWorkers } = rawSheets.workersMap;
     importedWorkers.forEach(iw => {
       const nick = iw.nickname?.trim();
       const id   = iw.worker_id?.trim();
       if (nick && id && !workerByNickname[nick]) {
-        // Check if this ID exists locally
         if (workerIdSet.has(id)) workerByNickname[nick] = id;
       }
     });
@@ -430,25 +436,33 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       effectiveColsForRow.forEach(c => { if (c.type === "task") effectiveColNames.add("משימה"); });
 
       rowValues.forEach(iv => {
-        const colName = iv.column_name;
+        const colName = iv.column_name || "";
 
         // ── Handle *_subTypes rows directly ──────────────────────────────────
         // These are NOT in MokedColumns; validate via parent column in effectiveColumns
-        if (colName.endsWith("_subTypes")) {
-          const parentColName = colName.slice(0, -"_subTypes".length);
+        const isSubTypesRow = colName.endsWith("_subTypes") ||
+          (iv.column_mapping_id && iv.column_mapping_id.endsWith("_subTypes")) ||
+          iv.column_type === "subtypes";
+
+        if (isSubTypesRow) {
+          const parentColName = colName.endsWith("_subTypes") ? colName.slice(0, -"_subTypes".length) : colName;
 
           // Try mapping_id resolution first for subTypes parent
           let parentEffectiveCol = null;
-          const parentColMid = iv.column_mapping_id?.trim();
-          if (parentColMid) {
+          const rawMid = iv.column_mapping_id?.trim() || "";
+          const parentColMid = rawMid.endsWith("_subTypes") ? rawMid.slice(0, -"_subTypes".length) : rawMid;
+          if (parentColMid && parentColMid !== "__status__" && parentColMid !== "__task__") {
             parentEffectiveCol = effectiveColsForRow.find(c => c.mapping_id && c.mapping_id === parentColMid);
           }
-          // Fallback: resolve by column name
+          if (!parentColMid || parentColMid === "__task__") {
+            parentEffectiveCol = parentEffectiveCol || effectiveColsForRow.find(c => c.type === "task");
+          }
+          // Fallback: resolve by column name (legacy)
           if (!parentEffectiveCol) {
             parentEffectiveCol = effectiveColsForRow.find(c =>
               c.name === parentColName ||
-              (c.type === "task" && parentColName === "משימה") ||
-              (c.name === iv.local_column_name?.replace(/_subTypes$/, ""))
+              (c.type === "task" && (parentColName === "משימה" || parentColName === "task")) ||
+              (c.name === (iv.local_column_name || "").replace(/_subTypes$/, ""))
             );
           }
           const parentInternalKey = parentEffectiveCol
@@ -465,7 +479,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
             return;
           }
           const subTypesWriteKey = `${parentInternalKey}_subTypes`;
-          const rawVal = iv.value_exported || iv.value_raw;
+          const rawVal = iv.value_raw || iv.value_exported;
           if (isEmpty(rawVal)) {
             fieldsDiag.push({ col: colName, internalKey: subTypesWriteKey, rawVal: "", writtenVal: null, status: "empty_skip" });
             return;
@@ -479,12 +493,10 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           return;
         }
 
-        const key = colMatchKey(irow.template_id, colName);
-        const cm = colMatchResult[key];
-
-        // Status column
-        if (colName === "status" || (cm && cm.action === "status")) {
-          const rawVal = iv.value_exported || iv.value_raw;
+        // Status column — handle new sentinel and old column_name="status"
+        const valColMid = iv.column_mapping_id?.trim() || "";
+        if (colName === "status" || valColMid === "__status__" || iv.internal_value_key === "status") {
+          const rawVal = iv.value_raw || iv.value_exported;
           if (!isEmpty(rawVal)) {
             const stripped = String(rawVal).startsWith("'") ? String(rawVal).slice(1) : String(rawVal);
             if (shiftStatuses.length === 0 || shiftStatuses.includes(stripped)) {
@@ -499,22 +511,40 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           return;
         }
 
+        // Look up column match from MokedColumns pre-built result (legacy/structured format)
+        const key = colMatchKey(irow.template_id, colName);
+        let cm = colMatchResult[key];
+
+        // For new-format exports: try direct mapping_id resolution from MokedValues if not found via MokedColumns
+        if ((!cm || cm.action === "missing") && valColMid && valColMid !== "__task__" && !valColMid.endsWith("_subTypes")) {
+          const liveTemplate = templateMatch[irow.template_id];
+          if (liveTemplate) {
+            const directMatch = matchColumn({ column_mapping_id: valColMid, internal_value_key: iv.internal_value_key, column_name: colName }, effectiveColsForRow);
+            if (directMatch.col) {
+              const internalKeyDirect = directMatch.col.type === "task" ? "task" : getInternalValueKey(directMatch.col);
+              cm = { importedCol: iv, liveCol: directMatch.col, action: "matched", internalKey: internalKeyDirect, matchedSource: "template", matchMethod: directMatch.matchMethod };
+            } else if (directMatch.matchMethod === "mapping_id_missing") {
+              cm = { importedCol: iv, liveCol: null, action: "missing_mapping_id", internalKey: null, reason: `לא נמצא מזהה מיפוי מקומי ולכן השדה לא יובא (${valColMid})`, matchedSource: "not_found", matchMethod: "mapping_id_missing" };
+            }
+          }
+        }
+
         if (!cm || cm.action === "missing" || cm.action === "no_template" || cm.action === "missing_mapping_id") {
           if (!isEmpty(iv.value_exported) || !isEmpty(iv.value_raw)) {
             if (cm?.action === "missing_mapping_id") {
-              warnings.push(cm.reason || `עמודה לא זוהתה לפי מזהה מיפוי — תידלג`);
+              warnings.push(cm.reason || `לא נמצא מזהה מיפוי מקומי ולכן השדה לא יובא`);
             } else {
               warnings.push(`עמודה "${colName}" לא קיימת בתבנית — תידלג`);
             }
           }
-          fieldsDiag.push({ col: colName, internalKey: null, rawVal: iv.value_exported, writtenVal: null, status: "skipped" });
+          fieldsDiag.push({ col: colName || valColMid, internalKey: null, rawVal: iv.value_exported || iv.value_raw, writtenVal: null, status: "skipped" });
           return;
         }
 
         const internalKey = cm.internalKey;
         const liveCol = cm.liveCol;
-        // Prefer value_exported (human readable), fall back to value_raw
-        const rawVal = iv.value_exported || iv.value_raw;
+        // New format has only value_raw; old format also had value_exported — use whichever is present
+        const rawVal = iv.value_raw || iv.value_exported;
 
         if (isEmpty(rawVal)) {
           fieldsDiag.push({ col: colName, internalKey, rawVal: "", writtenVal: null, status: "empty_skip" });
@@ -527,16 +557,21 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         const isTask   = liveCol.type === "task";
 
         if (isWorker) {
-          // Resolve nickname → worker_id
-          const resolvedId = workerByNickname[stripped] || (workerIdSet.has(stripped) ? stripped : null);
+          // Resolution priority: mapping_id → local worker_id → nickname → raw id fallback
+          const resolvedId =
+            workerByMappingId[stripped] ||          // new: resolve by worker mapping_id
+            (workerIdSet.has(stripped) ? stripped : null) || // same-env: direct id
+            workerByNickname[stripped] ||           // legacy: nickname fallback
+            null;
+          const resolveMethod = workerByMappingId[stripped] ? "mapping_id" : workerIdSet.has(stripped) ? "id" : workerByNickname[stripped] ? "nickname_fallback" : null;
           if (resolvedId) {
             parsedValues[internalKey] = resolvedId;
-            workerDiag.push({ col: colName, rawValue: stripped, resolvedId, status: "resolved" });
+            workerDiag.push({ col: colName, rawValue: stripped, resolvedId, resolveMethod, status: "resolved" });
             fieldsDiag.push({ col: colName, internalKey, rawVal: stripped, writtenVal: resolvedId, status: "written" });
           } else {
             warnings.push(`עובד "${stripped}" לא נמצא עבור "${colName}" — יידלג`);
             rejectedFields.push({ col: colName, value: stripped, reason: "עובד לא נמצא" });
-            workerDiag.push({ col: colName, rawValue: stripped, resolvedId: null, status: "unresolved" });
+            workerDiag.push({ col: colName, rawValue: stripped, resolvedId: null, resolveMethod: null, status: "unresolved" });
             fieldsDiag.push({ col: colName, internalKey, rawVal: stripped, writtenVal: null, status: "rejected" });
           }
           return;
@@ -936,11 +971,13 @@ function ColDiagTable({ colDiagList }) {
     not_found:     { label: "—",            cls: "text-red-400" },
   };
   const matchMethodLabel = {
-    mapping_id:         "🔑",
-    internal_value_key: "⚙",
-    name:               "שם",
-    implicit:           "מובנה",
-    mapping_id_missing: "✗",
+    mapping_id:           "🔑 מזהה",
+    internal_value_key:   "⚙ מפתח",
+    name:                 "שם",
+    legacy_name_fallback: "⚠ שם (fallback)",
+    implicit:             "מובנה",
+    implicit_status:      "מובנה",
+    mapping_id_missing:   "✗ חסר",
   };
   return (
     <div className="overflow-x-auto">
