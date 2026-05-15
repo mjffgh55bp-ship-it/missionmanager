@@ -182,7 +182,8 @@ export default function Availability() {
 
     staticLoaded.current = true;
 
-    // Now load dynamic (week-scoped) data
+    // Now load dynamic (week-scoped) data — pause first to avoid rate limit
+    await new Promise(r => setTimeout(r, 300));
     if (worker) {
       await loadDynamicData(worker, user);
     }
