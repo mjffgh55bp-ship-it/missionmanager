@@ -130,11 +130,10 @@ export default function Availability() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-    // Batch 1: cached static data first
-    const [workersData, allSettings] = await Promise.all([
-      getCachedWorkers(base44.entities),
-      getCachedAllSettings(base44.entities),
-    ]);
+    // Sequential static data fetches to avoid rate limits
+    const workersData = await getCachedWorkers(base44.entities);
+    await new Promise(r => setTimeout(r, 400));
+    const allSettings = await getCachedAllSettings(base44.entities);
 
     // Batch 2: non-cached dynamic data — staggered to avoid rate limits
     const eventsData = await base44.entities.CompanyEvent.list("-date");
