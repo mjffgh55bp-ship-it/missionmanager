@@ -56,7 +56,7 @@ export default function Settings() {
 
   const loadSettings = async () => {
     const allSettings = await base44.entities.AppSettings.list();
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 800));
     const workersData = await base44.entities.Worker.list();
 
     const getSetting = (key) => allSettings.find(s => s.setting_key === key);
