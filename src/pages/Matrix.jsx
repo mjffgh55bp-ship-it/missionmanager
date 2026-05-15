@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue } from "@/lib/operationalDate";
 import { getTimelineRangeStyle, getTimelinePointStyle } from "@/lib/matrixTimeUtils";
-import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut, Pin, PinOff } from "lucide-react";
+import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut } from "lucide-react";
 import BriefingBar from "../components/matrix/BriefingBar";
 import WorkerLockButton from "../components/matrix/WorkerLockButton";
 import MasterControls from "../components/matrix/MasterControls";
@@ -199,18 +199,6 @@ export default function Matrix() {
   const [signupMode, setSignupMode] = useState("allow_over_sign_up");
   const [savingSignupMode, setSavingSignupMode] = useState(false);
   const settingsIdCache = useRef({});
-
-  // ── Pin / freeze worker-side columns ────────────────────────────────────────
-  const [pinnedWorkerColumns, setPinnedWorkerColumns] = useState(
-    () => localStorage.getItem('matrix_pinned_worker_columns') === 'true'
-  );
-  const togglePinnedWorkerColumns = () => {
-    setPinnedWorkerColumns(prev => {
-      const next = !prev;
-      localStorage.setItem('matrix_pinned_worker_columns', String(next));
-      return next;
-    });
-  };
 
   // ── Scroll container ref (for middle-mouse drag + wheel zoom) ───────────────
   const scrollContainerRef = useRef(null);
@@ -1152,19 +1140,6 @@ export default function Matrix() {
           <button onClick={() => applyPreset('full')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">24h</button>
           <button onClick={() => applyPreset('12h')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">12h</button>
           <span className="text-[10px] text-gray-400 mr-2">Ctrl+גלגל לזום · גרירת גלגל לגלילה</span>
-          <div className="w-px h-5 bg-gray-300 mx-1" />
-          <button
-            onClick={togglePinnedWorkerColumns}
-            title={pinnedWorkerColumns ? "בטל נעיצת עמודות עובדים" : "נעץ עמודות עובדים"}
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${
-              pinnedWorkerColumns
-                ? "bg-blue-900 border-blue-900 text-white hover:bg-blue-800"
-                : "border-gray-300 bg-white hover:bg-gray-50 text-gray-600"
-            }`}
-          >
-            {pinnedWorkerColumns ? <Pin className="w-3 h-3" /> : <PinOff className="w-3 h-3" />}
-            נעץ עמודות
-          </button>
         </div>
 
         <Card className="border-none shadow-lg flex-1 min-h-0 flex flex-col">
@@ -1182,12 +1157,8 @@ export default function Matrix() {
               <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
                 {/* Sticky header row */}
                 <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
-                  {/* Worker name column — sticky left (always sticky for header) */}
-                  <div
-                    className="w-[220px] min-w-[220px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2"
-                    dir="rtl"
-                    style={pinnedWorkerColumns && viewMode === 'daily' ? { boxShadow: '-4px 0 8px rgba(0,0,0,0.06)' } : {}}
-                  >
+                  {/* Worker name column — sticky left */}
+                  <div className="w-[220px] min-w-[220px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
                     <MasterControls
                       workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
                       getWorkerSendStatus={getWorkerSendStatus}
@@ -1197,30 +1168,13 @@ export default function Matrix() {
                     />
                   </div>
                   {/* Summary columns (weekly) */}
-                  {viewMode === 'weekly' && summaryColumns.map((col, colIdx) => {
-                    const leftOffset = FIXED_COL_WIDTH + colIdx * SUMMARY_COL_WIDTH;
-                    return (
-                      <div
-                        key={col.id}
-                        className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1"
-                        style={pinnedWorkerColumns ? { position: 'sticky', left: leftOffset, zIndex: 29, background: '#f3f4f6' } : {}}
-                        title={col.name}
-                      >
-                        <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
-                      </div>
-                    );
-                  })}
+                  {viewMode === 'weekly' && summaryColumns.map(col => (
+                    <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1" title={col.name}>
+                      <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
+                    </div>
+                  ))}
                   {viewMode === 'weekly' && (
-                    <div
-                      className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center"
-                      style={pinnedWorkerColumns ? {
-                        position: 'sticky',
-                        left: FIXED_COL_WIDTH + summaryColumns.length * SUMMARY_COL_WIDTH,
-                        zIndex: 29,
-                        background: '#f3f4f6',
-                        boxShadow: '-4px 0 8px rgba(0,0,0,0.06)'
-                      } : {}}
-                    >
+                    <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center">
                       <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
                     </div>
                   )}
@@ -1273,18 +1227,8 @@ export default function Matrix() {
                     return (
                       <React.Fragment key={worker.id}>
                       <div className={`flex border-b h-8 shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ width: `${totalMatrixWidth}px` }}>
-                        {/* Worker name cell — sticky left when pinned */}
-                        <div
-                          className="w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 h-8"
-                          style={pinnedWorkerColumns ? {
-                            position: 'sticky',
-                            left: 0,
-                            zIndex: 20,
-                            background: index % 2 === 0 ? 'white' : 'rgb(249,250,251)',
-                            // In daily view the worker cell is the last pinned — show shadow here
-                            boxShadow: viewMode === 'daily' ? '-4px 0 8px rgba(0,0,0,0.06)' : 'none'
-                          } : {}}
-                        >
+                        {/* Worker name cell — sticky left */}
+                        <div className="w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-8">
                           <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
                           <button onClick={() => sendWhatsAppNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${actionClass}`} title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}>
                             {sendingWhatsApp ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /> : <MessageCircle className="w-4 h-4" />}
@@ -1301,43 +1245,12 @@ export default function Matrix() {
                           </div>
                         </div>
                         {/* Summary columns (weekly) */}
-                        {viewMode === 'weekly' && summaryColumns.map((col, colIdx) => {
-                          const leftOffset = FIXED_COL_WIDTH + colIdx * SUMMARY_COL_WIDTH;
-                          const isLast = colIdx === summaryColumns.length - 1;
-                          const bg = index % 2 === 0 ? 'white' : 'rgb(249,250,251)';
-                          return (
-                            <div
-                              key={col.id}
-                              className="w-[60px] min-w-[60px] border-r flex items-center justify-center h-8"
-                              style={pinnedWorkerColumns ? {
-                                position: 'sticky',
-                                left: leftOffset,
-                                zIndex: 19,
-                                background: bg,
-                                boxShadow: isLast && summaryColumns.length > 0 ? '-4px 0 8px rgba(0,0,0,0.06)' : 'none'
-                              } : { background: bg }}
-                            >
-                              <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
-                            </div>
-                          );
-                        })}
-                        {viewMode === 'weekly' && (() => {
-                          const leftOffset = FIXED_COL_WIDTH + summaryColumns.length * SUMMARY_COL_WIDTH;
-                          const bg = index % 2 === 0 ? 'white' : 'rgb(249,250,251)';
-                          const showShadow = summaryColumns.length === 0; // shadow on add-col button if no summary cols
-                          return (
-                            <div
-                              className="w-[28px] min-w-[28px] border-r h-8"
-                              style={pinnedWorkerColumns ? {
-                                position: 'sticky',
-                                left: leftOffset,
-                                zIndex: 19,
-                                background: bg,
-                                boxShadow: showShadow ? '-4px 0 8px rgba(0,0,0,0.06)' : 'none'
-                              } : { background: bg }}
-                            />
-                          );
-                        })()}
+                        {viewMode === 'weekly' && summaryColumns.map(col => (
+                          <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                            <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
+                          </div>
+                        ))}
+                        {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
 
                         {/* Timeline area — exact width matching ruler */}
                         <div
