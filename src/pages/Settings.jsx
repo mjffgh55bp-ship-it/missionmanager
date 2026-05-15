@@ -9,7 +9,6 @@ import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList,
 import MappingSettings from "@/components/settings/MappingSettings";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import MappableItemRow, { normalizeItem, suggestMappingId } from "@/components/settings/MappableItemRow";
 
 
@@ -513,12 +512,23 @@ export default function Settings() {
                   </div>
                   {expandedCol === idx && (
                    <div className="p-3 border-t space-y-4" dir="rtl">
-                     {/* Mapping fields — always visible at top of expanded panel */}
+                     {/* ID / mapping_id — simplified */}
                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
-                       <p className="text-xs font-semibold text-blue-800">מיפוי ייצוא/ייבוא</p>
                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                          <div>
-                           <label className="text-xs text-gray-500 block mb-1">מזהה מיפוי (mapping_id)</label>
+                           <label className="text-xs text-gray-500 block mb-1">שם מקומי</label>
+                           <Input
+                             value={col.name}
+                             onChange={e => {
+                               const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, name: e.target.value } : c);
+                               saveScheduleColumns(updated);
+                             }}
+                             className="h-7 text-sm"
+                             dir="rtl"
+                           />
+                         </div>
+                         <div>
+                           <label className="text-xs text-gray-500 block mb-1">ID / מזהה</label>
                            <div className="flex gap-1">
                              <Input
                                value={col.mapping_id || ""}
@@ -539,34 +549,8 @@ export default function Settings() {
                                title="הצע מזהה"><Wand2 className="w-3 h-3" /></Button>
                            </div>
                          </div>
-                         <div>
-                           <label className="text-xs text-gray-500 block mb-1">שם ייצוא (export_name)</label>
-                           <Input
-                             value={col.export_name || ""}
-                             onChange={e => {
-                               const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, export_name: e.target.value } : c);
-                               saveScheduleColumns(updated);
-                             }}
-                             placeholder={col.name}
-                             className="h-7 text-xs"
-                             dir="rtl"
-                           />
-                         </div>
                        </div>
-                       <div className="flex items-center gap-4 flex-wrap">
-                         <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">
-                           <Switch checked={col.is_exportable !== false} onCheckedChange={v => {
-                             const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, is_exportable: v } : c);
-                             saveScheduleColumns(updated);
-                           }} />ייצוא מופעל
-                         </label>
-                         <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">
-                           <Switch checked={col.is_importable !== false} onCheckedChange={v => {
-                             const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, is_importable: v } : c);
-                             saveScheduleColumns(updated);
-                           }} />ייבוא מופעל
-                         </label>
-                       </div>
+                       <p className="text-xs text-gray-400">ה-ID משמש לזיהוי בין סביבות. השם המקומי הוא רק שם התצוגה בסביבה הזו.</p>
                      </div>
                      {col.report_type === "count_quantitative" ? (
                        /* Quantitative items editor */
@@ -638,26 +622,9 @@ export default function Settings() {
                        </div>
                      ) : (
                        <>
-                         {/* Input mode toggle */}
-                         <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg border border-blue-200">
-                           <div>
-                             <p className="text-xs font-semibold text-gray-700">מצב הזנה</p>
-                             <p className="text-xs text-gray-500">{col.free_text ? "טקסט חופשי — כל ערך שיוזן ישמש לסינון" : "אפשרויות בלבד — חובה לבחור מהרשימה"}</p>
-                           </div>
-                           <div className="flex items-center gap-2">
-                             <span className="text-xs text-gray-500">{col.free_text ? "חופשי" : "מוגבל"}</span>
-                             <Switch
-                               checked={!!col.free_text}
-                               onCheckedChange={async (val) => {
-                                 const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, free_text: val } : c);
-                                 await saveScheduleColumns(updated);
-                               }}
-                             />
-                           </div>
-                         </div>
                          {/* Sub options */}
                          <div>
-                           <p className="text-xs font-semibold text-gray-600 mb-1">{col.free_text ? "אפשרויות מוכנות מראש (לא חובה)" : "אפשרויות מוכנות מראש לבחירה בלוח"}</p>
+                           <p className="text-xs font-semibold text-gray-600 mb-1">אפשרויות מוכנות לבחירה בלוח</p>
                            <p className="text-xs text-gray-400 mb-2">כל אפשרות מגדירה ערך לבחירה בתא ואת הקריטריון לספירת שעות בדוחות</p>
                            <div className="flex gap-2 mb-2">
                              <Input value={newSubOptionName} onChange={e => setNewSubOptionName(e.target.value)} placeholder="שם אפשרות..." className="h-7 text-sm flex-1" dir="rtl" />
@@ -741,7 +708,7 @@ export default function Settings() {
             <CardTitle className="flex items-center gap-2" dir="rtl"><SettingsIcon className="w-5 h-5 text-teal-600" />סטטוסי משמרות</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סטטוסים שניתן להקצות למשמרות בלוח. הרחב שורה לעריכת מזהה מיפוי.</p>
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר סטטוסים שניתן להקצות למשמרות בלוח. הרחב שורה לעריכת שם מקומי ו-ID.</p>
             <div className="flex gap-2 mb-4">
               <Input value={newShiftStatus} onChange={(e) => setNewShiftStatus(e.target.value)} placeholder="שם סטטוס חדש..." dir="rtl" onKeyDown={e => e.key === 'Enter' && handleAddShiftStatus()} />
               <Button onClick={handleAddShiftStatus}><Plus className="w-4 h-4" /></Button>
@@ -846,7 +813,7 @@ export default function Settings() {
             <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-indigo-600" />תפקידי עובדים</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר תפקידים שניתן לבחור בהם בעת הוספת/עריכת עובדים. הרחב שורה לעריכת מזהה מיפוי לייצוא/ייבוא.</p>
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר תפקידים שניתן לבחור בהם בעת הוספת/עריכת עובדים. הרחב שורה לעריכת שם מקומי ו-ID.</p>
             <div className="flex gap-2 mb-4">
               <Input value={newWorkerRole} onChange={(e) => setNewWorkerRole(e.target.value)} placeholder="שם תפקיד חדש..." dir="rtl" onKeyDown={e => e.key === 'Enter' && handleAddWorkerRole()} />
               <Button onClick={handleAddWorkerRole}><Plus className="w-4 h-4" /></Button>
@@ -874,7 +841,7 @@ export default function Settings() {
             <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-orange-600" />אוכלוסיות עובדים</CardTitle>
           </CardHeader>
           <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר אוכלוסיות שניתן לבחור בהן בעת הוספת/עריכת עובדים. הרחב שורה לעריכת מזהה מיפוי.</p>
+            <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר אוכלוסיות שניתן לבחור בהן בעת הוספת/עריכת עובדים. הרחב שורה לעריכת שם מקומי ו-ID.</p>
             <div className="flex gap-2 mb-4">
               <Input value={newPopulation} onChange={(e) => setNewPopulation(e.target.value)} placeholder="שם אוכלוסייה חדשה..." dir="rtl" onKeyDown={e => e.key === 'Enter' && handleAddPopulation()} />
               <Button onClick={handleAddPopulation}><Plus className="w-4 h-4" /></Button>

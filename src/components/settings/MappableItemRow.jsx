@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, ChevronDown, ChevronUp, Check, X, Wand2 } from "lucide-react";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
@@ -109,7 +108,7 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Local display name */}
             <div>
-              <label className="text-xs text-gray-500 block mb-1">שם מקומי (תצוגה)</label>
+              <label className="text-xs text-gray-500 block mb-1">שם מקומי</label>
               <Input
                 value={draft.name}
                 onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
@@ -117,9 +116,9 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
                 dir="rtl"
               />
             </div>
-            {/* mapping_id */}
+            {/* mapping_id / ID */}
             <div>
-              <label className="text-xs text-gray-500 block mb-1">מזהה מיפוי (mapping_id)</label>
+              <label className="text-xs text-gray-500 block mb-1">ID / מזהה</label>
               <div className="flex gap-1">
                 <Input
                   value={draft.mapping_id}
@@ -136,24 +135,12 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
               </div>
             </div>
           </div>
-          <p className="text-xs text-gray-400">הID הוא שפת ההעברה. השם המקומי הוא תצוגה פנימית בלבד.</p>
-          {/* Toggles */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">
-              <Switch checked={draft.is_exportable} onCheckedChange={v => setDraft(d => ({ ...d, is_exportable: v }))} />
-              ייצוא מופעל
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-600">
-              <Switch checked={draft.is_importable} onCheckedChange={v => setDraft(d => ({ ...d, is_importable: v }))} />
-              ייבוא מופעל
-            </label>
-          </div>
+          <p className="text-xs text-gray-400">ה-ID משמש לזיהוי בין סביבות. השם המקומי הוא רק שם התצוגה בסביבה הזו.</p>
           {isDuplicate && (
             <p className="text-xs text-orange-600 flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" />מזהה מיפוי כפול — שנה אותו לפני השמירה
+              <AlertTriangle className="w-3 h-3" />מזהה כפול — שנה אותו לפני השמירה
             </p>
           )}
-          {/* Actions */}
           <div className="flex gap-2 justify-end">
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleCancel}>
               <X className="w-3 h-3 mr-1" />ביטול
