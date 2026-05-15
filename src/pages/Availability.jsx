@@ -221,32 +221,39 @@ export default function Availability() {
     setUnavailabilities(weekUnavailabilities);
 
     // Sequential fetches with delays to avoid rate limits
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 500));
     const templatesData = await getCachedTemplates(base44.entities);
-    await new Promise(r => setTimeout(r, 300));
-    
-    const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-    await new Promise(r => setTimeout(r, 300));
-    
-    const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 300));
-    
-    const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 300));
-    
-    const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 300));
-    
-    const allTemplateRowsData = await base44.entities.TemplateRow.list();
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 500));
 
-    // Filter client-side to only rows within this week (for demand panel)
+    const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
+    await new Promise(r => setTimeout(r, 500));
+
+    const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
+    await new Promise(r => setTimeout(r, 500));
+
+    const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
+    await new Promise(r => setTimeout(r, 500));
+
+    const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
+    await new Promise(r => setTimeout(r, 500));
+
+    // Fetch template rows per-day for the week (avoids expensive .list() on the full table)
+    const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
+    const perDayRows = [];
+    for (const d of weekDates) {
+      const rows = await base44.entities.TemplateRow.filter({ date: d });
+      perDayRows.push(...rows);
+      await new Promise(r => setTimeout(r, 300));
+    }
+    const allTemplateRowsData = perDayRows;
+
+    // For the calendar we use the same week-scoped rows (no full .list() needed)
     const templateRowsData = allTemplateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
 
     const allAssignments = [...assignmentsData, ...sousAssignments, ...additionalAssignments];
     setAssignments(allAssignments);
     setTemplateRows(templateRowsData);
-    setAllTemplateRowsForCalendar(allTemplateRowsData);
+    setAllTemplateRowsForCalendar(allTemplateRowsData); // now week-scoped (no full .list())
     setAllTemplates(templatesData);
     setWeekAvailabilities(weekAvailsData);
 
