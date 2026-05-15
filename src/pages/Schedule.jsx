@@ -105,7 +105,7 @@ export default function Schedule() {
   }, [currentDate]);
 
   // Retry helper for rate-limited calls
-  const fetchWithRetry = async (fn, retries = 3, delay = 600) => {
+  const fetchWithRetry = async (fn, retries = 3, delay = 1000) => {
     for (let i = 0; i < retries; i++) {
       try { return await fn(); }
       catch (e) {
@@ -132,11 +132,11 @@ export default function Schedule() {
     ]);
 
     // Batch 2 & 3: staggered + retry to survive rate limits on concurrent page loads
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 500));
     const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 400));
     const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 400));
     const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
 
     // Filter settings client-side
