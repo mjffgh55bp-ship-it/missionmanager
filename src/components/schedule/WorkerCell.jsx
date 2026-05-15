@@ -186,14 +186,32 @@ export default function WorkerCell({
       )}
 
       {/* Dropdown list */}
-      {editing && (
+      {editing && (() => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        // For fixed positioning, coordinates are relative to viewport — never add scroll offsets
+        const spaceBelow = rect ? window.innerHeight - rect.bottom : 999;
+        const dropdownHeight = 240; // max-h-60
+        const openUpward = spaceBelow < dropdownHeight && rect?.top > dropdownHeight;
+        const top = rect ? (openUpward ? rect.top - dropdownHeight : rect.bottom) : 0;
+        const right = rect ? Math.max(0, window.innerWidth - rect.right) : 0;
+
+        console.log("WORKER DROPDOWN OPEN", {
+          rowId,
+          columnName,
+          triggerRect: rect,
+          openUpward,
+          top,
+          right
+        });
+
+        return (
         <div
           className="fixed bg-white border border-gray-200 rounded-lg shadow-2xl w-56 max-h-60 overflow-y-auto"
           style={{
             minWidth: "180px",
-            zIndex: 50,
-            top: containerRef.current ? containerRef.current.getBoundingClientRect().bottom + window.scrollY : 'auto',
-            right: containerRef.current ? window.innerWidth - containerRef.current.getBoundingClientRect().right + window.scrollX : 'auto'
+            zIndex: 9999,
+            top,
+            right
           }}
           dir="rtl"
         >
@@ -254,7 +272,8 @@ export default function WorkerCell({
             })
           )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
