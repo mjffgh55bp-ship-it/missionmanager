@@ -20,16 +20,14 @@ import { NotificationDialog, TypeChangeDialog, ManualShiftDialog } from "../comp
 const DAILY_TOTAL_MINUTES = 24 * 60;        // 1440
 const WEEKLY_TOTAL_MINUTES = 7 * 24 * 60;  // 10080
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
-const FIXED_COL_WIDTH = 220;      // worker name column px (sticky left)
+const FIXED_COL_WIDTH = 220;      // worker name column px
 const SUMMARY_COL_WIDTH = 60;     // each summary column
 const SUMMARY_ADD_COL_WIDTH = 28; // the "+column" button
 
-// ── Time slot generators (for the header ruler) ─────────────────────────────
-// Daily: 06:00 → 05:00 next day (operational), returns array of clock hours
+// ── Time slot generators ─────────────────────────────────────────────────────
 const getDailyTimeSlots = () =>
   Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
 
-// Weekly: day×24h, returns slots with day/hour metadata
 const getWeeklyTimeSlots = (weekStartDate = null) => {
   const slots = [];
   for (let day = 0; day < 7; day++) {
@@ -45,12 +43,6 @@ const getWeeklyTimeSlots = (weekStartDate = null) => {
   return slots;
 };
 
-// ── Core pixel mapping ───────────────────────────────────────────────────────
-// Returns pixel offset from the LEFT edge of the timeline (LTR internally,
-// we flip to RTL via "right" in CSS because the layout is RTL).
-// Actually: since the grid is flex RTL, bars use "right" offset.
-// We compute the PERCENTAGE position in the FULL timeline, then multiply by totalWidth.
-
 const timeToPixels = (timeStr, day = 0, viewMode = 'daily', ppm) => {
   if (!timeStr) return 0;
   const parsed = parseTimeCellValue(timeStr);
@@ -59,33 +51,27 @@ const timeToPixels = (timeStr, day = 0, viewMode = 'daily', ppm) => {
   if (viewMode === 'weekly') {
     totalMins = (day + parsed.dayOffset) * 24 * 60 + parsed.hour * 60 + (parsed.minute || 0);
   } else {
-    totalMins = getOperationalMinutes(timeStr); // 0 = 06:00, 1440 = next 06:00
+    totalMins = getOperationalMinutes(timeStr);
   }
   return totalMins * ppm;
 };
 
-// Operational end minutes → pixels (handles overnight shifts correctly)
 const endTimeToPixels = (startTimeStr, endTimeStr, viewMode = 'daily', ppm, dayIndex = 0) => {
   let endPx = timeToPixels(endTimeStr, dayIndex, viewMode, ppm);
   const startPx = timeToPixels(startTimeStr, dayIndex, viewMode, ppm);
-
-  // If end <= start, shift moved to next cycle (overnight or next day in weekly)
   if (endPx <= startPx) {
     if (viewMode === 'weekly') {
-      endPx += 7 * 24 * 60 * ppm; // add one week
+      endPx += 7 * 24 * 60 * ppm;
     } else {
       endPx += DAILY_TOTAL_MINUTES * ppm;
     }
   }
-
   return endPx;
 };
 
-// Total timeline width in pixels
 const getTimelineWidth = (viewMode, ppm) =>
   (viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES) * ppm;
 
-// Convert a pixel offset within the timeline back to {day, time}
 const pixelsToTime = (px, viewMode = 'daily', ppm) => {
   const totalMins = px / ppm;
   if (viewMode === 'weekly') {
@@ -97,7 +83,6 @@ const pixelsToTime = (px, viewMode = 'daily', ppm) => {
     const hf = m >= 60 ? (h + 1) % 24 : h;
     return { day, time: `${String(hf).padStart(2,'0')}:${String(mf).padStart(2,'0')}` };
   } else {
-    // Operational: 0min=06:00
     const clockMins = (totalMins + 6 * 60) % (24 * 60);
     const h = Math.floor(clockMins / 60);
     const m = Math.round((clockMins % 60) / 15) * 15;
@@ -106,6 +91,14 @@ const pixelsToTime = (px, viewMode = 'daily', ppm) => {
     return { day: 0, time: `${String(hf).padStart(2,'0')}:${String(mf).padStart(2,'0')}` };
   }
 };
+
+// ── Pin icon SVG (pushpin outline style) ─────────────────────────────────────
+const PinIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 17v5"/>
+    <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/>
+  </svg>
+);
 
 export default function Matrix() {
   const [_savedDate, _setSavedDate] = usePageState("matrix", "currentDate", null);
@@ -117,52 +110,50 @@ export default function Matrix() {
   const [roleFilter, setRoleFilter] = usePageState("matrix", "roleFilter", "__all__");
   const [statusFilter, setStatusFilter] = usePageState("matrix", "statusFilter", "__all__");
 
-  // ── Container width tracking (for dynamic ppm calculation) ──────────────────
+  // ── Pin state ────────────────────────────────────────────────────────────────
+  const [pinned, setPinned] = useState(() => {
+    try { return localStorage.getItem('matrix_pinned_worker_panel') === 'true'; } catch { return false; }
+  });
+  const togglePin = () => {
+    setPinned(prev => {
+      const next = !prev;
+      try { localStorage.setItem('matrix_pinned_worker_panel', String(next)); } catch {}
+      return next;
+    });
+  };
+
+  // ── Container width tracking ─────────────────────────────────────────────────
   const [containerWidth, setContainerWidth] = useState(0);
   const containerWidthRef = useRef(0);
 
-  // ppm = null means "fit" (auto-calculated from containerWidth)
-  // We store a "preset" separately to know which mode we're in
-  const [zoomPreset, setZoomPreset] = useState('fit'); // 'fit' | '24h' | '12h' | 'custom'
+  const [zoomPreset, setZoomPreset] = useState('fit');
   const [customPpm, setCustomPpm] = useState(null);
 
-  // ── summaryColumns must be declared BEFORE fixedColumnsWidth useMemo ─────────
   const [summaryColumns, setSummaryColumns] = useState([]);
 
-  // ── Derived: total timeline minutes ─────────────────────────────────────────
   const totalMins = viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES;
 
-  // ── Fixed columns total width (depends on summaryColumns + viewMode) ─────────
-  // Must be computed BEFORE ppm so ppm can use it for available width
-  // summaryColumns may not be loaded yet (empty array default), so this is safe.
   const fixedColumnsWidth = useMemo(() => {
     return FIXED_COL_WIDTH +
       (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH : 0) +
       (viewMode === 'weekly' ? SUMMARY_ADD_COL_WIDTH : 0);
   }, [viewMode, summaryColumns]);
 
-  // ── PPM calculation ──────────────────────────────────────────────────────────
-  // availableTimelineWidth = scroll container width minus all fixed columns
-  // ppm presets:
-  //   fit  = full week (weekly) or full day (daily) fits the screen
-  //   24h  = one full day (1440 min) fills the screen — same as fit for daily
-  //   12h  = 720 minutes fill the screen (zoomed in, same formula for both modes)
   const ppm = useMemo(() => {
     if (!containerWidth) return 1;
-    const available = Math.max(300, containerWidth - fixedColumnsWidth);
-    const ppmFit  = available / totalMins;          // full period fits screen
-    const ppm24h  = available / DAILY_TOTAL_MINUTES; // one day fills screen
-    const ppm12h  = available / 720;                 // 12 hours fills screen
+    const available = Math.max(300, containerWidth - (pinned ? 0 : fixedColumnsWidth));
+    const ppmFit  = available / totalMins;
+    const ppm24h  = available / DAILY_TOTAL_MINUTES;
+    const ppm12h  = available / 720;
 
     if (zoomPreset === 'fit')    return ppmFit;
     if (zoomPreset === '24h')    return ppm24h;
     if (zoomPreset === '12h')    return ppm12h;
     if (zoomPreset === 'custom' && customPpm !== null) {
-      // clamp: never smaller than fit, no upper hard limit (free zoom in)
       return Math.max(ppmFit, customPpm);
     }
     return ppmFit;
-  }, [containerWidth, fixedColumnsWidth, totalMins, zoomPreset, customPpm]);
+  }, [containerWidth, fixedColumnsWidth, totalMins, zoomPreset, customPpm, pinned]);
 
   const [workers, setWorkers] = useState([]);
   const [availabilities, setAvailabilities] = useState([]);
@@ -200,21 +191,29 @@ export default function Matrix() {
   const [savingSignupMode, setSavingSignupMode] = useState(false);
   const settingsIdCache = useRef({});
 
-  // ── Scroll container ref (for middle-mouse drag + wheel zoom) ───────────────
+  // ── Scroll refs ──────────────────────────────────────────────────────────────
+  // Legacy single-container (unpinned)
   const scrollContainerRef = useRef(null);
+  // Split layout (pinned)
+  const workerPanelRef = useRef(null);        // fixed panel — vertical scroll only
+  const timelineScrollRef = useRef(null);     // timeline — both axes
+  const timelineHeaderRef = useRef(null);     // timeline header — horizontal sync only
+  const vScrollSyncRef = useRef(false);       // guard against scroll loop
+
   const midMouseDragRef = useRef(null);
   const ppmRef = useRef(ppm);
   ppmRef.current = ppm;
 
-  // ── Derived widths ───────────────────────────────────────────────────────────
   const timelineWidth = useMemo(() => totalMins * ppm, [totalMins, ppm]);
   const totalMatrixWidth = useMemo(() => fixedColumnsWidth + timelineWidth, [fixedColumnsWidth, timelineWidth]);
 
-  // Track scroll container width with ResizeObserver
+  // ── Container width: track the relevant scroll container ─────────────────────
   useEffect(() => {
-    const sc = scrollContainerRef.current;
-    if (!sc) return;
+    const getTarget = () => pinned ? timelineScrollRef.current : scrollContainerRef.current;
+    let ro;
     const update = () => {
+      const sc = getTarget();
+      if (!sc) return;
       const w = sc.clientWidth;
       if (w !== containerWidthRef.current) {
         containerWidthRef.current = w;
@@ -222,23 +221,72 @@ export default function Matrix() {
       }
     };
     update();
-    const ro = new ResizeObserver(update);
-    ro.observe(sc);
-    return () => ro.disconnect();
-  }, []);
+    ro = new ResizeObserver(update);
+    const sc = getTarget();
+    if (sc) ro.observe(sc);
+    return () => ro && ro.disconnect();
+  }, [pinned]);
+
+  // Also remeasure when pinned changes
+  useEffect(() => {
+    setTimeout(() => {
+      const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+      if (!sc) return;
+      const w = sc.clientWidth;
+      containerWidthRef.current = w;
+      setContainerWidth(w);
+    }, 50);
+  }, [pinned]);
+
+  // ── Vertical scroll sync (pinned mode) ───────────────────────────────────────
+  useEffect(() => {
+    if (!pinned) return;
+    const panel = workerPanelRef.current;
+    const timeline = timelineScrollRef.current;
+    if (!panel || !timeline) return;
+
+    const syncFromTimeline = () => {
+      if (vScrollSyncRef.current) return;
+      vScrollSyncRef.current = true;
+      panel.scrollTop = timeline.scrollTop;
+      vScrollSyncRef.current = false;
+    };
+    const syncFromPanel = () => {
+      if (vScrollSyncRef.current) return;
+      vScrollSyncRef.current = true;
+      timeline.scrollTop = panel.scrollTop;
+      vScrollSyncRef.current = false;
+    };
+
+    timeline.addEventListener('scroll', syncFromTimeline);
+    panel.addEventListener('scroll', syncFromPanel);
+    return () => {
+      timeline.removeEventListener('scroll', syncFromTimeline);
+      panel.removeEventListener('scroll', syncFromPanel);
+    };
+  }, [pinned]);
+
+  // ── Horizontal scroll sync: timeline body → timeline header (pinned) ─────────
+  useEffect(() => {
+    if (!pinned) return;
+    const body = timelineScrollRef.current;
+    const header = timelineHeaderRef.current;
+    if (!body || !header) return;
+    const sync = () => { header.scrollLeft = body.scrollLeft; };
+    body.addEventListener('scroll', sync);
+    return () => body.removeEventListener('scroll', sync);
+  }, [pinned]);
 
   // ── Zoom helpers ─────────────────────────────────────────────────────────────
-  // NOTE: scroll container is dir="ltr" so scrollLeft=0 is the LEFT edge and
-  // increases to the right — standard LTR math, no RTL flip needed.
   const applyZoom = useCallback((newPpmRaw, focalClientX = null) => {
-    const sc = scrollContainerRef.current;
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     const oldPpm = ppmRef.current;
     if (!containerWidth) return;
-    const fixedW = FIXED_COL_WIDTH +
-      (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH + SUMMARY_ADD_COL_WIDTH : 0);
+    const fixedW = pinned ? 0 : (FIXED_COL_WIDTH +
+      (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH + SUMMARY_ADD_COL_WIDTH : 0));
     const available = Math.max(300, containerWidth - fixedW);
     const ppmFit = available / totalMins;
-    const newPpm = Math.max(ppmFit, newPpmRaw); // never zoom out beyond fit
+    const newPpm = Math.max(ppmFit, newPpmRaw);
 
     if (Math.abs(newPpm - oldPpm) < 0.0001) return;
 
@@ -246,41 +294,31 @@ export default function Matrix() {
     setCustomPpm(newPpm);
 
     if (sc) {
-      // focalClientX is the mouse X relative to the scroll container (LTR)
       const rect = sc.getBoundingClientRect();
       const focalX = focalClientX !== null ? (focalClientX - rect.left) : sc.clientWidth / 2;
-      // Which minute is currently under the focal point?
       const minuteUnderCursor = (sc.scrollLeft + focalX) / oldPpm;
-      // After zoom, scroll so that same minute stays under focal point
       const newScrollLeft = minuteUnderCursor * newPpm - focalX;
       requestAnimationFrame(() => {
-        const s = scrollContainerRef.current;
+        const s = pinned ? timelineScrollRef.current : scrollContainerRef.current;
         if (!s) return;
         const maxScroll = s.scrollWidth - s.clientWidth;
         s.scrollLeft = Math.max(0, Math.min(newScrollLeft, maxScroll));
       });
     }
-  }, [containerWidth, totalMins, viewMode, summaryColumns]);
+  }, [containerWidth, totalMins, viewMode, summaryColumns, pinned]);
 
-  // ── Wheel handler: Ctrl/Cmd+wheel = zoom, plain wheel = native scroll ────────
   const handleWheel = useCallback((e) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
-      // delta > 0 = zoom out, < 0 = zoom in
       const factor = e.deltaY > 0 ? 0.85 : 1.18;
       applyZoom(ppmRef.current * factor, e.clientX);
     }
-    // All other wheel events: let the browser handle naturally
   }, [applyZoom]);
 
-  // Pinch (wheel with ctrlKey set by browser for trackpad pinch)
-  // Already handled above via ctrlKey check.
-
-  // ── Middle mouse drag ────────────────────────────────────────────────────────
   const handlePointerDown = useCallback((e) => {
-    if (e.button !== 1) return; // middle button only
+    if (e.button !== 1) return;
     e.preventDefault();
-    const sc = scrollContainerRef.current;
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     if (!sc) return;
     midMouseDragRef.current = {
       startX: e.clientX,
@@ -289,59 +327,53 @@ export default function Matrix() {
       initScrollTop: sc.scrollTop,
     };
     sc.style.cursor = 'grabbing';
-  }, []);
+  }, [pinned]);
 
   const handlePointerMove = useCallback((e) => {
     if (!midMouseDragRef.current) return;
-    const sc = scrollContainerRef.current;
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     if (!sc) return;
     const { startX, startY, initScrollLeft, initScrollTop } = midMouseDragRef.current;
-    // LTR container: dragging right means scrollLeft decreases (we move content right)
     sc.scrollLeft = initScrollLeft - (e.clientX - startX);
     sc.scrollTop  = initScrollTop  - (e.clientY - startY);
-  }, []);
+  }, [pinned]);
 
   const handlePointerUp = useCallback((e) => {
     if (e.button !== 1) return;
     midMouseDragRef.current = null;
-    const sc = scrollContainerRef.current;
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     if (sc) sc.style.cursor = '';
-  }, []);
+  }, [pinned]);
 
-  // Attach wheel listener (non-passive to allow preventDefault for zoom)
+  // Attach wheel listener to the relevant scroll container
   useEffect(() => {
-    const sc = scrollContainerRef.current;
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     if (!sc) return;
     const onWheel = (e) => handleWheel(e);
     sc.addEventListener('wheel', onWheel, { passive: false });
     return () => sc.removeEventListener('wheel', onWheel);
-  }, [handleWheel]);
+  }, [handleWheel, pinned]);
 
-  // ── Zoom preset buttons ──────────────────────────────────────────────────────
   const zoomIn  = () => applyZoom(ppmRef.current * 1.25);
   const zoomOut = () => applyZoom(ppmRef.current * 0.8);
 
   const applyPreset = (preset) => {
-    const sc = scrollContainerRef.current;
-    if (preset === 'auto' || preset === 'fit') {
-      setZoomPreset('fit');
-    } else if (preset === 'full' || preset === '24h') {
-      setZoomPreset('24h');
-    } else if (preset === '12h') {
-      setZoomPreset('12h');
-    }
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+    if (preset === 'auto' || preset === 'fit') setZoomPreset('fit');
+    else if (preset === 'full' || preset === '24h') setZoomPreset('24h');
+    else if (preset === '12h') setZoomPreset('12h');
     setCustomPpm(null);
     if (sc) requestAnimationFrame(() => { sc.scrollLeft = 0; });
   };
 
-  // Reset preset when viewMode changes
   useEffect(() => {
     setZoomPreset('fit');
     setCustomPpm(null);
-    if (scrollContainerRef.current) scrollContainerRef.current.scrollLeft = 0;
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+    if (sc) sc.scrollLeft = 0;
   }, [viewMode]);
 
-  // ── Data loading (unchanged) ─────────────────────────────────────────────────
+  // ── Data loading ─────────────────────────────────────────────────────────────
   useEffect(() => { loadStaticData(); }, []);
   useEffect(() => {
     if (!initialLoadDoneRef.current) return;
@@ -349,10 +381,8 @@ export default function Matrix() {
   }, [currentDate, viewMode]);
   useEffect(() => {
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => { debouncedLoadDataRef.current(true); });
-    // Refresh when tab regains focus (catches Schedule changes made in another tab)
     const onVisibility = () => { if (document.visibilityState === 'visible') debouncedLoadDataRef.current(true); };
     document.addEventListener('visibilitychange', onVisibility);
-    // Refresh on explicit event dispatched by WorkerCell after saving
     const onTemplateRowsUpdated = () => { debouncedLoadDataRef.current(true); };
     window.addEventListener('templateRowsUpdated', onTemplateRowsUpdated);
     return () => {
@@ -405,7 +435,6 @@ export default function Matrix() {
       const weekEndStr = format(weekEnd, "yyyy-MM-dd");
       const dateStr = format(currentDate, "yyyy-MM-dd");
 
-      // Load availability / unavailability
       const availabilitiesData = await base44.entities.Availability.list();
       await new Promise(r => setTimeout(r, 100));
       const unavailabilitiesData = viewMode === "daily"
@@ -413,18 +442,15 @@ export default function Matrix() {
         : await base44.entities.Unavailability.list();
       await new Promise(r => setTimeout(r, 100));
 
-      // Load TemplateRows: always fetch per-date (never use .list() for schedule bars)
       let filteredTemplateRows = [];
       if (viewMode === "daily") {
         filteredTemplateRows = await base44.entities.TemplateRow.filter({ date: dateStr });
       } else {
-        // Weekly: fetch each date in the week individually to avoid stale/unrelated rows
         const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
         const perDayRows = await Promise.all(weekDates.map(d => base44.entities.TemplateRow.filter({ date: d })));
         filteredTemplateRows = perDayRows.flat();
       }
 
-      // For daily: also fetch continuation source rows that may live on a different date
       if (viewMode === "daily") {
         const continuationRows = filteredTemplateRows.filter(r => r.values?.is_continuation && r.values?.continuation_source_row_id);
         const uniqueSourceIds = [...new Set(continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean))];
@@ -461,8 +487,7 @@ export default function Matrix() {
   const dateString = format(currentDate, "yyyy-MM-dd");
   const weekStartDate = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-  // ── Data helpers (unchanged) ─────────────────────────────────────────────────
-  // Check if a worker is assigned to a row by scanning ONLY worker-type columns
+  // ── Data helpers ─────────────────────────────────────────────────────────────
   const isWorkerAssignedToRow = (row, workerId, template) => {
     if (!row.values || !workerId) return { assigned: false, workerColumnName: null };
     const columns = template?.columns || [];
@@ -479,26 +504,15 @@ export default function Matrix() {
     const targetDate = date || dateString;
     const shifts = [];
     templateRows.forEach(row => {
-      if (!row.values) {
-        console.log("MATRIX SKIPPED ROW", { rowId: row.id, rowDate: row.date, reason: "no values" });
-        return;
-      }
-      // Only show rows for the exact selected date
+      if (!row.values) return;
       if (row.date !== targetDate) return;
-
       const template = allTemplates.find(t => t.id === row.template_id);
-      if (!template) {
-        console.log("MATRIX SKIPPED ROW", { rowId: row.id, rowDate: row.date, reason: "template not found" });
-        return;
-      }
-
+      if (!template) return;
       const isContinuation = row.values.is_continuation;
       const sourceRowId = row.values.continuation_source_row_id;
       let assignedResult = { assigned: false, workerColumnName: null };
       let briefingTime = row.values?.["תדריך"];
-
       if (isContinuation && sourceRowId) {
-        // For continuation rows, check workers from the SOURCE row
         const sourceRow = templateRows.find(r => r.id === sourceRowId);
         if (sourceRow && sourceRow.values) {
           const sourceTemplate = allTemplates.find(t => t.id === sourceRow.template_id) || template;
@@ -508,31 +522,10 @@ export default function Matrix() {
       } else {
         assignedResult = isWorkerAssignedToRow(row, workerId, template);
       }
-
       if (!assignedResult.assigned) return;
-
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
-      if (!startTime || !endTime) {
-        console.log("MATRIX SKIPPED ROW", { rowId: row.id, rowDate: row.date, reason: "no start/end time" });
-        return;
-      }
-
-      console.log("MATRIX SCHEDULE BAR", {
-        rowId: row.id,
-        rowDate: row.date,
-        selectedDate: targetDate,
-        templateId: row.template_id,
-        groupId: row.group_id,
-        workerId,
-        workerName: workers.find(w => w.id === workerId)?.nickname,
-        workerColumnName: assignedResult.workerColumnName,
-        startTime,
-        endTime,
-        status: row.values?.status || null,
-        source: "schedule"
-      });
-
+      if (!startTime || !endTime) return;
       shifts.push({
         id: `schedule_${row.id}_${assignedResult.workerColumnName}_${workerId}`,
         source: "schedule",
@@ -721,19 +714,14 @@ export default function Matrix() {
     return Math.max(0, Math.min(6, diff));
   };
 
-  // ── Drag handlers — now use pixel positions ──────────────────────────────────
+  // ── Drag handlers ────────────────────────────────────────────────────────────
   const handleMouseDown = (e, worker, shift, action, dayIndex = 0) => {
     e.preventDefault(); e.stopPropagation();
     if (action === 'move' && e.detail === 2) return;
     const timeline = timelineRefs.current[worker.id];
     if (!timeline) return;
     const rect = timeline.getBoundingClientRect();
-    // In RTL layout, right edge = 0, left edge = timelineWidth
-    // clientX - rect.left = distance from left edge of timeline element
-    // RTL pixel offset from right = rect.width - (clientX - rect.left)
     const pxFromRight = rect.width - (e.clientX - rect.left);
-    // But bars use "right" % of their parent element (which is the timeline).
-    // Let's store raw clientX and rect for computing in move.
     const startPxFromRight = Math.max(0, Math.min(timelineWidth, pxFromRight));
     setDragging({ workerId: worker.id, worker, shift, action, startPxFromRight, originalStart: shift?.start_time, originalEnd: shift?.end_time, originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0, rect });
   };
@@ -742,17 +730,8 @@ export default function Matrix() {
     if (!dragging) return;
     const { worker, shift, action, startPxFromRight, originalStart, originalEnd, originalDay, rect } = dragging;
     const currentPxFromRight = Math.max(0, Math.min(timelineWidth, rect.width - (e.clientX - rect.left)));
-
-    // Convert pixel-from-right to "operational minutes from right edge" = pxFromRight / ppm
-    const pxToOpMins = (px) => px / ppm;
-
-    let newStart = originalStart, newEnd = originalEnd, newDay = originalDay || 0;
-
-    const pxToTime = (px) => pixelsToTime(px / ppm * ppm, viewMode, ppm);
-
-    // Convert px-from-right to timeline-pixel-from-left (for pixelsToTime)
     const rightToTimelinePx = (pxR) => Math.max(0, timelineWidth - pxR);
-
+    let newStart = originalStart, newEnd = originalEnd, newDay = originalDay || 0;
     if (action === 'create') {
       const [minPx, maxPx] = [Math.min(startPxFromRight, currentPxFromRight), Math.max(startPxFromRight, currentPxFromRight)];
       const sd = pixelsToTime(rightToTimelinePx(maxPx), viewMode, ppm);
@@ -767,7 +746,6 @@ export default function Matrix() {
       const origStartPx = timeToPixels(originalStart, originalDay || 0, viewMode, ppm);
       const origEndPx = endTimeToPixels(originalStart, originalEnd, viewMode, ppm, originalDay || 0);
       const widthPx = origEndPx - origStartPx;
-      // origStartPx is from timeline left; "from right" = timelineWidth - origStartPx
       const origStartPxFromRight = timelineWidth - origStartPx;
       const delta = currentPxFromRight - startPxFromRight;
       const newStartPxFromRight = origStartPxFromRight + delta;
@@ -809,15 +787,8 @@ export default function Matrix() {
       await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
       debouncedLoadData();
     } catch (error) {
-      console.error('Error updating shift type:', error);
-      // Retry after delay
       await new Promise(r => setTimeout(r, 500));
-      try {
-        await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
-        debouncedLoadData();
-      } catch (retryError) {
-        console.error('Retry failed:', retryError);
-      }
+      try { await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts }); debouncedLoadData(); } catch {}
     }
   };
 
@@ -938,30 +909,17 @@ export default function Matrix() {
     return 0;
   };
 
-  // ── Bar Components (now use pixel positions via timeToPixels) ─────────────────
+  // ── Bar Components ────────────────────────────────────────────────────────────
   const AssignmentBar = ({ assignment }) => {
     const positionDate = assignment.schedule_date || assignment.date;
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(positionDate) : 0;
     const startPx = timeToPixels(assignment.start_time, dayIndex, viewMode, ppm);
     const endPx = endTimeToPixels(assignment.start_time, assignment.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 2);
-    // RTL: right = startPx (position from right edge)
     const rightPx = startPx;
-    const workerName = workers.find(w => w.id === assignment.worker_id)?.nickname || '';
     if (startPx < 0 || startPx > timelineWidth) return null;
     const isTemplate = assignment.isTemplateShift;
     const standby = isStandbyStatus(assignment.status);
-    console.log("MATRIX ASSIGNMENT POSITION", {
-      workerName,
-      startTime: assignment.start_time,
-      endTime: assignment.end_time,
-      dayIndex,
-      startPx,
-      endPx,
-      widthPx,
-      rightPx,
-      expected: "rightPx should equal startPx"
-    });
     if (standby) {
       const borderColor = isTemplate ? '#a855f7' : '#3b82f6';
       return (
@@ -1000,16 +958,6 @@ export default function Matrix() {
     const endPx = endTimeToPixels(shift.start_time, shift.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 0);
     const rightPx = startPx;
-    console.log("MATRIX AVAILABILITY POSITION", {
-      workerName: worker.nickname,
-      startTime: shift.start_time,
-      endTime: shift.end_time,
-      dayIndex,
-      startPx,
-      endPx,
-      widthPx,
-      rightPx
-    });
     if (startPx < 0 || startPx > timelineWidth) return null;
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
     const borderColors = { wanted: '#16a34a', available: '#3b82f6', unavailable: '#dc2626' };
@@ -1036,8 +984,8 @@ export default function Matrix() {
           const avS = toMins(shift.start_time), avE = toMins(shift.end_time) || avS + 24*60;
           const assS = toMins(ass.start_time), assE = toMins(ass.end_time) || assS + 24*60;
           const overS = Math.max(avS, assS), overE = Math.min(avE, assE);
-          const totalMins = avE - avS;
-          return <div key={i} className="absolute top-0 h-full" style={{ left: `${((overS - avS) / totalMins) * 100}%`, width: `${((overE - overS) / totalMins) * 100}%`, backgroundColor: isStandbyStatus(ass.status) ? 'rgba(200,200,210,0.55)' : 'rgba(192,132,252,0.55)', pointerEvents: 'none' }} />;
+          const totalM = avE - avS;
+          return <div key={i} className="absolute top-0 h-full" style={{ left: `${((overS - avS) / totalM) * 100}%`, width: `${((overE - overS) / totalM) * 100}%`, backgroundColor: isStandbyStatus(ass.status) ? 'rgba(200,200,210,0.55)' : 'rgba(192,132,252,0.55)', pointerEvents: 'none' }} />;
         })}
       </div>
     );
@@ -1092,14 +1040,368 @@ export default function Matrix() {
     return <div className="flex gap-0.5 items-center">{days.map((d, i) => <div key={i} className={`text-[9px] font-medium leading-tight ${d.working ? 'text-green-600' : 'text-gray-300'}`} title={`${d.day}: ${d.working ? d.hours.toFixed(1) + 'h' : 'חופש'}`}>{d.day}</div>)}</div>;
   };
 
-  // ── Hour ruler slots for the header ──────────────────────────────────────────
   const dailySlots = useMemo(() => getDailyTimeSlots(), []);
   const weeklySlots = useMemo(
     () => getWeeklyTimeSlots(startOfWeek(currentDate, { weekStartsOn: 0 })),
     [currentDate]
   );
 
+  // ── Filtered workers ──────────────────────────────────────────────────────────
+  const filteredWorkers = useMemo(() => workers.filter(w => {
+    if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
+    if (roleFilter !== "__all__") { const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []); if (!roles.includes(roleFilter)) return false; }
+    return true;
+  }), [workers, populationFilter, roleFilter]);
 
+  // ── Row height: fixed 32px (h-8) — constant for both panels ──────────────────
+  const ROW_H = 32;
+
+  // ── Render helpers ────────────────────────────────────────────────────────────
+  const renderTimelineHeader = () => (
+    <div className="flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
+      {viewMode === 'daily' ? (
+        dailySlots.map((hour) => (
+          <div key={hour} className="shrink-0 text-xs text-gray-600 py-3 border-l text-center font-medium overflow-hidden" style={{ width: `${60 * ppm}px` }}>
+            {String(hour).padStart(2, '0')}:00
+          </div>
+        ))
+      ) : (
+        weeklySlots.map((slot, idx) => (
+          <div key={idx} className={`shrink-0 text-xs text-gray-600 py-1 text-center font-medium overflow-hidden ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : 'border-l border-l-gray-200'}`} style={{ width: `${60 * ppm}px` }}>
+            {slot.label && <div className="font-bold text-gray-800 text-[10px] leading-tight">{slot.label}</div>}
+            {slot.dateLabel && <div className="text-[8px] text-gray-500 leading-tight">{slot.dateLabel}</div>}
+            <div className={`text-[8px] leading-tight ${slot.hour === 0 ? 'text-gray-800 font-semibold' : 'text-gray-400'}`}>
+              {String(slot.hour).padStart(2, '0')}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const renderWorkerCell = (worker, index) => {
+    const sendStatus = getWorkerSendStatus(worker);
+    const actionClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
+    return (
+      <div
+        key={worker.id}
+        className={`flex items-center border-b h-8 shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+        style={{ height: `${ROW_H}px` }}
+      >
+        <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
+        <button onClick={() => sendWhatsAppNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${actionClass}`} title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}>
+          {sendingWhatsApp ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+        </button>
+        <button onClick={() => { setSelectedWorkerForNotification(worker); setNotificationNotes(""); setShowNotificationDialog(true); }} className={`rounded p-1 transition-colors hover:bg-gray-100 ${actionClass}`} title="שלח לוח משמרות באימייל">
+          <Send className="w-4 h-4" />
+        </button>
+        <div className="flex items-center flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
+            <span className="truncate block text-sm leading-tight">{worker.nickname}</span>
+            <WeeklySummary worker={worker} />
+          </div>
+          <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSummaryCell = (worker, col, index) => (
+    <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ height: `${ROW_H}px` }}>
+      <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
+    </div>
+  );
+
+  const renderTimelineRow = (worker, index) => {
+    const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
+    const workerTemplateShifts = (() => {
+      if (viewMode !== 'weekly') return getWorkerTemplateShifts(worker.id, dateString);
+      const wS = startOfWeek(currentDate, { weekStartsOn: 0 });
+      const all = [];
+      for (let _i = 0; _i < 7; _i++) all.push(...getWorkerTemplateShifts(worker.id, format(addDays(wS, _i), "yyyy-MM-dd")));
+      return all;
+    })();
+    const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
+    const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
+
+    return (
+      <div
+        key={worker.id}
+        className={`relative border-b cursor-crosshair shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+        style={{ width: `${timelineWidth}px`, height: `${ROW_H}px` }}
+        dir="rtl"
+        data-worker-id={worker.id}
+        ref={el => { if (el) timelineRefs.current[worker.id] = el; }}
+        onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
+      >
+        {/* Grid lines */}
+        <div className="absolute inset-0 flex" dir="rtl">
+          {viewMode === 'daily'
+            ? dailySlots.map(hour => <div key={hour} className="shrink-0 border-l time-slot h-full" style={{ width: `${60 * ppm}px` }} />)
+            : weeklySlots.map((slot, idx) => <div key={idx} className="shrink-0 border-l time-slot h-full" style={{ width: `${60 * ppm}px` }} />)
+          }
+        </div>
+        {/* Day boundary lines (weekly) */}
+        <div className="absolute inset-0">
+          {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
+            const px = timeToPixels("06:00", day, 'weekly', ppm);
+            return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
+          })}
+          {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
+          {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
+          {workerTemplateShifts.map(ts => (
+            <React.Fragment key={ts.id}>
+              <AssignmentBar assignment={ts} />
+              {ts.briefing_time && <BriefingBar
+                briefingTime={ts.briefing_time}
+                shiftStartTime={ts.start_time}
+                shiftEndTime={ts.end_time}
+                dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
+                viewMode={viewMode}
+                ppm={ppm}
+                timeToPixels={timeToPixels}
+              />}
+            </React.Fragment>
+          ))}
+          {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
+          <DragPreviewBar preview={dragPreview} workerId={worker.id} />
+        </div>
+      </div>
+    );
+  };
+
+  // ── PINNED LAYOUT ─────────────────────────────────────────────────────────────
+  const renderPinnedLayout = () => (
+    <div className="flex flex-1 min-h-0" dir="rtl">
+      {/* ── Fixed Worker Panel (right side, RTL) ── */}
+      <div
+        className="flex flex-col flex-shrink-0 bg-white z-20"
+        style={{
+          width: `${fixedColumnsWidth}px`,
+          boxShadow: '-4px 0 8px rgba(0,0,0,0.06)',
+          borderLeft: '1px solid #e5e7eb',
+        }}
+      >
+        {/* Worker panel header */}
+        <div className="flex-shrink-0 bg-gray-100 border-b z-10" style={{ height: '40px' }}>
+          <div className="flex items-center h-full">
+            {/* Pin icon in the top-right corner of the fixed panel header */}
+            <div className="w-[220px] min-w-[220px] px-2 flex items-center gap-1 h-full border-r">
+              <MasterControls
+                workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
+                getWorkerSendStatus={getWorkerSendStatus}
+                onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
+                onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
+                sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
+              />
+              {/* Pin indicator inside fixed panel header */}
+              <div className="ml-auto flex-shrink-0 text-green-600" title="עמודות עובדים נעוצות">
+                <PinIcon size={13} />
+              </div>
+            </div>
+            {viewMode === 'weekly' && summaryColumns.map(col => (
+              <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1 h-full" title={col.name}>
+                <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
+              </div>
+            ))}
+            {viewMode === 'weekly' && (
+              <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center h-full">
+                <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Worker panel body — vertical scroll only */}
+        <div
+          ref={workerPanelRef}
+          className="overflow-y-auto overflow-x-hidden flex-1 min-h-0"
+          style={{ scrollbarWidth: 'none' }}
+        >
+          {loading && !initialLoaded ? (
+            <div className="text-center p-8" dir="rtl">טוען...</div>
+          ) : filteredWorkers.length === 0 ? (
+            <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
+          ) : (
+            filteredWorkers.map((worker, index) => (
+              <div key={worker.id} className="flex" style={{ height: `${ROW_H}px` }}>
+                {/* Worker name + actions */}
+                <div
+                  className={`w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 h-full ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                >
+                  {renderWorkerCell(worker, index)}
+                </div>
+                {/* Summary columns */}
+                {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index))}
+                {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* ── Scrollable Timeline Panel (left side, RTL) ── */}
+      <div className="flex flex-col flex-1 min-w-0 min-h-0">
+        {/* Timeline header — horizontal scroll synced with body, no scrollbar shown */}
+        <div
+          ref={timelineHeaderRef}
+          className="flex-shrink-0 bg-gray-100 border-b overflow-x-hidden"
+          style={{ height: '40px' }}
+          dir="ltr"
+        >
+          <div style={{ width: `${timelineWidth}px` }}>
+            {renderTimelineHeader()}
+          </div>
+        </div>
+
+        {/* Timeline body — both axes scrollable */}
+        <div
+          ref={timelineScrollRef}
+          className="flex-1 min-h-0 overflow-x-auto overflow-y-auto"
+          dir="ltr"
+          onMouseDown={handlePointerDown}
+          onMouseMove={handlePointerMove}
+          onMouseUp={handlePointerUp}
+        >
+          <div dir="rtl" style={{ width: `${timelineWidth}px` }}>
+            {loading && !initialLoaded ? null : (
+              filteredWorkers.map((worker, index) => renderTimelineRow(worker, index))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── CLASSIC (UNPINNED) LAYOUT — identical to original ─────────────────────────
+  const renderClassicLayout = () => (
+    <div
+      ref={scrollContainerRef}
+      dir="ltr"
+      className="overflow-x-auto overflow-y-auto flex-1 min-h-0"
+      onMouseDown={handlePointerDown}
+      onMouseMove={handlePointerMove}
+      onMouseUp={handlePointerUp}
+    >
+      <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
+        {/* Sticky header row */}
+        <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
+          <div className="w-[220px] min-w-[220px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
+            <MasterControls
+              workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
+              getWorkerSendStatus={getWorkerSendStatus}
+              onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
+              onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
+              sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
+            />
+          </div>
+          {viewMode === 'weekly' && summaryColumns.map(col => (
+            <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1" title={col.name}>
+              <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
+            </div>
+          ))}
+          {viewMode === 'weekly' && (
+            <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center">
+              <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
+            </div>
+          )}
+          <div className="flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
+            {renderTimelineHeader()}
+          </div>
+        </div>
+
+        {/* Worker rows */}
+        {loading && !initialLoaded ? (
+          <div className="text-center p-8" dir="rtl">טוען...</div>
+        ) : workers.length === 0 ? (
+          <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
+        ) : (
+          filteredWorkers.map((worker, index) => {
+            const sendStatus = getWorkerSendStatus(worker);
+            const actionClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
+            const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
+            const workerTemplateShifts = (() => {
+              if (viewMode !== 'weekly') return getWorkerTemplateShifts(worker.id, dateString);
+              const wS = startOfWeek(currentDate, { weekStartsOn: 0 });
+              const all = [];
+              for (let _i = 0; _i < 7; _i++) all.push(...getWorkerTemplateShifts(worker.id, format(addDays(wS, _i), "yyyy-MM-dd")));
+              return all;
+            })();
+            const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
+            const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
+
+            return (
+              <React.Fragment key={worker.id}>
+                <div className={`flex border-b h-8 shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ width: `${totalMatrixWidth}px` }}>
+                  <div className="w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-8">
+                    <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
+                    <button onClick={() => sendWhatsAppNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${actionClass}`} title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}>
+                      {sendingWhatsApp ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                    </button>
+                    <button onClick={() => { setSelectedWorkerForNotification(worker); setNotificationNotes(""); setShowNotificationDialog(true); }} className={`rounded p-1 transition-colors hover:bg-gray-100 ${actionClass}`} title="שלח לוח משמרות באימייל">
+                      <Send className="w-4 h-4" />
+                    </button>
+                    <div className="flex items-center flex-1 min-w-0">
+                      <div className="min-w-0 flex-1">
+                        <span className="truncate block text-sm leading-tight">{worker.nickname}</span>
+                        <WeeklySummary worker={worker} />
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
+                    </div>
+                  </div>
+                  {viewMode === 'weekly' && summaryColumns.map(col => (
+                    <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                      <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
+                    </div>
+                  ))}
+                  {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
+                  <div
+                    data-worker-id={worker.id}
+                    ref={el => { if (el) timelineRefs.current[worker.id] = el; }}
+                    className="relative border-r cursor-crosshair h-8 shrink-0"
+                    dir="rtl"
+                    style={{ width: `${timelineWidth}px` }}
+                    onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
+                  >
+                    <div className="absolute inset-0 flex h-8" dir="rtl">
+                      {viewMode === 'daily'
+                        ? dailySlots.map(hour => <div key={hour} className="shrink-0 border-l time-slot h-8" style={{ width: `${60 * ppm}px` }} />)
+                        : weeklySlots.map((slot, idx) => <div key={idx} className="shrink-0 border-l time-slot h-8" style={{ width: `${60 * ppm}px` }} />)
+                      }
+                    </div>
+                    <div className="absolute inset-0">
+                      {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
+                        const px = timeToPixels("06:00", day, 'weekly', ppm);
+                        return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
+                      })}
+                      {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
+                      {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
+                      {workerTemplateShifts.map(ts => (
+                        <React.Fragment key={ts.id}>
+                          <AssignmentBar assignment={ts} />
+                          {ts.briefing_time && <BriefingBar
+                            briefingTime={ts.briefing_time}
+                            shiftStartTime={ts.start_time}
+                            shiftEndTime={ts.end_time}
+                            dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
+                            viewMode={viewMode}
+                            ppm={ppm}
+                            timeToPixels={timeToPixels}
+                          />}
+                        </React.Fragment>
+                      ))}
+                      {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
+                      <DragPreviewBar preview={dragPreview} workerId={worker.id} />
+                    </div>
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -1125,184 +1427,40 @@ export default function Matrix() {
         {/* Zoom controls bar */}
         <div className="flex items-center gap-2 mb-1 px-1 flex-shrink-0" dir="rtl">
           <span className="text-xs text-gray-500 font-medium">רזולוציה:</span>
-          <button
-            onClick={zoomOut}
-            className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors"
-            title="הקטן רזולוציית זמן"
-          >−</button>
-          <button
-            onClick={zoomIn}
-            className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors"
-            title="הגדל רזולוציית זמן"
-          >+</button>
+          <button onClick={zoomOut} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הקטן רזולוציית זמן">−</button>
+          <button onClick={zoomIn} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הגדל רזולוציית זמן">+</button>
           <div className="w-px h-5 bg-gray-300 mx-1" />
           <button onClick={() => applyPreset('auto')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">התאם ליום</button>
           <button onClick={() => applyPreset('full')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">24h</button>
           <button onClick={() => applyPreset('12h')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">12h</button>
+          <div className="w-px h-5 bg-gray-300 mx-1" />
+          {/* Pin toggle button */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={togglePin}
+                  className={`w-7 h-7 flex items-center justify-center rounded border transition-colors ${
+                    pinned
+                      ? 'bg-green-50 border-green-400 text-green-600 hover:bg-green-100'
+                      : 'bg-white border-gray-300 text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+                  }`}
+                  title="נעץ עמודות עובדים"
+                >
+                  <PinIcon size={14} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent dir="rtl">
+                {pinned ? 'בטל נעיצת עמודות עובדים' : 'נעץ עמודות עובדים'}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <span className="text-[10px] text-gray-400 mr-2">Ctrl+גלגל לזום · גרירת גלגל לגלילה</span>
         </div>
 
         <Card className="border-none shadow-lg flex-1 min-h-0 flex flex-col">
           <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
-            {/* Outer scroll container — dir="ltr" so scrollLeft is always 0→right (LTR math) */}
-            <div
-              ref={scrollContainerRef}
-              dir="ltr"
-              className="overflow-x-auto overflow-y-auto flex-1 min-h-0"
-              onMouseDown={handlePointerDown}
-              onMouseMove={handlePointerMove}
-              onMouseUp={handlePointerUp}
-            >
-              {/* Inner fixed-width wrapper — RTL content direction restored here */}
-              <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
-                {/* Sticky header row */}
-                <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
-                  {/* Worker name column — sticky left */}
-                  <div className="w-[220px] min-w-[220px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
-                    <MasterControls
-                      workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
-                      getWorkerSendStatus={getWorkerSendStatus}
-                      onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
-                      onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
-                      sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
-                    />
-                  </div>
-                  {/* Summary columns (weekly) */}
-                  {viewMode === 'weekly' && summaryColumns.map(col => (
-                    <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1" title={col.name}>
-                      <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
-                    </div>
-                  ))}
-                  {viewMode === 'weekly' && (
-                    <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center">
-                      <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
-                    </div>
-                  )}
-                  {/* Time ruler — exact fixed slot widths, no flex-1 stretching */}
-                  <div className="flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
-                    {viewMode === 'daily' ? (
-                      dailySlots.map((hour) => (
-                        <div key={hour} className="shrink-0 text-xs text-gray-600 py-3 border-l text-center font-medium overflow-hidden" style={{ width: `${60 * ppm}px` }}>
-                          {String(hour).padStart(2, '0')}:00
-                        </div>
-                      ))
-                    ) : (
-                      weeklySlots.map((slot, idx) => (
-                        <div key={idx} className={`shrink-0 text-xs text-gray-600 py-1 text-center font-medium overflow-hidden ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : 'border-l border-l-gray-200'}`} style={{ width: `${60 * ppm}px` }}>
-                          {slot.label && <div className="font-bold text-gray-800 text-[10px] leading-tight">{slot.label}</div>}
-                          {slot.dateLabel && <div className="text-[8px] text-gray-500 leading-tight">{slot.dateLabel}</div>}
-                          <div className={`text-[8px] leading-tight ${slot.hour === 0 ? 'text-gray-800 font-semibold' : 'text-gray-400'}`}>
-                            {String(slot.hour).padStart(2, '0')}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Worker rows */}
-                {loading && !initialLoaded ? (
-                  <div className="text-center p-8" dir="rtl">טוען...</div>
-                ) : workers.length === 0 ? (
-                  <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
-                ) : (
-                  workers.filter(w => {
-                    if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
-                    if (roleFilter !== "__all__") { const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []); if (!roles.includes(roleFilter)) return false; }
-                    return true;
-                  }).map((worker, index) => {
-                    const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
-                    const workerTemplateShifts = (() => {
-                      if (viewMode !== 'weekly') return getWorkerTemplateShifts(worker.id, dateString);
-                      const wS = startOfWeek(currentDate, { weekStartsOn: 0 });
-                      const all = [];
-                      for (let _i = 0; _i < 7; _i++) all.push(...getWorkerTemplateShifts(worker.id, format(addDays(wS, _i), "yyyy-MM-dd")));
-                      return all;
-                    })();
-                    const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
-                    const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
-                    const sendStatus = getWorkerSendStatus(worker);
-                    const actionClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
-
-                    return (
-                      <React.Fragment key={worker.id}>
-                      <div className={`flex border-b h-8 shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ width: `${totalMatrixWidth}px` }}>
-                        {/* Worker name cell — sticky left */}
-                        <div className="w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-8">
-                          <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
-                          <button onClick={() => sendWhatsAppNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${actionClass}`} title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}>
-                            {sendingWhatsApp ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /> : <MessageCircle className="w-4 h-4" />}
-                          </button>
-                          <button onClick={() => { setSelectedWorkerForNotification(worker); setNotificationNotes(""); setShowNotificationDialog(true); }} className={`rounded p-1 transition-colors hover:bg-gray-100 ${actionClass}`} title="שלח לוח משמרות באימייל">
-                            <Send className="w-4 h-4" />
-                          </button>
-                          <div className="flex items-center flex-1 min-w-0">
-                            <div className="min-w-0 flex-1">
-                              <span className="truncate block text-sm leading-tight">{worker.nickname}</span>
-                              <WeeklySummary worker={worker} />
-                            </div>
-                            <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
-                          </div>
-                        </div>
-                        {/* Summary columns (weekly) */}
-                        {viewMode === 'weekly' && summaryColumns.map(col => (
-                          <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                            <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
-                          </div>
-                        ))}
-                        {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
-
-                        {/* Timeline area — exact width matching ruler */}
-                        <div
-                          data-worker-id={worker.id}
-                          ref={el => { if (el) timelineRefs.current[worker.id] = el; }}
-                          className="relative border-r cursor-crosshair h-8 shrink-0"
-                          dir="rtl"
-                          style={{ width: `${timelineWidth}px` }}
-                          onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
-                        >
-                          {/* Grid lines — exact fixed slot widths matching ruler */}
-                          <div className="absolute inset-0 flex h-8" dir="rtl">
-                            {viewMode === 'daily'
-                              ? dailySlots.map(hour => <div key={hour} className="shrink-0 border-l time-slot h-8" style={{ width: `${60 * ppm}px` }} />)
-                              : weeklySlots.map((slot, idx) => <div key={idx} className="shrink-0 border-l time-slot h-8" style={{ width: `${60 * ppm}px` }} />)
-                            }
-                          </div>
-                          {/* Day boundary lines (weekly) */}
-                          <div className="absolute inset-0">
-                            {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
-                              // 06:00 of each day in weekly pixel coords
-                              const px = timeToPixels("06:00", day, 'weekly', ppm);
-                              const rightPx = px;
-                              return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${rightPx}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
-                            })}
-                            {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
-                            {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
-                            {workerTemplateShifts.map(ts => (
-                              <React.Fragment key={ts.id}>
-                                <AssignmentBar assignment={ts} />
-                                {ts.briefing_time && <BriefingBar
-                                   briefingTime={ts.briefing_time}
-                                   shiftStartTime={ts.start_time}
-                                   shiftEndTime={ts.end_time}
-                                   dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
-                                   viewMode={viewMode}
-                                   ppm={ppm}
-                                   timeToPixels={timeToPixels}
-                                 />}
-                              </React.Fragment>
-                            ))}
-                            {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
-                            <DragPreviewBar preview={dragPreview} workerId={worker.id} />
-                          </div>
-                        </div>
-                      </div>
-                      </React.Fragment>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+            {pinned ? renderPinnedLayout() : renderClassicLayout()}
           </CardContent>
         </Card>
 
