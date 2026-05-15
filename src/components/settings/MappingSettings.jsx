@@ -31,10 +31,9 @@ export default function MappingSettings({ onNavigateToTab }) {
 
   const loadData = async () => {
     setLoading(true);
-    const [allSettings, allTemplates] = await Promise.all([
-      base44.entities.AppSettings.list(),
-      base44.entities.Template.list(),
-    ]);
+    const allSettings = await base44.entities.AppSettings.list();
+    await new Promise(r => setTimeout(r, 400));
+    const allTemplates = await base44.entities.Template.list();
 
     const flat = [];
     for (const key of Object.keys(SECTION_LABELS)) {
