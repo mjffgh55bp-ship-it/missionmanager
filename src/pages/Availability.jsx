@@ -199,7 +199,7 @@ export default function Availability() {
 
     // Batch 1: availability + unavailability (with delays between calls to avoid rate limit)
     const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 300));
     const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
 
     if (availabilities.length > 0) {
@@ -221,23 +221,24 @@ export default function Availability() {
     setUnavailabilities(weekUnavailabilities);
 
     // Sequential fetches with delays to avoid rate limits
+    await new Promise(r => setTimeout(r, 300));
     const templatesData = await getCachedTemplates(base44.entities);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 300));
     
     const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 300));
     
     const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 300));
     
     const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 300));
     
     const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 300));
     
     const allTemplateRowsData = await base44.entities.TemplateRow.list();
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 300));
 
     // Filter client-side to only rows within this week (for demand panel)
     const templateRowsData = allTemplateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
