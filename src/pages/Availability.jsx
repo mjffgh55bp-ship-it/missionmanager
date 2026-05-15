@@ -132,14 +132,15 @@ export default function Availability() {
 
     // Sequential static data fetches to avoid rate limits
     const workersData = await getCachedWorkers(base44.entities);
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 600));
     const allSettings = await getCachedAllSettings(base44.entities);
+    await new Promise(r => setTimeout(r, 600));
 
-    // Batch 2: non-cached dynamic data — staggered to avoid rate limits
+    // non-cached dynamic data — staggered to avoid rate limits
     const eventsData = await base44.entities.CompanyEvent.list("-date");
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 600));
     const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 600));
 
     // Extract settings client-side (no extra API calls)
     const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -182,7 +183,7 @@ export default function Availability() {
     staticLoaded.current = true;
 
     // Now load dynamic (week-scoped) data — pause first to avoid rate limit
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 600));
     if (worker) {
       await loadDynamicData(worker, user);
     }
