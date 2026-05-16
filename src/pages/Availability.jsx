@@ -184,7 +184,7 @@ export default function Availability() {
     staticLoaded.current = true;
 
     // Now load dynamic (week-scoped) data — pause first to avoid rate limit
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 1000));
     if (worker) {
       await loadDynamicData(worker, user);
     }
@@ -198,10 +198,15 @@ export default function Availability() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
-    // Batch 1: availability + unavailability (with delays between calls to avoid rate limit)
+    const delay = (ms) => new Promise(r => setTimeout(r, ms));
+
+    // 1. Worker's own availability for this week
     const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
-    await new Promise(r => setTimeout(r, 300));
+    await delay(800);
+
+    // 2. Worker's unavailabilities (all-time, filtered client-side)
     const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
+    await delay(800);
 
     if (availabilities.length > 0) {
       setExistingAvailability(availabilities[0]);
@@ -221,30 +226,29 @@ export default function Availability() {
     });
     setUnavailabilities(weekUnavailabilities);
 
-    // Sequential fetches with delays to avoid rate limits
-    await new Promise(r => setTimeout(r, 500));
+    // 3. Templates (cached)
     const templatesData = await getCachedTemplates(base44.entities);
-    await new Promise(r => setTimeout(r, 700));
+    await delay(800);
 
+    // 4. All availabilities for this week (for demand panel)
     const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-    await new Promise(r => setTimeout(r, 700));
+    await delay(800);
 
+    // 5. All assignments for this worker (3 roles merged into one list via 3 calls, staggered)
     const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 700));
-
+    await delay(800);
     const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 700));
-
+    await delay(800);
     const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 700));
+    await delay(800);
 
-    // Fetch template rows per-day for the week (avoids expensive .list() on the full table)
+    // 6. Template rows per-day for the week (7 staggered calls)
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
     const perDayRows = [];
     for (const d of weekDates) {
       const rows = await base44.entities.TemplateRow.filter({ date: d });
       perDayRows.push(...rows);
-      await new Promise(r => setTimeout(r, 500));
+      await delay(700);
     }
     const allTemplateRowsData = perDayRows;
 
@@ -254,13 +258,12 @@ export default function Availability() {
     const allAssignments = [...assignmentsData, ...sousAssignments, ...additionalAssignments];
     setAssignments(allAssignments);
     setTemplateRows(templateRowsData);
-    setAllTemplateRowsForCalendar(allTemplateRowsData); // now week-scoped (no full .list())
+    setAllTemplateRowsForCalendar(allTemplateRowsData);
     setAllTemplates(templatesData);
     setWeekAvailabilities(weekAvailsData);
 
-    // Reload open_registrations fresh from DB — load ALL, do NOT auto-clean
-    // (cleaning is only done intentionally via the "נקה ישנות" button)
-    await new Promise(r => setTimeout(r, 150));
+    // 7. Fresh open_registrations
+    await delay(800);
     const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
     const freshOpenReg = openRegSettings.length > 0
       ? (() => { try { return JSON.parse(openRegSettings[0].setting_value); } catch { return []; } })()
