@@ -11,6 +11,7 @@ import {
   filterDemandForWeek,
 } from "@/lib/shiftDemand";
 import { filterVisibleScheduleRows } from "@/lib/scheduleVisibility";
+import { getOperationalMinutes, getOperationalEndMinutes } from "@/lib/operationalDate";
 import { formatHebrewDate } from "@/components/utils/HebrewDate";
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -140,6 +141,16 @@ function DayColumn({ dateStr, shifts, allAvailabilities, workers, myRoles, selec
   shifts.forEach(s => {
     if (!byMoked[s.mokedName]) byMoked[s.mokedName] = [];
     byMoked[s.mokedName].push(s);
+  });
+
+  // Sort each moked's shifts by operational start time (06:00 = 0, 02:00 = 1200, etc.)
+  Object.values(byMoked).forEach(mokedShifts => {
+    mokedShifts.sort((a, b) => {
+      const aStart = getOperationalMinutes(a.startTime);
+      const bStart = getOperationalMinutes(b.startTime);
+      if (aStart !== bStart) return aStart - bStart;
+      return getOperationalEndMinutes(a.startTime, a.endTime) - getOperationalEndMinutes(b.startTime, b.endTime);
+    });
   });
 
   return (
