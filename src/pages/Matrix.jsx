@@ -20,7 +20,7 @@ import { NotificationDialog, TypeChangeDialog, ManualShiftDialog } from "../comp
 const DAILY_TOTAL_MINUTES = 24 * 60;        // 1440
 const WEEKLY_TOTAL_MINUTES = 7 * 24 * 60;  // 10080
 const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
-const FIXED_COL_WIDTH = 220;      // worker name column px
+const WORKER_COL_WIDTH = 170;     // worker name column px
 const SUMMARY_COL_WIDTH = 60;     // each summary column
 const SUMMARY_ADD_COL_WIDTH = 28; // the "+column" button
 
@@ -134,7 +134,7 @@ export default function Matrix() {
   const totalMins = viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES;
 
   const fixedColumnsWidth = useMemo(() => {
-    return FIXED_COL_WIDTH +
+    return WORKER_COL_WIDTH +
       (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH : 0) +
       (viewMode === 'weekly' ? SUMMARY_ADD_COL_WIDTH : 0);
   }, [viewMode, summaryColumns]);
@@ -190,6 +190,11 @@ export default function Matrix() {
   const [signupMode, setSignupMode] = useState("allow_over_sign_up");
   const [savingSignupMode, setSavingSignupMode] = useState(false);
   const settingsIdCache = useRef({});
+
+  // ── Row selection ─────────────────────────────────────────────────────────────
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState(new Set());
+  const lastSelectedIndexRef = useRef(null);
+  const filteredWorkersRef = useRef([]);
 
   // ── Scroll refs ──────────────────────────────────────────────────────────────
   // Legacy single-container (unpinned)
@@ -282,7 +287,7 @@ export default function Matrix() {
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     const oldPpm = ppmRef.current;
     if (!containerWidth) return;
-    const fixedW = pinned ? 0 : (FIXED_COL_WIDTH +
+    const fixedW = pinned ? 0 : (WORKER_COL_WIDTH +
       (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH + SUMMARY_ADD_COL_WIDTH : 0));
     const available = Math.max(300, containerWidth - fixedW);
     const ppmFit = available / totalMins;
@@ -1052,6 +1057,33 @@ export default function Matrix() {
     if (roleFilter !== "__all__") { const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []); if (!roles.includes(roleFilter)) return false; }
     return true;
   }), [workers, populationFilter, roleFilter]);
+  filteredWorkersRef.current = filteredWorkers;
+
+  const handleRowClick = useCallback((e, worker, index) => {
+    if (e.shiftKey && lastSelectedIndexRef.current !== null) {
+      const lo = Math.min(lastSelectedIndexRef.current, index);
+      const hi = Math.max(lastSelectedIndexRef.current, index);
+      setSelectedWorkerIds(prev => {
+        const next = new Set(prev);
+        for (let i = lo; i <= hi; i++) {
+          const w = filteredWorkersRef.current[i];
+          if (w) next.add(w.id);
+        }
+        return next;
+      });
+    } else if (e.ctrlKey || e.metaKey) {
+      setSelectedWorkerIds(prev => {
+        const next = new Set(prev);
+        if (next.has(worker.id)) next.delete(worker.id);
+        else next.add(worker.id);
+        return next;
+      });
+      lastSelectedIndexRef.current = index;
+    } else {
+      setSelectedWorkerIds(new Set([worker.id]));
+      lastSelectedIndexRef.current = index;
+    }
+  }, []);
 
   // ── Row height: fixed 32px (h-8) — constant for both panels ──────────────────
   const ROW_H = 32;
@@ -1079,20 +1111,25 @@ export default function Matrix() {
     </div>
   );
 
-  const renderWorkerCell = (worker, index) => {
+  // Renders the inner content of a worker cell (no outer wrapper — caller provides the container)
+  const renderWorkerCellContent = (worker, index) => {
     const sendStatus = getWorkerSendStatus(worker);
     const actionClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
     return (
-      <div
-        key={worker.id}
-        className={`flex items-center border-b h-8 shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
-        style={{ height: `${ROW_H}px` }}
-      >
-        <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
-        <button onClick={() => sendWhatsAppNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${actionClass}`} title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}>
+      <>
+        <div onClick={e => e.stopPropagation()}><WorkerLockButton worker={worker} onUpdate={refreshWorkers} /></div>
+        <button
+          onClick={e => { e.stopPropagation(); sendWhatsAppNotification(worker); }}
+          className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${actionClass}`}
+          title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}
+        >
           {sendingWhatsApp ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /> : <MessageCircle className="w-4 h-4" />}
         </button>
-        <button onClick={() => { setSelectedWorkerForNotification(worker); setNotificationNotes(""); setShowNotificationDialog(true); }} className={`rounded p-1 transition-colors hover:bg-gray-100 ${actionClass}`} title="שלח לוח משמרות באימייל">
+        <button
+          onClick={e => { e.stopPropagation(); setSelectedWorkerForNotification(worker); setNotificationNotes(""); setShowNotificationDialog(true); }}
+          className={`rounded p-1 transition-colors hover:bg-gray-100 ${actionClass}`}
+          title="שלח לוח משמרות באימייל"
+        >
           <Send className="w-4 h-4" />
         </button>
         <div className="flex items-center flex-1 min-w-0">
@@ -1100,19 +1137,23 @@ export default function Matrix() {
             <span className="truncate block text-sm leading-tight">{worker.nickname}</span>
             <WeeklySummary worker={worker} />
           </div>
-          <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
+          <Button
+            variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1"
+            onClick={e => { e.stopPropagation(); handleManualShiftAdd(worker); }}
+            title="הוסף חלון זמינות ידנית"
+          ><Plus className="w-3 h-3" /></Button>
         </div>
-      </div>
+      </>
     );
   };
 
-  const renderSummaryCell = (worker, col, index) => (
-    <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ height: `${ROW_H}px` }}>
+  const renderSummaryCell = (worker, col, index, isSelected) => (
+    <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ height: `${ROW_H}px` }}>
       <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
     </div>
   );
 
-  const renderTimelineRow = (worker, index) => {
+  const renderTimelineRow = (worker, index, isSelected) => {
     const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
     const workerTemplateShifts = (() => {
       if (viewMode !== 'weekly') return getWorkerTemplateShifts(worker.id, dateString);
@@ -1127,11 +1168,12 @@ export default function Matrix() {
     return (
       <div
         key={worker.id}
-        className={`relative border-b cursor-crosshair shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+        className={`relative border-b cursor-crosshair shrink-0 ${isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
         style={{ width: `${timelineWidth}px`, height: `${ROW_H}px` }}
         dir="rtl"
         data-worker-id={worker.id}
         ref={el => { if (el) timelineRefs.current[worker.id] = el; }}
+        onClick={e => handleRowClick(e, worker, index)}
         onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
       >
         {/* Grid lines */}
@@ -1185,8 +1227,7 @@ export default function Matrix() {
         {/* Worker panel header */}
         <div className="flex-shrink-0 bg-gray-100 border-b z-10" style={{ height: '40px' }}>
           <div className="flex items-center h-full">
-            {/* Pin icon in the top-right corner of the fixed panel header */}
-            <div className="w-[220px] min-w-[220px] px-2 flex items-center gap-1 h-full border-r">
+            <div className="px-2 flex items-center gap-1 h-full border-r" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
               <MasterControls
                 workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
                 getWorkerSendStatus={getWorkerSendStatus}
@@ -1223,19 +1264,29 @@ export default function Matrix() {
           ) : filteredWorkers.length === 0 ? (
             <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
           ) : (
-            filteredWorkers.map((worker, index) => (
-              <div key={worker.id} className="flex" style={{ height: `${ROW_H}px` }}>
-                {/* Worker name + actions */}
+            filteredWorkers.map((worker, index) => {
+              const isSelected = selectedWorkerIds.has(worker.id);
+              const rowBg = isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
+              return (
                 <div
-                  className={`w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 h-full ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                  key={worker.id}
+                  className={`flex border-b cursor-pointer select-none ${rowBg}`}
+                  style={{ height: `${ROW_H}px` }}
+                  onClick={e => handleRowClick(e, worker, index)}
                 >
-                  {renderWorkerCell(worker, index)}
+                  {/* Worker name + actions */}
+                  <div
+                    className={`px-1 font-medium text-gray-800 border-r flex items-center gap-1 h-full ${rowBg}`}
+                    style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}
+                  >
+                    {renderWorkerCellContent(worker, index)}
+                  </div>
+                  {/* Summary columns */}
+                  {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index, isSelected))}
+                  {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${rowBg}`} />}
                 </div>
-                {/* Summary columns */}
-                {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index))}
-                {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -1265,7 +1316,7 @@ export default function Matrix() {
         >
           <div dir="rtl" style={{ width: `${timelineWidth}px` }}>
             {loading && !initialLoaded ? null : (
-              filteredWorkers.map((worker, index) => renderTimelineRow(worker, index))
+              filteredWorkers.map((worker, index) => renderTimelineRow(worker, index, selectedWorkerIds.has(worker.id)))
             )}
           </div>
         </div>
@@ -1286,7 +1337,7 @@ export default function Matrix() {
       <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
         {/* Sticky header row */}
         <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
-          <div className="w-[220px] min-w-[220px] p-3 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl">
+          <div className="p-2 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
             <MasterControls
               workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
               getWorkerSendStatus={getWorkerSendStatus}
@@ -1317,8 +1368,8 @@ export default function Matrix() {
           <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
         ) : (
           filteredWorkers.map((worker, index) => {
-            const sendStatus = getWorkerSendStatus(worker);
-            const actionClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
+            const isSelected = selectedWorkerIds.has(worker.id);
+            const rowBg = isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
             const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
             const workerTemplateShifts = (() => {
               if (viewMode !== 'weekly') return getWorkerTemplateShifts(worker.id, dateString);
@@ -1331,71 +1382,60 @@ export default function Matrix() {
             const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
 
             return (
-              <React.Fragment key={worker.id}>
-                <div className={`flex border-b h-8 shrink-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ width: `${totalMatrixWidth}px` }}>
-                  <div className="w-[220px] min-w-[220px] px-2 py-0.5 font-medium text-gray-800 border-r flex items-center gap-2 sticky left-0 bg-inherit z-20 h-8">
-                    <WorkerLockButton worker={worker} onUpdate={refreshWorkers} />
-                    <button onClick={() => sendWhatsAppNotification(worker)} className={`rounded p-1 transition-colors hover:bg-gray-100 disabled:opacity-50 ${actionClass}`} title="שלח משמרות בוואטסאפ" disabled={sendingWhatsApp}>
-                      {sendingWhatsApp ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /> : <MessageCircle className="w-4 h-4" />}
-                    </button>
-                    <button onClick={() => { setSelectedWorkerForNotification(worker); setNotificationNotes(""); setShowNotificationDialog(true); }} className={`rounded p-1 transition-colors hover:bg-gray-100 ${actionClass}`} title="שלח לוח משמרות באימייל">
-                      <Send className="w-4 h-4" />
-                    </button>
-                    <div className="flex items-center flex-1 min-w-0">
-                      <div className="min-w-0 flex-1">
-                        <span className="truncate block text-sm leading-tight">{worker.nickname}</span>
-                        <WeeklySummary worker={worker} />
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1" onClick={() => handleManualShiftAdd(worker)} title="הוסף חלון זמינות ידנית"><Plus className="w-3 h-3" /></Button>
-                    </div>
+              <div
+                key={worker.id}
+                className={`flex border-b shrink-0 cursor-pointer select-none ${rowBg}`}
+                style={{ width: `${totalMatrixWidth}px`, height: `${ROW_H}px` }}
+                onClick={e => handleRowClick(e, worker, index)}
+              >
+                <div
+                  className={`px-1 font-medium text-gray-800 border-r flex items-center gap-1 sticky left-0 z-20 h-full ${rowBg}`}
+                  style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}
+                >
+                  {renderWorkerCellContent(worker, index)}
+                </div>
+                {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index, isSelected))}
+                {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${rowBg}`} />}
+                <div
+                  data-worker-id={worker.id}
+                  ref={el => { if (el) timelineRefs.current[worker.id] = el; }}
+                  className={`relative border-r cursor-crosshair h-full shrink-0 ${rowBg}`}
+                  dir="rtl"
+                  style={{ width: `${timelineWidth}px` }}
+                  onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
+                >
+                  <div className="absolute inset-0 flex h-full" dir="rtl">
+                    {viewMode === 'daily'
+                      ? dailySlots.map(hour => <div key={hour} className="shrink-0 border-l time-slot h-full" style={{ width: `${60 * ppm}px` }} />)
+                      : weeklySlots.map((slot, idx) => <div key={idx} className="shrink-0 border-l time-slot h-full" style={{ width: `${60 * ppm}px` }} />)
+                    }
                   </div>
-                  {viewMode === 'weekly' && summaryColumns.map(col => (
-                    <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
-                      <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
-                    </div>
-                  ))}
-                  {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-8 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} />}
-                  <div
-                    data-worker-id={worker.id}
-                    ref={el => { if (el) timelineRefs.current[worker.id] = el; }}
-                    className="relative border-r cursor-crosshair h-8 shrink-0"
-                    dir="rtl"
-                    style={{ width: `${timelineWidth}px` }}
-                    onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
-                  >
-                    <div className="absolute inset-0 flex h-8" dir="rtl">
-                      {viewMode === 'daily'
-                        ? dailySlots.map(hour => <div key={hour} className="shrink-0 border-l time-slot h-8" style={{ width: `${60 * ppm}px` }} />)
-                        : weeklySlots.map((slot, idx) => <div key={idx} className="shrink-0 border-l time-slot h-8" style={{ width: `${60 * ppm}px` }} />)
-                      }
-                    </div>
-                    <div className="absolute inset-0">
-                      {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
-                        const px = timeToPixels("06:00", day, 'weekly', ppm);
-                        return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
-                      })}
-                      {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
-                      {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
-                      {workerTemplateShifts.map(ts => (
-                        <React.Fragment key={ts.id}>
-                          <AssignmentBar assignment={ts} />
-                          {ts.briefing_time && <BriefingBar
-                            briefingTime={ts.briefing_time}
-                            shiftStartTime={ts.start_time}
-                            shiftEndTime={ts.end_time}
-                            dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
-                            viewMode={viewMode}
-                            ppm={ppm}
-                            timeToPixels={timeToPixels}
-                          />}
-                        </React.Fragment>
-                      ))}
-                      {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
-                      <DragPreviewBar preview={dragPreview} workerId={worker.id} />
-                    </div>
+                  <div className="absolute inset-0">
+                    {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
+                      const px = timeToPixels("06:00", day, 'weekly', ppm);
+                      return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
+                    })}
+                    {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
+                    {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
+                    {workerTemplateShifts.map(ts => (
+                      <React.Fragment key={ts.id}>
+                        <AssignmentBar assignment={ts} />
+                        {ts.briefing_time && <BriefingBar
+                          briefingTime={ts.briefing_time}
+                          shiftStartTime={ts.start_time}
+                          shiftEndTime={ts.end_time}
+                          dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
+                          viewMode={viewMode}
+                          ppm={ppm}
+                          timeToPixels={timeToPixels}
+                        />}
+                      </React.Fragment>
+                    ))}
+                    {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
+                    <DragPreviewBar preview={dragPreview} workerId={worker.id} />
                   </div>
                 </div>
-              </React.Fragment>
+              </div>
             );
           })
         )}
