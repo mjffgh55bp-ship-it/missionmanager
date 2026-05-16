@@ -105,6 +105,7 @@ export default function Availability() {
   const staticLoaded = useRef(false);
   const cachedUser = useRef(null);
   const cachedWorker = useRef(null);
+  const isDynamicLoading = useRef(false);
 
   useEffect(() => {
     const weekKey = weekStart.toISOString();
@@ -195,10 +196,13 @@ export default function Availability() {
   // Week-change reload: only dynamic data, use cached templates
   const loadDynamicData = async (worker, user) => {
     if (!worker) return;
+    if (isDynamicLoading.current) return;
+    isDynamicLoading.current = true;
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
 
     const delay = (ms) => new Promise(r => setTimeout(r, ms));
+    try {
 
     // 1. Worker's own availability for this week
     const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
@@ -270,6 +274,9 @@ export default function Availability() {
       : [];
 
     setOpenRegistrations(freshOpenReg);
+    } finally {
+      isDynamicLoading.current = false;
+    }
   };
 
   // Legacy alias for components that call loadData()
