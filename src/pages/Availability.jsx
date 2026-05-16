@@ -139,13 +139,11 @@ export default function Availability() {
 
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      // Step 2: fetch all static data in parallel (cached — deduplicates concurrent calls)
-      const [workersData, allSettings, eventsData, yearlyEventsData] = await Promise.all([
-        getCachedWorkers(base44.entities),
-        getCachedAllSettings(base44.entities),
-        base44.entities.CompanyEvent.list("-date"),
-        base44.entities.YearlyEvent.list("-start_date", 500),
-      ]);
+      // Step 2: fetch static data sequentially to stay within rate limits
+      const workersData = await getCachedWorkers(base44.entities);
+      const allSettings = await getCachedAllSettings(base44.entities);
+      const eventsData = await base44.entities.CompanyEvent.list("-date");
+      const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
 
       // Extract settings client-side (no extra API calls)
       const openReg = parseSetting(allSettings, "open_registrations", []);
