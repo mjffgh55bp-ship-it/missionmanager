@@ -137,11 +137,11 @@ export default function Availability() {
     await new Promise(r => setTimeout(r, 600));
 
     // non-cached dynamic data — staggered to avoid rate limits
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 1000));
     const eventsData = await base44.entities.CompanyEvent.list("-date");
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 1200));
     const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
-    await new Promise(r => setTimeout(r, 800));
+    await new Promise(r => setTimeout(r, 1200));
 
     // Extract settings client-side (no extra API calls)
     const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -184,7 +184,7 @@ export default function Availability() {
     staticLoaded.current = true;
 
     // Now load dynamic (week-scoped) data — pause first to avoid rate limit
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 1500));
     if (worker) {
       await loadDynamicData(worker, user);
     }
