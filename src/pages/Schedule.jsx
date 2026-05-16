@@ -124,19 +124,17 @@ export default function Schedule() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     lastWeekStart.current = weekStartStr;
 
-    // Batch 1: static reference data (cached + deduplicated)
-    const [workersData, allTemplatesData, allSettings] = await Promise.all([
-      getCachedWorkers(base44.entities),
-      getCachedTemplates(base44.entities),
-      getCachedAllSettings(base44.entities),
-    ]);
-
-    // Batch 2 & 3: staggered + retry to survive rate limits on concurrent page loads
-    await new Promise(r => setTimeout(r, 500));
+    // Static reference data — sequential with delays to avoid rate limits
+    const workersData = await getCachedWorkers(base44.entities);
+    await new Promise(r => setTimeout(r, 700));
+    const allTemplatesData = await getCachedTemplates(base44.entities);
+    await new Promise(r => setTimeout(r, 700));
+    const allSettings = await getCachedAllSettings(base44.entities);
+    await new Promise(r => setTimeout(r, 700));
     const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 700));
     const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 700));
     const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
 
     // Filter settings client-side
