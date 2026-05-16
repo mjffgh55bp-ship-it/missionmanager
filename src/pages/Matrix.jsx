@@ -497,12 +497,25 @@ export default function Matrix() {
     return { assigned: false, workerColumnName: null };
   };
 
+  // Returns true for zero-duration continuation rows (06:00→06:00) that should be ignored
+  const isInvalidContinuationRow = (row) => {
+    if (!row?.values?.is_continuation) return false;
+    const start = row.values["התחלה"] || row.values["שעת התחלה"];
+    const end   = row.values["סיום"]  || row.values["שעת סיום"];
+    return start === "06:00" && end === "06:00" && !!row.values.continuation_source_row_id;
+  };
+
   const getWorkerTemplateShifts = (workerId, date = null) => {
     const targetDate = date || dateString;
     const shifts = [];
     templateRows.forEach(row => {
       if (!row.values) return;
       if (row.date !== targetDate) return;
+      // Skip invalid zero-duration continuation rows
+      if (isInvalidContinuationRow(row)) {
+        console.log("MATRIX SKIP INVALID CONTINUATION", { rowId: row.id, rowDate: row.date, values: row.values });
+        return;
+      }
       const template = allTemplates.find(t => t.id === row.template_id);
       if (!template) return;
       const isContinuation = row.values.is_continuation;

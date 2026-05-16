@@ -416,7 +416,19 @@ export default function Schedule() {
     if (!plusMatch) return;
     const daysAhead = parseInt(plusMatch[2]);
     const realEndTime = `${plusMatch[3]}:${plusMatch[4]}`;
-    if (daysAhead === 1 && realEndTime < "06:00") return;
+
+    // +1 06:00 is the exact end boundary of the same operational day — not a continuation
+    console.log("CONTINUATION DECISION", {
+      rowId: row.id,
+      rowDate: row.date,
+      endTime,
+      daysAhead,
+      realEndTime,
+      shouldCreateContinuation: !(daysAhead === 1 && realEndTime <= "06:00")
+    });
+
+    if (daysAhead === 1 && realEndTime <= "06:00") return;
+
     for (let d = 1; d <= daysAhead; d++) {
       const futureDate = format(addDays(currentDate, d), "yyyy-MM-dd");
       const existingRows = await base44.entities.TemplateRow.filter({ date: futureDate });
@@ -424,12 +436,18 @@ export default function Schedule() {
       if (alreadyExists) continue;
       const template = allTemplates.find((t) => t.id === row.template_id);
       const isLastDay = d === daysAhead;
+      const continuationStart = "06:00";
+      const continuationEnd = isLastDay ? realEndTime : "06:00";
+
+      // Never create a zero-duration continuation row (06:00→06:00)
+      if (continuationStart === continuationEnd) continue;
+
       const continuationValues = {
         ...newValues,
-        "התחלה": "06:00",
-        "שעת התחלה": "06:00",
-        "סיום": isLastDay ? realEndTime : "06:00",
-        "שעת סיום": isLastDay ? realEndTime : "06:00",
+        "התחלה": continuationStart,
+        "שעת התחלה": continuationStart,
+        "סיום": continuationEnd,
+        "שעת סיום": continuationEnd,
         is_continuation: true,
         continuation_from_date: dateString
       };

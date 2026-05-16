@@ -59,7 +59,9 @@ export default function TimeCell({ rowId, colName, value, defaultValue, rowValue
   const selectedMin = parsed.min;
 
   const handleSelect = async (hour, min) => {
-    const newVal = hour.startsWith("+") ? `${hour}:${min}` : `${hour}:${min}`;
+    let newVal = hour.startsWith("+") ? `${hour}:${min}` : `${hour}:${min}`;
+    // Normalize +1 06:00 → 06:00 (end boundary of same operational day, not a new day)
+    if (newVal === "+1 06:00") newVal = "06:00";
     setLocalValue(newVal);
     setOpen(false);
     const newValues = { ...rowValues, [colName]: newVal };

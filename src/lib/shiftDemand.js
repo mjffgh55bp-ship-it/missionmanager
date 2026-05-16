@@ -28,10 +28,20 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
 
   const map = new Map(); // key → unified shift
 
+  // Returns true for zero-duration continuation rows (06:00→06:00) — must be ignored
+  const isInvalidContinuationRow = (row) => {
+    if (!row?.values?.is_continuation) return false;
+    const start = row.values["התחלה"] || row.values["שעת התחלה"];
+    const end   = row.values["סיום"]  || row.values["שעת סיום"];
+    return start === "06:00" && end === "06:00" && !!row.values.continuation_source_row_id;
+  };
+
   templateRows.forEach(row => {
     const tmpl = templateById[row.template_id];
     // Skip rows whose template is missing or not visible in the Schedule calendar
     if (!tmpl || !isVisibleScheduleTemplate(tmpl) || !row.values) return;
+    // Skip invalid zero-duration continuation rows
+    if (isInvalidContinuationRow(row)) return;
 
     const values = row.values;
     const startTime = values["התחלה"] || values["שעת התחלה"];
