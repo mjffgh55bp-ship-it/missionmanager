@@ -217,29 +217,23 @@ export default function Availability() {
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
     try {
-      // Fetch core data first (4 parallel requests)
-      const [availabilities, unavailabilitiesData, templatesData, weekAvailsData] = await Promise.all([
-        base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
-        base44.entities.Unavailability.filter({ worker_id: worker.id }),
-        getCachedTemplates(base44.entities),
-        base44.entities.Availability.filter({ week_start_date: weekStartStr }),
-      ]);
+      // Fetch sequentially to stay within rate limits
+      const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
+      const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
+      const templatesData = await getCachedTemplates(base44.entities);
+      const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
 
-      // Fetch template rows in small batches to avoid rate limiting
+      // Fetch template rows one at a time to avoid rate limiting
       const perDayRowArrays = [];
-      const BATCH_SIZE = 2;
-      for (let i = 0; i < weekDates.length; i += BATCH_SIZE) {
-        const batch = weekDates.slice(i, i + BATCH_SIZE);
-        const batchResults = await Promise.all(batch.map(d => base44.entities.TemplateRow.filter({ date: d })));
-        perDayRowArrays.push(...batchResults);
+      for (const d of weekDates) {
+        const rows = await base44.entities.TemplateRow.filter({ date: d });
+        perDayRowArrays.push(rows);
       }
 
-      // Parallel: fetch assignments for all 3 roles simultaneously
-      const [assignmentsData, sousAssignments, additionalAssignments] = await Promise.all([
-        base44.entities.Assignment.filter({ chef_id: worker.id }),
-        base44.entities.Assignment.filter({ sous_chef_id: worker.id }),
-        base44.entities.Assignment.filter({ additional_chef_id: worker.id }),
-      ]);
+      // Fetch assignments sequentially to avoid rate limiting
+      const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
+      const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
+      const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
 
       // Drop stale results if week changed while loading
       if (weekStart.toISOString() !== weekKey && weekKey !== lastWeekStart.current) {
