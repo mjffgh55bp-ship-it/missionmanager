@@ -217,20 +217,22 @@ export default function Availability() {
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
     try {
-      // Parallel: fetch worker's own availability + unavailabilities + templates + week availabilities + template rows all at once
-      const [
-        availabilities,
-        unavailabilitiesData,
-        templatesData,
-        weekAvailsData,
-        ...perDayRowArrays
-      ] = await Promise.all([
+      // Fetch core data first (4 parallel requests)
+      const [availabilities, unavailabilitiesData, templatesData, weekAvailsData] = await Promise.all([
         base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
         base44.entities.Unavailability.filter({ worker_id: worker.id }),
         getCachedTemplates(base44.entities),
         base44.entities.Availability.filter({ week_start_date: weekStartStr }),
-        ...weekDates.map(d => base44.entities.TemplateRow.filter({ date: d })),
       ]);
+
+      // Fetch template rows in small batches to avoid rate limiting
+      const perDayRowArrays = [];
+      const BATCH_SIZE = 2;
+      for (let i = 0; i < weekDates.length; i += BATCH_SIZE) {
+        const batch = weekDates.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(batch.map(d => base44.entities.TemplateRow.filter({ date: d })));
+        perDayRowArrays.push(...batchResults);
+      }
 
       // Parallel: fetch assignments for all 3 roles simultaneously
       const [assignmentsData, sousAssignments, additionalAssignments] = await Promise.all([
