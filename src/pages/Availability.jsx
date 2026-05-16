@@ -137,10 +137,11 @@ export default function Availability() {
     await new Promise(r => setTimeout(r, 600));
 
     // non-cached dynamic data — staggered to avoid rate limits
+    await new Promise(r => setTimeout(r, 800));
     const eventsData = await base44.entities.CompanyEvent.list("-date");
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 800));
     const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
-    await new Promise(r => setTimeout(r, 600));
+    await new Promise(r => setTimeout(r, 800));
 
     // Extract settings client-side (no extra API calls)
     const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -223,19 +224,19 @@ export default function Availability() {
     // Sequential fetches with delays to avoid rate limits
     await new Promise(r => setTimeout(r, 500));
     const templatesData = await getCachedTemplates(base44.entities);
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 700));
 
     const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 700));
 
     const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 700));
 
     const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 700));
 
     const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 700));
 
     // Fetch template rows per-day for the week (avoids expensive .list() on the full table)
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
@@ -243,7 +244,7 @@ export default function Availability() {
     for (const d of weekDates) {
       const rows = await base44.entities.TemplateRow.filter({ date: d });
       perDayRows.push(...rows);
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 500));
     }
     const allTemplateRowsData = perDayRows;
 
