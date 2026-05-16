@@ -18,7 +18,7 @@
  * - 10:00 appears to the left (startPx=240*ppm, rightPx=240*ppm)
  * - bars and points use consistent RTL logic
  */
-import { getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue } from "@/lib/operationalDate";
+import { getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, operationalMinutesToTime } from "@/lib/operationalDate";
 
 export const DAYS_OF_WEEK = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
@@ -33,25 +33,28 @@ export const getDailyTimeSlots = (zoomRange = { start: 0, end: 100 }) => {
   return allSlots.slice(startIdx, endIdx);
 };
 
+// Operational hour order: 06, 07, ..., 23, 00, 01, ..., 05
+const OPERATIONAL_HOURS = Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
+
 export const getWeeklyTimeSlots = (zoomRange = { start: 0, end: 100 }, weekStartDate = null) => {
-  // import inline to avoid circular deps — use dynamic approach
   const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
   const fmtDM = (d) => `${d.getDate()}.${d.getMonth() + 1}`;
   const allSlots = [];
   for (let day = 0; day < 7; day++) {
     let dateLabel = null;
-    if (weekStartDate && day < 7) {
+    if (weekStartDate) {
       const date = addDays(weekStartDate, day);
       dateLabel = fmtDM(date);
     }
-    for (let hour = 0; hour < 24; hour++) {
+    OPERATIONAL_HOURS.forEach((hour, opIndex) => {
       allSlots.push({
         day,
         hour,
-        label: hour === 0 ? DAYS_OF_WEEK[day] : null,
-        dateLabel: hour === 0 ? dateLabel : null
+        opIndex,
+        label: opIndex === 0 ? DAYS_OF_WEEK[day] : null,
+        dateLabel: opIndex === 0 ? dateLabel : null
       });
-    }
+    });
   }
   const startIdx = Math.floor((zoomRange.start / 100) * allSlots.length);
   const endIdx = Math.ceil((zoomRange.end / 100) * allSlots.length);
@@ -127,17 +130,13 @@ export const percentageToTime = (percentage, viewMode = 'daily', zoomRange = { s
  */
 export const timeToPixels = (timeStr, dayIndex = 0, viewMode = 'daily', ppm = 1) => {
   if (!timeStr) return 0;
-  const parsed = parseTimeCellValue(timeStr);
-  const clockMins = parsed.hour * 60 + parsed.minute;
-
+  const opMins = getOperationalMinutes(timeStr);
   if (viewMode === 'weekly') {
-    const totalMins = (dayIndex + parsed.dayOffset) * 1440 + clockMins;
-    return totalMins * ppm;
-  } else {
-    // Daily: operational minutes (06:00=0, 10:00=240, etc.)
-    const opMins = (clockMins - 6 * 60 + 24 * 60) % (24 * 60);
-    return opMins * ppm;
+    // Weekly: dayIndex * 1440 + operational minutes (no dayOffset for visual placement)
+    return (dayIndex * 1440 + opMins) * ppm;
   }
+  // Daily: operational minutes only
+  return opMins * ppm;
 };
 
 /**
@@ -145,14 +144,11 @@ export const timeToPixels = (timeStr, dayIndex = 0, viewMode = 'daily', ppm = 1)
  * If end <= start, add 24h (1440 mins).
  */
 export const endTimeToPixels = (startTime, endTime, viewMode = 'daily', ppm = 1, dayIndex = 0) => {
-  let endPx = timeToPixels(endTime, dayIndex, viewMode, ppm);
-  const startPx = timeToPixels(startTime, dayIndex, viewMode, ppm);
-
-  if (endPx <= startPx) {
-    endPx += 1440 * ppm;
+  const endOpMins = getOperationalEndMinutes(startTime, endTime);
+  if (viewMode === 'weekly') {
+    return (dayIndex * 1440 + endOpMins) * ppm;
   }
-
-  return endPx;
+  return endOpMins * ppm;
 };
 
 /**

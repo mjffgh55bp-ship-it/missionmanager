@@ -235,3 +235,25 @@ export function isNextDayShift(startValue) {
   const { hour } = parseTimeCellValue(startValue);
   return !isNaN(hour) && hour < 6;
 }
+
+/**
+ * Convert operational minutes (0 = 06:00, 1440 = next-day 06:00) back to a clock time string.
+ * Used by Matrix drag/resize to convert pixel positions back to displayable times.
+ *
+ * Examples:
+ *   0    → "06:00"
+ *   240  → "10:00"
+ *   960  → "22:00"
+ *   1080 → "00:00"
+ *   1200 → "02:00"
+ *   1440 → "06:00"  (end-of-day boundary, wraps to 06:00)
+ */
+export function operationalMinutesToTime(opMinutes) {
+  const m = ((opMinutes % 1440) + 1440) % 1440;
+  const clockMinutes = (m + 6 * 60) % 1440;
+  const h = Math.floor(clockMinutes / 60);
+  const rawMin = Math.round((clockMinutes % 60) / 15) * 15;
+  const finalH = rawMin >= 60 ? (h + 1) % 24 : h;
+  const finalM = rawMin >= 60 ? 0 : rawMin;
+  return `${String(finalH).padStart(2, "0")}:${String(finalM).padStart(2, "0")}`;
+}

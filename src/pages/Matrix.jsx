@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
-import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue } from "@/lib/operationalDate";
+import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, operationalMinutesToTime } from "@/lib/operationalDate";
 import { getTimelineRangeStyle, getTimelinePointStyle } from "@/lib/matrixTimeUtils";
 import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut } from "lucide-react";
 import BriefingBar from "../components/matrix/BriefingBar";
@@ -28,6 +28,9 @@ const SUMMARY_ADD_COL_WIDTH = 28; // the "+column" button
 const getDailyTimeSlots = () =>
   Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
 
+// Operational hour order: 06, 07, ..., 23, 00, 01, ..., 05
+const OPERATIONAL_HOURS_ORDER = Array.from({ length: 24 }, (_, i) => (i + 6) % 24);
+
 const getWeeklyTimeSlots = (weekStartDate = null) => {
   const slots = [];
   for (let day = 0; day < 7; day++) {
@@ -36,9 +39,9 @@ const getWeeklyTimeSlots = (weekStartDate = null) => {
       const d = addDays(weekStartDate, day);
       dateLabel = format(d, 'd.M');
     }
-    for (let hour = 0; hour < 24; hour++) {
-      slots.push({ day, hour, label: hour === 0 ? DAYS_OF_WEEK[day] : null, dateLabel: hour === 0 ? dateLabel : null });
-    }
+    OPERATIONAL_HOURS_ORDER.forEach((hour, opIndex) => {
+      slots.push({ day, hour, opIndex, label: opIndex === 0 ? DAYS_OF_WEEK[day] : null, dateLabel: opIndex === 0 ? dateLabel : null });
+    });
   }
   return slots;
 };
@@ -72,21 +75,13 @@ const getTimelineWidth = (viewMode, ppm) =>
 const pixelsToTime = (px, viewMode = 'daily', ppm) => {
   const totalMins = px / ppm;
   if (viewMode === 'weekly') {
-    const day = Math.min(6, Math.max(0, Math.floor(totalMins / (24 * 60))));
-    const minsInDay = totalMins % (24 * 60);
-    const h = Math.floor(minsInDay / 60);
-    const m = Math.round((minsInDay % 60) / 15) * 15;
-    const mf = m >= 60 ? 0 : m;
-    const hf = m >= 60 ? (h + 1) % 24 : h;
-    return { day, time: `${String(hf).padStart(2,'0')}:${String(mf).padStart(2,'0')}` };
-  } else {
-    const clockMins = (totalMins + 6 * 60) % (24 * 60);
-    const h = Math.floor(clockMins / 60);
-    const m = Math.round((clockMins % 60) / 15) * 15;
-    const mf = m >= 60 ? 0 : m;
-    const hf = m >= 60 ? (h + 1) % 24 : h;
-    return { day: 0, time: `${String(hf).padStart(2,'0')}:${String(mf).padStart(2,'0')}` };
+    // Each operational day spans 1440 minutes in timeline space
+    const day = Math.max(0, Math.min(6, Math.floor(totalMins / 1440)));
+    const opMins = totalMins - day * 1440;
+    return { day, time: operationalMinutesToTime(opMins) };
   }
+  // Daily: totalMins are already operational minutes (0 = 06:00)
+  return { day: 0, time: operationalMinutesToTime(totalMins) };
 };
 
 // ── Pin icon SVG (pushpin outline style) ─────────────────────────────────────
@@ -626,9 +621,8 @@ export default function Matrix() {
       let message = `שלום ${worker.nickname}!\n\n`;
       const getBriefingTime = (shift) => {
         if (shift?.briefing_time) return shift.briefing_time;
-        const [h, m] = (shift?.start_time || shift).split(':').map(Number);
-        const bm = h * 60 + m - 15;
-        return `${String(Math.floor(bm / 60)).padStart(2, '0')}:${String(bm % 60).padStart(2, '0')}`;
+        const startOp = getOperationalMinutes(shift?.start_time || '06:00');
+        return operationalMinutesToTime(Math.max(0, startOp - 15));
       };
       let icsEvents = [];
       if (viewMode === "weekly") {
@@ -673,9 +667,8 @@ export default function Matrix() {
     if (!selectedWorkerForNotification) return;
     const getBriefingTime = (shift) => {
       if (shift?.briefing_time) return shift.briefing_time;
-      const [h, m] = (shift?.start_time || shift).split(':').map(Number);
-      const bm = h * 60 + m - 15;
-      return `${String(Math.floor(bm / 60)).padStart(2, '0')}:${String(bm % 60).padStart(2, '0')}`;
+      const startOp = getOperationalMinutes(shift?.start_time || '06:00');
+      return operationalMinutesToTime(Math.max(0, startOp - 15));
     };
     let emailBody = `שלום ${selectedWorkerForNotification.nickname},\n\n`;
     let icsEvents = [];
@@ -898,8 +891,13 @@ export default function Matrix() {
     if (column.criteria_type === 'time_range') {
       const [from, to] = (column.criteria_value || '').split('-');
       if (!from || !to) return 0;
-      const toMins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-      return weeklyShifts.filter(s => toMins(s.start_time) < toMins(to) && toMins(s.end_time) > toMins(from)).length;
+      const fromOp = getOperationalMinutes(from);
+      const toOp = getOperationalMinutes(to) || 1440; // if 'to' wraps to 0, treat as end-of-day
+      return weeklyShifts.filter(s => {
+        const sStart = getOperationalMinutes(s.start_time);
+        const sEnd = getOperationalEndMinutes(s.start_time, s.end_time);
+        return sStart < toOp && sEnd > fromOp;
+      }).length;
     }
     if (column.criteria_type === 'schedule_col') {
       const [colName, criterion] = (column.criteria_value || '').split('|||');
@@ -928,12 +926,25 @@ export default function Matrix() {
 
   // ── Bar Components ────────────────────────────────────────────────────────────
   const AssignmentBar = ({ assignment }) => {
-    const positionDate = assignment.schedule_date || assignment.date;
+    const positionDate = assignment.operational_date || assignment.schedule_date || assignment.date;
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(positionDate) : 0;
     const startPx = timeToPixels(assignment.start_time, dayIndex, viewMode, ppm);
     const endPx = endTimeToPixels(assignment.start_time, assignment.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 2);
     const rightPx = startPx;
+    console.log("MATRIX TIME DEBUG", {
+      workerName: assignment.worker_column_name,
+      rowId: assignment.template_row_id,
+      rowDate: assignment.date,
+      startTime: assignment.start_time,
+      endTime: assignment.end_time,
+      operationalDate: positionDate,
+      dayIndex,
+      startOp: getOperationalMinutes(assignment.start_time),
+      endOp: getOperationalEndMinutes(assignment.start_time, assignment.end_time),
+      startPx, endPx, rightPx, widthPx,
+      expected: "02:00 should be startOp=1200, endOp=1440"
+    });
     if (startPx < 0 || startPx > timelineWidth) return null;
     const isTemplate = assignment.isTemplateShift;
     const standby = isStandbyStatus(assignment.status);
@@ -997,9 +1008,10 @@ export default function Matrix() {
           {typeLabels[shift.type] || "A"}
         </button>
         {overlappingAssignments.map((ass, i) => {
-          const toMins = t => { const [h,m] = t.split(':').map(Number); return h * 60 + m; };
-          const avS = toMins(shift.start_time), avE = toMins(shift.end_time) || avS + 24*60;
-          const assS = toMins(ass.start_time), assE = toMins(ass.end_time) || assS + 24*60;
+          const avS = getOperationalMinutes(shift.start_time);
+          const avE = getOperationalEndMinutes(shift.start_time, shift.end_time);
+          const assS = getOperationalMinutes(ass.start_time);
+          const assE = getOperationalEndMinutes(ass.start_time, ass.end_time);
           const overS = Math.max(avS, assS), overE = Math.min(avE, assE);
           const totalM = avE - avS;
           return <div key={i} className="absolute top-0 h-full" style={{ left: `${((overS - avS) / totalM) * 100}%`, width: `${((overE - overS) / totalM) * 100}%`, backgroundColor: isStandbyStatus(ass.status) ? 'rgba(200,200,210,0.55)' : 'rgba(192,132,252,0.55)', pointerEvents: 'none' }} />;
@@ -1111,10 +1123,10 @@ export default function Matrix() {
         ))
       ) : (
         weeklySlots.map((slot, idx) => (
-          <div key={idx} className={`shrink-0 text-xs text-gray-600 py-1 text-center font-medium overflow-hidden ${slot.hour === 0 ? 'border-l-2 border-l-gray-400' : 'border-l border-l-gray-200'}`} style={{ width: `${60 * ppm}px` }}>
+          <div key={idx} className={`shrink-0 text-xs text-gray-600 py-1 text-center font-medium overflow-hidden ${slot.opIndex === 0 ? 'border-l-2 border-l-gray-400' : 'border-l border-l-gray-200'}`} style={{ width: `${60 * ppm}px` }}>
             {slot.label && <div className="font-bold text-gray-800 text-[10px] leading-tight">{slot.label}</div>}
             {slot.dateLabel && <div className="text-[8px] text-gray-500 leading-tight">{slot.dateLabel}</div>}
-            <div className={`text-[8px] leading-tight ${slot.hour === 0 ? 'text-gray-800 font-semibold' : 'text-gray-400'}`}>
+            <div className={`text-[8px] leading-tight ${slot.opIndex === 0 ? 'text-gray-800 font-semibold' : 'text-gray-400'}`}>
               {String(slot.hour).padStart(2, '0')}
             </div>
           </div>
