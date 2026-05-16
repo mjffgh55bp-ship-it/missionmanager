@@ -239,19 +239,28 @@ export default function Availability() {
 
     // 5. All assignments for this worker (3 roles merged into one list via 3 calls, staggered)
     const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
-    await delay(1000);
+    await delay(1500);
     const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
-    await delay(1000);
+    await delay(1500);
     const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
-    await delay(1000);
+    await delay(1500);
 
-    // 6. Template rows per-day for the week (7 staggered calls)
+    // 6. Template rows per-day for the week (7 staggered calls with retry)
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
     const perDayRows = [];
     for (const d of weekDates) {
-      const rows = await base44.entities.TemplateRow.filter({ date: d });
+      let rows = [];
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          rows = await base44.entities.TemplateRow.filter({ date: d });
+          break;
+        } catch (err) {
+          if (attempt < 3) await delay(2000 * Math.pow(2, attempt));
+          else console.warn("TemplateRow fetch failed for", d, err);
+        }
+      }
       perDayRows.push(...rows);
-      await delay(1000);
+      await delay(1500);
     }
     const allTemplateRowsData = perDayRows;
 
