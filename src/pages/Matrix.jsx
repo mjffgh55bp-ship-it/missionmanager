@@ -447,11 +447,9 @@ export default function Matrix() {
 
   const loadStaticData = async () => {
     try {
-      const [workersData, allSettings, trackersData] = await Promise.all([
-        getCachedWorkers(base44.entities),
-        getCachedAllSettings(base44.entities),
-        base44.entities.Tracker.list()
-      ]);
+      const workersData = await getCachedWorkers(base44.entities);
+      const allSettings = await getCachedAllSettings(base44.entities);
+      const trackersData = await base44.entities.Tracker.list();
       const parseSetting = (key) => { const s = allSettings.find(x => x.setting_key === key); return s ? JSON.parse(s.setting_value) : null; };
       const rawPops = parseSetting("worker_populations") || ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
       setPopulations(rawPops.map(p => (typeof p === "string" ? p : p.name)));
@@ -491,23 +489,22 @@ export default function Matrix() {
       // Fetch availabilities, unavailabilities, template rows, and templates all in parallel
       const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
-      const [
-        availabilitiesData,
-        unavailabilitiesData,
-        allTemplatesData,
-        trackerEntriesData,
-        ...templateRowArrays
-      ] = await Promise.all([
-        base44.entities.Availability.list(),
-        viewMode === "daily"
-          ? base44.entities.Unavailability.filter({ date: dateStrLocal })
-          : base44.entities.Unavailability.list(),
-        getCachedTemplates(base44.entities),
-        base44.entities.TrackerEntry.list(),
-        ...(viewMode === "daily"
-          ? [base44.entities.TemplateRow.filter({ date: dateStrLocal })]
-          : weekDates.map(d => base44.entities.TemplateRow.filter({ date: d }))),
-      ]);
+      const availabilitiesData = await base44.entities.Availability.list();
+      const unavailabilitiesData = await (viewMode === "daily"
+        ? base44.entities.Unavailability.filter({ date: dateStrLocal })
+        : base44.entities.Unavailability.list());
+      const allTemplatesData = await getCachedTemplates(base44.entities);
+      const trackerEntriesData = await base44.entities.TrackerEntry.list();
+
+      // Fetch template rows sequentially
+      const templateRowArrays = [];
+      if (viewMode === "daily") {
+        templateRowArrays.push(await base44.entities.TemplateRow.filter({ date: dateStrLocal }));
+      } else {
+        for (const d of weekDates) {
+          templateRowArrays.push(await base44.entities.TemplateRow.filter({ date: d }));
+        }
+      }
 
       let filteredTemplateRows = templateRowArrays.flat();
 
@@ -517,9 +514,9 @@ export default function Matrix() {
         const uniqueSourceIds = [...new Set(continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean))];
         if (uniqueSourceIds.length > 0) {
           const missingSourceIds = uniqueSourceIds.filter(id => !filteredTemplateRows.some(r => r.id === id));
-          if (missingSourceIds.length > 0) {
-            const sourceRows = await Promise.all(missingSourceIds.map(id => base44.entities.TemplateRow.get(id).catch(() => null)));
-            filteredTemplateRows = [...filteredTemplateRows, ...sourceRows.filter(Boolean)];
+          for (const id of missingSourceIds) {
+            const row = await base44.entities.TemplateRow.get(id).catch(() => null);
+            if (row) filteredTemplateRows.push(row);
           }
         }
       }
