@@ -4,7 +4,8 @@
  * Times between 00:00 and 05:59 belong to the NEXT calendar day.
  *
  * TimeCell stores values as:
- *   "HH:MM"        plain same-day time
+ *   "HH:MM"        plain same-day time (current operational day)
+ *   "-1 HH:MM"     previous operational day (e.g. briefing at 05:15 before shift starting at 06:00)
  *   "+1 HH:MM"     next-day time
  *   "+2 HH:MM"     two-days-out time
  */
@@ -30,6 +31,19 @@ export function parseTimeCellValue(value) {
   if (!value) return { dayOffset: 0, hour: NaN, minute: NaN, clockTime: "" };
 
   const str = String(value).trim();
+
+  // "-1 HH:MM" format — previous operational day (e.g. pre-shift briefing)
+  const prevMatch = str.match(/^-1\s+(\d{1,2}):(\d{2})$/);
+  if (prevMatch) {
+    const hour = parseInt(prevMatch[1], 10);
+    const minute = parseInt(prevMatch[2], 10);
+    return {
+      dayOffset: -1,
+      hour,
+      minute,
+      clockTime: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+    };
+  }
 
   // "+N HH:MM" format
   const plusMatch = str.match(/^\+(\d+)\s+(\d{1,2}):(\d{2})$/);
@@ -160,10 +174,16 @@ export function getOperationalDayForScheduleRow(rowDate) {
  * @returns {number} 0–1379
  */
 export function getOperationalMinutes(value) {
-  const { hour, minute } = parseTimeCellValue(value);
+  const { dayOffset, hour, minute } = parseTimeCellValue(value);
   if (isNaN(hour) || isNaN(minute)) return 0;
 
   const total = hour * 60 + minute;
+
+  // "-1 HH:MM" — previous operational day: place BEFORE 06:00 (negative minutes)
+  // e.g. "-1 05:00" → 5*60 - 6*60 = -60 minutes before the operational day start
+  if (dayOffset === -1) {
+    return total - 6 * 60; // always negative for hours < 06:00
+  }
 
   // 06:00–23:59 → 0–1079
   if (total >= 6 * 60) return total - 6 * 60;
