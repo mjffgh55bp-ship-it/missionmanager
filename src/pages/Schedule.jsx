@@ -105,13 +105,13 @@ export default function Schedule() {
     loadDailyData(weekChanged);
   }, [currentDate]);
 
-  // Retry helper for rate-limited calls
-  const fetchWithRetry = async (fn, retries = 3, delay = 1000) => {
+  // Retry helper for rate-limited calls with exponential backoff
+  const fetchWithRetry = async (fn, retries = 5, baseDelay = 2000) => {
     for (let i = 0; i < retries; i++) {
       try { return await fn(); }
       catch (e) {
         if (i < retries - 1 && e?.message?.includes('Rate limit')) {
-          await new Promise(r => setTimeout(r, delay * (i + 1)));
+          await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
         } else throw e;
       }
     }
@@ -128,17 +128,16 @@ export default function Schedule() {
     lastWeekStart.current = weekStartStr;
 
     try {
-    // Static reference data — sequential with delays to avoid rate limits
+    // Static reference data — use cache first (no network cost if cached)
     const workersData = await getCachedWorkers(base44.entities);
-    await new Promise(r => setTimeout(r, 2000));
     const allTemplatesData = await getCachedTemplates(base44.entities);
-    await new Promise(r => setTimeout(r, 2000));
     const allSettings = await getCachedAllSettings(base44.entities);
-    await new Promise(r => setTimeout(r, 2000));
+    // Live fetches — stagger to avoid rate limits
+    await new Promise(r => setTimeout(r, 500));
     const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 500));
     const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 500));
     const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
 
     // Filter settings client-side
