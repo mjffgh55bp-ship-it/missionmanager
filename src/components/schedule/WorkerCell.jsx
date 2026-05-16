@@ -76,14 +76,30 @@ export default function WorkerCell({
     return "text-gray-900";
   };
 
+  const broadcastRowUpdate = (rowId, date, updatedValues) => {
+    const payload = { type: "templateRowsUpdated", rowId, date, updatedValues, timestamp: Date.now() };
+    // Same-tab: immediate patch + fast refetch
+    window.dispatchEvent(new CustomEvent("templateRowsUpdated", { detail: payload }));
+    // Cross-tab: BroadcastChannel
+    try {
+      const bc = new BroadcastChannel("schedule-sync");
+      bc.postMessage(payload);
+      bc.close();
+    } catch {}
+    // Cross-tab: localStorage fallback
+    try {
+      localStorage.setItem("schedule-sync-event", JSON.stringify(payload));
+    } catch {}
+    console.log("SCHEDULE MATRIX SYNC", { source: "WorkerCell", rowId, date, patchedLocalState: true });
+  };
+
   const handleWorkerSelect = async (workerId) => {
     const updatedValues = { ...(currentRowValues || {}), [columnName]: workerId };
-    console.log("SCHEDULE CELL SAVE", { rowId, columnName, value: workerId, updatedValues });
     await base44.entities.TemplateRow.update(rowId, { values: updatedValues });
     setEditing(false);
     setSearchQuery("");
     if (onSaved) onSaved(workerId);
-    window.dispatchEvent(new CustomEvent("templateRowsUpdated", { detail: { rowId, date: dateString } }));
+    broadcastRowUpdate(rowId, dateString, updatedValues);
   };
 
   const handleRemoveWorker = async () => {
@@ -92,7 +108,7 @@ export default function WorkerCell({
     setEditing(false);
     setSearchQuery("");
     if (onSaved) onSaved(null);
-    window.dispatchEvent(new CustomEvent("templateRowsUpdated", { detail: { rowId, date: dateString } }));
+    broadcastRowUpdate(rowId, dateString, updatedValues);
   };
 
   const isWorkerQualified = (workerId) => {

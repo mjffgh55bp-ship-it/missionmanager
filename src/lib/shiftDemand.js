@@ -53,15 +53,6 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
     const mokedName = tmpl.name || row.template_name || "";
     const key = `${operationalDate}|${mokedName}|${startTime}|${endTime}`;
 
-    console.log("OPERATIONAL AVAILABILITY DEBUG", {
-      rowId: row.id,
-      rowDate: row.date,
-      startTime,
-      endTime,
-      operationalDate,
-      demandKey: key
-    });
-
     if (!map.has(key)) {
       map.set(key, { key, date: operationalDate, operational_date: operationalDate, mokedName, startTime, endTime, roles: {} });
     }

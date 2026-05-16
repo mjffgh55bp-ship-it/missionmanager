@@ -377,15 +377,64 @@ export default function Matrix() {
     loadDynamicData(false);
   }, [currentDate, viewMode]);
   useEffect(() => {
-    const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => { debouncedLoadDataRef.current(true); });
-    const onVisibility = () => { if (document.visibilityState === 'visible') debouncedLoadDataRef.current(true); };
+    // Noisy real-time subscription — throttled to 500ms
+    const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
+      debouncedLoadDataRef.current(true, false);
+    });
+
+    // Visibility change — reload when tab becomes visible
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') debouncedLoadDataRef.current(true, false);
+    };
     document.addEventListener('visibilitychange', onVisibility);
-    const onTemplateRowsUpdated = () => { debouncedLoadDataRef.current(true); };
+
+    // Same-tab fast sync from WorkerCell/Schedule — immediate local patch + fast refetch
+    const onTemplateRowsUpdated = (e) => {
+      const { rowId, updatedValues } = e.detail || {};
+      console.log("SCHEDULE MATRIX SYNC", { source: "same-tab", rowId, patchedLocalState: !!rowId });
+      if (rowId && updatedValues) {
+        setTemplateRows(prev => prev.map(row => row.id === rowId ? { ...row, values: updatedValues } : row));
+      }
+      debouncedLoadDataRef.current(true, true); // fast: 200ms
+    };
     window.addEventListener('templateRowsUpdated', onTemplateRowsUpdated);
+
+    // Cross-tab sync via BroadcastChannel
+    let bc = null;
+    try {
+      bc = new BroadcastChannel('schedule-sync');
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'templateRowsUpdated') {
+          const { rowId, updatedValues } = e.data;
+          console.log("SCHEDULE MATRIX SYNC", { source: "broadcast-channel", rowId, patchedLocalState: !!rowId });
+          if (rowId && updatedValues) {
+            setTemplateRows(prev => prev.map(row => row.id === rowId ? { ...row, values: updatedValues } : row));
+          }
+          debouncedLoadDataRef.current(true, true); // fast: 200ms
+        }
+      };
+    } catch {}
+
+    // Cross-tab fallback via localStorage
+    const onStorage = (e) => {
+      if (e.key === 'schedule-sync-event') {
+        try {
+          const data = JSON.parse(e.newValue || '{}');
+          if (data.type === 'templateRowsUpdated') {
+            console.log("SCHEDULE MATRIX SYNC", { source: "localStorage", rowId: data.rowId });
+            debouncedLoadDataRef.current(true, true); // fast: 200ms
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
     return () => {
       unsubTemplateRow();
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('templateRowsUpdated', onTemplateRowsUpdated);
+      window.removeEventListener('storage', onStorage);
+      if (bc) bc.close();
     };
   }, []);
 
@@ -421,33 +470,48 @@ export default function Matrix() {
     loadDynamicData(false);
   };
 
+  const queuedMatrixRefreshRef = useRef(false);
+
   const loadDynamicData = async (silent = false) => {
-    if (isLoadingRef.current) return;
+    if (isLoadingRef.current) {
+      queuedMatrixRefreshRef.current = true;
+      console.log("MATRIX LOAD", { phase: "queued", skippedDuplicate: true });
+      return;
+    }
     isLoadingRef.current = true;
     if (!silent && !initialLoaded) setLoading(true);
+    const t0 = Date.now();
+    const dateStr = format(currentDate, "yyyy-MM-dd");
+    console.log("MATRIX LOAD", { phase: "start", dateStr, viewMode });
     try {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-      const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
-      const weekEndStr = format(weekEnd, "yyyy-MM-dd");
-      const dateStr = format(currentDate, "yyyy-MM-dd");
+      const dateStrLocal = format(currentDate, "yyyy-MM-dd");
 
-      const availabilitiesData = await base44.entities.Availability.list();
-      await new Promise(r => setTimeout(r, 100));
-      const unavailabilitiesData = viewMode === "daily"
-        ? await base44.entities.Unavailability.filter({ date: dateStr })
-        : await base44.entities.Unavailability.list();
-      await new Promise(r => setTimeout(r, 100));
+      // Fetch availabilities, unavailabilities, template rows, and templates all in parallel
+      const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
-      let filteredTemplateRows = [];
-      if (viewMode === "daily") {
-        filteredTemplateRows = await base44.entities.TemplateRow.filter({ date: dateStr });
-      } else {
-        const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
-        const perDayRows = await Promise.all(weekDates.map(d => base44.entities.TemplateRow.filter({ date: d })));
-        filteredTemplateRows = perDayRows.flat();
-      }
+      const [
+        availabilitiesData,
+        unavailabilitiesData,
+        allTemplatesData,
+        trackerEntriesData,
+        ...templateRowArrays
+      ] = await Promise.all([
+        base44.entities.Availability.list(),
+        viewMode === "daily"
+          ? base44.entities.Unavailability.filter({ date: dateStrLocal })
+          : base44.entities.Unavailability.list(),
+        getCachedTemplates(base44.entities),
+        base44.entities.TrackerEntry.list(),
+        ...(viewMode === "daily"
+          ? [base44.entities.TemplateRow.filter({ date: dateStrLocal })]
+          : weekDates.map(d => base44.entities.TemplateRow.filter({ date: d }))),
+      ]);
 
+      let filteredTemplateRows = templateRowArrays.flat();
+
+      // For daily view: also fetch missing continuation source rows
       if (viewMode === "daily") {
         const continuationRows = filteredTemplateRows.filter(r => r.values?.is_continuation && r.values?.continuation_source_row_id);
         const uniqueSourceIds = [...new Set(continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean))];
@@ -460,23 +524,29 @@ export default function Matrix() {
         }
       }
 
-      const allTemplatesData = await getCachedTemplates(base44.entities);
-      await new Promise(r => setTimeout(r, 100));
-      const trackerEntriesData = await base44.entities.TrackerEntry.list();
-
       setAvailabilities(availabilitiesData);
       setUnavailabilities(unavailabilitiesData);
       setTemplateRows(filteredTemplateRows);
       setAllTemplates(allTemplatesData);
       setTrackerEntries(trackerEntriesData);
       setInitialLoaded(true);
+      console.log("MATRIX LOAD", { phase: "done", durationMs: Date.now() - t0 });
     } catch (error) { console.error('Error loading matrix data:', error); }
-    finally { setLoading(false); isLoadingRef.current = false; }
+    finally {
+      setLoading(false);
+      isLoadingRef.current = false;
+      if (queuedMatrixRefreshRef.current) {
+        queuedMatrixRefreshRef.current = false;
+        console.log("MATRIX LOAD", { phase: "running_queued_refresh" });
+        loadDynamicData(true);
+      }
+    }
   };
 
-  const debouncedLoadData = (silent = false) => {
+  // Fast debounce for schedule sync events (200ms), slower for noisy subscriptions (500ms)
+  const debouncedLoadData = (silent = false, fast = false) => {
     if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
-    loadingTimeoutRef.current = setTimeout(() => loadDynamicData(silent), 2500);
+    loadingTimeoutRef.current = setTimeout(() => loadDynamicData(silent), fast ? 200 : 500);
   };
   const debouncedLoadDataRef = useRef(null);
   debouncedLoadDataRef.current = debouncedLoadData;
@@ -536,17 +606,6 @@ export default function Matrix() {
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
       if (!startTime || !endTime) return;
-      console.log("OPERATIONAL MATRIX DEBUG", {
-        rowId: row.id,
-        rowDate: row.date,
-        startTime,
-        endTime,
-        operationalDate: row.date,
-        calendarStartDate: getOperationalStartDate(row.date, startTime),
-        dayIndex: getDayIndexFromDate(row.date),
-        startOperationalMinutes: getOperationalMinutes(startTime),
-        endOperationalMinutes: getOperationalEndMinutes(startTime, endTime)
-      });
       shifts.push({
         id: `schedule_${row.id}_${assignedResult.workerColumnName}_${workerId}`,
         source: "schedule",
@@ -945,19 +1004,6 @@ export default function Matrix() {
     const endPx = endTimeToPixels(assignment.start_time, assignment.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 2);
     const rightPx = startPx;
-    console.log("MATRIX TIME DEBUG", {
-      workerName: assignment.worker_column_name,
-      rowId: assignment.template_row_id,
-      rowDate: assignment.date,
-      startTime: assignment.start_time,
-      endTime: assignment.end_time,
-      operationalDate: positionDate,
-      dayIndex,
-      startOp: getOperationalMinutes(assignment.start_time),
-      endOp: getOperationalEndMinutes(assignment.start_time, assignment.end_time),
-      startPx, endPx, rightPx, widthPx,
-      expected: "02:00 should be startOp=1200, endOp=1440"
-    });
     if (startPx < 0 || startPx > timelineWidth) return null;
     const isTemplate = assignment.isTemplateShift;
     const standby = isStandbyStatus(assignment.status);
