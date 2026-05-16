@@ -202,11 +202,11 @@ export default function Availability() {
 
     // 1. Worker's own availability for this week
     const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
-    await delay(800);
+    await delay(1000);
 
     // 2. Worker's unavailabilities (all-time, filtered client-side)
     const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
-    await delay(800);
+    await delay(1000);
 
     if (availabilities.length > 0) {
       setExistingAvailability(availabilities[0]);
@@ -228,19 +228,19 @@ export default function Availability() {
 
     // 3. Templates (cached)
     const templatesData = await getCachedTemplates(base44.entities);
-    await delay(800);
+    await delay(1000);
 
     // 4. All availabilities for this week (for demand panel)
     const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-    await delay(800);
+    await delay(1000);
 
     // 5. All assignments for this worker (3 roles merged into one list via 3 calls, staggered)
     const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
-    await delay(800);
+    await delay(1000);
     const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
-    await delay(800);
+    await delay(1000);
     const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
-    await delay(800);
+    await delay(1000);
 
     // 6. Template rows per-day for the week (7 staggered calls)
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
@@ -248,7 +248,7 @@ export default function Availability() {
     for (const d of weekDates) {
       const rows = await base44.entities.TemplateRow.filter({ date: d });
       perDayRows.push(...rows);
-      await delay(700);
+      await delay(1000);
     }
     const allTemplateRowsData = perDayRows;
 
@@ -263,7 +263,7 @@ export default function Availability() {
     setWeekAvailabilities(weekAvailsData);
 
     // 7. Fresh open_registrations
-    await delay(800);
+    await delay(1000);
     const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
     const freshOpenReg = openRegSettings.length > 0
       ? (() => { try { return JSON.parse(openRegSettings[0].setting_value); } catch { return []; } })()
