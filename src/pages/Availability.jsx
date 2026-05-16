@@ -703,10 +703,11 @@ END:VEVENT
   // Handle signup from the demand panel: add/update the shift in selectedShifts
   const handleDemandSignup = (unifiedShift, roleName, type) => {
     if (!canEdit || currentWorker?.availability_locked) return;
-    const { date, startTime, endTime } = unifiedShift;
-    // Remove any existing entry for this slot
+    const operationalDate = unifiedShift.operational_date || unifiedShift.date;
+    const { startTime, endTime } = unifiedShift;
+    // Remove any existing entry for this slot (match by operational date)
     let newShifts = selectedShifts.filter(
-      s => !(s.date === date && s.start_time === startTime && s.end_time === endTime)
+      s => !((s.operational_date || s.date) === operationalDate && s.start_time === startTime && s.end_time === endTime)
     );
     if (type === "remove") {
       setSelectedShifts(newShifts);
@@ -714,7 +715,8 @@ END:VEVENT
     }
     const count = newShifts.filter(s => s.type === type).length;
     newShifts.push({
-      date,
+      date: operationalDate,
+      operational_date: operationalDate,
       start_time: startTime,
       end_time: endTime,
       type,

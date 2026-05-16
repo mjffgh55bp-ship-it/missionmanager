@@ -49,7 +49,9 @@ const timeToPixels = (timeStr, day = 0, viewMode = 'daily', ppm) => {
   if (isNaN(parsed.hour)) return 0;
   let totalMins;
   if (viewMode === 'weekly') {
-    totalMins = (day + parsed.dayOffset) * 24 * 60 + parsed.hour * 60 + (parsed.minute || 0);
+    // Use operational minutes so after-midnight times (02:00 = 1200 op-mins)
+    // stay visually within the same operational day, not pushed to the next day.
+    totalMins = day * 1440 + getOperationalMinutes(timeStr);
   } else {
     totalMins = getOperationalMinutes(timeStr);
   }
@@ -57,16 +59,11 @@ const timeToPixels = (timeStr, day = 0, viewMode = 'daily', ppm) => {
 };
 
 const endTimeToPixels = (startTimeStr, endTimeStr, viewMode = 'daily', ppm, dayIndex = 0) => {
-  let endPx = timeToPixels(endTimeStr, dayIndex, viewMode, ppm);
-  const startPx = timeToPixels(startTimeStr, dayIndex, viewMode, ppm);
-  if (endPx <= startPx) {
-    if (viewMode === 'weekly') {
-      endPx += 7 * 24 * 60 * ppm;
-    } else {
-      endPx += DAILY_TOTAL_MINUTES * ppm;
-    }
+  if (viewMode === 'weekly') {
+    // Use operational end minutes so the width is always correct within the operational day.
+    return (dayIndex * 1440 + getOperationalEndMinutes(startTimeStr, endTimeStr)) * ppm;
   }
-  return endPx;
+  return getOperationalEndMinutes(startTimeStr, endTimeStr) * ppm;
 };
 
 const getTimelineWidth = (viewMode, ppm) =>
@@ -531,6 +528,17 @@ export default function Matrix() {
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
       if (!startTime || !endTime) return;
+      console.log("OPERATIONAL MATRIX DEBUG", {
+        rowId: row.id,
+        rowDate: row.date,
+        startTime,
+        endTime,
+        operationalDate: row.date,
+        calendarStartDate: getOperationalStartDate(row.date, startTime),
+        dayIndex: getDayIndexFromDate(row.date),
+        startOperationalMinutes: getOperationalMinutes(startTime),
+        endOperationalMinutes: getOperationalEndMinutes(startTime, endTime)
+      });
       shifts.push({
         id: `schedule_${row.id}_${assignedResult.workerColumnName}_${workerId}`,
         source: "schedule",
@@ -538,7 +546,11 @@ export default function Matrix() {
         template_id: row.template_id,
         group_id: row.group_id || "default",
         schedule_date: row.date,
-        date: getOperationalStartDate(row.date, startTime),
+        operational_date: row.date,
+        // date = operational day (row.date), NOT the physical calendar date.
+        // This ensures Matrix/Availability group by the correct operational day.
+        date: row.date,
+        calendar_start_date: getOperationalStartDate(row.date, startTime),
         worker_id: workerId,
         worker_column_name: assignedResult.workerColumnName,
         start_time: startTime,
@@ -875,9 +887,9 @@ export default function Matrix() {
       const st = row.values?.['התחלה'] || row.values?.['שעת התחלה'];
       const et = row.values?.['סיום'] || row.values?.['שעת סיום'];
       if (st && et) {
-        const effectiveDate = getOperationalStartDate(row.date, st);
-        if (effectiveDate < weekStartStr || effectiveDate > weekEndStr) return;
-        weeklyShifts.push({ date: effectiveDate, start_time: st, end_time: et, status: row.values?.status || null, food_cart_name: allTemplates.find(t => t.id === row.template_id)?.name || row.template_name || '' });
+        // Use row.date (operational date) for column counting, not the physical calendar date.
+        if (row.date < weekStartStr || row.date > weekEndStr) return;
+        weeklyShifts.push({ date: row.date, start_time: st, end_time: et, status: row.values?.status || null, food_cart_name: allTemplates.find(t => t.id === row.template_id)?.name || row.template_name || '' });
       }
     });
     if (column.criteria_type === 'total_shifts') return weeklyShifts.length;

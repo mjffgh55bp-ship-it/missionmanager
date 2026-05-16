@@ -106,6 +106,36 @@ export function getOperationalStartDate(scheduleDate, startTime) {
   return getOperationalDate(scheduleDate, startTime);
 }
 
+/**
+ * Explicit alias: returns the physical calendar date for a given time value on an operational date.
+ * Use for ICS/calendar export, NOT for visual grouping in Schedule/Matrix/Availability.
+ *
+ * Examples (operationalDate = 2026-05-18):
+ *   getCalendarDateForTime("2026-05-18", "06:00") → "2026-05-18"
+ *   getCalendarDateForTime("2026-05-18", "02:00") → "2026-05-19"  ← after midnight
+ *   getCalendarDateForTime("2026-05-18", "+1 02:00") → "2026-05-19"
+ */
+export function getCalendarDateForTime(operationalDate, timeValue) {
+  return getOperationalDate(operationalDate, timeValue);
+}
+
+/**
+ * Add N days to a date string "yyyy-MM-dd" and return the new date string.
+ */
+export function addDaysString(dateStr, n) {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Returns the operational day for a schedule row — always row.date unchanged.
+ * Use this everywhere you need the "business day" for visual grouping.
+ */
+export function getOperationalDayForScheduleRow(rowDate) {
+  return rowDate;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // OPERATIONAL MINUTE HELPERS
 // ─────────────────────────────────────────────────────────────────────────────

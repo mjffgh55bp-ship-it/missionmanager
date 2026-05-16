@@ -41,8 +41,9 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
 
   const hasMyRole = !!myRoleEntry;
 
+  const operationalDate = shift.operational_date || shift.date;
   const currentEntry = selectedShifts.find(
-    s => s.date === shift.date && s.start_time === shift.startTime && s.end_time === shift.endTime
+    s => (s.operational_date || s.date) === operationalDate && s.start_time === shift.startTime && s.end_time === shift.endTime
   );
   const currentType = currentEntry?.type || null;
 

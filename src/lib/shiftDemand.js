@@ -2,12 +2,26 @@
  * shiftDemand.js
  * Computes unified shift demand from TemplateRows + Templates,
  * counts signups from all Availability records, and calculates status.
+ *
+ * Operational day rule: 06:00 → next-day 06:00.
+ * row.date is always the OPERATIONAL date (the Schedule day).
+ * Do NOT convert after-midnight times to the next calendar day for grouping.
  */
 
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Get the operational date from a shift entry.
+ * New records have operational_date; old records fall back to date.
+ */
+function getShiftOperationalDate(shift) {
+  return shift.operational_date || shift.date;
+}
+
 // ── 1. Build unified shift demand from TemplateRows ───────────────────────────
-// Returns Map: unifiedKey → { key, date, mokedName, startTime, endTime, roles: { roleName: count } }
+// Returns Map: unifiedKey → { key, date, operational_date, mokedName, startTime, endTime, roles: { roleName: count } }
 export function buildUnifiedShiftDemand(templateRows, templates) {
   const templateById = {};
   templates.forEach(t => { templateById[t.id] = t; });
@@ -24,11 +38,22 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
     const endTime   = values["סיום"]  || values["שעת סיום"];
     if (!startTime || !endTime || !row.date) return;
 
+    // Always use row.date as the operational date for grouping.
+    const operationalDate = row.date;
     const mokedName = tmpl.name || row.template_name || "";
-    const key = `${row.date}|${mokedName}|${startTime}|${endTime}`;
+    const key = `${operationalDate}|${mokedName}|${startTime}|${endTime}`;
+
+    console.log("OPERATIONAL AVAILABILITY DEBUG", {
+      rowId: row.id,
+      rowDate: row.date,
+      startTime,
+      endTime,
+      operationalDate,
+      demandKey: key
+    });
 
     if (!map.has(key)) {
-      map.set(key, { key, date: row.date, mokedName, startTime, endTime, roles: {} });
+      map.set(key, { key, date: operationalDate, operational_date: operationalDate, mokedName, startTime, endTime, roles: {} });
     }
     const unified = map.get(key);
 
@@ -49,7 +74,8 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
 // unifiedShift: one entry from buildUnifiedShiftDemand
 // roleName: the specific role to count for
 export function getSignupsForRole(availabilities, workers, unifiedShift, roleName) {
-  const { date, startTime, endTime } = unifiedShift;
+  const operationalDate = unifiedShift.operational_date || unifiedShift.date;
+  const { startTime, endTime } = unifiedShift;
 
   // Build a set of worker IDs that have the required role
   const eligibleWorkerIds = new Set(
@@ -63,7 +89,7 @@ export function getSignupsForRole(availabilities, workers, unifiedShift, roleNam
     if (!eligibleWorkerIds.has(avail.worker_id)) return;
     const shifts = avail.shifts || [];
     const hasMatch = shifts.some(s =>
-      s.date === date &&
+      getShiftOperationalDate(s) === operationalDate &&
       s.start_time === startTime &&
       s.end_time === endTime &&
       (s.type === "wanted" || s.type === "available")
@@ -96,9 +122,10 @@ export function calculateRoleStatus(required, signed, signupMode) {
 
 // ── 4. Check if current worker already signed up for a unified shift slot ─────
 export function workerSignedForShift(selectedShifts, unifiedShift) {
-  const { date, startTime, endTime } = unifiedShift;
+  const operationalDate = unifiedShift.operational_date || unifiedShift.date;
+  const { startTime, endTime } = unifiedShift;
   return selectedShifts.some(s =>
-    s.date === date &&
+    getShiftOperationalDate(s) === operationalDate &&
     s.start_time === startTime &&
     s.end_time === endTime &&
     (s.type === "wanted" || s.type === "available")
