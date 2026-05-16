@@ -83,6 +83,7 @@ export default function Schedule() {
   const staticDataLoaded = useRef(false);
   const lastWeekStart = useRef(null);
   const initialLoadStarted = useRef(false);
+  const isLoadingAll = useRef(false);
 
   useEffect(() => {
     if (!initialLoadStarted.current) {
@@ -118,23 +119,26 @@ export default function Schedule() {
 
   // Load everything on first render
   const loadAllData = async () => {
+    if (isLoadingAll.current) return;
+    isLoadingAll.current = true;
     setLoading(true);
     const dateString = format(currentDate, "yyyy-MM-dd");
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     lastWeekStart.current = weekStartStr;
 
+    try {
     // Static reference data — sequential with delays to avoid rate limits
     const workersData = await getCachedWorkers(base44.entities);
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 2000));
     const allTemplatesData = await getCachedTemplates(base44.entities);
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 2000));
     const allSettings = await getCachedAllSettings(base44.entities);
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 2000));
     const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 2000));
     const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
-    await new Promise(r => setTimeout(r, 1200));
+    await new Promise(r => setTimeout(r, 2000));
     const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
 
     // Filter settings client-side
@@ -151,7 +155,10 @@ export default function Schedule() {
     applyStaticData({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData });
     applyDailyData({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     staticDataLoaded.current = true;
-    setLoading(false);
+    } finally {
+      isLoadingAll.current = false;
+      setLoading(false);
+    }
   };
 
   // Load only day-specific data on date change
