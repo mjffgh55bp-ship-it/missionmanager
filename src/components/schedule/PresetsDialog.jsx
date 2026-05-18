@@ -9,6 +9,7 @@ import { Plus, Trash2, Pencil, Check, X, BookmarkPlus, ChevronLeft, ChevronRight
 import toast from "react-hot-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import OperationalTimePicker from "./OperationalTimePicker";
 
 const DEFAULT_COLUMNS = [
   { name: "תדריך", type: "time", width: 100 },
@@ -267,12 +268,13 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                         {editingPreset.template_config.columns.map((col, idx) => (
                           <TableCell key={idx} className="text-center py-1 px-1" dir="rtl">
                             {col.type === "time" ? (
-                              <input
-                                type="time"
-                                value={row[col.name] || ""}
-                                onChange={(e) => updateRowCell(rowIdx, col.name, e.target.value)}
-                                className="w-full text-xs border rounded px-1 py-0.5 text-center"
-                              />
+                              <div className="w-full border rounded overflow-hidden" style={{ minWidth: 80 }}>
+                                <OperationalTimePicker
+                                  value={row[col.name] || ""}
+                                  onChange={(newVal) => updateRowCell(rowIdx, col.name, newVal)}
+                                  compact={true}
+                                />
+                              </div>
                             ) : col.type === "worker" ? (
                               <select
                                 value={row[col.name] || ""}

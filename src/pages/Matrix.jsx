@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
-import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, operationalMinutesToTime } from "@/lib/operationalDate";
+import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, operationalMinutesToTime, addDaysString } from "@/lib/operationalDate";
 import { getTimelineRangeStyle, getTimelinePointStyle } from "@/lib/matrixTimeUtils";
 import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut } from "lucide-react";
 import BriefingBar from "../components/matrix/BriefingBar";
@@ -496,12 +496,26 @@ export default function Matrix() {
       const allTemplatesData = await getCachedTemplates(base44.entities);
       const trackerEntriesData = await base44.entities.TrackerEntry.list();
 
-      // Fetch template rows sequentially
+      // Fetch template rows for visible range + adjacent days (for cross-day briefing markers)
       const templateRowArrays = [];
       if (viewMode === "daily") {
-        templateRowArrays.push(await base44.entities.TemplateRow.filter({ date: dateStrLocal }));
+        // Load D-1, D, D+1 so briefing markers on adjacent operational days are visible
+        const adjacentDates = [
+          addDaysString(dateStrLocal, -1),
+          dateStrLocal,
+          addDaysString(dateStrLocal, 1),
+        ];
+        for (const d of adjacentDates) {
+          templateRowArrays.push(await base44.entities.TemplateRow.filter({ date: d }));
+        }
       } else {
-        for (const d of weekDates) {
+        // Load week-1 through week+1
+        const extendedDates = [
+          addDaysString(weekStartStr, -1),
+          ...weekDates,
+          addDaysString(weekDates[weekDates.length - 1], 1),
+        ];
+        for (const d of extendedDates) {
           templateRowArrays.push(await base44.entities.TemplateRow.filter({ date: d }));
         }
       }
@@ -578,6 +592,11 @@ export default function Matrix() {
     templateRows.forEach(row => {
       if (!row.values) return;
       if (row.date !== targetDate) return;
+      // Only render assignment bars for rows within the visible date range (not adjacent preloaded days)
+      const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+      const weekEnd = format(addDays(weekStart, 6), "yyyy-MM-dd");
+      const weekStartStr2 = format(weekStart, "yyyy-MM-dd");
+      if (viewMode === 'weekly' && (row.date < weekStartStr2 || row.date > weekEnd)) return;
       // Skip invalid zero-duration continuation rows
       if (isInvalidContinuationRow(row)) {
         console.log("MATRIX SKIP INVALID CONTINUATION", { rowId: row.id, rowDate: row.date, values: row.values });
@@ -1125,6 +1144,84 @@ export default function Matrix() {
     return <div className="flex gap-0.5 items-center">{days.map((d, i) => <div key={i} className={`text-[9px] font-medium leading-tight ${d.working ? 'text-green-600' : 'text-gray-300'}`} title={`${d.day}: ${d.working ? d.hours.toFixed(1) + 'h' : 'חופש'}`}>{d.day}</div>)}</div>;
   };
 
+  // ── Derived briefing markers ──────────────────────────────────────────────────
+  // Built from ALL loaded templateRows (including adjacent days).
+  // Each marker has a visual_operational_date that may differ from row.date.
+  const briefingMarkers = useMemo(() => {
+    const markers = [];
+    templateRows.forEach(row => {
+      if (!row.values) return;
+      const originalBriefingTime = row.values?.["תדריך"];
+      if (!originalBriefingTime) return;
+
+      const template = allTemplates.find(t => t.id === row.template_id);
+      if (!template) return;
+
+      const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
+      const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
+      if (!startTime || !endTime) return;
+
+      const parsed = parseTimeCellValue(originalBriefingTime);
+      let visualOperationalDate;
+      let visualTime;
+
+      if (parsed.dayOffset === -1) {
+        // "-1 HH:MM" → marker on the previous operational day, plain time
+        visualOperationalDate = addDaysString(row.date, -1);
+        visualTime = parsed.clockTime; // e.g. "05:15"
+      } else if (parsed.dayOffset > 0) {
+        // "+N HH:MM" → marker on a future operational day
+        visualOperationalDate = addDaysString(row.date, parsed.dayOffset);
+        visualTime = parsed.clockTime;
+      } else {
+        // plain "HH:MM" → same operational day as row
+        visualOperationalDate = row.date;
+        visualTime = parsed.clockTime;
+      }
+
+      // Find all worker IDs assigned to this row
+      const workerCols = (template.columns || []).filter(c => c.type === "worker");
+      const assignedWorkerIds = [];
+      workerCols.forEach(col => {
+        const val = row.values[col.name];
+        if (!val) return;
+        if (Array.isArray(val)) assignedWorkerIds.push(...val);
+        else assignedWorkerIds.push(val);
+      });
+
+      if (assignedWorkerIds.length === 0) return;
+
+      assignedWorkerIds.forEach(workerId => {
+        const worker = workers.find(w => w.id === workerId);
+        const workerName = worker?.nickname || workerId;
+
+        console.log("BRIEFING MARKER BUILT", {
+          workerName,
+          rowId: row.id,
+          rowDate: row.date,
+          originalBriefingTime,
+          visualOperationalDate,
+          visualTime,
+          linkedShift: `${startTime}-${endTime}`
+        });
+
+        markers.push({
+          id: `briefing_${row.id}_${workerId}`,
+          worker_id: workerId,
+          source_row_id: row.id,
+          linked_shift_operational_date: row.date,
+          visual_operational_date: visualOperationalDate,
+          visual_time: visualTime,
+          original_briefing_time: originalBriefingTime,
+          shift_start_time: startTime,
+          shift_end_time: endTime,
+          template_name: template.name || row.template_name,
+        });
+      });
+    });
+    return markers;
+  }, [templateRows, allTemplates, workers]);
+
   const dailySlots = useMemo(() => getDailyTimeSlots(), []);
   const weeklySlots = useMemo(
     () => getWeeklyTimeSlots(startOfWeek(currentDate, { weekStartsOn: 0 })),
@@ -1233,6 +1330,22 @@ export default function Matrix() {
     </div>
   );
 
+  // Get briefing markers visible for a worker on the current view
+  const getWorkerBriefingMarkers = (workerId) => {
+    return briefingMarkers.filter(m => {
+      if (m.worker_id !== workerId) return false;
+      if (viewMode === 'daily') {
+        return m.visual_operational_date === dateString;
+      } else {
+        // Weekly: marker visual date must be within the visible week
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+        const weekEnd = addDays(weekStart, 6);
+        const vd = new Date(m.visual_operational_date + "T12:00:00");
+        return vd >= weekStart && vd <= weekEnd;
+      }
+    });
+  };
+
   const renderTimelineRow = (worker, index, isSelected) => {
     const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
     const workerTemplateShifts = (() => {
@@ -1244,6 +1357,7 @@ export default function Matrix() {
     })();
     const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
+    const workerBriefingMarkers = getWorkerBriefingMarkers(worker.id);
 
     return (
       <div
@@ -1271,21 +1385,26 @@ export default function Matrix() {
           })}
           {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
           {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
-          {workerTemplateShifts.map(ts => (
-            <React.Fragment key={ts.id}>
-              <AssignmentBar assignment={ts} />
-              {ts.briefing_time && <BriefingBar
-                briefingTime={ts.briefing_time}
-                shiftStartTime={ts.start_time}
-                shiftEndTime={ts.end_time}
-                dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
+          {workerTemplateShifts.map(ts => <AssignmentBar key={ts.id} assignment={ts} />)}
+          {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
+          {/* Briefing markers — placed by visual_operational_date, not by shift date */}
+          {workerBriefingMarkers.map(marker => {
+            const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(marker.visual_operational_date) : 0;
+            return (
+              <BriefingBar
+                key={marker.id}
+                visualTime={marker.visual_time}
+                originalBriefingTime={marker.original_briefing_time}
+                linkedShiftDate={marker.linked_shift_operational_date}
+                shiftStartTime={marker.shift_start_time}
+                shiftEndTime={marker.shift_end_time}
+                dayIndex={dayIndex}
                 viewMode={viewMode}
                 ppm={ppm}
                 timeToPixels={timeToPixels}
-              />}
-            </React.Fragment>
-          ))}
-          {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
+              />
+            );
+          })}
           <DragPreviewBar preview={dragPreview} workerId={worker.id} />
         </div>
       </div>
@@ -1460,6 +1579,7 @@ export default function Matrix() {
             })();
             const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
             const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
+            const workerBriefingMarkers = getWorkerBriefingMarkers(worker.id);
 
             return (
               <div
@@ -1497,21 +1617,26 @@ export default function Matrix() {
                     })}
                     {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
                     {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
-                    {workerTemplateShifts.map(ts => (
-                      <React.Fragment key={ts.id}>
-                        <AssignmentBar assignment={ts} />
-                        {ts.briefing_time && <BriefingBar
-                          briefingTime={ts.briefing_time}
-                          shiftStartTime={ts.start_time}
-                          shiftEndTime={ts.end_time}
-                          dayIndex={viewMode === 'weekly' ? getDayIndexFromDate(ts.schedule_date || ts.date) : 0}
+                    {workerTemplateShifts.map(ts => <AssignmentBar key={ts.id} assignment={ts} />)}
+                    {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
+                    {/* Briefing markers — placed by visual_operational_date, not by shift date */}
+                    {workerBriefingMarkers.map(marker => {
+                      const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(marker.visual_operational_date) : 0;
+                      return (
+                        <BriefingBar
+                          key={marker.id}
+                          visualTime={marker.visual_time}
+                          originalBriefingTime={marker.original_briefing_time}
+                          linkedShiftDate={marker.linked_shift_operational_date}
+                          shiftStartTime={marker.shift_start_time}
+                          shiftEndTime={marker.shift_end_time}
+                          dayIndex={dayIndex}
                           viewMode={viewMode}
                           ppm={ppm}
                           timeToPixels={timeToPixels}
-                        />}
-                      </React.Fragment>
-                    ))}
-                    {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
+                        />
+                      );
+                    })}
                     <DragPreviewBar preview={dragPreview} workerId={worker.id} />
                   </div>
                 </div>
