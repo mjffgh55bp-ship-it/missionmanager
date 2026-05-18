@@ -13,18 +13,26 @@ import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 // ── Signup key helpers ────────────────────────────────────────────────────────
 
 /**
- * Normalize a moked name for use as a stable key part (lowercase, trim, collapse spaces).
- */
-function normalizeMokedName(name) {
-  return (name || "").trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-/**
- * Build the shared moked key — groups duplicate same-name mokeds together,
- * but keeps different-name mokeds separate even at the same time.
+ * Build the shared moked key.
+ *
+ * Two template rows should share a signup group ONLY when they represent
+ * the same logical moked duplicated on the same day (e.g. two physical
+ * instances of "מוקד מלא 1" at the same time).
+ *
+ * Different mokeds (מוקד מלא 1 vs מוקד מלא 2) MUST produce different keys
+ * even if they share timing. We therefore use template.id as the primary
+ * discriminator — it is unique per moked type.
+ *
+ * The only exception is an explicit signup_group_id / registration_group_id
+ * set on the template to intentionally merge multiple templates into one group.
  */
 export function buildSharedMokedKey(template) {
-  return template?.mapping_id || normalizeMokedName(template?.name || "");
+  // Explicit cross-template group override (intentional merging only)
+  if (template?.signup_group_id) return template.signup_group_id;
+  if (template?.registration_group_id) return template.registration_group_id;
+  // Default: use template.id so every distinct template gets its own key.
+  // This correctly separates מוקד מלא 1 (id=AAA) from מוקד מלא 2 (id=BBB).
+  return template?.id || (template?.name || "").trim();
 }
 
 /**
@@ -78,6 +86,20 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
     const mokedName = tmpl.name || row.template_name || "";
     const sharedMokedKey = buildSharedMokedKey(tmpl);
     const signupKey = buildSignupKey(operationalDate, sharedMokedKey, startTime, endTime);
+
+    console.log("SHIFT SIGNUP KEY DEBUG", {
+      mokedName,
+      template_id: tmpl.id,
+      mapping_id: tmpl.mapping_id,
+      signup_group_id: tmpl.signup_group_id,
+      group_id: row.group_id,
+      row_id: row.id,
+      operational_date: operationalDate,
+      start_time: startTime,
+      end_time: endTime,
+      sharedMokedKey,
+      signupKey,
+    });
     // Use signupKey as the map key so duplicate same-name mokeds are grouped together
     const key = signupKey;
 
