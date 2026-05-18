@@ -158,24 +158,24 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
 
       {displayRole && (
         <>
-          {/* Fill bar — only when unselected and not over/full */}
-          {!isSelected && !blocked && !isOver && (
-            <div className="mt-1 h-1 w-full bg-gray-200 rounded-full overflow-hidden">
-              <div className={`h-full ${fillColor} transition-all`} style={{ width: `${fillPct}%` }} />
-            </div>
-          )}
-          {/* Over-capacity bar indicator */}
-          {!isSelected && isOver && (
-            <div className="mt-1 h-1 w-full bg-orange-200 rounded-full overflow-hidden">
-              <div className="h-full bg-orange-500 w-full transition-all" />
-            </div>
-          )}
-          {/* Full bar indicator */}
-          {!isSelected && blocked && !isOver && (
-            <div className="mt-1 h-1 w-full bg-red-200 rounded-full overflow-hidden">
-              <div className="h-full bg-red-500 w-full transition-all" />
-            </div>
-          )}
+          {/* Fill bar — always visible */}
+          <div className="mt-1 h-1.5 w-full rounded-full overflow-hidden" style={{ background: isSelected ? "rgba(255,255,255,0.3)" : isOver ? "#fed7aa" : blocked ? "#fecaca" : "#e5e7eb" }}>
+            <div
+              className="h-full transition-all"
+              style={{
+                width: `${fillPct}%`,
+                background: isSelected
+                  ? "rgba(255,255,255,0.85)"
+                  : isOver
+                  ? "#f97316"
+                  : blocked
+                  ? "#ef4444"
+                  : fillPct >= 70
+                  ? "#facc15"
+                  : "#22c55e",
+              }}
+            />
+          </div>
 
           {/* Count + status row — always visible */}
           <div className="flex items-center justify-center gap-1 mt-0.5 flex-wrap">
