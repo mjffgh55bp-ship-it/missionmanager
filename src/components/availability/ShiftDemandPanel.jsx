@@ -69,32 +69,40 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
 
   let chipClass = "border rounded-md px-1 py-1 text-xs text-center transition-all select-none w-full ";
   if (isSignedWanted) {
-    chipClass += "bg-green-500 text-white border-green-600 cursor-pointer";
+    chipClass += isOver
+      ? "bg-orange-500 text-white border-orange-600 cursor-pointer"
+      : "bg-green-500 text-white border-green-600 cursor-pointer";
   } else if (isSignedAvailable) {
-    chipClass += "bg-cyan-500 text-white border-cyan-600 cursor-pointer";
+    chipClass += isOver
+      ? "bg-orange-400 text-white border-orange-500 cursor-pointer"
+      : "bg-cyan-500 text-white border-cyan-600 cursor-pointer";
   } else if (isSignedUnavailable) {
     chipClass += "bg-red-500 text-white border-red-600 cursor-pointer";
   } else if (!hasMyRole) {
     chipClass += "bg-gray-50 border-gray-200 text-gray-400 cursor-default";
   } else if (blocked) {
-    chipClass += "bg-red-50 border-red-200 text-red-400 cursor-default";
+    chipClass += "bg-red-50 border-red-300 text-red-500 cursor-not-allowed";
+  } else if (isOver) {
+    chipClass += "bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100 cursor-pointer";
   } else {
     chipClass += "bg-white border-gray-300 text-gray-700 hover:border-green-400 hover:bg-green-50 cursor-pointer";
   }
 
   const handleClick = () => {
     if (!canEdit || !hasMyRole) return;
+
+    // If not yet signed up and capacity is full in limit mode → block
+    if (currentType === null && blocked) return;
+
     if (currentType === null) {
       onSignup && onSignup(shift, displayRole, "wanted");
     } else if (currentType === "wanted") {
+      // Already signed up — allow cycling even if full (worker is already counted)
       onSignup && onSignup(shift, displayRole, "available");
     } else if (currentType === "available") {
-      if (!blocked) {
-        onSignup && onSignup(shift, displayRole, "unavailable");
-      } else {
-        onSignup && onSignup(shift, displayRole, "remove");
-      }
+      onSignup && onSignup(shift, displayRole, "unavailable");
     } else if (currentType === "unavailable") {
+      // Remove the unavailable entry (worker is not counted in signed, so removing is always allowed)
       onSignup && onSignup(shift, displayRole, "remove");
     }
   };
@@ -122,22 +130,27 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
     blocked ? "מלא" :
     null;
 
-  // Count label — always shown, adapts for limit vs no-limit mode
-  const isLimitMode = displayRequired > 0;
-  const countLabel = isLimitMode
-    ? `${signed}/${displayRequired}`
-    : `${signed}`;
+  const countLabel = `${signed}/${displayRequired}`;
 
-  // Badge text color: white on selected cards, gray on unselected
-  const countBadgeClass = isSelected
-    ? "inline-flex items-center rounded px-1 bg-black/20 text-white font-semibold"
-    : isOver
-    ? "inline-flex items-center rounded px-1 bg-orange-100 text-orange-700 font-semibold"
-    : "inline-flex items-center rounded px-1 bg-gray-100 text-gray-600";
+  // Determine the status label shown below the count
+  let bottomLabel = null;
+  let bottomLabelClass = "";
+  if (blocked && !isSelected) {
+    bottomLabel = "מלא";
+    bottomLabelClass = "text-red-500 font-semibold";
+  } else if (isOver && !isSelected) {
+    bottomLabel = "חריגה";
+    bottomLabelClass = "text-orange-600 font-semibold";
+  } else if (isOver && isSelected) {
+    bottomLabel = "חריגה";
+    bottomLabelClass = "text-white/90 font-semibold";
+  }
 
   return (
-    <button className={chipClass} onClick={handleClick}
-      title={!hasMyRole ? "אין תפקיד מתאים" : blocked ? "המשמרת מלאה" : "לחץ לבחירה"}
+    <button
+      className={chipClass}
+      onClick={handleClick}
+      title={!hasMyRole ? "אין תפקיד מתאים" : blocked && !isSelected ? "המשמרת מלאה" : "לחץ לבחירה"}
       disabled={!canEdit}
     >
       {/* Time range */}
@@ -145,32 +158,45 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
 
       {displayRole && (
         <>
-          {/* Fill bar — only when unselected */}
-          {!isSelected && (
+          {/* Fill bar — only when unselected and not over/full */}
+          {!isSelected && !blocked && !isOver && (
             <div className="mt-1 h-1 w-full bg-gray-200 rounded-full overflow-hidden">
               <div className={`h-full ${fillColor} transition-all`} style={{ width: `${fillPct}%` }} />
             </div>
           )}
+          {/* Over-capacity bar indicator */}
+          {!isSelected && isOver && (
+            <div className="mt-1 h-1 w-full bg-orange-200 rounded-full overflow-hidden">
+              <div className="h-full bg-orange-500 w-full transition-all" />
+            </div>
+          )}
+          {/* Full bar indicator */}
+          {!isSelected && blocked && !isOver && (
+            <div className="mt-1 h-1 w-full bg-red-200 rounded-full overflow-hidden">
+              <div className="h-full bg-red-500 w-full transition-all" />
+            </div>
+          )}
 
-          {/* Status row — icon+label when selected, always show count badge */}
-          <div className="flex items-center justify-center gap-1 mt-1 flex-wrap">
+          {/* Count + status row — always visible */}
+          <div className="flex items-center justify-center gap-1 mt-0.5 flex-wrap">
+            {/* Selection icon when selected */}
             {isSelected && (
-              <span className="flex items-center gap-0.5 text-[10px] text-white font-medium">
+              <span className={`flex items-center gap-0.5 text-[10px] text-white/90`}>
                 {statusIcon}
-                {statusText}
               </span>
             )}
-            {!isSelected && statusText === "מלא" && (
-              <span className="text-[10px] text-red-500 font-medium">מלא</span>
-            )}
             {/* Count badge — always visible */}
-            <span className={`text-[10px] ${countBadgeClass}`}>
-              {!isLimitMode && <span className="opacity-80 ml-0.5">נרשמו:</span>}
+            <span className={`text-[10px] font-semibold ${isSelected ? "text-white" : isOver ? "text-orange-700" : blocked ? "text-red-600" : "text-gray-600"}`}>
               {countLabel}
-              {isOver && isLimitMode && (
-                <span className="mr-0.5 text-orange-300">↑</span>
-              )}
             </span>
+            {/* Status label */}
+            {bottomLabel && (
+              <span className={`text-[10px] ${bottomLabelClass}`}>{bottomLabel}</span>
+            )}
+            {/* "רצוי/זמין" label when selected and not over */}
+            {isSelected && !isOver && statusText && (
+              <span className="text-[10px] text-white/90">{statusText}</span>
+            )}
           </div>
         </>
       )}
