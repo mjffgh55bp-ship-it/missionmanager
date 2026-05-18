@@ -1535,10 +1535,17 @@ export default function Matrix() {
                 onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
                 sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
               />
-              {/* Pin indicator inside fixed panel header */}
-              <div className="ml-auto flex-shrink-0 text-green-600" title="עמודות עובדים נעוצות">
-                <PinIcon size={13} />
-              </div>
+              {/* Pin toggle — click to unfreeze */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button onClick={togglePin} className="ml-auto flex-shrink-0 text-green-600 hover:text-green-800 transition-colors p-0.5 rounded hover:bg-green-50">
+                      <PinIcon size={13} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent dir="rtl">בטל הקפאת עמודת עובדים</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             {viewMode === 'weekly' && summaryColumns.map(col => (
               <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1 h-full" title={col.name}>
@@ -1638,6 +1645,17 @@ export default function Matrix() {
         {/* Sticky header row */}
         <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
           <div className="p-2 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
+            {/* Pin toggle in classic layout */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button onClick={togglePin} className="flex-shrink-0 text-gray-400 hover:text-green-600 transition-colors p-0.5 rounded hover:bg-green-50">
+                    <PinIcon size={13} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent dir="rtl">הקפא עמודת עובדים</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <MasterControls
               workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
               getWorkerSendStatus={getWorkerSendStatus}
@@ -1768,7 +1786,7 @@ export default function Matrix() {
 
   return (
     <div
-      className="h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 p-2"
+      className="h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 p-2 pb-10"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
@@ -1787,8 +1805,16 @@ export default function Matrix() {
           />
         </Card>
 
-        {/* Zoom controls bar */}
-        <div className="flex items-center gap-2 mb-1 px-1 flex-shrink-0" dir="rtl">
+
+
+        <Card className="border-none shadow-lg flex-1 min-h-0 flex flex-col">
+          <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
+            {pinned ? renderPinnedLayout() : renderClassicLayout()}
+          </CardContent>
+        </Card>
+
+        {/* ── Fixed bottom zoom bar ── */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-md flex items-center gap-2 px-3 py-1.5" dir="rtl" style={{ marginRight: 48 }}>
           <span className="text-xs text-gray-500 font-medium">רזולוציה:</span>
           <button onClick={zoomOut} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הקטן רזולוציית זמן">−</button>
           <button onClick={zoomIn} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הגדל רזולוציית זמן">+</button>
@@ -1796,36 +1822,8 @@ export default function Matrix() {
           <button onClick={() => applyPreset('auto')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">התאם ליום</button>
           <button onClick={() => applyPreset('full')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">24h</button>
           <button onClick={() => applyPreset('12h')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">12h</button>
-          <div className="w-px h-5 bg-gray-300 mx-1" />
-          {/* Pin toggle button */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={togglePin}
-                  className={`w-7 h-7 flex items-center justify-center rounded border transition-colors ${
-                    pinned
-                      ? 'bg-green-50 border-green-400 text-green-600 hover:bg-green-100'
-                      : 'bg-white border-gray-300 text-gray-400 hover:bg-gray-50 hover:text-gray-600'
-                  }`}
-                  title="נעץ עמודות עובדים"
-                >
-                  <PinIcon size={14} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent dir="rtl">
-                {pinned ? 'בטל נעיצת עמודות עובדים' : 'נעץ עמודות עובדים'}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <span className="text-[10px] text-gray-400 mr-2">Ctrl+גלגל לזום · גרירת גלגל לגלילה</span>
+          <span className="text-[10px] text-gray-400 mr-auto">Ctrl+גלגל לזום · גרירת גלגל לגלילה</span>
         </div>
-
-        <Card className="border-none shadow-lg flex-1 min-h-0 flex flex-col">
-          <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
-            {pinned ? renderPinnedLayout() : renderClassicLayout()}
-          </CardContent>
-        </Card>
 
         <SummaryColumnsDialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog} summaryColumns={summaryColumns} saveSummaryColumns={saveSummaryColumns} shiftStatuses={shiftStatuses} scheduleParams={scheduleParams} trackers={trackers} />
         <NotificationDialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog} viewMode={viewMode} currentDate={currentDate} selectedWorkerForNotification={selectedWorkerForNotification} notificationNotes={notificationNotes} setNotificationNotes={setNotificationNotes} getWorkerTemplateShifts={getWorkerTemplateShifts} getWorkerExtraTaskShifts={getWorkerExtraTaskShifts} sendNotification={sendNotification} />
