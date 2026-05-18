@@ -222,17 +222,19 @@ export default function Availability() {
       const templatesData = await getCachedTemplates(base44.entities);
       const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
 
-      // Fetch template rows one at a time to avoid rate limiting
+      // Fetch template rows one at a time with a small delay to avoid rate limiting
       const perDayRowArrays = [];
       for (const d of weekDates) {
         const rows = await base44.entities.TemplateRow.filter({ date: d });
         perDayRowArrays.push(rows);
+        await new Promise(r => setTimeout(r, 80));
       }
 
-      // Fetch assignments sequentially to avoid rate limiting
-      const assignmentsData = await base44.entities.Assignment.filter({ chef_id: worker.id });
-      const sousAssignments = await base44.entities.Assignment.filter({ sous_chef_id: worker.id });
-      const additionalAssignments = await base44.entities.Assignment.filter({ additional_chef_id: worker.id });
+      // Fetch all assignments at once and filter client-side to reduce API calls
+      const allWorkerAssignments = await base44.entities.Assignment.list();
+      const assignmentsData = allWorkerAssignments.filter(a => a.chef_id === worker.id);
+      const sousAssignments = allWorkerAssignments.filter(a => a.sous_chef_id === worker.id);
+      const additionalAssignments = allWorkerAssignments.filter(a => a.additional_chef_id === worker.id);
 
       // Drop stale results if week changed while loading
       if (weekStart.toISOString() !== weekKey && weekKey !== lastWeekStart.current) {
