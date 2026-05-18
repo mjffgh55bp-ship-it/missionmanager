@@ -9,6 +9,7 @@ import {
   calculateRoleStatus,
   workerSignedForShift,
   filterDemandForWeek,
+  buildSignupKey,
 } from "@/lib/shiftDemand";
 import { filterVisibleScheduleRows } from "@/lib/scheduleVisibility";
 import { getOperationalMinutes, getOperationalEndMinutes } from "@/lib/operationalDate";
@@ -43,9 +44,23 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   const hasMyRole = !!myRoleEntry;
 
   const operationalDate = shift.operational_date || shift.date;
-  const currentEntry = selectedShifts.find(
-    s => (s.operational_date || s.date) === operationalDate && s.start_time === shift.startTime && s.end_time === shift.endTime
-  );
+  // Match by signupKey first (new records), then legacy fallback
+  const currentEntry = selectedShifts.find(s => {
+    const active = !!s.type; // any type
+    if (!active) return false;
+    // New records: match by exact signupKey
+    if (shift.signupKey && s.signupKey) return s.signupKey === shift.signupKey;
+    // Legacy records with sharedMokedKey: rebuild key and compare
+    if (shift.signupKey && s.sharedMokedKey) {
+      const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
+      return legacyKey === shift.signupKey;
+    }
+    // Oldest records: no moked identity — match by date+time only
+    if (!s.signupKey && !s.sharedMokedKey && !s.moked_name) {
+      return (s.operational_date || s.date) === operationalDate && s.start_time === shift.startTime && s.end_time === shift.endTime;
+    }
+    return false;
+  });
   const currentType = currentEntry?.type || null;
 
   const isSignedWanted = currentType === "wanted";

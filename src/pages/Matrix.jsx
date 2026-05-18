@@ -10,6 +10,7 @@ import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinute
 import { getTimelineRangeStyle, getTimelinePointStyle } from "@/lib/matrixTimeUtils";
 import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut } from "lucide-react";
 import BriefingBar from "../components/matrix/BriefingBar";
+import MokedSignupBar from "../components/matrix/MokedSignupBar";
 import WorkerLockButton from "../components/matrix/WorkerLockButton";
 import MasterControls from "../components/matrix/MasterControls";
 import SummaryColumnsDialog from "../components/matrix/SummaryColumnsDialog";
@@ -381,6 +382,10 @@ export default function Matrix() {
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
       debouncedLoadDataRef.current(true, false);
     });
+    // Sync moked signups — reload availabilities when any worker submits/updates
+    const unsubAvailability = base44.entities.Availability.subscribe(() => {
+      debouncedLoadDataRef.current(true, false);
+    });
 
     // Visibility change — reload when tab becomes visible
     const onVisibility = () => {
@@ -431,6 +436,7 @@ export default function Matrix() {
 
     return () => {
       unsubTemplateRow();
+      unsubAvailability();
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('templateRowsUpdated', onTemplateRowsUpdated);
       window.removeEventListener('storage', onStorage);
@@ -1273,6 +1279,44 @@ export default function Matrix() {
   const ROW_H = 32;
 
   // ── Render helpers ────────────────────────────────────────────────────────────
+  // ── Moked signup windows ──────────────────────────────────────────────────────
+  // Returns grouped signup bars for a worker: array of { startTime, endTime, date, signups[] }
+  const getWorkerMokedSignups = (workerId) => {
+    const workerAvail = availabilities.find(
+      a => a.worker_id === workerId && a.week_start_date === weekStartDate &&
+           (a.status === "approved" || a.status === "submitted")
+    );
+    if (!workerAvail?.shifts) return [];
+
+    const grouped = new Map(); // signupKey → { startTime, endTime, date, signups[] }
+
+    workerAvail.shifts.forEach(s => {
+      // Only show shifts that have moked identity (came from ShiftDemandPanel signup)
+      if (!s.moked_name && !s.signupKey && !s.sharedMokedKey) return;
+      if (s.type !== "wanted" && s.type !== "available") return;
+
+      const opDate = s.operational_date || s.date;
+
+      // Filter by current view
+      if (viewMode === 'daily') {
+        if (opDate !== dateString) return;
+      } else {
+        const weekStart2 = startOfWeek(currentDate, { weekStartsOn: 0 });
+        const weekEnd2 = format(addDays(weekStart2, 6), "yyyy-MM-dd");
+        const weekStartStr2 = format(weekStart2, "yyyy-MM-dd");
+        if (opDate < weekStartStr2 || opDate > weekEnd2) return;
+      }
+
+      const key = s.signupKey || `${opDate}__${s.start_time}__${s.end_time}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, { startTime: s.start_time, endTime: s.end_time, date: opDate, signups: [] });
+      }
+      grouped.get(key).signups.push(s);
+    });
+
+    return Array.from(grouped.values());
+  };
+
   const renderTimelineHeader = () => (
     <div className="flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
       {viewMode === 'daily' ? (
@@ -1398,6 +1442,7 @@ export default function Matrix() {
     const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
     const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
     const workerBriefingMarkers = getWorkerBriefingMarkers(worker.id);
+    const workerMokedSignups = getWorkerMokedSignups(worker.id);
 
     return (
       <div
@@ -1427,6 +1472,22 @@ export default function Matrix() {
           {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
           {workerTemplateShifts.map(ts => <AssignmentBar key={ts.id} assignment={ts} />)}
           {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
+          {/* Moked signup candidate windows */}
+          {workerMokedSignups.map((sg, i) => {
+            const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(sg.date) : 0;
+            return (
+              <MokedSignupBar
+                key={`mokedsignup_${worker.id}_${i}`}
+                signups={sg.signups}
+                startTime={sg.startTime}
+                endTime={sg.endTime}
+                dayIndex={dayIndex}
+                viewMode={viewMode}
+                ppm={ppm}
+                timelineWidth={timelineWidth}
+              />
+            );
+          })}
           {/* Briefing markers — placed by visual_operational_date, not by shift date */}
           {workerBriefingMarkers.map(marker => {
             const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(marker.visual_operational_date) : 0;
@@ -1620,6 +1681,7 @@ export default function Matrix() {
             const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
             const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
             const workerBriefingMarkers = getWorkerBriefingMarkers(worker.id);
+            const workerMokedSignups = getWorkerMokedSignups(worker.id);
 
             return (
               <div
@@ -1659,6 +1721,22 @@ export default function Matrix() {
                     {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
                     {workerTemplateShifts.map(ts => <AssignmentBar key={ts.id} assignment={ts} />)}
                     {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
+                    {/* Moked signup candidate windows */}
+                    {workerMokedSignups.map((sg, i) => {
+                      const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(sg.date) : 0;
+                      return (
+                        <MokedSignupBar
+                          key={`mokedsignup_${worker.id}_${i}`}
+                          signups={sg.signups}
+                          startTime={sg.startTime}
+                          endTime={sg.endTime}
+                          dayIndex={dayIndex}
+                          viewMode={viewMode}
+                          ppm={ppm}
+                          timelineWidth={timelineWidth}
+                        />
+                      );
+                    })}
                     {/* Briefing markers — placed by visual_operational_date, not by shift date */}
                     {workerBriefingMarkers.map(marker => {
                       const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(marker.visual_operational_date) : 0;

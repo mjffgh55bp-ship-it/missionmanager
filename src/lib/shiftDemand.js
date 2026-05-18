@@ -10,6 +10,31 @@
 
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 
+// ── Signup key helpers ────────────────────────────────────────────────────────
+
+/**
+ * Normalize a moked name for use as a stable key part (lowercase, trim, collapse spaces).
+ */
+function normalizeMokedName(name) {
+  return (name || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Build the shared moked key — groups duplicate same-name mokeds together,
+ * but keeps different-name mokeds separate even at the same time.
+ */
+export function buildSharedMokedKey(template) {
+  return template?.mapping_id || normalizeMokedName(template?.name || "");
+}
+
+/**
+ * Build the canonical signup key for a unified shift.
+ * Format: `${operational_date}__${sharedMokedKey}__${start_time}__${end_time}`
+ */
+export function buildSignupKey(operationalDate, sharedMokedKey, startTime, endTime) {
+  return `${operationalDate}__${sharedMokedKey}__${startTime}__${endTime}`;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -51,10 +76,13 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
     // Always use row.date as the operational date for grouping.
     const operationalDate = row.date;
     const mokedName = tmpl.name || row.template_name || "";
-    const key = `${operationalDate}|${mokedName}|${startTime}|${endTime}`;
+    const sharedMokedKey = buildSharedMokedKey(tmpl);
+    const signupKey = buildSignupKey(operationalDate, sharedMokedKey, startTime, endTime);
+    // Use signupKey as the map key so duplicate same-name mokeds are grouped together
+    const key = signupKey;
 
     if (!map.has(key)) {
-      map.set(key, { key, date: operationalDate, operational_date: operationalDate, mokedName, startTime, endTime, roles: {} });
+      map.set(key, { key, signupKey, sharedMokedKey, date: operationalDate, operational_date: operationalDate, mokedName, startTime, endTime, roles: {} });
     }
     const unified = map.get(key);
 
@@ -86,15 +114,29 @@ export function getSignupsForRole(availabilities, workers, unifiedShift, roleNam
 
   const signedWorkerIds = new Set();
 
+  const { signupKey } = unifiedShift;
+
   availabilities.forEach(avail => {
     if (!eligibleWorkerIds.has(avail.worker_id)) return;
     const shifts = avail.shifts || [];
-    const hasMatch = shifts.some(s =>
-      getShiftOperationalDate(s) === operationalDate &&
-      s.start_time === startTime &&
-      s.end_time === endTime &&
-      (s.type === "wanted" || s.type === "available")
-    );
+    const hasMatch = shifts.some(s => {
+      if (s.type !== "wanted" && s.type !== "available") return false;
+      // Match by signupKey when available
+      if (signupKey && s.signupKey) return s.signupKey === signupKey;
+      if (signupKey && s.sharedMokedKey) {
+        const legacyKey = buildSignupKey(getShiftOperationalDate(s), s.sharedMokedKey, s.start_time, s.end_time);
+        return legacyKey === signupKey;
+      }
+      // Last-resort: old records with no moked identity — match by date+time
+      if (!s.moked_name && !s.signupKey && !s.sharedMokedKey) {
+        return (
+          getShiftOperationalDate(s) === operationalDate &&
+          s.start_time === startTime &&
+          s.end_time === endTime
+        );
+      }
+      return false;
+    });
     if (hasMatch) signedWorkerIds.add(avail.worker_id);
   });
 
@@ -123,14 +165,33 @@ export function calculateRoleStatus(required, signed, signupMode) {
 
 // ── 4. Check if current worker already signed up for a unified shift slot ─────
 export function workerSignedForShift(selectedShifts, unifiedShift) {
-  const operationalDate = unifiedShift.operational_date || unifiedShift.date;
-  const { startTime, endTime } = unifiedShift;
-  return selectedShifts.some(s =>
-    getShiftOperationalDate(s) === operationalDate &&
-    s.start_time === startTime &&
-    s.end_time === endTime &&
-    (s.type === "wanted" || s.type === "available")
-  );
+  const { signupKey } = unifiedShift;
+  return selectedShifts.some(s => {
+    const active = s.type === "wanted" || s.type === "available";
+    if (!active) return false;
+    // Match by signupKey when available (new records)
+    if (signupKey && s.signupKey) return s.signupKey === signupKey;
+    // Legacy fallback: match by signupKey computed from stored sharedMokedKey/moked_name
+    if (signupKey && s.sharedMokedKey) {
+      const legacyKey = buildSignupKey(
+        getShiftOperationalDate(s),
+        s.sharedMokedKey,
+        s.start_time,
+        s.end_time
+      );
+      return legacyKey === signupKey;
+    }
+    // Last-resort fallback: date+time only (old records with no moked identity)
+    if (!s.moked_name && !s.signupKey && !s.sharedMokedKey) {
+      const operationalDate = unifiedShift.operational_date || unifiedShift.date;
+      return (
+        getShiftOperationalDate(s) === operationalDate &&
+        s.start_time === unifiedShift.startTime &&
+        s.end_time === unifiedShift.endTime
+      );
+    }
+    return false;
+  });
 }
 
 // ── 5. Filter unified shifts to the current week ──────────────────────────────

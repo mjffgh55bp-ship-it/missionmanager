@@ -17,6 +17,7 @@ import { formatHebrewDate } from "../components/utils/HebrewDate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import ShiftDemandPanel from "@/components/availability/ShiftDemandPanel";
+import { buildSignupKey } from "@/lib/shiftDemand";
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const HEBREW_DAYS_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -719,11 +720,17 @@ END:VEVENT
   const handleDemandSignup = (unifiedShift, roleName, type) => {
     if (!canEdit || currentWorker?.availability_locked) return;
     const operationalDate = unifiedShift.operational_date || unifiedShift.date;
-    const { startTime, endTime } = unifiedShift;
-    // Remove any existing entry for this slot (match by operational date)
-    let newShifts = selectedShifts.filter(
-      s => !((s.operational_date || s.date) === operationalDate && s.start_time === startTime && s.end_time === endTime)
-    );
+    const { startTime, endTime, signupKey, sharedMokedKey, mokedName } = unifiedShift;
+    // Remove any existing entry for THIS specific moked signup (match by signupKey)
+    let newShifts = selectedShifts.filter(s => {
+      // Remove if it matches by signupKey
+      if (signupKey && s.signupKey === signupKey) return false;
+      // Remove legacy entries (same date+time, no signupKey identity)
+      if (!s.signupKey && !s.sharedMokedKey && !s.moked_name) {
+        if ((s.operational_date || s.date) === operationalDate && s.start_time === startTime && s.end_time === endTime) return false;
+      }
+      return true;
+    });
     if (type === "remove") {
       setSelectedShifts(newShifts);
       return;
@@ -736,9 +743,10 @@ END:VEVENT
       end_time: endTime,
       type,
       priority: type === "unavailable" ? 0 : count + 1,
-      moked_name: unifiedShift.mokedName,
+      moked_name: mokedName,
+      sharedMokedKey: sharedMokedKey || "",
+      signupKey: signupKey || buildSignupKey(operationalDate, sharedMokedKey || "", startTime, endTime),
       role_or_qualification: roleName,
-      unified_shift_key: unifiedShift.key,
     });
     setSelectedShifts(newShifts);
   };
