@@ -109,6 +109,8 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
     ? "bg-yellow-400"
     : "bg-green-400";
 
+  const isSelected = isSignedWanted || isSignedAvailable || isSignedUnavailable;
+
   const statusIcon = isSignedWanted ? <Star className="w-3 h-3" /> :
     isSignedAvailable ? <Check className="w-3 h-3" /> :
     isSignedUnavailable ? <Ban className="w-3 h-3" /> :
@@ -120,24 +122,54 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
     blocked ? "מלא" :
     null;
 
+  // Count label — always shown, adapts for limit vs no-limit mode
+  const isLimitMode = displayRequired > 0;
+  const countLabel = isLimitMode
+    ? `${signed}/${displayRequired}`
+    : `${signed}`;
+
+  // Badge text color: white on selected cards, gray on unselected
+  const countBadgeClass = isSelected
+    ? "inline-flex items-center rounded px-1 bg-black/20 text-white font-semibold"
+    : isOver
+    ? "inline-flex items-center rounded px-1 bg-orange-100 text-orange-700 font-semibold"
+    : "inline-flex items-center rounded px-1 bg-gray-100 text-gray-600";
+
   return (
     <button className={chipClass} onClick={handleClick}
       title={!hasMyRole ? "אין תפקיד מתאים" : blocked ? "המשמרת מלאה" : "לחץ לבחירה"}
       disabled={!canEdit}
     >
-      <div className="text-[10px] sm:text-[11px] text-gray-600">{shift.startTime}–{shift.endTime}</div>
+      {/* Time range */}
+      <div className={`text-[10px] sm:text-[11px] ${isSelected ? "text-white/90" : "text-gray-600"}`}>{shift.startTime}–{shift.endTime}</div>
+
       {displayRole && (
         <>
-          {/* Fill bar */}
-          {!isSignedWanted && !isSignedAvailable && !isSignedUnavailable && (
+          {/* Fill bar — only when unselected */}
+          {!isSelected && (
             <div className="mt-1 h-1 w-full bg-gray-200 rounded-full overflow-hidden">
               <div className={`h-full ${fillColor} transition-all`} style={{ width: `${fillPct}%` }} />
             </div>
           )}
-          <div className="flex items-center justify-center gap-1 mt-1 text-[10px] opacity-90">
-            {statusIcon}
-            <span>
-              {statusText || `${signed}/${displayRequired}`}
+
+          {/* Status row — icon+label when selected, always show count badge */}
+          <div className="flex items-center justify-center gap-1 mt-1 flex-wrap">
+            {isSelected && (
+              <span className="flex items-center gap-0.5 text-[10px] text-white font-medium">
+                {statusIcon}
+                {statusText}
+              </span>
+            )}
+            {!isSelected && statusText === "מלא" && (
+              <span className="text-[10px] text-red-500 font-medium">מלא</span>
+            )}
+            {/* Count badge — always visible */}
+            <span className={`text-[10px] ${countBadgeClass}`}>
+              {!isLimitMode && <span className="opacity-80 ml-0.5">נרשמו:</span>}
+              {countLabel}
+              {isOver && isLimitMode && (
+                <span className="mr-0.5 text-orange-300">↑</span>
+              )}
             </span>
           </div>
         </>
