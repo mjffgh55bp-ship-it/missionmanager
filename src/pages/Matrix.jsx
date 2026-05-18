@@ -808,7 +808,8 @@ export default function Matrix() {
 
   const getDayIndexFromDate = (dateStr) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const diff = Math.floor((new Date(dateStr) - weekStart) / (1000 * 60 * 60 * 24));
+    // Use noon to avoid DST/timezone shifts
+    const diff = Math.floor((new Date(dateStr + "T12:00:00") - weekStart) / (1000 * 60 * 60 * 24));
     return Math.max(0, Math.min(6, diff));
   };
 
@@ -1151,6 +1152,10 @@ export default function Matrix() {
     const markers = [];
     templateRows.forEach(row => {
       if (!row.values) return;
+
+      // Skip continuation rows — briefings come from the source row
+      if (row.values?.is_continuation) return;
+
       const originalBriefingTime = row.values?.["תדריך"];
       if (!originalBriefingTime) return;
 
@@ -1166,9 +1171,9 @@ export default function Matrix() {
       let visualTime;
 
       if (parsed.dayOffset === -1) {
-        // "-1 HH:MM" → marker on the previous operational day, plain time
+        // "-1 HH:MM" → marker belongs to the PREVIOUS operational day
         visualOperationalDate = addDaysString(row.date, -1);
-        visualTime = parsed.clockTime; // e.g. "05:15"
+        visualTime = parsed.clockTime; // plain "HH:MM" e.g. "05:15"
       } else if (parsed.dayOffset > 0) {
         // "+N HH:MM" → marker on a future operational day
         visualOperationalDate = addDaysString(row.date, parsed.dayOffset);
@@ -1179,7 +1184,7 @@ export default function Matrix() {
         visualTime = parsed.clockTime;
       }
 
-      // Find all worker IDs assigned to this row
+      // Find all worker IDs assigned to this row (worker-type columns only)
       const workerCols = (template.columns || []).filter(c => c.type === "worker");
       const assignedWorkerIds = [];
       workerCols.forEach(col => {
@@ -1192,17 +1197,19 @@ export default function Matrix() {
       if (assignedWorkerIds.length === 0) return;
 
       assignedWorkerIds.forEach(workerId => {
-        const worker = workers.find(w => w.id === workerId);
-        const workerName = worker?.nickname || workerId;
+        const workerObj = workers.find(w => w.id === workerId);
+        const workerName = workerObj?.nickname || workerId;
 
-        console.log("BRIEFING MARKER BUILT", {
+        console.log("PAPS BRIEFING BUILT", {
           workerName,
           rowId: row.id,
           rowDate: row.date,
           originalBriefingTime,
           visualOperationalDate,
           visualTime,
-          linkedShift: `${startTime}-${endTime}`
+          linkedShiftDate: row.date,
+          startTime,
+          endTime,
         });
 
         markers.push({
@@ -1211,7 +1218,7 @@ export default function Matrix() {
           source_row_id: row.id,
           linked_shift_operational_date: row.date,
           visual_operational_date: visualOperationalDate,
-          visual_time: visualTime,
+          visual_time: visualTime,           // ALWAYS plain "HH:MM" — never "-1 ..."
           original_briefing_time: originalBriefingTime,
           shift_start_time: startTime,
           shift_end_time: endTime,
@@ -1335,13 +1342,46 @@ export default function Matrix() {
     return briefingMarkers.filter(m => {
       if (m.worker_id !== workerId) return false;
       if (viewMode === 'daily') {
-        return m.visual_operational_date === dateString;
+        // Only show marker if its VISUAL date matches the selected day
+        const show = m.visual_operational_date === dateString;
+        if (m.original_briefing_time?.startsWith("-1 ")) {
+          const workerObj = workers.find(w => w.id === workerId);
+          const dayIndex = 0;
+          const pointPx = timeToPixels(m.visual_time, dayIndex, viewMode, ppm);
+          console.log("PAPS BRIEFING RENDER", {
+            selectedDate: dateString,
+            viewMode,
+            workerName: workerObj?.nickname,
+            visualOperationalDate: m.visual_operational_date,
+            visualTime: m.visual_time,
+            dayIndex,
+            pointPx,
+            willRender: show,
+          });
+        }
+        return show;
       } else {
         // Weekly: marker visual date must be within the visible week
         const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
         const weekEnd = addDays(weekStart, 6);
         const vd = new Date(m.visual_operational_date + "T12:00:00");
-        return vd >= weekStart && vd <= weekEnd;
+        const show = vd >= weekStart && vd <= weekEnd;
+        if (m.original_briefing_time?.startsWith("-1 ") && show) {
+          const workerObj = workers.find(w => w.id === workerId);
+          const dayIndex = getDayIndexFromDate(m.visual_operational_date);
+          const pointPx = timeToPixels(m.visual_time, dayIndex, viewMode, ppm);
+          console.log("PAPS BRIEFING RENDER", {
+            selectedDate: dateString,
+            viewMode,
+            workerName: workerObj?.nickname,
+            visualOperationalDate: m.visual_operational_date,
+            visualTime: m.visual_time,
+            dayIndex,
+            pointPx,
+            willRender: show,
+          });
+        }
+        return show;
       }
     });
   };

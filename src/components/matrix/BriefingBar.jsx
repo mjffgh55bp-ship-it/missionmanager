@@ -28,8 +28,10 @@ export default function BriefingBar({
 }) {
   if (!visualTime) return null;
 
+  // visualTime is always a plain "HH:MM" (never "-1 ..." — that's already resolved by Matrix).
+  // dayIndex is pre-computed from marker.visual_operational_date, not the linked shift date.
   const pointPx = timeToPixels(visualTime, dayIndex, viewMode, ppm);
-  if (pointPx < 0 || pointPx === undefined) return null;
+  if (pointPx === undefined || pointPx === null || isNaN(pointPx)) return null;
 
   // Detect if this was a previous-day briefing for display purposes
   const isPrevDay = (originalBriefingTime || "").startsWith("-1 ");
