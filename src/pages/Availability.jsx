@@ -111,6 +111,9 @@ export default function Availability() {
   const queuedRefreshRef = useRef(false);
   // Track which week key we last finished loading, to drop stale results
   const loadedWeekKeyRef = useRef(null);
+  // Live sync
+  const syncDebounceRef = useRef(null);
+  const broadcastRef = useRef(null);
 
   useEffect(() => {
     const weekKey = weekStart.toISOString();
@@ -124,6 +127,46 @@ export default function Availability() {
     lastWeekStart.current = weekKey;
     // On week change: reload only dynamic (week-scoped) data, skip static
     loadDynamicData(cachedWorker.current, cachedUser.current);
+  }, [weekStart]);
+
+  // Lightweight refetch — only weekAvailabilities (for live count updates)
+  const refetchWeekAvailabilities = () => {
+    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
+    syncDebounceRef.current = setTimeout(async () => {
+      const weekStartStr = format(weekStart, "yyyy-MM-dd");
+      const fresh = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
+      setWeekAvailabilities(fresh);
+    }, 300);
+  };
+
+  // Live sync: BroadcastChannel + localStorage + focus
+  useEffect(() => {
+    // BroadcastChannel for same-origin cross-tab sync
+    const bc = new BroadcastChannel("availability-sync");
+    broadcastRef.current = bc;
+    bc.onmessage = () => refetchWeekAvailabilities();
+
+    // localStorage fallback
+    const onStorage = (e) => {
+      if (e.key === "availability-sync-event") refetchWeekAvailabilities();
+    };
+    window.addEventListener("storage", onStorage);
+
+    // Refetch on tab focus (catches cases where BroadcastChannel or storage missed)
+    const onFocus = () => refetchWeekAvailabilities();
+    window.addEventListener("focus", onFocus);
+
+    // Custom in-page event (same-tab immediate update)
+    const onUpdated = () => refetchWeekAvailabilities();
+    window.addEventListener("availabilityUpdated", onUpdated);
+
+    return () => {
+      bc.close();
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("availabilityUpdated", onUpdated);
+      if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
+    };
   }, [weekStart]);
 
   // First load: identify user immediately, then parallelize everything else
@@ -403,6 +446,12 @@ export default function Availability() {
     setOriginalShifts(JSON.parse(JSON.stringify(selectedShifts)));
     setShowSummary(false);
     setShowEditMode(false);
+
+    // Broadcast to other tabs/workers
+    const syncPayload = JSON.stringify({ ts: Date.now() });
+    try { broadcastRef.current?.postMessage("update"); } catch {}
+    try { localStorage.setItem("availability-sync-event", syncPayload); } catch {}
+    window.dispatchEvent(new CustomEvent("availabilityUpdated"));
   };
 
   const handleSubmitChangeRequest = async () => {
@@ -419,6 +468,10 @@ export default function Availability() {
     setShowChangeRecap(false);
     setShowEditMode(false);
     setChangeNote("");
+
+    try { broadcastRef.current?.postMessage("update"); } catch {}
+    try { localStorage.setItem("availability-sync-event", JSON.stringify({ ts: Date.now() })); } catch {}
+    window.dispatchEvent(new CustomEvent("availabilityUpdated"));
   };
 
   const getChanges = () => {

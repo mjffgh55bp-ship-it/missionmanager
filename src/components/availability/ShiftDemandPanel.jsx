@@ -67,25 +67,21 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   const isSignedAvailable = currentType === "available";
   const isSignedUnavailable = currentType === "unavailable";
 
-  let chipClass = "border rounded-md px-1 py-1 text-xs text-center transition-all select-none w-full ";
+  let chipClass = "border-2 rounded-md px-1 py-1 text-xs text-center transition-all select-none w-full ";
   if (isSignedWanted) {
-    chipClass += isOver
-      ? "bg-orange-500 text-white border-orange-600 cursor-pointer"
-      : "bg-green-500 text-white border-green-600 cursor-pointer";
+    chipClass += "bg-green-50 border-green-400 text-green-800 cursor-pointer";
   } else if (isSignedAvailable) {
-    chipClass += isOver
-      ? "bg-orange-400 text-white border-orange-500 cursor-pointer"
-      : "bg-cyan-500 text-white border-cyan-600 cursor-pointer";
+    chipClass += "bg-blue-50 border-blue-400 text-blue-800 cursor-pointer";
   } else if (isSignedUnavailable) {
-    chipClass += "bg-red-500 text-white border-red-600 cursor-pointer";
+    chipClass += "bg-red-50 border-red-400 text-red-800 cursor-pointer";
   } else if (!hasMyRole) {
     chipClass += "bg-gray-50 border-gray-200 text-gray-400 cursor-default";
   } else if (blocked) {
-    chipClass += "bg-red-50 border-red-300 text-red-500 cursor-not-allowed";
+    chipClass += "bg-red-50 border-red-200 text-red-500 cursor-not-allowed";
   } else if (isOver) {
     chipClass += "bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100 cursor-pointer";
   } else {
-    chipClass += "bg-white border-gray-300 text-gray-700 hover:border-green-400 hover:bg-green-50 cursor-pointer";
+    chipClass += "bg-white border-gray-200 text-gray-700 hover:border-green-400 hover:bg-green-50 cursor-pointer";
   }
 
   const handleClick = () => {
@@ -127,24 +123,20 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   const statusText = isSignedWanted ? "רצוי" :
     isSignedAvailable ? "זמין" :
     isSignedUnavailable ? "לא זמין" :
-    blocked ? "מלא" :
     null;
 
   const countLabel = `${signed}/${displayRequired}`;
 
-  // Determine the status label shown below the count
-  let bottomLabel = null;
-  let bottomLabelClass = "";
-  if (blocked && !isSelected) {
-    bottomLabel = "מלא";
-    bottomLabelClass = "text-red-500 font-semibold";
-  } else if (isOver && !isSelected) {
-    bottomLabel = "חריגה";
-    bottomLabelClass = "text-orange-600 font-semibold";
-  } else if (isOver && isSelected) {
-    bottomLabel = "חריגה";
-    bottomLabelClass = "text-white/90 font-semibold";
-  }
+  // Bar track and fill colors — always visible, adapted for light selected backgrounds
+  const barTrackColor = isOver ? "#fed7aa" : blocked ? "#fecaca" : "#e5e7eb";
+  const barFillColor = isOver ? "#f97316" : blocked ? "#ef4444" : fillPct >= 70 ? "#facc15" : "#22c55e";
+
+  // Status badge below count
+  const statusBadge = isOver
+    ? <span className="text-[9px] font-semibold text-orange-600">חריגה</span>
+    : blocked && !isSelected
+    ? <span className="text-[9px] font-semibold text-red-500">מלא</span>
+    : null;
 
   return (
     <button
@@ -154,48 +146,33 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
       disabled={!canEdit}
     >
       {/* Time range */}
-      <div className={`text-[10px] sm:text-[11px] ${isSelected ? "text-white/90" : "text-gray-600"}`}>{shift.startTime}–{shift.endTime}</div>
+      <div className="text-[10px] sm:text-[11px] text-gray-600">{shift.startTime}–{shift.endTime}</div>
 
       {displayRole && (
         <>
-          {/* Fill bar — always visible */}
-          <div className="mt-1 h-1.5 w-full rounded-full overflow-hidden" style={{ background: isSelected ? "rgba(255,255,255,0.3)" : isOver ? "#fed7aa" : blocked ? "#fecaca" : "#e5e7eb" }}>
+          {/* Fill bar — always visible, proportional */}
+          <div className="mt-1 h-2 w-full rounded-full overflow-hidden" style={{ background: barTrackColor }}>
             <div
-              className="h-full transition-all"
+              className="h-full rounded-full"
               style={{
                 width: `${fillPct}%`,
-                background: isSelected
-                  ? "rgba(255,255,255,0.85)"
-                  : isOver
-                  ? "#f97316"
-                  : blocked
-                  ? "#ef4444"
-                  : fillPct >= 70
-                  ? "#facc15"
-                  : "#22c55e",
+                background: barFillColor,
+                transition: "width 0.3s ease-out",
               }}
             />
           </div>
 
           {/* Count + status row — always visible */}
           <div className="flex items-center justify-center gap-1 mt-0.5 flex-wrap">
-            {/* Selection icon when selected */}
-            {isSelected && (
-              <span className={`flex items-center gap-0.5 text-[10px] text-white/90`}>
-                {statusIcon}
-              </span>
+            {isSelected && statusIcon && (
+              <span className="flex items-center gap-0.5 text-[10px]">{statusIcon}</span>
             )}
-            {/* Count badge — always visible */}
-            <span className={`text-[10px] font-semibold ${isSelected ? "text-white" : isOver ? "text-orange-700" : blocked ? "text-red-600" : "text-gray-600"}`}>
+            <span className={`text-[10px] font-semibold ${isOver ? "text-orange-700" : blocked ? "text-red-600" : "text-gray-700"}`}>
               {countLabel}
             </span>
-            {/* Status label */}
-            {bottomLabel && (
-              <span className={`text-[10px] ${bottomLabelClass}`}>{bottomLabel}</span>
-            )}
-            {/* "רצוי/זמין" label when selected and not over */}
-            {isSelected && !isOver && statusText && (
-              <span className="text-[10px] text-white/90">{statusText}</span>
+            {statusBadge}
+            {isSelected && statusText && (
+              <span className="text-[10px] font-medium">{statusText}</span>
             )}
           </div>
         </>
