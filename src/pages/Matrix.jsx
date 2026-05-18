@@ -108,10 +108,25 @@ export default function Matrix() {
     try { return localStorage.getItem('matrix_pinned_worker_panel') === 'true'; } catch { return false; }
   });
   const togglePin = () => {
+    // Capture the current scroll position (in minutes) before toggling
+    // so we can restore it after the layout switch re-measures container width
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+    const scrollMinutes = sc ? sc.scrollLeft / ppmRef.current : 0;
+
     setPinned(prev => {
       const next = !prev;
       try { localStorage.setItem('matrix_pinned_worker_panel', String(next)); } catch {}
       return next;
+    });
+
+    // After the layout re-renders and container width is remeasured, restore the scroll position
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const newSc = !pinned ? timelineScrollRef.current : scrollContainerRef.current;
+          if (newSc) newSc.scrollLeft = scrollMinutes * ppmRef.current;
+        }, 80);
+      });
     });
   };
 
@@ -1527,7 +1542,18 @@ export default function Matrix() {
         {/* Worker panel header */}
         <div className="flex-shrink-0 bg-gray-100 border-b z-10" style={{ height: '40px' }}>
           <div className="flex items-center h-full">
-            <div className="px-2 flex items-center gap-1 h-full border-r" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
+            <div className="px-2 flex items-center gap-1 h-full border-r relative" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
+              {/* Pin toggle — always top-right corner, absolute */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button onClick={togglePin} className="absolute top-1 left-1 flex-shrink-0 text-green-600 hover:text-green-800 transition-colors p-0.5 rounded hover:bg-green-50 z-10">
+                      <PinIcon size={13} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent dir="rtl">בטל הקפאת עמודת עובדים</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <MasterControls
                 workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
                 getWorkerSendStatus={getWorkerSendStatus}
@@ -1535,17 +1561,6 @@ export default function Matrix() {
                 onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
                 sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
               />
-              {/* Pin toggle — click to unfreeze */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button onClick={togglePin} className="ml-auto flex-shrink-0 text-green-600 hover:text-green-800 transition-colors p-0.5 rounded hover:bg-green-50">
-                      <PinIcon size={13} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent dir="rtl">בטל הקפאת עמודת עובדים</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             </div>
             {viewMode === 'weekly' && summaryColumns.map(col => (
               <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1 h-full" title={col.name}>
@@ -1644,12 +1659,12 @@ export default function Matrix() {
       <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
         {/* Sticky header row */}
         <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
-          <div className="p-2 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2" dir="rtl" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
-            {/* Pin toggle in classic layout */}
+          <div className="p-2 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2 relative" dir="rtl" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
+            {/* Pin toggle in classic layout — always top-right corner, absolute */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button onClick={togglePin} className="flex-shrink-0 text-gray-400 hover:text-green-600 transition-colors p-0.5 rounded hover:bg-green-50">
+                  <button onClick={togglePin} className="absolute top-1 left-1 flex-shrink-0 text-gray-400 hover:text-green-600 transition-colors p-0.5 rounded hover:bg-green-50 z-10">
                     <PinIcon size={13} />
                   </button>
                 </TooltipTrigger>
