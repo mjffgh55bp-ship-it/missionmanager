@@ -33,20 +33,22 @@ export default function BriefingBar({
   const pointPx = timeToPixels(visualTime, dayIndex, viewMode, ppm);
   if (pointPx === undefined || pointPx === null || isNaN(pointPx)) return null;
 
-  // Detect if this was a previous-day briefing for display purposes
+  // Detect offset for text prefix only — no color difference
   const isPrevDay = (originalBriefingTime || "").startsWith("-1 ");
-  const isNextDay = (originalBriefingTime || "").startsWith("+");
+  const isNextDay = /^\+\d/.test(originalBriefingTime || "");
 
-  // Display original time in tooltip
-  const displayOriginal = isPrevDay
-    ? `− ${(originalBriefingTime || "").replace("-1 ", "")}`
-    : originalBriefingTime || visualTime;
+  // Build display string: "− HH:MM", "+ HH:MM", or "HH:MM"
+  let displayOriginal;
+  if (isPrevDay) {
+    displayOriginal = `− ${(originalBriefingTime || "").replace("-1 ", "").trim()}`;
+  } else if (isNextDay) {
+    displayOriginal = `+ ${(originalBriefingTime || "").replace(/^\+\d+\s*/, "").trim()}`;
+  } else {
+    displayOriginal = originalBriefingTime || visualTime;
+  }
 
-  const barColor = isPrevDay
-    ? { bg: 'rgba(139, 92, 246, 0.3)', border: '#7c3aed', fill: 'bg-violet-500' }
-    : isNextDay
-    ? { bg: 'rgba(251, 191, 36, 0.25)', border: '#d97706', fill: 'bg-amber-400' }
-    : { bg: 'rgba(251, 191, 36, 0.3)', border: '#f59e0b', fill: 'bg-amber-400' };
+  // Single consistent color for all briefing markers
+  const barColor = { bg: 'rgba(251, 191, 36, 0.3)', border: '#f59e0b', fill: 'bg-amber-400' };
 
   return (
     <TooltipProvider>
@@ -65,7 +67,7 @@ export default function BriefingBar({
           </div>
         </TooltipTrigger>
         <TooltipContent className="bg-gray-800 text-white border-none" dir="rtl">
-          <p className="font-bold">תדריך{isPrevDay ? " (יממה קודמת)" : ""}</p>
+          <p className="font-bold">תדריך</p>
           <p>שעת תדריך: {displayOriginal}</p>
           {linkedShiftDate && <p>תאריך משמרת: {linkedShiftDate}</p>}
           <p>משמרת: {shiftStartTime} – {shiftEndTime}</p>
