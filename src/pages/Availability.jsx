@@ -290,9 +290,24 @@ export default function Availability() {
 
       if (availabilities.length > 0) {
         setExistingAvailability(availabilities[0]);
-        const shifts = availabilities[0].shifts || [];
-        setSelectedShifts(shifts);
-        setOriginalShifts(JSON.parse(JSON.stringify(shifts)));
+        // Deduplicate shifts: if multiple entries share the same signupKey, keep only the last one.
+        // This cleans up stale entries created by a previous bug that merged moked keys.
+        const rawShifts = availabilities[0].shifts || [];
+        const seenKeys = new Map();
+        rawShifts.forEach((s, idx) => {
+          const key = s.signupKey || (s.sharedMokedKey
+            ? buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time)
+            : `${s.date}__${s.start_time}__${s.end_time}`);
+          seenKeys.set(key, idx);
+        });
+        const deduped = rawShifts.filter((s, idx) => {
+          const key = s.signupKey || (s.sharedMokedKey
+            ? buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time)
+            : `${s.date}__${s.start_time}__${s.end_time}`);
+          return seenKeys.get(key) === idx;
+        });
+        setSelectedShifts(deduped);
+        setOriginalShifts(JSON.parse(JSON.stringify(deduped)));
         setExtraTaskStates(availabilities[0].extra_tasks || {});
       } else {
         setExistingAvailability(null);
@@ -780,28 +795,15 @@ END:VEVENT
     const operationalDate = unifiedShift.operational_date || unifiedShift.date;
     const { startTime, endTime, signupKey, sharedMokedKey, mokedName } = unifiedShift;
 
-    // Build new shifts array — remove entries that belong to this specific moked signup slot.
+    // Remove ONLY the entry with this exact signupKey (or legacy sharedMokedKey match).
+    // Never match by date+time alone — that would remove entries for other mokeds at the same slot.
     let newShifts = selectedShifts.filter(s => {
-      // 1. Exact signupKey match — primary path for all new records
-      if (signupKey && s.signupKey === signupKey) return false;
-
-      // 2. Legacy entries with sharedMokedKey but no signupKey
-      if (signupKey && s.sharedMokedKey && !s.signupKey) {
+      if (s.signupKey) return s.signupKey !== signupKey;
+      if (s.sharedMokedKey) {
         const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
-        if (legacyKey === signupKey) return false;
+        return legacyKey !== signupKey;
       }
-
-      // 3. Stale entries: same date+time+mokedName but with an outdated/merged signupKey.
-      //    This handles the case where a bug previously merged two separate mokeds into one key.
-      //    Only remove if this entry was a moked signup (has moked identity) AND it's for the
-      //    same moked name — never remove entries for other mokeds at the same time slot.
-      if (s.signupKey && signupKey && s.signupKey !== signupKey) {
-        const sDate = s.operational_date || s.date;
-        const matchesSlot = sDate === operationalDate && s.start_time === startTime && s.end_time === endTime;
-        const matchesMoked = s.moked_name === mokedName || s.sharedMokedKey === sharedMokedKey;
-        if (matchesSlot && matchesMoked) return false;
-      }
-
+      // No moked identity: leave as-is (these are general availability blocks)
       return true;
     });
 

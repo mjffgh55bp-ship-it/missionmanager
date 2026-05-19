@@ -264,30 +264,19 @@ export function getSignupsForShift(availabilities, unifiedShift) {
     const shifts = avail.shifts || [];
     const hasMatch = shifts.some(s => {
       if (normalizeSignupType(s) !== "wanted") return false;
-      // Primary: match by exact signupKey
-      if (signupKey && s.signupKey) {
-        if (s.signupKey === signupKey) return true;
-        // Stale key: same slot + same moked identity (handles merged-key migration)
-        const sDate = getShiftOperationalDate(s);
-        const matchesSlot = sDate === operationalDate && s.start_time === startTime && s.end_time === endTime;
-        const matchesMoked = s.moked_name === mokedName || s.sharedMokedKey === sharedMokedKey;
-        return matchesSlot && matchesMoked;
-      }
+      // Primary: exact signupKey match only — never cross-match between mokeds
+      if (s.signupKey) return s.signupKey === signupKey;
       // Legacy: rebuild key from stored sharedMokedKey
-      if (signupKey && s.sharedMokedKey) {
+      if (s.sharedMokedKey) {
         const legacyKey = buildSignupKey(getShiftOperationalDate(s), s.sharedMokedKey, s.start_time, s.end_time);
         return legacyKey === signupKey;
       }
       // Last-resort: only truly old records with no moked identity at all
-      const hasMokedIdentity = s.moked_name || s.signupKey || s.sharedMokedKey;
-      if (!hasMokedIdentity) {
-        return (
-          getShiftOperationalDate(s) === operationalDate &&
-          s.start_time === startTime &&
-          s.end_time === endTime
-        );
-      }
-      return false;
+      return (
+        getShiftOperationalDate(s) === operationalDate &&
+        s.start_time === startTime &&
+        s.end_time === endTime
+      );
     });
     if (hasMatch) signedWorkerIds.add(avail.worker_id);
   });
