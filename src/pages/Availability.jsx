@@ -290,20 +290,37 @@ export default function Availability() {
 
       if (availabilities.length > 0) {
         setExistingAvailability(availabilities[0]);
-        // Deduplicate shifts: if multiple entries share the same signupKey, keep only the last one.
-        // This cleans up stale entries created by a previous bug that merged moked keys.
         const rawShifts = availabilities[0].shifts || [];
+
+        // Step 1: collect all date+time slots that have at least one KEYED entry (with signupKey or sharedMokedKey)
+        const slotsWithKeyedEntry = new Set();
+        rawShifts.forEach(s => {
+          if (s.signupKey || s.sharedMokedKey) {
+            const d = s.operational_date || s.date;
+            slotsWithKeyedEntry.add(`${d}__${s.start_time}__${s.end_time}`);
+          }
+        });
+
+        // Step 2: remove naked (no moked identity) entries for slots that already have a keyed entry.
+        // This eliminates legacy duplicates that cause multiple chips to appear highlighted.
+        const withoutNakedDupes = rawShifts.filter(s => {
+          if (s.signupKey || s.sharedMokedKey) return true; // keyed entry — always keep
+          const slotKey = `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`;
+          return !slotsWithKeyedEntry.has(slotKey); // remove naked only if a keyed entry exists for this slot
+        });
+
+        // Step 3: deduplicate remaining entries by their canonical key (keep last occurrence)
         const seenKeys = new Map();
-        rawShifts.forEach((s, idx) => {
+        withoutNakedDupes.forEach((s, idx) => {
           const key = s.signupKey || (s.sharedMokedKey
             ? buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time)
-            : `${s.date}__${s.start_time}__${s.end_time}`);
+            : `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`);
           seenKeys.set(key, idx);
         });
-        const deduped = rawShifts.filter((s, idx) => {
+        const deduped = withoutNakedDupes.filter((s, idx) => {
           const key = s.signupKey || (s.sharedMokedKey
             ? buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time)
-            : `${s.date}__${s.start_time}__${s.end_time}`);
+            : `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`);
           return seenKeys.get(key) === idx;
         });
         setSelectedShifts(deduped);
@@ -842,8 +859,21 @@ END:VEVENT
       newShifts.push(newEntry);
     }
 
-    // 1. Optimistic local update
-    setSelectedShifts(newShifts);
+    // 1. Optimistic local update — also strip any remaining naked entries for slots
+    // that now have a keyed entry (mirrors the deduplication done on load).
+    const slotsWithKey = new Set();
+    newShifts.forEach(s => {
+      if (s.signupKey || s.sharedMokedKey) {
+        const d = s.operational_date || s.date;
+        slotsWithKey.add(`${d}__${s.start_time}__${s.end_time}`);
+      }
+    });
+    const cleanedShifts = newShifts.filter(s => {
+      if (s.signupKey || s.sharedMokedKey) return true;
+      const slotKey = `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`;
+      return !slotsWithKey.has(slotKey);
+    });
+    setSelectedShifts(cleanedShifts);
 
     // 2. Build availability record
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
@@ -851,14 +881,14 @@ END:VEVENT
       worker_id: currentWorker.id,
       worker_name: currentWorker.nickname,
       week_start_date: weekStartStr,
-      shifts: newShifts,
+      shifts: cleanedShifts,
       extra_tasks: extraTaskStates,
       status: existingAvailability?.status || "draft",
       desired_shifts: desiredShiftsCount ? parseInt(desiredShiftsCount) : null,
     };
 
     // 3. Optimistic weekAvailabilities update so ShiftDemandPanel sees new count immediately
-    const optimisticRecord = { ...(existingAvailability || {}), ...availabilityData };
+    const optimisticRecord = { ...(existingAvailability || {}), ...availabilityData, shifts: cleanedShifts };
     setWeekAvailabilities(prev => {
       const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
       return [...withoutMine, optimisticRecord];
