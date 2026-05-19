@@ -795,15 +795,16 @@ END:VEVENT
     const operationalDate = unifiedShift.operational_date || unifiedShift.date;
     const { startTime, endTime, signupKey, sharedMokedKey, mokedName } = unifiedShift;
 
-    // Remove ONLY the entry with this exact signupKey.
-    // Generic blocks (no signupKey, no sharedMokedKey) are NEVER touched.
+    // Remove ONLY the entry with this exact signupKey (or legacy sharedMokedKey match).
+    // Never match by date+time alone — that would remove entries for other mokeds at the same slot.
     let newShifts = selectedShifts.filter(s => {
       if (s.signupKey) return s.signupKey !== signupKey;
       if (s.sharedMokedKey) {
         const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
         return legacyKey !== signupKey;
       }
-      return true; // generic availability block — always keep
+      // No moked identity: leave as-is (these are general availability blocks)
+      return true;
     });
 
     if (type !== "remove") {
