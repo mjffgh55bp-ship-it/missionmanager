@@ -48,11 +48,14 @@ function isRealAvailabilityDemandRow(row, tmpl) {
  * grouping keys and UI labels.
  */
 function getMokedDisplayName(row, tmpl) {
+  // tmpl.name is authoritative — it is the live template name (e.g. "מוקד מלא 1").
+  // row.template_name can be stale (copied at row-creation time and never updated).
+  // row values can carry a manual override via moked_name / שם מוקד.
   return (
     row?.values?.moked_name ||
     row?.values?.["שם מוקד"] ||
-    row?.template_name ||
-    tmpl?.name ||
+    tmpl?.name ||            // ← authoritative live name first
+    row?.template_name ||    // ← stale fallback
     ""
   ).trim().replace(/\s+/g, " ");
 }

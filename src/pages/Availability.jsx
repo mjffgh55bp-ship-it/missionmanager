@@ -780,11 +780,16 @@ END:VEVENT
     const operationalDate = unifiedShift.operational_date || unifiedShift.date;
     const { startTime, endTime, signupKey, sharedMokedKey, mokedName } = unifiedShift;
 
-    // Build new shifts array
+    // Build new shifts array — remove ONLY the entry matching this exact signupKey.
+    // Never fall back to date+time matching: that would accidentally remove entries
+    // for other mokeds that share the same time slot.
     let newShifts = selectedShifts.filter(s => {
+      // Remove by exact signupKey match
       if (signupKey && s.signupKey === signupKey) return false;
-      if (!s.signupKey && !s.sharedMokedKey && !s.moked_name) {
-        if ((s.operational_date || s.date) === operationalDate && s.start_time === startTime && s.end_time === endTime) return false;
+      // Remove legacy entries that resolve to the same signupKey via sharedMokedKey
+      if (signupKey && s.sharedMokedKey && !s.signupKey) {
+        const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
+        if (legacyKey === signupKey) return false;
       }
       return true;
     });
