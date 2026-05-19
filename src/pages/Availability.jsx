@@ -780,17 +780,28 @@ END:VEVENT
     const operationalDate = unifiedShift.operational_date || unifiedShift.date;
     const { startTime, endTime, signupKey, sharedMokedKey, mokedName } = unifiedShift;
 
-    // Build new shifts array — remove ONLY the entry matching this exact signupKey.
-    // Never fall back to date+time matching: that would accidentally remove entries
-    // for other mokeds that share the same time slot.
+    // Build new shifts array — remove entries that belong to this specific moked signup slot.
     let newShifts = selectedShifts.filter(s => {
-      // Remove by exact signupKey match
+      // 1. Exact signupKey match — primary path for all new records
       if (signupKey && s.signupKey === signupKey) return false;
-      // Remove legacy entries that resolve to the same signupKey via sharedMokedKey
+
+      // 2. Legacy entries with sharedMokedKey but no signupKey
       if (signupKey && s.sharedMokedKey && !s.signupKey) {
         const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
         if (legacyKey === signupKey) return false;
       }
+
+      // 3. Stale entries: same date+time+mokedName but with an outdated/merged signupKey.
+      //    This handles the case where a bug previously merged two separate mokeds into one key.
+      //    Only remove if this entry was a moked signup (has moked identity) AND it's for the
+      //    same moked name — never remove entries for other mokeds at the same time slot.
+      if (s.signupKey && signupKey && s.signupKey !== signupKey) {
+        const sDate = s.operational_date || s.date;
+        const matchesSlot = sDate === operationalDate && s.start_time === startTime && s.end_time === endTime;
+        const matchesMoked = s.moked_name === mokedName || s.sharedMokedKey === sharedMokedKey;
+        if (matchesSlot && matchesMoked) return false;
+      }
+
       return true;
     });
 

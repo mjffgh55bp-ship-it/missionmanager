@@ -49,8 +49,17 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   const currentEntry = selectedShifts.find(s => {
     const active = !!s.type; // any type
     if (!active) return false;
-    // New records: match by exact signupKey
-    if (shift.signupKey && s.signupKey) return s.signupKey === shift.signupKey;
+    // Primary: exact signupKey match
+    if (shift.signupKey && s.signupKey) {
+      if (s.signupKey === shift.signupKey) return true;
+      // Stale key: same date+time+moked but different (outdated merged) key
+      // Only match if moked identity confirms it's the same moked
+      const sDate = s.operational_date || s.date;
+      const matchesSlot = sDate === operationalDate && s.start_time === shift.startTime && s.end_time === shift.endTime;
+      const matchesMoked = s.moked_name === shift.mokedName || s.sharedMokedKey === shift.sharedMokedKey;
+      if (matchesSlot && matchesMoked) return true;
+      return false;
+    }
     // Legacy records with sharedMokedKey: rebuild key and compare
     if (shift.signupKey && s.sharedMokedKey) {
       const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);

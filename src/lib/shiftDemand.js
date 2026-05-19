@@ -48,14 +48,13 @@ function isRealAvailabilityDemandRow(row, tmpl) {
  * grouping keys and UI labels.
  */
 function getMokedDisplayName(row, tmpl) {
-  // tmpl.name is authoritative — it is the live template name (e.g. "מוקד מלא 1").
-  // row.template_name can be stale (copied at row-creation time and never updated).
-  // row values can carry a manual override via moked_name / שם מוקד.
+  // tmpl.name is the ONLY authoritative identifier of a moked.
+  // It is set by the admin in the template editor and distinguishes
+  // "מוקד מלא 1" from "מוקד מלא 2" — never override it with row values.
+  // row.template_name is a stale copy made at row-creation time; use only as last resort.
   return (
-    row?.values?.moked_name ||
-    row?.values?.["שם מוקד"] ||
-    tmpl?.name ||            // ← authoritative live name first
-    row?.template_name ||    // ← stale fallback
+    tmpl?.name ||
+    row?.template_name ||
     ""
   ).trim().replace(/\s+/g, " ");
 }
@@ -255,7 +254,7 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
 // ── 2. Count unique workers signed up (wanted) for a unified shift ────────────
 // Counts by signupKey — does NOT multiply by worker-column count.
 export function getSignupsForShift(availabilities, unifiedShift) {
-  const { signupKey } = unifiedShift;
+  const { signupKey, mokedName, sharedMokedKey } = unifiedShift;
   const operationalDate = unifiedShift.operational_date || unifiedShift.date;
   const { startTime, endTime } = unifiedShift;
 
@@ -266,19 +265,22 @@ export function getSignupsForShift(availabilities, unifiedShift) {
     const hasMatch = shifts.some(s => {
       if (normalizeSignupType(s) !== "wanted") return false;
       // Primary: match by exact signupKey
-      if (signupKey && s.signupKey) return s.signupKey === signupKey;
+      if (signupKey && s.signupKey) {
+        if (s.signupKey === signupKey) return true;
+        // Stale key: same slot + same moked identity (handles merged-key migration)
+        const sDate = getShiftOperationalDate(s);
+        const matchesSlot = sDate === operationalDate && s.start_time === startTime && s.end_time === endTime;
+        const matchesMoked = s.moked_name === mokedName || s.sharedMokedKey === sharedMokedKey;
+        return matchesSlot && matchesMoked;
+      }
       // Legacy: rebuild key from stored sharedMokedKey
       if (signupKey && s.sharedMokedKey) {
         const legacyKey = buildSignupKey(getShiftOperationalDate(s), s.sharedMokedKey, s.start_time, s.end_time);
         return legacyKey === signupKey;
       }
-      // Last-resort: only truly old records with no moked identity
+      // Last-resort: only truly old records with no moked identity at all
       const hasMokedIdentity = s.moked_name || s.signupKey || s.sharedMokedKey;
       if (!hasMokedIdentity) {
-        console.warn("LEGACY DATE_TIME SIGNUP MATCH USED", {
-          signupKey, shiftDate: getShiftOperationalDate(s),
-          shiftStart: s.start_time, shiftEnd: s.end_time, workerId: avail.worker_id,
-        });
         return (
           getShiftOperationalDate(s) === operationalDate &&
           s.start_time === startTime &&
