@@ -262,27 +262,50 @@ export function getSignupsForShift(availabilities, unifiedShift) {
 
   availabilities.forEach(avail => {
     const shifts = avail.shifts || [];
-    const hasMatch = shifts.some(s => {
+
+    // Phase 1: check for an exact moked-keyed match (new-style records)
+    const hasKeyedMatch = shifts.some(s => {
       if (normalizeSignupType(s) !== "wanted") return false;
-      // Primary: exact signupKey match only — never cross-match between mokeds
       if (s.signupKey) return s.signupKey === signupKey;
-      // Legacy: rebuild key from stored sharedMokedKey
       if (s.sharedMokedKey) {
         const legacyKey = buildSignupKey(getShiftOperationalDate(s), s.sharedMokedKey, s.start_time, s.end_time);
         return legacyKey === signupKey;
       }
-      // Records with no moked identity cannot be attributed to any specific moked.
-      // Returning false prevents cross-moked contamination.
       return false;
     });
-    if (hasMatch) signedWorkerIds.add(avail.worker_id);
-  });
 
-  console.log("SIGNUP COUNT DEBUG", {
-    mokedName: unifiedShift.mokedName,
-    signupKey,
-    required: unifiedShift.requiredCount,
-    signedCount: signedWorkerIds.size,
+    if (hasKeyedMatch) {
+      signedWorkerIds.add(avail.worker_id);
+      return;
+    }
+
+    // Phase 2: if no keyed entry for THIS moked at this slot, check if this worker
+    // has a DIFFERENT moked's keyed entry at the same date+time — if so, the naked
+    // entry belongs to that other moked and should NOT count here.
+    const hasOtherMokedKeyedEntry = shifts.some(s => {
+      if (normalizeSignupType(s) !== "wanted") return false;
+      const sDate = getShiftOperationalDate(s);
+      if (sDate !== operationalDate || s.start_time !== startTime || s.end_time !== endTime) return false;
+      // Has a moked identity but it's different from this signupKey
+      if (s.signupKey && s.signupKey !== signupKey) return true;
+      if (s.sharedMokedKey) {
+        const legacyKey = buildSignupKey(sDate, s.sharedMokedKey, s.start_time, s.end_time);
+        if (legacyKey !== signupKey) return true;
+      }
+      return false;
+    });
+
+    if (hasOtherMokedKeyedEntry) return; // belongs to another moked
+
+    // Phase 3: naked entry (no moked identity) — counts for ALL mokeds at this slot
+    const hasNakedMatch = shifts.some(s => {
+      if (normalizeSignupType(s) !== "wanted") return false;
+      if (s.signupKey || s.sharedMokedKey) return false; // has identity, handled above
+      return getShiftOperationalDate(s) === operationalDate &&
+        s.start_time === startTime &&
+        s.end_time === endTime;
+    });
+    if (hasNakedMatch) signedWorkerIds.add(avail.worker_id);
   });
 
   return signedWorkerIds.size;
@@ -331,8 +354,23 @@ export function workerSignedForShift(selectedShifts, unifiedShift) {
       );
       return legacyKey === signupKey;
     }
-    // Records with no moked identity cannot be attributed to any specific moked.
-    return false;
+    // Naked entry: check if it belongs to another moked first
+    const hasMokedIdentity = s.signupKey || s.sharedMokedKey;
+    if (hasMokedIdentity) return false;
+    const operationalDate2 = unifiedShift.operational_date || unifiedShift.date;
+    if (getShiftOperationalDate(s) !== operationalDate2 || s.start_time !== unifiedShift.startTime || s.end_time !== unifiedShift.endTime) return false;
+    const hasOtherKey = selectedShifts.some(other => {
+      if (other === s) return false;
+      const oDate = getShiftOperationalDate(other);
+      if (oDate !== operationalDate2 || other.start_time !== unifiedShift.startTime || other.end_time !== unifiedShift.endTime) return false;
+      if (other.signupKey && other.signupKey !== signupKey) return true;
+      if (other.sharedMokedKey) {
+        const ok = buildSignupKey(oDate, other.sharedMokedKey, other.start_time, other.end_time);
+        if (ok !== signupKey) return true;
+      }
+      return false;
+    });
+    return !hasOtherKey;
   });
 }
 

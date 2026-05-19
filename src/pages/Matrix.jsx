@@ -1306,8 +1306,6 @@ export default function Matrix() {
     const grouped = new Map(); // signupKey → { startTime, endTime, date, signups[] }
 
     workerAvail.shifts.forEach(s => {
-      // Only show shifts that have moked identity (came from ShiftDemandPanel signup)
-      if (!s.moked_name && !s.signupKey && !s.sharedMokedKey) return;
       if (s.type !== "wanted" && s.type !== "available") return;
 
       const opDate = s.operational_date || s.date;

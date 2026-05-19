@@ -49,16 +49,30 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   const currentEntry = selectedShifts.find(s => {
     const active = !!s.type;
     if (!active) return false;
-    // Primary: exact signupKey match only — never fall back to date+time alone
+    // Primary: exact signupKey match
     if (s.signupKey) return s.signupKey === shift.signupKey;
     // Legacy: rebuild from sharedMokedKey
     if (s.sharedMokedKey) {
       const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
       return legacyKey === shift.signupKey;
     }
-    // If a record has NO moked identity at all, we cannot determine which moked it belongs to.
-    // Never match it against a specific moked chip — this prevents cross-moked contamination.
-    return false;
+    // Naked entry (no moked identity): only show it on this chip if there's NO other entry
+    // with a different signupKey for the same date+time (i.e. it doesn't belong to another moked)
+    const sDate = s.operational_date || s.date;
+    if (sDate !== operationalDate || s.start_time !== shift.startTime || s.end_time !== shift.endTime) return false;
+    // Check that no other entry with a different moked key exists for this slot
+    const otherMokedEntry = selectedShifts.some(other => {
+      if (other === s) return false;
+      const oDate = other.operational_date || other.date;
+      if (oDate !== operationalDate || other.start_time !== shift.startTime || other.end_time !== shift.endTime) return false;
+      if (other.signupKey && other.signupKey !== shift.signupKey) return true;
+      if (other.sharedMokedKey) {
+        const otherKey = buildSignupKey(oDate, other.sharedMokedKey, other.start_time, other.end_time);
+        if (otherKey !== shift.signupKey) return true;
+      }
+      return false;
+    });
+    return !otherMokedEntry;
   });
   const currentType = currentEntry?.type || null;
 
