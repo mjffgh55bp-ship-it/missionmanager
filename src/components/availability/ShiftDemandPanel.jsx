@@ -79,9 +79,9 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   } else if (blocked) {
     chipClass += "bg-red-50 border-red-200 text-red-500 cursor-not-allowed";
   } else if (isOver) {
-    chipClass += "bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100 cursor-pointer";
+    chipClass += "bg-orange-50 border-orange-300 text-orange-700 cursor-pointer";
   } else {
-    chipClass += "bg-white border-gray-200 text-gray-700 hover:border-green-400 hover:bg-green-50 cursor-pointer";
+    chipClass += "bg-white border-gray-200 text-gray-700 cursor-pointer";
   }
 
   const handleClick = () => {
@@ -128,8 +128,8 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   const countLabel = `${signed}/${displayRequired}`;
 
   // Bar track and fill colors — always visible, adapted for light selected backgrounds
-  const barTrackColor = isOver ? "#fed7aa" : blocked ? "#fecaca" : "#e5e7eb";
-  const barFillColor = isOver ? "#f97316" : blocked ? "#ef4444" : fillPct >= 70 ? "#facc15" : "#22c55e";
+  const barTrackColor = isOver ? "#fed7aa" : isFull ? "#fecaca" : "#e5e7eb";
+  const barFillColor = isOver ? "#f97316" : isFull ? "#ef4444" : fillPct >= 70 ? "#facc15" : "#22c55e";
 
   // Status badge below count
   const statusBadge = isOver

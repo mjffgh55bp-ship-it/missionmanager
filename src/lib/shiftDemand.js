@@ -87,19 +87,6 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
     const sharedMokedKey = buildSharedMokedKey(tmpl);
     const signupKey = buildSignupKey(operationalDate, sharedMokedKey, startTime, endTime);
 
-    console.log("SHIFT SIGNUP KEY DEBUG", {
-      mokedName,
-      template_id: tmpl.id,
-      mapping_id: tmpl.mapping_id,
-      signup_group_id: tmpl.signup_group_id,
-      group_id: row.group_id,
-      row_id: row.id,
-      operational_date: operationalDate,
-      start_time: startTime,
-      end_time: endTime,
-      sharedMokedKey,
-      signupKey,
-    });
     // Use signupKey as the map key so duplicate same-name mokeds are grouped together
     const key = signupKey;
 
@@ -142,7 +129,7 @@ export function getSignupsForRole(availabilities, workers, unifiedShift, roleNam
     if (!eligibleWorkerIds.has(avail.worker_id)) return;
     const shifts = avail.shifts || [];
     const hasMatch = shifts.some(s => {
-      if (s.type !== "wanted" && s.type !== "available") return false;
+      if (s.type !== "wanted") return false;
       // Match by signupKey when available
       if (signupKey && s.signupKey) return s.signupKey === signupKey;
       if (signupKey && s.sharedMokedKey) {
