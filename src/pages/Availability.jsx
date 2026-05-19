@@ -17,7 +17,7 @@ import { formatHebrewDate } from "../components/utils/HebrewDate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import ShiftDemandPanel from "@/components/availability/ShiftDemandPanel";
-import { buildSignupKey } from "@/lib/shiftDemand";
+import { buildSignupKey, serializePossibleInstances } from "@/lib/shiftDemand";
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const HEBREW_DAYS_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -846,7 +846,7 @@ END:VEVENT
         sharedMokedKey,
         signupKey,
         role_or_qualification: roleName,
-        possibleInstances: unifiedShift.possibleInstances || [],
+        possibleInstances: serializePossibleInstances(unifiedShift.possibleInstances),
       };
       console.log("SIGNUP SAVE DEBUG", {
         workerId: currentWorker.id,

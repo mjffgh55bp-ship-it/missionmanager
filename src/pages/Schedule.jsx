@@ -255,7 +255,7 @@ export default function Schedule() {
                 template_id: template.id,
                 template_name: template.name,
                 date: dateString,
-                values: rowValues,
+                values: { ...rowValues, moked_instance_name: template.name },
                 group_id: groupId
               });
             }
@@ -280,11 +280,14 @@ export default function Schedule() {
   const handleAddTemplateRowForTemplate = async (templateId, groupId) => {
     const template = allTemplates.find((t) => t.id === templateId);
     if (!template) return;
+    // Inherit moked_instance_name from existing rows in this group (so name stays consistent)
+    const existingGroupRow = templateRows.find(r => r.template_id === templateId && (r.group_id || "default") === (groupId || "default"));
+    const instanceName = existingGroupRow?.values?.moked_instance_name || existingGroupRow?.template_name || template.name;
     await base44.entities.TemplateRow.create({
       template_id: templateId,
       template_name: template.name,
       date: dateString,
-      values: {},
+      values: { moked_instance_name: instanceName },
       group_id: groupId
     });
     await loadData();
@@ -307,7 +310,7 @@ export default function Schedule() {
         template_id: newTemplate.id,
         template_name: newTemplate.name,
         date: dateString,
-        values: rowValues,
+        values: { ...rowValues, moked_instance_name: preset.name },
         group_id: newGroupId
       });
       createdRows.push(newRow);
@@ -366,6 +369,12 @@ export default function Schedule() {
       delete clonedValues.continuation_source_row_id;
       delete clonedValues.continuation_from_date;
       delete clonedValues.is_continuation;
+
+      // Carry over the instance name (from the source group so duplicate starts named correctly)
+      // The user can rename the duplicate afterward — that will update only its group's rows.
+      if (!clonedValues.moked_instance_name && (row.values?.moked_instance_name || row.template_name)) {
+        clonedValues.moked_instance_name = row.values?.moked_instance_name || row.template_name || "";
+      }
 
       // Assign a fresh, independent _order within the new group
       clonedValues._order = index;
@@ -471,13 +480,33 @@ export default function Schedule() {
     }
   };
 
-  const saveMokedName = async (templateId, name) => {
-    if (name.trim()) {
-      await base44.entities.Template.update(templateId, { name });
-      setTemplateRows(prev => prev.map(r => r.template_id === templateId ? { ...r, template_name: name } : r));
-      setAllTemplates(prev => prev.map(t => t.id === templateId ? { ...t, name } : t));
-      setTemplates(prev => prev.map(t => t.id === templateId ? { ...t, name } : t));
+  /**
+   * Save a new display name for a SPECIFIC moked group instance.
+   *
+   * CRITICAL: Do NOT update Template.name globally — that would rename ALL groups
+   * using the same template and break instance identity.
+   *
+   * Instead, write moked_instance_name onto every TemplateRow in this group.
+   * getMokedDisplayName() in shiftDemand.js reads this field first.
+   */
+  const saveMokedName = async (templateId, groupId, name) => {
+    if (!name.trim()) {
+      setEditingMokedName(null);
+      setEditingMokedNameValue("");
+      return;
     }
+    const trimmed = name.trim();
+    // Update all rows in this specific group
+    const groupRows = templateRows.filter(r => r.template_id === templateId && (r.group_id || "default") === (groupId || "default"));
+    await Promise.all(groupRows.map(r =>
+      base44.entities.TemplateRow.update(r.id, { values: { ...r.values, moked_instance_name: trimmed } })
+    ));
+    // Optimistic local update
+    setTemplateRows(prev => prev.map(r =>
+      r.template_id === templateId && (r.group_id || "default") === (groupId || "default")
+        ? { ...r, template_name: trimmed, values: { ...r.values, moked_instance_name: trimmed } }
+        : r
+    ));
     setEditingMokedName(null);
     setEditingMokedNameValue("");
   };
@@ -721,9 +750,9 @@ export default function Schedule() {
                             <Input
                               value={editingMokedNameValue}
                               onChange={(e) => setEditingMokedNameValue(e.target.value)}
-                              onBlur={() => saveMokedName(template.id, editingMokedNameValue)}
+                              onBlur={() => saveMokedName(template.id, group.group_id, editingMokedNameValue)}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') saveMokedName(template.id, editingMokedNameValue);
+                                if (e.key === 'Enter') saveMokedName(template.id, group.group_id, editingMokedNameValue);
                                 else if (e.key === 'Escape') { setEditingMokedName(null); setEditingMokedNameValue(""); }
                               }}
                               autoFocus
@@ -732,9 +761,14 @@ export default function Schedule() {
                           ) : (
                             <CardTitle
                               className="text-slate-50 text-lg font-semibold tracking-tight cursor-pointer hover:underline flex items-center gap-2"
-                              onClick={() => { setEditingMokedName(`${group.key}`); setEditingMokedNameValue(template.name); }}
+                              onClick={() => {
+                                // Pre-populate with the instance-level name (from rows), not template.name
+                                const instanceName = group.rows[0]?.values?.moked_instance_name || group.rows[0]?.template_name || template.name;
+                                setEditingMokedName(`${group.key}`);
+                                setEditingMokedNameValue(instanceName);
+                              }}
                               dir="rtl">
-                              {template.name}
+                              {group.rows[0]?.values?.moked_instance_name || group.rows[0]?.template_name || template.name}
                               <Pencil className="w-3 h-3 opacity-60" />
                             </CardTitle>
                           )}

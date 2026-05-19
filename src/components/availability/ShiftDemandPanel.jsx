@@ -45,34 +45,33 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   const { isFull, isOver, blocked } = calculateRoleStatus(requiredCount, signed, signupMode);
 
   const operationalDate = shift.operational_date || shift.date;
-  // Match by signupKey first (new records), then legacy fallback
+
+  // STRICT matching — same logic as workerSignedForShift in shiftDemand.js.
+  // When the chip has a signupKey, NEVER fall back to date+time matching:
+  // that is what caused signing to one moked to affect another moked at the same time.
   const currentEntry = selectedShifts.find(s => {
-    const active = !!s.type;
-    if (!active) return false;
-    // Primary: exact signupKey match
-    if (s.signupKey) return s.signupKey === shift.signupKey;
-    // Legacy: rebuild from sharedMokedKey
-    if (s.sharedMokedKey) {
+    if (!s.type) return false;
+
+    // 1. Exact signupKey match (new records)
+    if (s.signupKey && shift.signupKey) return s.signupKey === shift.signupKey;
+
+    // 2. Legacy: reconstruct from sharedMokedKey
+    if (s.sharedMokedKey && shift.signupKey) {
       const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
       return legacyKey === shift.signupKey;
     }
-    // Naked entry (no moked identity): only show it on this chip if there's NO other entry
-    // with a different signupKey for the same date+time (i.e. it doesn't belong to another moked)
+
+    // 3. Naked entry — only match if NO keyed entry exists for this date+time slot
+    if (s.signupKey || s.sharedMokedKey) return false;
     const sDate = s.operational_date || s.date;
     if (sDate !== operationalDate || s.start_time !== shift.startTime || s.end_time !== shift.endTime) return false;
-    // Check that no other entry with a different moked key exists for this slot
-    const otherMokedEntry = selectedShifts.some(other => {
+    const hasKeyedEntry = selectedShifts.some(other => {
       if (other === s) return false;
       const oDate = other.operational_date || other.date;
       if (oDate !== operationalDate || other.start_time !== shift.startTime || other.end_time !== shift.endTime) return false;
-      if (other.signupKey && other.signupKey !== shift.signupKey) return true;
-      if (other.sharedMokedKey) {
-        const otherKey = buildSignupKey(oDate, other.sharedMokedKey, other.start_time, other.end_time);
-        if (otherKey !== shift.signupKey) return true;
-      }
-      return false;
+      return !!(other.signupKey || other.sharedMokedKey);
     });
-    return !otherMokedEntry;
+    return !hasKeyedEntry;
   });
   const currentType = currentEntry?.type || null;
 
