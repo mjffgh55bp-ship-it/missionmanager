@@ -264,19 +264,18 @@ export function getSignupsForShift(availabilities, unifiedShift) {
     const shifts = avail.shifts || [];
     const hasMatch = shifts.some(s => {
       if (normalizeSignupType(s) !== "wanted") return false;
-      // Primary: exact signupKey match only — never cross-match between mokeds
+      // STRICT: only exact signupKey match. Records without signupKey are old general
+      // availability blocks — they must NEVER count toward a specific moked's capacity.
       if (s.signupKey) return s.signupKey === signupKey;
-      // Legacy: rebuild key from stored sharedMokedKey
+      // Legacy records that have sharedMokedKey but no signupKey: rebuild and compare.
       if (s.sharedMokedKey) {
         const legacyKey = buildSignupKey(getShiftOperationalDate(s), s.sharedMokedKey, s.start_time, s.end_time);
         return legacyKey === signupKey;
       }
-      // Last-resort: only truly old records with no moked identity at all
-      return (
-        getShiftOperationalDate(s) === operationalDate &&
-        s.start_time === startTime &&
-        s.end_time === endTime
-      );
+      // Records with neither signupKey nor sharedMokedKey are generic availability blocks
+      // (created via drag in Matrix, or old format). They do NOT belong to any specific moked.
+      // Never match them against a moked shift — doing so would double-count across mokeds.
+      return false;
     });
     if (hasMatch) signedWorkerIds.add(avail.worker_id);
   });
@@ -322,10 +321,10 @@ export function workerSignedForShift(selectedShifts, unifiedShift) {
   return selectedShifts.some(s => {
     const active = s.type === "wanted" || s.type === "available";
     if (!active) return false;
-    // Match by signupKey when available (new records)
-    if (signupKey && s.signupKey) return s.signupKey === signupKey;
-    // Legacy fallback: match by signupKey computed from stored sharedMokedKey/moked_name
-    if (signupKey && s.sharedMokedKey) {
+    // STRICT: exact signupKey only
+    if (s.signupKey) return s.signupKey === signupKey;
+    // Legacy: rebuild from sharedMokedKey
+    if (s.sharedMokedKey) {
       const legacyKey = buildSignupKey(
         getShiftOperationalDate(s),
         s.sharedMokedKey,
@@ -334,22 +333,7 @@ export function workerSignedForShift(selectedShifts, unifiedShift) {
       );
       return legacyKey === signupKey;
     }
-    // Last-resort fallback: only for truly old records with NO moked identity at all.
-    const hasMokedIdentity = s.moked_name || s.signupKey || s.sharedMokedKey;
-    if (!hasMokedIdentity) {
-      const operationalDate = unifiedShift.operational_date || unifiedShift.date;
-      console.warn("LEGACY DATE_TIME SIGNUP MATCH USED (workerSignedForShift)", {
-        signupKey,
-        shiftDate: getShiftOperationalDate(s),
-        shiftStart: s.start_time,
-        shiftEnd: s.end_time,
-      });
-      return (
-        getShiftOperationalDate(s) === operationalDate &&
-        s.start_time === unifiedShift.startTime &&
-        s.end_time === unifiedShift.endTime
-      );
-    }
+    // Generic availability blocks (no moked identity) — never match a specific moked
     return false;
   });
 }

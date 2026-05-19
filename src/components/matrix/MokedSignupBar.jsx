@@ -30,8 +30,25 @@ export default function MokedSignupBar({ signups, startTime, endTime, dayIndex, 
   const borderColor = hasWanted ? '#16a34a' : '#0891b2';
   const bgColor = hasWanted ? 'rgba(22, 163, 74, 0.12)' : 'rgba(8, 145, 178, 0.12)';
 
-  // Deduplicate moked names for tooltip
-  const mokedNames = [...new Set(signups.map(s => s.moked_name).filter(Boolean))];
+  // Extract moked name: prefer moked_name field, fall back to parsing signupKey
+  const extractMokedName = (s) => {
+    if (s.moked_name) return s.moked_name;
+    if (s.signupKey) {
+      // Format: "date__name:MokedName__startTime__endTime" or "date__group:id__..."
+      const parts = s.signupKey.split('__');
+      if (parts.length >= 2) {
+        const keyPart = parts[1]; // "name:מוקד מלא 1" or "group:abc"
+        if (keyPart.startsWith('name:')) return keyPart.slice(5);
+        if (keyPart.startsWith('group:')) return `קבוצה: ${keyPart.slice(6)}`;
+      }
+    }
+    return null;
+  };
+
+  const mokedNames = [...new Set(signups.map(extractMokedName).filter(Boolean))];
+
+  // Determine signup type label
+  const typeLabel = signups.some(s => s.type === "wanted") ? "רצוי" : "זמין";
 
   return (
     <TooltipProvider>
@@ -48,7 +65,7 @@ export default function MokedSignupBar({ signups, startTime, endTime, dayIndex, 
           />
         </TooltipTrigger>
         <TooltipContent className="bg-gray-800 text-white border-none" dir="rtl">
-          <p className="font-bold text-xs mb-1">נרשם ל:</p>
+          <p className="font-bold text-xs mb-1">נרשם ל{typeLabel === "רצוי" ? " (רצוי)" : " (זמין)"}:</p>
           {mokedNames.length > 0
             ? mokedNames.map((n, i) => <p key={i} className="text-xs">• {n}</p>)
             : <p className="text-xs">מוקד לא ידוע</p>

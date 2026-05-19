@@ -49,15 +49,15 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   const currentEntry = selectedShifts.find(s => {
     const active = !!s.type;
     if (!active) return false;
-    // Primary: exact signupKey match only
+    // STRICT: exact signupKey only — never fall back to date+time matching
     if (s.signupKey) return s.signupKey === shift.signupKey;
     // Legacy: rebuild from sharedMokedKey
     if (s.sharedMokedKey) {
       const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
       return legacyKey === shift.signupKey;
     }
-    // Oldest records: no moked identity — match by date+time only
-    return (s.operational_date || s.date) === operationalDate && s.start_time === shift.startTime && s.end_time === shift.endTime;
+    // Generic blocks (no moked identity) — never match a specific moked chip
+    return false;
   });
   const currentType = currentEntry?.type || null;
 
