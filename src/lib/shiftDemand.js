@@ -10,6 +10,53 @@
 
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 
+// ── Row validity guard ────────────────────────────────────────────────────────
+
+/**
+ * Returns true only for real, visible, scheduled rows that should contribute
+ * to availability demand capacity. Excludes hidden, archived, preset, and
+ * invalid continuation rows.
+ */
+function isRealAvailabilityDemandRow(row, tmpl) {
+  if (!row || !tmpl || !row.values) return false;
+  if (!isVisibleScheduleTemplate(tmpl)) return false;
+  if (!row.date) return false;
+
+  const v = row.values;
+
+  // Skip hidden / deleted / archived rows
+  if (v.is_hidden || v.hidden || v.deleted || v.archived) return false;
+
+  // Skip preset / template-definition rows (not live schedule rows)
+  if (v.is_preset || v.is_template_definition) return false;
+
+  // Must have valid start and end times
+  const start = v["התחלה"] || v["שעת התחלה"];
+  const end   = v["סיום"]  || v["שעת סיום"];
+  if (!start || !end) return false;
+
+  // Skip invalid zero-duration continuation rows (06:00→06:00)
+  if (v.is_continuation && start === "06:00" && end === "06:00" && v.continuation_source_row_id) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Single source of truth for the moked display name used in both
+ * grouping keys and UI labels.
+ */
+function getMokedDisplayName(row, tmpl) {
+  return (
+    row?.values?.moked_name ||
+    row?.values?.["שם מוקד"] ||
+    row?.template_name ||
+    tmpl?.name ||
+    ""
+  ).trim().replace(/\s+/g, " ");
+}
+
 // ── Signup key helpers ────────────────────────────────────────────────────────
 
 /**
@@ -48,14 +95,8 @@ export function buildSharedMokedKey(template, row) {
     template?.registration_group_id;
   if (explicit) return `group:${explicit}`;
 
-  // Default: exact normalized display name
-  const name =
-    row?.template_name ||
-    template?.name ||
-    row?.values?.moked_name ||
-    row?.values?.["שם מוקד"] ||
-    "";
-  return `name:${normalizeMokedName(name)}`;
+  // Default: use the same display name function — single source of truth
+  return `name:${normalizeMokedName(getMokedDisplayName(row, template))}`;
 }
 
 /**
@@ -87,46 +128,55 @@ function getShiftOperationalDate(shift) {
 
 // ── 1. Build unified shift demand from TemplateRows ───────────────────────────
 // Returns Map: unifiedKey → { key, date, operational_date, mokedName, startTime, endTime,
-//   requiredCount (row instances), eligibleRoles (Set of worker col names), possibleInstances }
+//   requiredCount (unique row instances), eligibleRoles (Set of worker col names), possibleInstances }
 export function buildUnifiedShiftDemand(templateRows, templates) {
   const templateById = {};
   templates.forEach(t => { templateById[t.id] = t; });
 
-  const map = new Map(); // key → unified shift
-
-  // Returns true for zero-duration continuation rows (06:00→06:00) — must be ignored
-  const isInvalidContinuationRow = (row) => {
-    if (!row?.values?.is_continuation) return false;
-    const start = row.values["התחלה"] || row.values["שעת התחלה"];
-    const end   = row.values["סיום"]  || row.values["שעת סיום"];
-    return start === "06:00" && end === "06:00" && !!row.values.continuation_source_row_id;
-  };
+  const map = new Map(); // signupKey → unified shift
 
   templateRows.forEach(row => {
     const tmpl = templateById[row.template_id];
-    // Skip rows whose template is missing or not visible in the Schedule calendar
-    if (!tmpl || !isVisibleScheduleTemplate(tmpl) || !row.values) return;
-    // Skip invalid zero-duration continuation rows
-    if (isInvalidContinuationRow(row)) return;
+
+    // ── Gate 1: must be a real, visible, valid scheduled row ──
+    if (!isRealAvailabilityDemandRow(row, tmpl)) {
+      // Only log for rows that have a date (skip truly empty rows)
+      if (row.date) {
+        const start = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
+        const end   = row.values?.["סיום"]  || row.values?.["שעת סיום"];
+        console.log("DEMAND ROW SKIPPED", {
+          rowId: row.id,
+          rowDate: row.date,
+          templateId: row.template_id,
+          templateName: tmpl?.name,
+          reason: !tmpl ? "no_template"
+            : !isVisibleScheduleTemplate(tmpl) ? "not_visible"
+            : !row.values ? "no_values"
+            : row.values.is_hidden || row.values.hidden || row.values.deleted || row.values.archived ? "hidden_archived"
+            : row.values.is_preset || row.values.is_template_definition ? "preset_or_definition"
+            : !start || !end ? "no_times"
+            : "invalid_continuation",
+          isContinuation: row.values?.is_continuation,
+          startTime: start,
+          endTime: end,
+        });
+      }
+      return;
+    }
 
     const values = row.values;
     const startTime = values["התחלה"] || values["שעת התחלה"];
     const endTime   = values["סיום"]  || values["שעת סיום"];
-    if (!startTime || !endTime || !row.date) return;
-
-    // Always use row.date as the operational date for grouping.
     const operationalDate = row.date;
-    const mokedName = tmpl.name || row.template_name || "";
-    // Pass both template AND row so buildSharedMokedKey can use row-level overrides
+
+    // ── Single source of truth for the moked name ──
+    const mokedName = getMokedDisplayName(row, tmpl);
     const sharedMokedKey = buildSharedMokedKey(tmpl, row);
     const signupKey = buildSignupKey(operationalDate, sharedMokedKey, startTime, endTime);
 
-    // Use signupKey as the map key so duplicate same-name mokeds are grouped together
-    const key = signupKey;
-
-    if (!map.has(key)) {
-      map.set(key, {
-        key, signupKey, sharedMokedKey,
+    if (!map.has(signupKey)) {
+      map.set(signupKey, {
+        key: signupKey, signupKey, sharedMokedKey,
         date: operationalDate, operational_date: operationalDate,
         mokedName, startTime, endTime,
         requiredCount: 0,
@@ -134,32 +184,65 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
         possibleInstances: [],
       });
     }
-    const unified = map.get(key);
+    const unified = map.get(signupKey);
 
-    // Each row instance = one signup capacity unit
-    unified.requiredCount += 1;
+    // ── Gate 2: deduplicate — never count the same row.id twice ──
+    const alreadyCounted = unified.possibleInstances.some(i => i.row_id === row.id);
+    if (alreadyCounted) {
+      console.warn("DEMAND ROW DUPLICATE SKIPPED", {
+        rowId: row.id, signupKey, mokedName,
+        existingCount: unified.possibleInstances.length,
+      });
+      return;
+    }
 
-    // Collect all worker-column names as eligible roles (for hasMyRole check)
+    // Collect worker-column names as eligible roles (for hasMyRole check only)
     const workerCols = (tmpl.columns || []).filter(c => c.type === "worker");
     workerCols.forEach(col => unified.eligibleRoles.add(col.name));
 
-    // Track possible instances (for manager assignment later)
     unified.possibleInstances.push({
       row_id: row.id,
       template_id: tmpl.id,
       group_id: row.group_id || "default",
       mokedName,
+      startTime,
+      endTime,
       worker_columns: workerCols.map(c => c.name),
     });
 
-    console.log("UNIFIED DEMAND DEBUG", {
+    // requiredCount = unique row instances (recalculate from Set to be safe)
+    unified.requiredCount = new Set(unified.possibleInstances.map(i => i.row_id)).size;
+
+    console.log("DEMAND ROW INCLUDED", {
       rowId: row.id,
+      rowDate: row.date,
+      templateId: row.template_id,
       templateName: tmpl.name,
+      rowTemplateName: row.template_name,
       mokedName,
       signupKey,
-      workerColumns: workerCols.map(c => c.name),
-      requiredCount: unified.requiredCount,
-      possibleInstancesCount: unified.possibleInstances.length,
+      sharedMokedKey,
+      startTime,
+      endTime,
+      isContinuation: row.values?.is_continuation,
+      continuationSource: row.values?.continuation_source_row_id,
+      rowValues: row.values,
+      visibleTemplate: isVisibleScheduleTemplate(tmpl),
+    });
+  });
+
+  // Log final state for each unified shift
+  map.forEach(shift => {
+    console.log("UNIFIED SHIFT FINAL", {
+      mokedName: shift.mokedName,
+      signupKey: shift.signupKey,
+      requiredCount: shift.requiredCount,
+      possibleInstances: shift.possibleInstances.map(i => ({
+        row_id: i.row_id,
+        template_id: i.template_id,
+        group_id: i.group_id,
+        mokedName: i.mokedName,
+      })),
     });
   });
 
