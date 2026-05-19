@@ -774,39 +774,88 @@ END:VEVENT
   const wantedShifts = selectedShifts.filter((s) => s.type === "wanted").sort((a, b) => (a.priority || 0) - (b.priority || 0));
   const availableShifts = selectedShifts.filter((s) => s.type === "available").sort((a, b) => (a.priority || 0) - (b.priority || 0));
 
-  // Handle signup from the demand panel: add/update the shift in selectedShifts
-  const handleDemandSignup = (unifiedShift, roleName, type) => {
+  // Handle signup from the demand panel: write-through save + optimistic weekAvailabilities update
+  const handleDemandSignup = async (unifiedShift, roleName, type) => {
     if (!canEdit || currentWorker?.availability_locked) return;
     const operationalDate = unifiedShift.operational_date || unifiedShift.date;
     const { startTime, endTime, signupKey, sharedMokedKey, mokedName } = unifiedShift;
-    // Remove any existing entry for THIS specific moked signup (match by signupKey)
+
+    // Build new shifts array
     let newShifts = selectedShifts.filter(s => {
-      // Remove if it matches by signupKey
       if (signupKey && s.signupKey === signupKey) return false;
-      // Remove legacy entries (same date+time, no signupKey identity)
       if (!s.signupKey && !s.sharedMokedKey && !s.moked_name) {
         if ((s.operational_date || s.date) === operationalDate && s.start_time === startTime && s.end_time === endTime) return false;
       }
       return true;
     });
-    if (type === "remove") {
-      setSelectedShifts(newShifts);
-      return;
+
+    if (type !== "remove") {
+      const count = newShifts.filter(s => s.type === type).length;
+      newShifts.push({
+        date: operationalDate,
+        operational_date: operationalDate,
+        start_time: startTime,
+        end_time: endTime,
+        type,
+        priority: type === "unavailable" ? 0 : count + 1,
+        moked_name: mokedName,
+        sharedMokedKey: sharedMokedKey || "",
+        signupKey: signupKey || buildSignupKey(operationalDate, sharedMokedKey || "", startTime, endTime),
+        role_or_qualification: roleName,
+      });
     }
-    const count = newShifts.filter(s => s.type === type).length;
-    newShifts.push({
-      date: operationalDate,
-      operational_date: operationalDate,
-      start_time: startTime,
-      end_time: endTime,
-      type,
-      priority: type === "unavailable" ? 0 : count + 1,
-      moked_name: mokedName,
-      sharedMokedKey: sharedMokedKey || "",
-      signupKey: signupKey || buildSignupKey(operationalDate, sharedMokedKey || "", startTime, endTime),
-      role_or_qualification: roleName,
-    });
+
+    // 1. Optimistic local update
     setSelectedShifts(newShifts);
+
+    // 2. Build availability record
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    const availabilityData = {
+      worker_id: currentWorker.id,
+      worker_name: currentWorker.nickname,
+      week_start_date: weekStartStr,
+      shifts: newShifts,
+      extra_tasks: extraTaskStates,
+      status: existingAvailability?.status || "draft",
+      desired_shifts: desiredShiftsCount ? parseInt(desiredShiftsCount) : null,
+    };
+
+    // 3. Optimistic weekAvailabilities update so ShiftDemandPanel sees new count immediately
+    const optimisticRecord = { ...(existingAvailability || {}), ...availabilityData };
+    setWeekAvailabilities(prev => {
+      const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
+      return [...withoutMine, optimisticRecord];
+    });
+
+    // 4. Persist to DB
+    let savedRecord;
+    if (existingAvailability) {
+      savedRecord = await base44.entities.Availability.update(existingAvailability.id, availabilityData);
+    } else {
+      savedRecord = await base44.entities.Availability.create(availabilityData);
+    }
+    setExistingAvailability(savedRecord);
+
+    // 5. Replace optimistic record with real DB record
+    setWeekAvailabilities(prev => {
+      const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
+      return [...withoutMine, savedRecord];
+    });
+
+    // 6. Broadcast to other tabs
+    try { broadcastRef.current?.postMessage("update"); } catch {}
+    try { localStorage.setItem("availability-sync-event", JSON.stringify({ ts: Date.now() })); } catch {}
+    window.dispatchEvent(new CustomEvent("availabilityUpdated", {
+      detail: {
+        workerId: currentWorker.id,
+        signupKey,
+        type,
+        operational_date: operationalDate,
+        start_time: startTime,
+        end_time: endTime,
+        timestamp: Date.now(),
+      }
+    }));
   };
 
   // Stale registration name denylist — permanently ignored regardless of any other check

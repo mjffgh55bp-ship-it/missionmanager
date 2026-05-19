@@ -10,6 +10,7 @@ import {
   workerSignedForShift,
   filterDemandForWeek,
   buildSignupKey,
+  normalizeSignupType,
 } from "@/lib/shiftDemand";
 import { filterVisibleScheduleRows } from "@/lib/scheduleVisibility";
 import { getOperationalMinutes, getOperationalEndMinutes } from "@/lib/operationalDate";
@@ -105,6 +106,23 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
 
   // Fill indicator
   const fillPct = displayRequired > 0 ? Math.min(100, Math.round((signed / displayRequired) * 100)) : 0;
+
+  console.log("SHIFT CHIP COUNT DEBUG", {
+    mokedName: shift.mokedName,
+    signupKey: shift.signupKey,
+    displayRole,
+    signed,
+    required: displayRequired,
+    fillPct,
+    allAvailabilities: allAvailabilities.map(a => ({
+      worker_id: a.worker_id,
+      shifts: (a.shifts || []).map(s => ({
+        signupKey: s.signupKey,
+        type: s.type,
+        normalized: normalizeSignupType(s),
+      }))
+    }))
+  });
   const fillColor = isOver
     ? "bg-orange-400"
     : isFull

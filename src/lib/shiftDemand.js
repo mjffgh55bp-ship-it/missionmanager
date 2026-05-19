@@ -43,6 +43,15 @@ export function buildSignupKey(operationalDate, sharedMokedKey, startTime, endTi
   return `${operationalDate}__${sharedMokedKey}__${startTime}__${endTime}`;
 }
 
+// ── Status normalization ──────────────────────────────────────────────────────
+export function normalizeSignupType(s) {
+  const raw = s.type || s.status || s.preference || s.value;
+  if (raw === "wanted" || raw === "רצוי") return "wanted";
+  if (raw === "available" || raw === "זמין") return "available";
+  if (raw === "unavailable" || raw === "לא זמין") return "unavailable";
+  return raw || null;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -129,7 +138,7 @@ export function getSignupsForRole(availabilities, workers, unifiedShift, roleNam
     if (!eligibleWorkerIds.has(avail.worker_id)) return;
     const shifts = avail.shifts || [];
     const hasMatch = shifts.some(s => {
-      if (s.type !== "wanted") return false;
+      if (normalizeSignupType(s) !== "wanted") return false;
       // Match by signupKey when available
       if (signupKey && s.signupKey) return s.signupKey === signupKey;
       if (signupKey && s.sharedMokedKey) {
