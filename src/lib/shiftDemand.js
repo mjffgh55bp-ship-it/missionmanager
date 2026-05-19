@@ -271,12 +271,9 @@ export function getSignupsForShift(availabilities, unifiedShift) {
         const legacyKey = buildSignupKey(getShiftOperationalDate(s), s.sharedMokedKey, s.start_time, s.end_time);
         return legacyKey === signupKey;
       }
-      // Last-resort: only truly old records with no moked identity at all
-      return (
-        getShiftOperationalDate(s) === operationalDate &&
-        s.start_time === startTime &&
-        s.end_time === endTime
-      );
+      // Records with no moked identity cannot be attributed to any specific moked.
+      // Returning false prevents cross-moked contamination.
+      return false;
     });
     if (hasMatch) signedWorkerIds.add(avail.worker_id);
   });
@@ -334,22 +331,7 @@ export function workerSignedForShift(selectedShifts, unifiedShift) {
       );
       return legacyKey === signupKey;
     }
-    // Last-resort fallback: only for truly old records with NO moked identity at all.
-    const hasMokedIdentity = s.moked_name || s.signupKey || s.sharedMokedKey;
-    if (!hasMokedIdentity) {
-      const operationalDate = unifiedShift.operational_date || unifiedShift.date;
-      console.warn("LEGACY DATE_TIME SIGNUP MATCH USED (workerSignedForShift)", {
-        signupKey,
-        shiftDate: getShiftOperationalDate(s),
-        shiftStart: s.start_time,
-        shiftEnd: s.end_time,
-      });
-      return (
-        getShiftOperationalDate(s) === operationalDate &&
-        s.start_time === unifiedShift.startTime &&
-        s.end_time === unifiedShift.endTime
-      );
-    }
+    // Records with no moked identity cannot be attributed to any specific moked.
     return false;
   });
 }
