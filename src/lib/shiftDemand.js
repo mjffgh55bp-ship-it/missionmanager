@@ -86,7 +86,8 @@ function getShiftOperationalDate(shift) {
 }
 
 // ── 1. Build unified shift demand from TemplateRows ───────────────────────────
-// Returns Map: unifiedKey → { key, date, operational_date, mokedName, startTime, endTime, roles: { roleName: count } }
+// Returns Map: unifiedKey → { key, date, operational_date, mokedName, startTime, endTime,
+//   requiredCount (row instances), eligibleRoles (Set of worker col names), possibleInstances }
 export function buildUnifiedShiftDemand(templateRows, templates) {
   const templateById = {};
   templates.forEach(t => { templateById[t.id] = t; });
@@ -128,11 +129,19 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
         key, signupKey, sharedMokedKey,
         date: operationalDate, operational_date: operationalDate,
         mokedName, startTime, endTime,
-        roles: {},
+        requiredCount: 0,
+        eligibleRoles: new Set(),
         possibleInstances: [],
       });
     }
     const unified = map.get(key);
+
+    // Each row instance = one signup capacity unit
+    unified.requiredCount += 1;
+
+    // Collect all worker-column names as eligible roles (for hasMyRole check)
+    const workerCols = (tmpl.columns || []).filter(c => c.type === "worker");
+    workerCols.forEach(col => unified.eligibleRoles.add(col.name));
 
     // Track possible instances (for manager assignment later)
     unified.possibleInstances.push({
@@ -140,73 +149,49 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
       template_id: tmpl.id,
       group_id: row.group_id || "default",
       mokedName,
+      worker_columns: workerCols.map(c => c.name),
     });
 
-    // Find worker-type columns and count one slot per column per row
-    const workerCols = (tmpl.columns || []).filter(c => c.type === "worker");
-    workerCols.forEach(col => {
-      const roleName = col.name;
-      unified.roles[roleName] = (unified.roles[roleName] || 0) + 1;
-    });
-
-    console.log("UNIFIED SHIFT KEY DEBUG", {
+    console.log("UNIFIED DEMAND DEBUG", {
       rowId: row.id,
-      templateId: tmpl.id,
       templateName: tmpl.name,
-      rowTemplateName: row.template_name,
       mokedName,
-      sharedMokedKey,
       signupKey,
-      startTime,
-      endTime,
-      roles: unified.roles,
+      workerColumns: workerCols.map(c => c.name),
+      requiredCount: unified.requiredCount,
+      possibleInstancesCount: unified.possibleInstances.length,
     });
   });
 
   return map;
 }
 
-// ── 2. Count signups per unified shift + role ─────────────────────────────────
-// availabilities: all Availability records for the week
-// workers: all Worker records
-// unifiedShift: one entry from buildUnifiedShiftDemand
-// roleName: the specific role to count for
-export function getSignupsForRole(availabilities, workers, unifiedShift, roleName) {
+// ── 2. Count unique workers signed up (wanted) for a unified shift ────────────
+// Counts by signupKey — does NOT multiply by worker-column count.
+export function getSignupsForShift(availabilities, unifiedShift) {
+  const { signupKey } = unifiedShift;
   const operationalDate = unifiedShift.operational_date || unifiedShift.date;
   const { startTime, endTime } = unifiedShift;
 
-  // Build a set of worker IDs that have the required role
-  const eligibleWorkerIds = new Set(
-    workers.filter(w => Array.isArray(w.role) ? w.role.includes(roleName) : w.role === roleName)
-           .map(w => w.id)
-  );
-
   const signedWorkerIds = new Set();
 
-  const { signupKey } = unifiedShift;
-
   availabilities.forEach(avail => {
-    if (!eligibleWorkerIds.has(avail.worker_id)) return;
     const shifts = avail.shifts || [];
     const hasMatch = shifts.some(s => {
       if (normalizeSignupType(s) !== "wanted") return false;
-      // Match by signupKey (new records — most reliable)
+      // Primary: match by exact signupKey
       if (signupKey && s.signupKey) return s.signupKey === signupKey;
       // Legacy: rebuild key from stored sharedMokedKey
       if (signupKey && s.sharedMokedKey) {
         const legacyKey = buildSignupKey(getShiftOperationalDate(s), s.sharedMokedKey, s.start_time, s.end_time);
         return legacyKey === signupKey;
       }
-      // Last-resort: only for truly old records with NO moked identity at all.
-      // Never use this path if either side has any moked identity.
+      // Last-resort: only truly old records with no moked identity
       const hasMokedIdentity = s.moked_name || s.signupKey || s.sharedMokedKey;
-      if (!hasMokedIdentity && signupKey) {
+      if (!hasMokedIdentity) {
         console.warn("LEGACY DATE_TIME SIGNUP MATCH USED", {
-          signupKey,
-          shiftDate: getShiftOperationalDate(s),
-          shiftStart: s.start_time,
-          shiftEnd: s.end_time,
-          workerId: avail.worker_id,
+          signupKey, shiftDate: getShiftOperationalDate(s),
+          shiftStart: s.start_time, shiftEnd: s.end_time, workerId: avail.worker_id,
         });
         return (
           getShiftOperationalDate(s) === operationalDate &&
@@ -216,19 +201,22 @@ export function getSignupsForRole(availabilities, workers, unifiedShift, roleNam
       }
       return false;
     });
-
-    console.log("SIGNUP COUNT DEBUG", {
-      mokedName: unifiedShift.mokedName,
-      signupKey: unifiedShift.signupKey,
-      required: Object.values(unifiedShift.roles || {}).reduce((a, b) => a + b, 0),
-      workerId: avail.worker_id,
-      hasMatch,
-      signedCount: hasMatch ? signedWorkerIds.size + 1 : signedWorkerIds.size,
-    });
     if (hasMatch) signedWorkerIds.add(avail.worker_id);
   });
 
+  console.log("SIGNUP COUNT DEBUG", {
+    mokedName: unifiedShift.mokedName,
+    signupKey,
+    required: unifiedShift.requiredCount,
+    signedCount: signedWorkerIds.size,
+  });
+
   return signedWorkerIds.size;
+}
+
+// Keep old name as alias for any callers that still use it
+export function getSignupsForRole(availabilities, workers, unifiedShift, roleName) {
+  return getSignupsForShift(availabilities, unifiedShift);
 }
 
 // ── 3. Calculate status for a role slot ──────────────────────────────────────

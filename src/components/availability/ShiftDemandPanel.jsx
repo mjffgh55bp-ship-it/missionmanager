@@ -5,7 +5,7 @@ import { Star, Check, Ban } from "lucide-react";
 import { format, addDays } from "date-fns";
 import {
   buildUnifiedShiftDemand,
-  getSignupsForRole,
+  getSignupsForShift,
   calculateRoleStatus,
   workerSignedForShift,
   filterDemandForWeek,
@@ -30,19 +30,19 @@ function dateLabel(dateStr) {
 
 // ── Shift chip — a single time-slot button ─────────────────────────────────────
 function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
-  const iSignedUp = workerSignedForShift(selectedShifts, shift);
+  // requiredCount = number of row instances (not worker columns)
+  const requiredCount = shift.requiredCount || 1;
 
-  const myRoleEntry = Object.entries(shift.roles).find(([rName]) => myRoles.has(rName));
-  const [displayRole, displayRequired] = myRoleEntry || Object.entries(shift.roles)[0] || [null, 0];
+  // eligibleRoles = Set of worker-column names from the template
+  const eligibleRoles = shift.eligibleRoles || new Set();
+  const hasMyRole = myRoles.size === 0
+    ? false  // no roles on worker record
+    : eligibleRoles.size === 0
+    ? true   // template has no worker columns — show to everyone
+    : [...myRoles].some(r => eligibleRoles.has(r));
 
-  const signed = displayRole
-    ? getSignupsForRole(allAvailabilities, workers, shift, displayRole)
-    : 0;
-  const { isFull, isOver, blocked } = displayRole
-    ? calculateRoleStatus(displayRequired, signed, signupMode)
-    : { isFull: false, isOver: false, blocked: false };
-
-  const hasMyRole = !!myRoleEntry;
+  const signed = getSignupsForShift(allAvailabilities, shift);
+  const { isFull, isOver, blocked } = calculateRoleStatus(requiredCount, signed, signupMode);
 
   const operationalDate = shift.operational_date || shift.date;
   // Match by signupKey first (new records), then legacy fallback
@@ -92,38 +92,22 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
     // If not yet signed up and capacity is full in limit mode → block
     if (currentType === null && blocked) return;
 
+    // Use first eligible role name (or null) as the roleName passed to onSignup
+    const roleName = eligibleRoles.size > 0 ? [...eligibleRoles][0] : null;
+
     if (currentType === null) {
-      onSignup && onSignup(shift, displayRole, "wanted");
+      onSignup && onSignup(shift, roleName, "wanted");
     } else if (currentType === "wanted") {
-      // Already signed up — allow cycling even if full (worker is already counted)
-      onSignup && onSignup(shift, displayRole, "available");
+      onSignup && onSignup(shift, roleName, "available");
     } else if (currentType === "available") {
-      onSignup && onSignup(shift, displayRole, "unavailable");
+      onSignup && onSignup(shift, roleName, "unavailable");
     } else if (currentType === "unavailable") {
-      // Remove the unavailable entry (worker is not counted in signed, so removing is always allowed)
-      onSignup && onSignup(shift, displayRole, "remove");
+      onSignup && onSignup(shift, roleName, "remove");
     }
   };
 
   // Fill indicator
-  const fillPct = displayRequired > 0 ? Math.min(100, Math.round((signed / displayRequired) * 100)) : 0;
-
-  console.log("SHIFT CHIP COUNT DEBUG", {
-    mokedName: shift.mokedName,
-    signupKey: shift.signupKey,
-    displayRole,
-    signed,
-    required: displayRequired,
-    fillPct,
-    allAvailabilities: allAvailabilities.map(a => ({
-      worker_id: a.worker_id,
-      shifts: (a.shifts || []).map(s => ({
-        signupKey: s.signupKey,
-        type: s.type,
-        normalized: normalizeSignupType(s),
-      }))
-    }))
-  });
+  const fillPct = requiredCount > 0 ? Math.min(100, Math.round((signed / requiredCount) * 100)) : 0;
   const fillColor = isOver
     ? "bg-orange-400"
     : isFull
@@ -144,7 +128,7 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
     isSignedUnavailable ? "לא זמין" :
     null;
 
-  const countLabel = `${signed}/${displayRequired}`;
+  const countLabel = `${signed}/${requiredCount}`;
 
   // Bar track and fill colors — always visible, adapted for light selected backgrounds
   const barTrackColor = isOver ? "#fed7aa" : isFull ? "#fecaca" : "#e5e7eb";
@@ -167,35 +151,31 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
       {/* Time range */}
       <div className="text-[10px] sm:text-[11px] text-gray-600">{shift.startTime}–{shift.endTime}</div>
 
-      {displayRole && (
-        <>
-          {/* Fill bar — always visible, proportional */}
-          <div className="mt-1 h-2 w-full rounded-full overflow-hidden" style={{ background: barTrackColor }}>
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${fillPct}%`,
-                background: barFillColor,
-                transition: "width 0.3s ease-out",
-              }}
-            />
-          </div>
+      {/* Fill bar */}
+      <div className="mt-1 h-2 w-full rounded-full overflow-hidden" style={{ background: barTrackColor }}>
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${fillPct}%`,
+            background: barFillColor,
+            transition: "width 0.3s ease-out",
+          }}
+        />
+      </div>
 
-          {/* Count + status row — always visible */}
-          <div className="flex items-center justify-center gap-1 mt-0.5 flex-wrap">
-            {isSelected && statusIcon && (
-              <span className="flex items-center gap-0.5 text-[10px]">{statusIcon}</span>
-            )}
-            <span className={`text-[10px] font-semibold ${isOver ? "text-orange-700" : blocked ? "text-red-600" : "text-gray-700"}`}>
-              {countLabel}
-            </span>
-            {statusBadge}
-            {isSelected && statusText && (
-              <span className="text-[10px] font-medium">{statusText}</span>
-            )}
-          </div>
-        </>
-      )}
+      {/* Count + status row */}
+      <div className="flex items-center justify-center gap-1 mt-0.5 flex-wrap">
+        {isSelected && statusIcon && (
+          <span className="flex items-center gap-0.5 text-[10px]">{statusIcon}</span>
+        )}
+        <span className={`text-[10px] font-semibold ${isOver ? "text-orange-700" : blocked ? "text-red-600" : "text-gray-700"}`}>
+          {countLabel}
+        </span>
+        {statusBadge}
+        {isSelected && statusText && (
+          <span className="text-[10px] font-medium">{statusText}</span>
+        )}
+      </div>
     </button>
   );
 }
