@@ -56,8 +56,9 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
       const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
       return legacyKey === shift.signupKey;
     }
-    // Oldest records: no moked identity — match by date+time only
-    if (!s.signupKey && !s.sharedMokedKey && !s.moked_name) {
+    // Oldest records: no moked identity at all — match by date+time only
+    const hasMokedIdentity = s.signupKey || s.sharedMokedKey || s.moked_name;
+    if (!hasMokedIdentity) {
       return (s.operational_date || s.date) === operationalDate && s.start_time === shift.startTime && s.end_time === shift.endTime;
     }
     return false;

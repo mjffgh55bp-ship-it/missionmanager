@@ -13,26 +13,49 @@ import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 // ── Signup key helpers ────────────────────────────────────────────────────────
 
 /**
+ * Normalize a moked name for key building:
+ * - trim whitespace
+ * - collapse multiple spaces to one
+ * - preserve numbers and all suffixes (1, 2, etc.)
+ */
+function normalizeMokedName(name) {
+  return String(name || "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+/**
  * Build the shared moked key.
  *
- * Two template rows should share a signup group ONLY when they represent
- * the same logical moked duplicated on the same day (e.g. two physical
- * instances of "מוקד מלא 1" at the same time).
+ * Key rule (in priority order):
+ * 1. Explicit signup_group_id / registration_group_id on template or row →
+ *    intentional cross-template merge: `group:<id>`
+ * 2. Default: exact normalized moked display name →
+ *    `name:<normalizedName>`
  *
- * Different mokeds (מוקד מלא 1 vs מוקד מלא 2) MUST produce different keys
- * even if they share timing. We therefore use template.id as the primary
- * discriminator — it is unique per moked type.
- *
- * The only exception is an explicit signup_group_id / registration_group_id
- * set on the template to intentionally merge multiple templates into one group.
+ * This means:
+ * - "מוקד מלא 1" and "מוקד מלא 1" (same name, different template instances)
+ *   → same key → shared capacity pool
+ * - "מוקד מלא 1" and "מוקד מלא 2" (different names, same time)
+ *   → different keys → separate pools, never cross-affect each other
  */
-export function buildSharedMokedKey(template) {
-  // Explicit cross-template group override (intentional merging only)
-  if (template?.signup_group_id) return template.signup_group_id;
-  if (template?.registration_group_id) return template.registration_group_id;
-  // Default: use template.id so every distinct template gets its own key.
-  // This correctly separates מוקד מלא 1 (id=AAA) from מוקד מלא 2 (id=BBB).
-  return template?.id || (template?.name || "").trim();
+export function buildSharedMokedKey(template, row) {
+  // Explicit cross-template group override
+  const explicit =
+    row?.values?.signup_group_id ||
+    row?.values?.registration_group_id ||
+    template?.signup_group_id ||
+    template?.registration_group_id;
+  if (explicit) return `group:${explicit}`;
+
+  // Default: exact normalized display name
+  const name =
+    row?.template_name ||
+    template?.name ||
+    row?.values?.moked_name ||
+    row?.values?.["שם מוקד"] ||
+    "";
+  return `name:${normalizeMokedName(name)}`;
 }
 
 /**
@@ -93,22 +116,50 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
     // Always use row.date as the operational date for grouping.
     const operationalDate = row.date;
     const mokedName = tmpl.name || row.template_name || "";
-    const sharedMokedKey = buildSharedMokedKey(tmpl);
+    // Pass both template AND row so buildSharedMokedKey can use row-level overrides
+    const sharedMokedKey = buildSharedMokedKey(tmpl, row);
     const signupKey = buildSignupKey(operationalDate, sharedMokedKey, startTime, endTime);
 
     // Use signupKey as the map key so duplicate same-name mokeds are grouped together
     const key = signupKey;
 
     if (!map.has(key)) {
-      map.set(key, { key, signupKey, sharedMokedKey, date: operationalDate, operational_date: operationalDate, mokedName, startTime, endTime, roles: {} });
+      map.set(key, {
+        key, signupKey, sharedMokedKey,
+        date: operationalDate, operational_date: operationalDate,
+        mokedName, startTime, endTime,
+        roles: {},
+        possibleInstances: [],
+      });
     }
     const unified = map.get(key);
+
+    // Track possible instances (for manager assignment later)
+    unified.possibleInstances.push({
+      row_id: row.id,
+      template_id: tmpl.id,
+      group_id: row.group_id || "default",
+      mokedName,
+    });
 
     // Find worker-type columns and count one slot per column per row
     const workerCols = (tmpl.columns || []).filter(c => c.type === "worker");
     workerCols.forEach(col => {
       const roleName = col.name;
       unified.roles[roleName] = (unified.roles[roleName] || 0) + 1;
+    });
+
+    console.log("UNIFIED SHIFT KEY DEBUG", {
+      rowId: row.id,
+      templateId: tmpl.id,
+      templateName: tmpl.name,
+      rowTemplateName: row.template_name,
+      mokedName,
+      sharedMokedKey,
+      signupKey,
+      startTime,
+      endTime,
+      roles: unified.roles,
     });
   });
 
@@ -139,14 +190,24 @@ export function getSignupsForRole(availabilities, workers, unifiedShift, roleNam
     const shifts = avail.shifts || [];
     const hasMatch = shifts.some(s => {
       if (normalizeSignupType(s) !== "wanted") return false;
-      // Match by signupKey when available
+      // Match by signupKey (new records — most reliable)
       if (signupKey && s.signupKey) return s.signupKey === signupKey;
+      // Legacy: rebuild key from stored sharedMokedKey
       if (signupKey && s.sharedMokedKey) {
         const legacyKey = buildSignupKey(getShiftOperationalDate(s), s.sharedMokedKey, s.start_time, s.end_time);
         return legacyKey === signupKey;
       }
-      // Last-resort: old records with no moked identity — match by date+time
-      if (!s.moked_name && !s.signupKey && !s.sharedMokedKey) {
+      // Last-resort: only for truly old records with NO moked identity at all.
+      // Never use this path if either side has any moked identity.
+      const hasMokedIdentity = s.moked_name || s.signupKey || s.sharedMokedKey;
+      if (!hasMokedIdentity && signupKey) {
+        console.warn("LEGACY DATE_TIME SIGNUP MATCH USED", {
+          signupKey,
+          shiftDate: getShiftOperationalDate(s),
+          shiftStart: s.start_time,
+          shiftEnd: s.end_time,
+          workerId: avail.worker_id,
+        });
         return (
           getShiftOperationalDate(s) === operationalDate &&
           s.start_time === startTime &&
@@ -154,6 +215,15 @@ export function getSignupsForRole(availabilities, workers, unifiedShift, roleNam
         );
       }
       return false;
+    });
+
+    console.log("SIGNUP COUNT DEBUG", {
+      mokedName: unifiedShift.mokedName,
+      signupKey: unifiedShift.signupKey,
+      required: Object.values(unifiedShift.roles || {}).reduce((a, b) => a + b, 0),
+      workerId: avail.worker_id,
+      hasMatch,
+      signedCount: hasMatch ? signedWorkerIds.size + 1 : signedWorkerIds.size,
     });
     if (hasMatch) signedWorkerIds.add(avail.worker_id);
   });
@@ -199,9 +269,16 @@ export function workerSignedForShift(selectedShifts, unifiedShift) {
       );
       return legacyKey === signupKey;
     }
-    // Last-resort fallback: date+time only (old records with no moked identity)
-    if (!s.moked_name && !s.signupKey && !s.sharedMokedKey) {
+    // Last-resort fallback: only for truly old records with NO moked identity at all.
+    const hasMokedIdentity = s.moked_name || s.signupKey || s.sharedMokedKey;
+    if (!hasMokedIdentity) {
       const operationalDate = unifiedShift.operational_date || unifiedShift.date;
+      console.warn("LEGACY DATE_TIME SIGNUP MATCH USED (workerSignedForShift)", {
+        signupKey,
+        shiftDate: getShiftOperationalDate(s),
+        shiftStart: s.start_time,
+        shiftEnd: s.end_time,
+      });
       return (
         getShiftOperationalDate(s) === operationalDate &&
         s.start_time === unifiedShift.startTime &&

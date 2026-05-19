@@ -790,8 +790,12 @@ END:VEVENT
     });
 
     if (type !== "remove") {
+      if (!signupKey) {
+        console.error("SIGNUP SAVE ERROR: unifiedShift.signupKey is missing — this is a bug", { unifiedShift, roleName, type });
+        return; // Do not silently create a weak key
+      }
       const count = newShifts.filter(s => s.type === type).length;
-      newShifts.push({
+      const newEntry = {
         date: operationalDate,
         operational_date: operationalDate,
         start_time: startTime,
@@ -799,10 +803,20 @@ END:VEVENT
         type,
         priority: type === "unavailable" ? 0 : count + 1,
         moked_name: mokedName,
-        sharedMokedKey: sharedMokedKey || "",
-        signupKey: signupKey || buildSignupKey(operationalDate, sharedMokedKey || "", startTime, endTime),
+        sharedMokedKey,
+        signupKey,
         role_or_qualification: roleName,
+        possibleInstances: unifiedShift.possibleInstances || [],
+      };
+      console.log("SIGNUP SAVE DEBUG", {
+        workerId: currentWorker.id,
+        mokedName,
+        sharedMokedKey,
+        signupKey,
+        type,
+        possibleInstances: newEntry.possibleInstances,
       });
+      newShifts.push(newEntry);
     }
 
     // 1. Optimistic local update
