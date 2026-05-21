@@ -1227,17 +1227,19 @@ export default function Matrix() {
       const et = r.values?.["סיום"] || r.values?.["שעת סיום"];
       return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
     }).map(r => ({ start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"], end_time: r.values?.["סיום"] || r.values?.["שעת סיום"], status: r.values?.status || null }));
+    const handleBarDblClick = (e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); };
+    const handleBarMD = (action) => (e) => { if (e.detail === 2) return; e.stopPropagation(); handleMouseDown(e, worker, shift, action, dayIndex); };
     return (
       <div
         data-matrix-existing-bar="true"
         className="absolute h-full rounded-sm z-20 cursor-move overflow-visible"
         style={{ right: `${rightPx}px`, width: `${widthPx}px`, backgroundColor: `${borderColor}18`, border: `2px solid ${borderColor}` }}
-        onMouseDown={(e) => { if (e.detail === 2) return; e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }}
-        onDoubleClick={(e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); }}
+        onMouseDown={handleBarMD('move')}
+        onDoubleClick={handleBarDblClick}
       >
-        <div data-matrix-existing-bar="true" className="absolute right-0 top-0 h-full cursor-ew-resize hover:bg-black/15 z-30" style={{ width: '12px', marginRight: '-4px' }} onMouseDown={(e) => { if (e.detail === 2) return; e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start', dayIndex); }} onDoubleClick={(e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); }} />
-        <div data-matrix-existing-bar="true" className="absolute left-0 top-0 h-full cursor-ew-resize hover:bg-black/15 z-30" style={{ width: '12px', marginLeft: '-4px' }} onMouseDown={(e) => { if (e.detail === 2) return; e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end', dayIndex); }} onDoubleClick={(e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); }} />
-        <button data-matrix-existing-bar="true" className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform" style={{ borderColor }} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }} onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }}>
+        <div data-matrix-existing-bar="true" className="absolute right-0 top-0 h-full cursor-ew-resize z-30" style={{ width: '16px', marginRight: '-6px' }} onMouseDown={handleBarMD('resize-start')} onDoubleClick={handleBarDblClick} />
+        <div data-matrix-existing-bar="true" className="absolute left-0 top-0 h-full cursor-ew-resize z-30" style={{ width: '16px', marginLeft: '-6px' }} onMouseDown={handleBarMD('resize-end')} onDoubleClick={handleBarDblClick} />
+        <button data-matrix-existing-bar="true" className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform" style={{ borderColor }} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }} onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }} onDoubleClick={handleBarDblClick}>
           {typeLabels[shift.type] || "A"}
         </button>
         {overlappingAssignments.map((ass, i) => {
@@ -1606,14 +1608,8 @@ export default function Matrix() {
             e.target.closest("button") ||
             e.target.closest("[role='button']") ||
             e.target.closest("[data-no-drag='true']")
-          ) {
-            console.log("MATRIX POINTER TARGET DEBUG", {
-              existingBar: !!e.target.closest("[data-matrix-existing-bar='true']"),
-              button: !!e.target.closest("button"),
-              slot: !!e.target.closest("[data-matrix-time-slot='true']"),
-            });
-            return;
-          }
+          ) return;
+          if (e.detail === 2) return; // double-click on empty space — skip
           handleMouseDown(e, worker, null, 'create');
         }}
       >

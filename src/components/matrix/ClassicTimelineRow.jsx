@@ -98,41 +98,37 @@ export default function ClassicTimelineRow({
       const et = r.values?.["סיום"] || r.values?.["שעת סיום"];
       return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
     }).map(r => ({ start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"], end_time: r.values?.["סיום"] || r.values?.["שעת סיום"], status: r.values?.status || null }));
+
+    const handleBarDblClick = (e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); };
+    const handleBarMouseDown = (action) => (e) => {
+      if (e.detail === 2) return; // let double-click fire instead
+      e.stopPropagation();
+      handleMouseDown(e, worker, shift, action, dayIndex);
+    };
+
     return (
       <div
         data-matrix-existing-bar="true"
         className="absolute h-full rounded-sm z-20 cursor-move overflow-visible"
         style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: `${borderColor}18`, border: `2px solid ${borderColor}` }}
-        onMouseDown={(e) => {
-          if (e.detail === 2) return; // double-click — don't start a drag, let onDoubleClick fire
-          e.stopPropagation();
-          handleMouseDown(e, worker, shift, 'move', dayIndex);
-        }}
-        onDoubleClick={(e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); }}
+        onMouseDown={handleBarMouseDown('move')}
+        onDoubleClick={handleBarDblClick}
       >
-        {/* Left resize handle (end-time edge) — wide invisible hit area */}
+        {/* Left resize handle — extra-wide for easy grabbing, dblclick opens editor */}
         <div
           data-matrix-existing-bar="true"
-          className="absolute left-0 top-0 h-full cursor-ew-resize z-30 hover:bg-black/15"
-          style={{ width: '12px', marginLeft: '-4px' }}
-          onMouseDown={(e) => {
-            if (e.detail === 2) return; // let double-click fall through to onDoubleClick
-            e.stopPropagation();
-            handleMouseDown(e, worker, shift, 'resize-end', dayIndex);
-          }}
-          onDoubleClick={(e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); }}
+          className="absolute left-0 top-0 h-full cursor-ew-resize z-30"
+          style={{ width: '16px', marginLeft: '-6px' }}
+          onMouseDown={handleBarMouseDown('resize-end')}
+          onDoubleClick={handleBarDblClick}
         />
-        {/* Right resize handle (start-time edge) — wide invisible hit area */}
+        {/* Right resize handle — extra-wide for easy grabbing, dblclick opens editor */}
         <div
           data-matrix-existing-bar="true"
-          className="absolute right-0 top-0 h-full cursor-ew-resize z-30 hover:bg-black/15"
-          style={{ width: '12px', marginRight: '-4px' }}
-          onMouseDown={(e) => {
-            if (e.detail === 2) return; // let double-click fall through to onDoubleClick
-            e.stopPropagation();
-            handleMouseDown(e, worker, shift, 'resize-start', dayIndex);
-          }}
-          onDoubleClick={(e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); }}
+          className="absolute right-0 top-0 h-full cursor-ew-resize z-30"
+          style={{ width: '16px', marginRight: '-6px' }}
+          onMouseDown={handleBarMouseDown('resize-start')}
+          onDoubleClick={handleBarDblClick}
         />
         <button
           data-matrix-existing-bar="true"
@@ -140,6 +136,7 @@ export default function ClassicTimelineRow({
           style={{ borderColor }}
           onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
           onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }}
+          onDoubleClick={handleBarDblClick}
         >
           {typeLabels[shift.type] || "A"}
         </button>
@@ -195,19 +192,15 @@ export default function ClassicTimelineRow({
           e.target.closest("[role='button']") ||
           e.target.closest("[data-no-drag='true']")
         ) {
-          console.log("MATRIX POINTER TARGET DEBUG", {
-            existingBar: !!e.target.closest("[data-matrix-existing-bar='true']"),
-            button: !!e.target.closest("button"),
-            slot: !!e.target.closest("[data-matrix-time-slot='true']"),
-          });
           return;
         }
-        console.log("MATRIX POINTER TARGET DEBUG", {
-          existingBar: false,
-          button: false,
-          slot: !!e.target.closest("[data-matrix-time-slot='true']"),
-        });
+        if (e.detail === 2) return; // double-click on empty space — don't create
         handleMouseDown(e, worker, null, 'create');
+      }}
+      onDoubleClick={(e) => {
+        // If double-click lands on an existing bar, open editor (safety net)
+        const bar = e.target.closest("[data-matrix-existing-bar='true']");
+        if (bar) e.stopPropagation();
       }}
     >
       {/* Grid lines with data attributes for slot-based drag */}
