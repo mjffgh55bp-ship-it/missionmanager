@@ -101,32 +101,33 @@ export default function ClassicTimelineRow({
     return (
       <div
         data-matrix-existing-bar="true"
-        className="absolute h-full rounded-sm z-10 cursor-move overflow-visible"
-        style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px solid ${borderColor}` }}
+        className="absolute h-full rounded-sm z-20 cursor-move overflow-visible"
+        style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: `${borderColor}18`, border: `2px solid ${borderColor}` }}
         onMouseDown={(e) => {
           e.stopPropagation();
-          console.log("MATRIX EXISTING BAR ACTION", { action: 'move', workerId: worker.id, startTime: shift.start_time, endTime: shift.end_time });
           handleMouseDown(e, worker, shift, 'move', dayIndex);
         }}
         onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
       >
+        {/* Left resize handle (end-time edge) — wide invisible hit area */}
         <div
           data-matrix-existing-bar="true"
-          className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20"
+          className="absolute left-0 top-0 h-full cursor-ew-resize z-30 hover:bg-black/15"
+          style={{ width: '12px', marginLeft: '-4px' }}
           onMouseDown={(e) => {
             e.stopPropagation();
-            console.log("MATRIX EXISTING BAR ACTION", { action: 'resize-start', workerId: worker.id, startTime: shift.start_time, endTime: shift.end_time });
-            handleMouseDown(e, worker, shift, 'resize-start', dayIndex);
+            handleMouseDown(e, worker, shift, 'resize-end', dayIndex);
           }}
           onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
         />
+        {/* Right resize handle (start-time edge) — wide invisible hit area */}
         <div
           data-matrix-existing-bar="true"
-          className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20"
+          className="absolute right-0 top-0 h-full cursor-ew-resize z-30 hover:bg-black/15"
+          style={{ width: '12px', marginRight: '-4px' }}
           onMouseDown={(e) => {
             e.stopPropagation();
-            console.log("MATRIX EXISTING BAR ACTION", { action: 'resize-end', workerId: worker.id, startTime: shift.start_time, endTime: shift.end_time });
-            handleMouseDown(e, worker, shift, 'resize-end', dayIndex);
+            handleMouseDown(e, worker, shift, 'resize-start', dayIndex);
           }}
           onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
         />
