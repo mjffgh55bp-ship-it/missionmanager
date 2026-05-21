@@ -75,6 +75,22 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   });
   const currentType = currentEntry?.type || null;
 
+  // Debug log — helps verify architecture correctness
+  console.log("SHIFT CHIP DEBUG", {
+    mokedName: shift.mokedName,
+    signupKey: shift.signupKey,
+    requiredCount,
+    registeredCount: signed,
+    currentWorkerEntry: currentEntry ? { moked_name: currentEntry.moked_name, signupKey: currentEntry.signupKey, type: currentEntry.type } : null,
+    selectedShifts: selectedShifts.map(s => ({
+      moked_name: s.moked_name,
+      signupKey: s.signupKey,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      type: s.type
+    }))
+  });
+
   const isSignedWanted = currentType === "wanted";
   const isSignedAvailable = currentType === "available";
   const isSignedUnavailable = currentType === "unavailable";

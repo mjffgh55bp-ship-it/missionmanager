@@ -43,6 +43,7 @@ import WorkerCell from "../components/schedule/WorkerCell";
 import TimeCell from "../components/schedule/TimeCell";
 import PresetsDialog from "../components/schedule/PresetsDialog";
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
+import { getMokedDisplayName } from "@/lib/shiftDemand";
 
 export default function Schedule() {
   const [currentDate, setCurrentDate] = useState(() => {
@@ -251,11 +252,14 @@ export default function Schedule() {
             const groupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
             const rowsToCreate = template.default_rows && template.default_rows.length > 0 ? template.default_rows : [{}];
             for (const rowValues of rowsToCreate) {
+              // Do NOT set moked_instance_name here — getMokedDisplayName falls back to template.name,
+              // which is always correct for a freshly created (non-renamed) group.
+              const { moked_instance_name, moked_instance_name_locked, ...cleanRowValues } = rowValues;
               await base44.entities.TemplateRow.create({
                 template_id: template.id,
                 template_name: template.name,
                 date: dateString,
-                values: { ...rowValues, moked_instance_name: template.name },
+                values: cleanRowValues,
                 group_id: groupId
               });
             }
@@ -280,14 +284,18 @@ export default function Schedule() {
   const handleAddTemplateRowForTemplate = async (templateId, groupId) => {
     const template = allTemplates.find((t) => t.id === templateId);
     if (!template) return;
-    // Inherit moked_instance_name from existing rows in this group (so name stays consistent)
+    // Inherit the lock status from existing rows in this group.
+    // If the group was explicitly renamed (locked), carry the locked name to the new row.
     const existingGroupRow = templateRows.find(r => r.template_id === templateId && (r.group_id || "default") === (groupId || "default"));
-    const instanceName = existingGroupRow?.values?.moked_instance_name || existingGroupRow?.template_name || template.name;
+    const isLocked = existingGroupRow?.values?.moked_instance_name_locked === true;
+    const newValues = isLocked
+      ? { moked_instance_name: existingGroupRow.values.moked_instance_name, moked_instance_name_locked: true }
+      : {};
     await base44.entities.TemplateRow.create({
       template_id: templateId,
       template_name: template.name,
       date: dateString,
-      values: { moked_instance_name: instanceName },
+      values: newValues,
       group_id: groupId
     });
     await loadData();
@@ -306,11 +314,13 @@ export default function Schedule() {
     const rowsToCreate = config.default_rows && config.default_rows.length > 0 ? config.default_rows : [{}];
     const createdRows = [];
     for (const rowValues of rowsToCreate) {
+      // Do not set moked_instance_name — getMokedDisplayName uses template.name (which IS preset.name).
+      const { moked_instance_name, moked_instance_name_locked, ...cleanRowValues } = rowValues;
       const newRow = await base44.entities.TemplateRow.create({
         template_id: newTemplate.id,
         template_name: newTemplate.name,
         date: dateString,
-        values: { ...rowValues, moked_instance_name: preset.name },
+        values: cleanRowValues,
         group_id: newGroupId
       });
       createdRows.push(newRow);
@@ -370,11 +380,13 @@ export default function Schedule() {
       delete clonedValues.continuation_from_date;
       delete clonedValues.is_continuation;
 
-      // Carry over the instance name (from the source group so duplicate starts named correctly)
-      // The user can rename the duplicate afterward — that will update only its group's rows.
-      if (!clonedValues.moked_instance_name && (row.values?.moked_instance_name || row.template_name)) {
-        clonedValues.moked_instance_name = row.values?.moked_instance_name || row.template_name || "";
-      }
+      // CRITICAL: Clear the lock flag on the duplicate.
+      // getMokedDisplayName() only trusts moked_instance_name when _locked === true.
+      // A fresh duplicate must NOT carry the source group's locked name — it should
+      // start with template.name as its identity. The user can rename it afterward,
+      // which will set a new locked name for this group only.
+      delete clonedValues.moked_instance_name;
+      delete clonedValues.moked_instance_name_locked;
 
       // Assign a fresh, independent _order within the new group
       clonedValues._order = index;
@@ -496,15 +508,19 @@ export default function Schedule() {
       return;
     }
     const trimmed = name.trim();
-    // Update all rows in this specific group
+    // Update ALL rows in this specific group only.
+    // Set moked_instance_name_locked = true so getMokedDisplayName() knows this was
+    // explicitly renamed by the user (not a stale copied value from duplication).
     const groupRows = templateRows.filter(r => r.template_id === templateId && (r.group_id || "default") === (groupId || "default"));
     await Promise.all(groupRows.map(r =>
-      base44.entities.TemplateRow.update(r.id, { values: { ...r.values, moked_instance_name: trimmed } })
+      base44.entities.TemplateRow.update(r.id, {
+        values: { ...r.values, moked_instance_name: trimmed, moked_instance_name_locked: true }
+      })
     ));
     // Optimistic local update
     setTemplateRows(prev => prev.map(r =>
       r.template_id === templateId && (r.group_id || "default") === (groupId || "default")
-        ? { ...r, template_name: trimmed, values: { ...r.values, moked_instance_name: trimmed } }
+        ? { ...r, values: { ...r.values, moked_instance_name: trimmed, moked_instance_name_locked: true } }
         : r
     ));
     setEditingMokedName(null);
@@ -760,16 +776,16 @@ export default function Schedule() {
                               dir="rtl" />
                           ) : (
                             <CardTitle
-                              className="text-slate-50 text-lg font-semibold tracking-tight cursor-pointer hover:underline flex items-center gap-2"
-                              onClick={() => {
-                                // Pre-populate with the instance-level name (from rows), not template.name
-                                const instanceName = group.rows[0]?.values?.moked_instance_name || group.rows[0]?.template_name || template.name;
-                                setEditingMokedName(`${group.key}`);
-                                setEditingMokedNameValue(instanceName);
-                              }}
-                              dir="rtl">
-                              {group.rows[0]?.values?.moked_instance_name || group.rows[0]?.template_name || template.name}
-                              <Pencil className="w-3 h-3 opacity-60" />
+                            className="text-slate-50 text-lg font-semibold tracking-tight cursor-pointer hover:underline flex items-center gap-2"
+                            onClick={() => {
+                              // Pre-populate with the canonical display name (same as what signupKey uses)
+                              const canonicalName = getMokedDisplayName(group.rows[0], template);
+                              setEditingMokedName(`${group.key}`);
+                              setEditingMokedNameValue(canonicalName);
+                            }}
+                            dir="rtl">
+                            {getMokedDisplayName(group.rows[0], template)}
+                            <Pencil className="w-3 h-3 opacity-60" />
                             </CardTitle>
                           )}
                         </div>

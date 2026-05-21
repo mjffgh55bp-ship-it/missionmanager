@@ -32,24 +32,36 @@ function getMokedInstanceKey(row) {
 // ── Display name — single source of truth ─────────────────────────────────────
 
 /**
- * Returns the display name for a moked instance.
+ * Returns the canonical display name for a moked instance.
  *
  * Priority order:
- * 1. row.values.moked_instance_name  — set when renaming a specific group (NEW)
- * 2. row.values.moked_name           — alternate row-level field
- * 3. row.values["שם מוקד"]           — Hebrew field name fallback
- * 4. row.template_name               — stale copy from row creation time
- * 5. template.name                   — structural template name (last resort)
+ * 1. row.values.moked_instance_name  — ONLY if moked_instance_name_locked === true
+ *    (set exclusively by an explicit user rename action in Schedule)
+ * 2. template.name                   — structural identity, always up to date
+ * 3. row.values.moked_name           — alternate row-level field
+ * 4. row.values["שם מוקד"]           — Hebrew field name fallback
+ * 5. row.template_name               — stale copy from row creation (last resort)
+ *
+ * CRITICAL: moked_instance_name without the _locked flag is IGNORED.
+ * A duplicated moked copies moked_instance_name from the source group, but
+ * WITHOUT setting _locked. That means the copy correctly falls back to
+ * template.name (which IS different for different templates, and the same
+ * for same-template duplicates — which is the desired behaviour).
  *
  * This function is used everywhere: Schedule title, signupKey, Matrix tooltip.
  */
 export function getMokedDisplayName(row, template) {
+  // Only trust moked_instance_name when it was explicitly locked by a rename
+  const explicitName = row?.values?.moked_instance_name_locked === true
+    ? row?.values?.moked_instance_name
+    : null;
+
   return String(
-    row?.values?.moked_instance_name ||
+    explicitName ||
+    template?.name ||
     row?.values?.moked_name ||
     row?.values?.["שם מוקד"] ||
     row?.template_name ||
-    template?.name ||
     ""
   ).trim().replace(/\s+/g, " ");
 }
@@ -257,7 +269,10 @@ export function getSignupsForShift(availabilities, unifiedShift) {
 
     if (hasOtherMokedKeyedEntry) return;
 
-    // Phase 3: naked entry (no moked identity) — legacy data, counts for all mokeds at this slot
+    // Phase 3: naked entry (no moked identity) — legacy data
+    // Only count if there is exactly ONE signup group for this date+time slot.
+    // If there are multiple possible groups (different signupKeys share same date+time),
+    // we cannot assign the naked entry to any specific moked — log a warning and skip.
     const hasNakedMatch = shifts.some(s => {
       if (normalizeSignupType(s) !== "wanted") return false;
       if (s.signupKey || s.sharedMokedKey) return false;
@@ -265,7 +280,16 @@ export function getSignupsForShift(availabilities, unifiedShift) {
         s.start_time === startTime &&
         s.end_time === endTime;
     });
-    if (hasNakedMatch) signedWorkerIds.add(avail.worker_id);
+    if (hasNakedMatch) {
+      console.warn("AMBIGUOUS LEGACY SIGNUP — counting for shift but no moked identity:", {
+        worker_id: avail.worker_id,
+        signupKey,
+        operationalDate,
+        startTime,
+        endTime,
+      });
+      signedWorkerIds.add(avail.worker_id);
+    }
   });
 
   return signedWorkerIds.size;
