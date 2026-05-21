@@ -876,7 +876,10 @@ export default function Matrix() {
 
   // ── Drag handlers ────────────────────────────────────────────────────────────
   const handleMouseDown = (e, worker, shift, action, dayIndex = 0) => {
-    e.preventDefault(); e.stopPropagation();
+    // Don't preventDefault on existing bar mousedowns — it blocks dblclick delivery.
+    // Only prevent default for create (empty slot drags) to avoid text selection.
+    if (action === 'create') e.preventDefault();
+    e.stopPropagation();
     if (action === 'move' && e.detail === 2) return;
 
     const slot = getSlotFromPointer(e, true);
