@@ -16,6 +16,7 @@ import MasterControls from "../components/matrix/MasterControls";
 import SummaryColumnsDialog from "../components/matrix/SummaryColumnsDialog";
 import MatrixHeader from "../components/matrix/MatrixHeader";
 import { NotificationDialog, TypeChangeDialog, ManualShiftDialog } from "../components/matrix/MatrixDialogs";
+import ClassicTimelineRow from "../components/matrix/ClassicTimelineRow";
 
 // ── Timeline constants ──────────────────────────────────────────────────────
 const DAILY_TOTAL_MINUTES = 24 * 60;        // 1440
@@ -834,66 +835,142 @@ export default function Matrix() {
     return Math.max(0, Math.min(6, diff));
   };
 
-  // ── Drag handlers ────────────────────────────────────────────────────────────
-  // Returns the pixel offset from the RIGHT edge of the full timeline for a clientX position.
-  // Accounts for: scroll container scrollLeft, RTL direction.
-  const clientXToTimelinePxFromRight = (clientX) => {
+  // ── Slot-based drag: primary coordinate system ───────────────────────────────
+  // Finds the time slot element under the pointer using hit testing.
+  // This is immune to scroll, RTL, and fixed column offsets.
+  const getSlotFromPointer = (e) =>
+    document.elementFromPoint(e.clientX, e.clientY)
+      ?.closest("[data-matrix-time-slot='true']");
+
+  // Fallback: convert clientX to operational minutes via scroll math (only used if slot hit fails)
+  const clientXToOpMinutes = (clientX) => {
+    console.warn("MATRIX DRAG FALLBACK X-MATH USED");
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
-    if (!sc) return 0;
+    if (!sc) return { opMinutes: 0, dayIndex: 0 };
     const rect = sc.getBoundingClientRect();
-    // In LTR scroll container: localX = distance from left of scroll viewport + scrolled amount
     const localX = (clientX - rect.left) + sc.scrollLeft;
-    // In RTL timeline: right edge = offset 0, so pxFromRight = timelineWidth - localX
-    // But in classic (unpinned) mode, the timeline starts after fixedColumnsWidth
     const timelineOffsetFromLeft = pinned ? 0 : fixedColumnsWidth;
     const localXInTimeline = localX - timelineOffsetFromLeft;
-    return Math.max(0, Math.min(timelineWidth, timelineWidth - localXInTimeline));
+    const pxFromRight = Math.max(0, Math.min(timelineWidth, timelineWidth - localXInTimeline));
+    const pxFromLeft = timelineWidth - pxFromRight;
+    const totalMinsFromLeft = pxFromLeft / ppm;
+    if (viewMode === 'weekly') {
+      const dayIndex = Math.max(0, Math.min(6, Math.floor(totalMinsFromLeft / 1440)));
+      return { opMinutes: totalMinsFromLeft - dayIndex * 1440, dayIndex };
+    }
+    return { opMinutes: totalMinsFromLeft, dayIndex: 0 };
   };
 
+  // ── Drag handlers ────────────────────────────────────────────────────────────
   const handleMouseDown = (e, worker, shift, action, dayIndex = 0) => {
     e.preventDefault(); e.stopPropagation();
     if (action === 'move' && e.detail === 2) return;
-    const startPxFromRight = clientXToTimelinePxFromRight(e.clientX);
 
-    console.log("MATRIX DRAG DEBUG", {
-      clientX: e.clientX,
-      startPxFromRight,
-      ppm,
-      viewMode,
+    const slot = getSlotFromPointer(e);
+
+    let startAbsMinute;
+    let startOpDate;
+
+    if (slot) {
+      const slotDay = Number(slot.dataset.dayIndex || 0);
+      const slotOpMin = Number(slot.dataset.operationalMinute || 0);
+      startAbsMinute = slotDay * 1440 + slotOpMin;
+      startOpDate = slot.dataset.operationalDate || dateString;
+
+      console.log("MATRIX SLOT DRAG START", {
+        workerId: worker.id,
+        slotDate: slot.dataset.operationalDate,
+        minute: slot.dataset.operationalMinute,
+        time: slot.dataset.time,
+        dayIndex: slot.dataset.dayIndex,
+        action,
+      });
+    } else {
+      // Fallback to X-math
+      const { opMinutes, dayIndex: fbDay } = clientXToOpMinutes(e.clientX);
+      startAbsMinute = fbDay * 1440 + opMinutes;
+      startOpDate = viewMode === 'weekly'
+        ? format(addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), fbDay), 'yyyy-MM-dd')
+        : dateString;
+    }
+
+    setDragging({
+      workerId: worker.id,
+      worker,
+      shift,
       action,
+      startAbsMinute,
+      currentAbsMinute: startAbsMinute,
+      startOpDate,
+      originalStart: shift?.start_time,
+      originalEnd: shift?.end_time,
+      originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0,
     });
-
-    setDragging({ workerId: worker.id, worker, shift, action, startPxFromRight, originalStart: shift?.start_time, originalEnd: shift?.end_time, originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0 });
   };
 
   const handleMouseMove = (e) => {
     if (!dragging) return;
-    const { worker, shift, action, startPxFromRight, originalStart, originalEnd, originalDay } = dragging;
-    const currentPxFromRight = clientXToTimelinePxFromRight(e.clientX);
-    const rightToTimelinePx = (pxR) => Math.max(0, timelineWidth - pxR);
-    let newStart = originalStart, newEnd = originalEnd, newDay = originalDay || 0;
+    const { worker, shift, action, startAbsMinute, originalStart, originalEnd, originalDay } = dragging;
+
+    // ── Slot-based path (primary) ────────────────────────────────────────────
+    const slot = getSlotFromPointer(e);
+
+    let currentAbsMinute;
+
+    if (slot) {
+      const slotDay = Number(slot.dataset.dayIndex || 0);
+      const slotOpMin = Number(slot.dataset.operationalMinute || 0);
+      currentAbsMinute = slotDay * 1440 + slotOpMin;
+    } else {
+      // Fallback
+      const { opMinutes, dayIndex: fbDay } = clientXToOpMinutes(e.clientX);
+      currentAbsMinute = fbDay * 1440 + opMinutes;
+    }
+
+    const SLOT_MINS = 60; // each slot = 1 hour
+
+    let newStart = originalStart;
+    let newEnd = originalEnd;
+    let newDay = originalDay || 0;
+
     if (action === 'create') {
-      const [minPx, maxPx] = [Math.min(startPxFromRight, currentPxFromRight), Math.max(startPxFromRight, currentPxFromRight)];
-      const sd = pixelsToTime(rightToTimelinePx(maxPx), viewMode, ppm);
-      const ed = pixelsToTime(rightToTimelinePx(minPx), viewMode, ppm);
-      newStart = sd.time; newEnd = ed.time; newDay = sd.day;
+      const startAbs = Math.min(startAbsMinute, currentAbsMinute);
+      const endAbs = Math.max(startAbsMinute, currentAbsMinute + SLOT_MINS);
+      newDay = Math.max(0, Math.min(6, Math.floor(startAbs / 1440)));
+      const startOpMins = startAbs - newDay * 1440;
+      const endOpMins = endAbs - newDay * 1440;
+      newStart = operationalMinutesToTime(Math.max(0, Math.min(1440, startOpMins)));
+      newEnd = operationalMinutesToTime(Math.max(0, Math.min(1440, endOpMins)));
+
+      console.log("MATRIX SLOT DRAG PREVIEW", {
+        workerId: dragging.workerId,
+        previewDate: viewMode === 'weekly'
+          ? format(addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), newDay), 'yyyy-MM-dd')
+          : dateString,
+        previewStartTime: newStart,
+        previewEndTime: newEnd,
+        startAbs,
+        endAbs,
+      });
     } else if (action === 'resize-start') {
-      const d = pixelsToTime(rightToTimelinePx(currentPxFromRight), viewMode, ppm);
-      newStart = d.time; newDay = d.day;
+      newDay = Math.max(0, Math.min(6, Math.floor(currentAbsMinute / 1440)));
+      newStart = operationalMinutesToTime(Math.max(0, currentAbsMinute - newDay * 1440));
     } else if (action === 'resize-end') {
-      newEnd = pixelsToTime(rightToTimelinePx(currentPxFromRight), viewMode, ppm).time;
+      const endDay = Math.max(0, Math.min(6, Math.floor(currentAbsMinute / 1440)));
+      newEnd = operationalMinutesToTime(Math.max(0, currentAbsMinute - endDay * 1440 + SLOT_MINS));
     } else if (action === 'move') {
+      // For move, keep same duration, translate by delta
       const origStartPx = timeToPixels(originalStart, originalDay || 0, viewMode, ppm);
       const origEndPx = endTimeToPixels(originalStart, originalEnd, viewMode, ppm, originalDay || 0);
-      const widthPx = origEndPx - origStartPx;
-      const origStartPxFromRight = timelineWidth - origStartPx;
-      const delta = currentPxFromRight - startPxFromRight;
-      const newStartPxFromRight = origStartPxFromRight + delta;
-      const newStartPxFromLeft = Math.max(0, Math.min(timelineWidth - widthPx, timelineWidth - newStartPxFromRight));
-      const sd = pixelsToTime(newStartPxFromLeft, viewMode, ppm);
-      const ed = pixelsToTime(Math.min(timelineWidth, newStartPxFromLeft + widthPx), viewMode, ppm);
-      newStart = sd.time; newEnd = ed.time; newDay = sd.day;
+      const widthMins = (origEndPx - origStartPx) / ppm;
+      const delta = currentAbsMinute - startAbsMinute;
+      const newStartAbs = Math.max(0, (originalDay || 0) * 1440 + getOperationalMinutes(originalStart) + delta);
+      newDay = Math.max(0, Math.min(6, Math.floor(newStartAbs / 1440)));
+      const newStartOpMins = newStartAbs - newDay * 1440;
+      newStart = operationalMinutesToTime(Math.max(0, Math.min(1440, newStartOpMins)));
+      newEnd = operationalMinutesToTime(Math.max(0, Math.min(1440, newStartOpMins + widthMins)));
     }
+
     setDragPreview({ workerId: dragging.workerId, start: newStart, end: newEnd, day: newDay, type: shift?.type || 'available' });
   };
 
@@ -902,11 +979,19 @@ export default function Matrix() {
     const { workerId, worker, shift, action } = dragging;
     const { start, end, day } = dragPreview;
 
-    console.log("MATRIX DRAG CREATE FINAL", { workerId, startTime: start, endTime: end, date: day, action });
-
-    if (start === end) { setDragging(null); setDragPreview(null); return; }
+    // Save exactly what the preview shows — no recalculation from mouse position
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const targetDate = viewMode === 'weekly' ? format(addDays(weekStart, day || 0), 'yyyy-MM-dd') : dateString;
+
+    console.log("MATRIX SLOT DRAG SAVE", {
+      workerId,
+      savedDate: targetDate,
+      savedStartTime: start,
+      savedEndTime: end,
+      action,
+    });
+
+    if (start === end) { setDragging(null); setDragPreview(null); return; }
     const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     if (action === 'create') {
@@ -1161,11 +1246,9 @@ export default function Matrix() {
   const DragPreviewBar = ({ preview, workerId }) => {
     if (!preview || preview.workerId !== workerId) return null;
     const dayIndex = preview.day || 0;
-    const startPx = timeToPixels(preview.start, dayIndex, viewMode, ppm);
-    const endPx = endTimeToPixels(preview.start, preview.end, viewMode, ppm, dayIndex);
-    const widthPx = Math.max(endPx - startPx, 0);
-    const rightPx = startPx;
-    return <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80" style={{ right: `${rightPx}px`, width: `${widthPx}px` }}><span className="text-xs font-bold">{preview.start} - {preview.end}</span></div>;
+    // Uses same getTimelineRangeStyle helper as all other bars — no independent positioning formula
+    const { style } = getTimelineRangeStyle(preview.start, preview.end, dayIndex, viewMode, ppm);
+    return <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80 pointer-events-none" style={style}><span className="text-xs font-bold">{preview.start} - {preview.end}</span></div>;
   };
 
   const calcHours = (s, e) => {
@@ -1491,11 +1574,42 @@ export default function Matrix() {
         onClick={e => handleRowClick(e, worker, index)}
         onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
       >
-        {/* Grid lines */}
+        {/* Grid lines — data attributes enable slot-based drag hit testing */}
         <div className="absolute inset-0 flex" dir="rtl">
           {viewMode === 'daily'
-            ? dailySlots.map(hour => <div key={hour} className="shrink-0 border-l time-slot h-full" style={{ width: `${60 * ppm}px` }} />)
-            : weeklySlots.map((slot, idx) => <div key={idx} className="shrink-0 border-l time-slot h-full" style={{ width: `${60 * ppm}px` }} />)
+            ? dailySlots.map(hour => {
+                const opMin = ((hour - 6 + 24) % 24) * 60;
+                const timeStr = `${String(hour).padStart(2,'0')}:00`;
+                return (
+                  <div
+                    key={hour}
+                    className="shrink-0 border-l time-slot h-full"
+                    style={{ width: `${60 * ppm}px` }}
+                    data-matrix-time-slot="true"
+                    data-operational-date={dateString}
+                    data-operational-minute={opMin}
+                    data-time={timeStr}
+                    data-day-index={0}
+                  />
+                );
+              })
+            : weeklySlots.map((slot, idx) => {
+                const opMin = ((slot.hour - 6 + 24) % 24) * 60;
+                const timeStr = `${String(slot.hour).padStart(2,'0')}:00`;
+                const slotDate = format(addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), slot.day), 'yyyy-MM-dd');
+                return (
+                  <div
+                    key={idx}
+                    className="shrink-0 border-l time-slot h-full"
+                    style={{ width: `${60 * ppm}px` }}
+                    data-matrix-time-slot="true"
+                    data-operational-date={slotDate}
+                    data-operational-minute={opMin}
+                    data-time={timeStr}
+                    data-day-index={slot.day}
+                  />
+                );
+              })
           }
         </div>
         {/* Day boundary lines (weekly) */}
@@ -1752,66 +1866,33 @@ export default function Matrix() {
                 </div>
                 {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index, isSelected))}
                 {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${rowBg}`} />}
-                <div
-                  data-worker-id={worker.id}
-                  ref={el => { if (el) timelineRefs.current[worker.id] = el; }}
-                  className={`relative border-r cursor-crosshair h-full shrink-0 ${rowBg}`}
-                  dir="rtl"
-                  style={{ width: `${timelineWidth}px` }}
-                  onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
-                >
-                  <div className="absolute inset-0 flex h-full" dir="rtl">
-                    {viewMode === 'daily'
-                      ? dailySlots.map(hour => <div key={hour} className="shrink-0 border-l time-slot h-full" style={{ width: `${60 * ppm}px` }} />)
-                      : weeklySlots.map((slot, idx) => <div key={idx} className="shrink-0 border-l time-slot h-full" style={{ width: `${60 * ppm}px` }} />)
-                    }
-                  </div>
-                  <div className="absolute inset-0">
-                    {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
-                      const px = timeToPixels("06:00", day, 'weekly', ppm);
-                      return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
-                    })}
-                    {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
-                    {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
-                    {workerTemplateShifts.map(ts => <AssignmentBar key={ts.id} assignment={ts} />)}
-                    {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
-                    {/* Moked signup candidate windows */}
-                    {workerMokedSignups.map((sg, i) => {
-                      const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(sg.date) : 0;
-                      return (
-                        <MokedSignupBar
-                          key={`mokedsignup_${worker.id}_${i}`}
-                          signups={sg.signups}
-                          startTime={sg.startTime}
-                          endTime={sg.endTime}
-                          dayIndex={dayIndex}
-                          viewMode={viewMode}
-                          ppm={ppm}
-                          timelineWidth={timelineWidth}
-                        />
-                      );
-                    })}
-                    {/* Briefing markers — placed by visual_operational_date, not by shift date */}
-                    {workerBriefingMarkers.map(marker => {
-                      const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(marker.visual_operational_date) : 0;
-                      return (
-                        <BriefingBar
-                          key={marker.id}
-                          visualTime={marker.visual_time}
-                          originalBriefingTime={marker.original_briefing_time}
-                          linkedShiftDate={marker.linked_shift_operational_date}
-                          shiftStartTime={marker.shift_start_time}
-                          shiftEndTime={marker.shift_end_time}
-                          dayIndex={dayIndex}
-                          viewMode={viewMode}
-                          ppm={ppm}
-                          timeToPixels={timeToPixels}
-                        />
-                      );
-                    })}
-                    <DragPreviewBar preview={dragPreview} workerId={worker.id} />
-                  </div>
-                </div>
+                <ClassicTimelineRow
+                  worker={worker} index={index} isSelected={isSelected} rowBg={rowBg}
+                  timelineWidth={timelineWidth} ppm={ppm} viewMode={viewMode}
+                  dateString={dateString} currentDate={currentDate}
+                  dailySlots={dailySlots} weeklySlots={weeklySlots}
+                  availabilityShifts={availabilityShifts}
+                  workerUnavailabilities={workerUnavailabilities}
+                  workerTemplateShifts={workerTemplateShifts}
+                  workerExtraTaskShifts={workerExtraTaskShifts}
+                  workerMokedSignups={workerMokedSignups}
+                  workerBriefingMarkers={workerBriefingMarkers}
+                  dragPreview={dragPreview}
+                  handleMouseDown={handleMouseDown}
+                  getDayIndexFromDate={getDayIndexFromDate}
+                  timeToPixels={timeToPixels}
+                  endTimeToPixels={endTimeToPixels}
+                  getTimelineRangeStyle={getTimelineRangeStyle}
+                  getOperationalMinutes={getOperationalMinutes}
+                  getOperationalEndMinutes={getOperationalEndMinutes}
+                  isStandbyStatus={isStandbyStatus}
+                  isWorkerAssignedToRow={isWorkerAssignedToRow}
+                  allTemplates={allTemplates}
+                  templateRows={templateRows}
+                  timesOverlap={timesOverlap}
+                  handleTypeClick={handleTypeClick}
+                  handleShiftDoubleClick={handleShiftDoubleClick}
+                />
               </div>
             );
           })
