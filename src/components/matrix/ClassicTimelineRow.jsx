@@ -104,10 +104,11 @@ export default function ClassicTimelineRow({
         className="absolute h-full rounded-sm z-20 cursor-move overflow-visible"
         style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: `${borderColor}18`, border: `2px solid ${borderColor}` }}
         onMouseDown={(e) => {
+          if (e.detail === 2) return; // double-click — don't start a drag, let onDoubleClick fire
           e.stopPropagation();
           handleMouseDown(e, worker, shift, 'move', dayIndex);
         }}
-        onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
+        onDoubleClick={(e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); }}
       >
         {/* Left resize handle (end-time edge) — wide invisible hit area */}
         <div
@@ -115,10 +116,11 @@ export default function ClassicTimelineRow({
           className="absolute left-0 top-0 h-full cursor-ew-resize z-30 hover:bg-black/15"
           style={{ width: '12px', marginLeft: '-4px' }}
           onMouseDown={(e) => {
+            if (e.detail === 2) return; // let double-click fall through to onDoubleClick
             e.stopPropagation();
             handleMouseDown(e, worker, shift, 'resize-end', dayIndex);
           }}
-          onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
+          onDoubleClick={(e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); }}
         />
         {/* Right resize handle (start-time edge) — wide invisible hit area */}
         <div
@@ -126,10 +128,11 @@ export default function ClassicTimelineRow({
           className="absolute right-0 top-0 h-full cursor-ew-resize z-30 hover:bg-black/15"
           style={{ width: '12px', marginRight: '-4px' }}
           onMouseDown={(e) => {
+            if (e.detail === 2) return; // let double-click fall through to onDoubleClick
             e.stopPropagation();
             handleMouseDown(e, worker, shift, 'resize-start', dayIndex);
           }}
-          onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
+          onDoubleClick={(e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); }}
         />
         <button
           data-matrix-existing-bar="true"
