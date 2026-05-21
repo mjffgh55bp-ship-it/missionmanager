@@ -59,7 +59,7 @@ export default function ClassicTimelineRow({
       const borderColor = isTemplate ? '#a855f7' : '#3b82f6';
       return (
         <TooltipProvider><Tooltip><TooltipTrigger asChild>
-          <div className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden" style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px dashed ${borderColor}`, pointerEvents: 'auto' }}>
+          <div className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden" style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px dashed ${borderColor}` }}>
             <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{assignment.status}</span>
           </div>
         </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
@@ -69,7 +69,7 @@ export default function ClassicTimelineRow({
     }
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <div className={`absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${startPx}px`, width: `${widthPx}px`, pointerEvents: 'auto' }}>
+        <div className={`absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${startPx}px`, width: `${widthPx}px` }}>
           {!isTemplate && <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>}
           {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
         </div>
@@ -102,7 +102,7 @@ export default function ClassicTimelineRow({
       <div
         data-matrix-existing-bar="true"
         className="absolute h-full rounded-sm z-10 cursor-move overflow-visible"
-        style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px solid ${borderColor}`, pointerEvents: 'auto' }}
+        style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px solid ${borderColor}` }}
         onMouseDown={(e) => {
           e.stopPropagation();
           console.log("MATRIX EXISTING BAR ACTION", { action: 'move', workerId: worker.id, startTime: shift.start_time, endTime: shift.end_time });
@@ -158,7 +158,7 @@ export default function ClassicTimelineRow({
     if (startPx < 0 || startPx > timelineWidth) return null;
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${startPx}px`, width: `${widthPx}px`, pointerEvents: 'auto' }}>
+        <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${startPx}px`, width: `${widthPx}px` }}>
           <Ban className="w-3 h-3 text-gray-600" />
         </div>
       </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
@@ -242,7 +242,7 @@ export default function ClassicTimelineRow({
             })
         }
       </div>
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0">
         {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
           const px = timeToPixels("06:00", day, 'weekly', ppm);
           return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;

@@ -839,12 +839,17 @@ export default function Matrix() {
   // Finds the time slot element under the pointer using hit testing.
   // This is immune to scroll, RTL, and fixed column offsets.
   const getSlotFromPointer = (e, debug = false) => {
-    const el = document.elementFromPoint(e.clientX, e.clientY);
-    const slot = el?.closest("[data-matrix-time-slot='true']");
+    // Use elementsFromPoint to pierce through bar overlays and find the slot underneath
+    const els = document.elementsFromPoint(e.clientX, e.clientY);
+    let slot = null;
+    for (const el of els) {
+      if (el.dataset?.matrixTimeSlot === 'true') { slot = el; break; }
+      const found = el.closest?.("[data-matrix-time-slot='true']");
+      if (found) { slot = found; break; }
+    }
     if (debug) {
       console.log("MATRIX SLOT HIT DEBUG", {
         visualPointerClientX: e.clientX,
-        rawElement: el?.tagName + (el?.className ? '.' + el.className.slice(0,30) : ''),
         slotTime: slot?.dataset?.time,
         operationalMinute: slot?.dataset?.operationalMinute,
         operationalDate: slot?.dataset?.operationalDate,
@@ -1174,7 +1179,7 @@ export default function Matrix() {
       const borderColor = isTemplate ? '#a855f7' : '#3b82f6';
       return (
         <TooltipProvider><Tooltip><TooltipTrigger asChild>
-          <div className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden" style={{ right: `${rightPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px dashed ${borderColor}`, pointerEvents: 'auto' }}>
+          <div className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden" style={{ right: `${rightPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px dashed ${borderColor}` }}>
             <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{assignment.status}</span>
           </div>
         </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
@@ -1184,7 +1189,7 @@ export default function Matrix() {
     }
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <div className={`absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${rightPx}px`, width: `${widthPx}px`, pointerEvents: 'auto' }}>
+        <div className={`absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${rightPx}px`, width: `${widthPx}px` }}>
           {!isTemplate && <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>}
           {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
         </div>
@@ -1226,7 +1231,7 @@ export default function Matrix() {
       <div
         data-matrix-existing-bar="true"
         className="absolute h-full rounded-sm z-10 cursor-move overflow-visible"
-        style={{ right: `${rightPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px solid ${borderColor}`, pointerEvents: 'auto' }}
+        style={{ right: `${rightPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px solid ${borderColor}` }}
         onMouseDown={(e) => { e.stopPropagation(); console.log("MATRIX EXISTING BAR ACTION", { action: 'move', workerId: worker.id, startTime: shift.start_time, endTime: shift.end_time }); handleMouseDown(e, worker, shift, 'move', dayIndex); }}
         onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
       >
@@ -1257,7 +1262,7 @@ export default function Matrix() {
     if (startPx < 0 || startPx > timelineWidth) return null;
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${rightPx}px`, width: `${widthPx}px`, pointerEvents: 'auto' }}>
+        <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${rightPx}px`, width: `${widthPx}px` }}>
           <Ban className="w-3 h-3 text-gray-600" />
         </div>
       </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
@@ -1650,8 +1655,8 @@ export default function Matrix() {
               })
           }
         </div>
-        {/* Bars + day boundary lines — container is pointer-events-none so slot grid remains hittable; individual bars restore pointer-events via inline style */}
-        <div className="absolute inset-0 pointer-events-none">
+        {/* Bars layer — pointer events enabled; individual bars have their own handlers; create-drag is guarded at the row level */}
+        <div className="absolute inset-0">
           {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
             const px = timeToPixels("06:00", day, 'weekly', ppm);
             return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
