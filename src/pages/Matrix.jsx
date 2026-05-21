@@ -835,21 +835,41 @@ export default function Matrix() {
   };
 
   // ── Drag handlers ────────────────────────────────────────────────────────────
+  // Returns the pixel offset from the RIGHT edge of the full timeline for a clientX position.
+  // Accounts for: scroll container scrollLeft, RTL direction.
+  const clientXToTimelinePxFromRight = (clientX) => {
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+    if (!sc) return 0;
+    const rect = sc.getBoundingClientRect();
+    // In LTR scroll container: localX = distance from left of scroll viewport + scrolled amount
+    const localX = (clientX - rect.left) + sc.scrollLeft;
+    // In RTL timeline: right edge = offset 0, so pxFromRight = timelineWidth - localX
+    // But in classic (unpinned) mode, the timeline starts after fixedColumnsWidth
+    const timelineOffsetFromLeft = pinned ? 0 : fixedColumnsWidth;
+    const localXInTimeline = localX - timelineOffsetFromLeft;
+    return Math.max(0, Math.min(timelineWidth, timelineWidth - localXInTimeline));
+  };
+
   const handleMouseDown = (e, worker, shift, action, dayIndex = 0) => {
     e.preventDefault(); e.stopPropagation();
     if (action === 'move' && e.detail === 2) return;
-    const timeline = timelineRefs.current[worker.id];
-    if (!timeline) return;
-    const rect = timeline.getBoundingClientRect();
-    const pxFromRight = rect.width - (e.clientX - rect.left);
-    const startPxFromRight = Math.max(0, Math.min(timelineWidth, pxFromRight));
-    setDragging({ workerId: worker.id, worker, shift, action, startPxFromRight, originalStart: shift?.start_time, originalEnd: shift?.end_time, originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0, rect });
+    const startPxFromRight = clientXToTimelinePxFromRight(e.clientX);
+
+    console.log("MATRIX DRAG DEBUG", {
+      clientX: e.clientX,
+      startPxFromRight,
+      ppm,
+      viewMode,
+      action,
+    });
+
+    setDragging({ workerId: worker.id, worker, shift, action, startPxFromRight, originalStart: shift?.start_time, originalEnd: shift?.end_time, originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0 });
   };
 
   const handleMouseMove = (e) => {
     if (!dragging) return;
-    const { worker, shift, action, startPxFromRight, originalStart, originalEnd, originalDay, rect } = dragging;
-    const currentPxFromRight = Math.max(0, Math.min(timelineWidth, rect.width - (e.clientX - rect.left)));
+    const { worker, shift, action, startPxFromRight, originalStart, originalEnd, originalDay } = dragging;
+    const currentPxFromRight = clientXToTimelinePxFromRight(e.clientX);
     const rightToTimelinePx = (pxR) => Math.max(0, timelineWidth - pxR);
     let newStart = originalStart, newEnd = originalEnd, newDay = originalDay || 0;
     if (action === 'create') {
@@ -881,6 +901,9 @@ export default function Matrix() {
     if (!dragging || !dragPreview) { setDragging(null); setDragPreview(null); return; }
     const { workerId, worker, shift, action } = dragging;
     const { start, end, day } = dragPreview;
+
+    console.log("MATRIX DRAG CREATE FINAL", { workerId, startTime: start, endTime: end, date: day, action });
+
     if (start === end) { setDragging(null); setDragPreview(null); return; }
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const targetDate = viewMode === 'weekly' ? format(addDays(weekStart, day || 0), 'yyyy-MM-dd') : dateString;
