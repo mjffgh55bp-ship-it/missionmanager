@@ -118,6 +118,7 @@ export default function ClassicTimelineRow({
             console.log("MATRIX EXISTING BAR ACTION", { action: 'resize-start', workerId: worker.id, startTime: shift.start_time, endTime: shift.end_time });
             handleMouseDown(e, worker, shift, 'resize-start', dayIndex);
           }}
+          onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
         />
         <div
           data-matrix-existing-bar="true"
@@ -127,6 +128,7 @@ export default function ClassicTimelineRow({
             console.log("MATRIX EXISTING BAR ACTION", { action: 'resize-end', workerId: worker.id, startTime: shift.start_time, endTime: shift.end_time });
             handleMouseDown(e, worker, shift, 'resize-end', dayIndex);
           }}
+          onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
         />
         <button
           data-matrix-existing-bar="true"
