@@ -99,10 +99,42 @@ export default function ClassicTimelineRow({
       return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
     }).map(r => ({ start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"], end_time: r.values?.["סיום"] || r.values?.["שעת סיום"], status: r.values?.status || null }));
     return (
-      <div className="absolute h-full rounded-sm z-10 cursor-move overflow-visible" style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px solid ${borderColor}` }} onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'move', dayIndex); }} onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}>
-        <div className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-start', dayIndex); }} />
-        <div className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, 'resize-end', dayIndex); }} />
-        <button className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform" style={{ borderColor }} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }} onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }}>
+      <div
+        data-matrix-existing-bar="true"
+        className="absolute h-full rounded-sm z-10 cursor-move overflow-visible"
+        style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px solid ${borderColor}` }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          console.log("MATRIX EXISTING BAR ACTION", { action: 'move', workerId: worker.id, startTime: shift.start_time, endTime: shift.end_time });
+          handleMouseDown(e, worker, shift, 'move', dayIndex);
+        }}
+        onDoubleClick={(e) => handleShiftDoubleClick(e, worker, shift)}
+      >
+        <div
+          data-matrix-existing-bar="true"
+          className="absolute right-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            console.log("MATRIX EXISTING BAR ACTION", { action: 'resize-start', workerId: worker.id, startTime: shift.start_time, endTime: shift.end_time });
+            handleMouseDown(e, worker, shift, 'resize-start', dayIndex);
+          }}
+        />
+        <div
+          data-matrix-existing-bar="true"
+          className="absolute left-0 top-0 h-full w-2 cursor-ew-resize hover:bg-black/10 z-20"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            console.log("MATRIX EXISTING BAR ACTION", { action: 'resize-end', workerId: worker.id, startTime: shift.start_time, endTime: shift.end_time });
+            handleMouseDown(e, worker, shift, 'resize-end', dayIndex);
+          }}
+        />
+        <button
+          data-matrix-existing-bar="true"
+          className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform"
+          style={{ borderColor }}
+          onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }}
+        >
           {typeLabels[shift.type] || "A"}
         </button>
         {overlappingAssignments.map((ass, i) => {
@@ -149,7 +181,28 @@ export default function ClassicTimelineRow({
       className={`relative border-r cursor-crosshair h-full shrink-0 ${rowBg}`}
       dir="rtl"
       style={{ width: `${timelineWidth}px` }}
-      onMouseDown={(e) => handleMouseDown(e, worker, null, 'create')}
+      onMouseDown={(e) => {
+        // RULE 1: existing bars handle themselves — never start a create drag from them
+        if (
+          e.target.closest("[data-matrix-existing-bar='true']") ||
+          e.target.closest("button") ||
+          e.target.closest("[role='button']") ||
+          e.target.closest("[data-no-drag='true']")
+        ) {
+          console.log("MATRIX POINTER TARGET DEBUG", {
+            existingBar: !!e.target.closest("[data-matrix-existing-bar='true']"),
+            button: !!e.target.closest("button"),
+            slot: !!e.target.closest("[data-matrix-time-slot='true']"),
+          });
+          return;
+        }
+        console.log("MATRIX POINTER TARGET DEBUG", {
+          existingBar: false,
+          button: false,
+          slot: !!e.target.closest("[data-matrix-time-slot='true']"),
+        });
+        handleMouseDown(e, worker, null, 'create');
+      }}
     >
       {/* Grid lines with data attributes for slot-based drag */}
       <div className="absolute inset-0 flex h-full" dir="rtl">
