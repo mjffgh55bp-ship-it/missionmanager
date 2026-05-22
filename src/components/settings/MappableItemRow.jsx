@@ -46,7 +46,7 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
   const [saving, setSaving] = useState(false);
 
   const isDuplicate = draft.mapping_id &&
-    allItems.filter(i => i !== item && normalizeItem(i).mapping_id === draft.mapping_id).length > 0;
+    allItems.filter(i => normalizeItem(i).mapping_id === draft.mapping_id).length > 1;
 
   const hasMappingId = !!item.mapping_id;
 
