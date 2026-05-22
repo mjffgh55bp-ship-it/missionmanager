@@ -268,16 +268,12 @@ export default function Availability() {
       const templatesData = await getCachedTemplates(base44.entities);
       const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
 
-      // Fetch template rows one at a time with a small delay to avoid rate limiting
-      const perDayRowArrays = [];
-      for (const d of weekDates) {
-        const rows = await base44.entities.TemplateRow.filter({ date: d });
-        perDayRowArrays.push(rows);
-        await new Promise(r => setTimeout(r, 80));
-      }
+      // Fetch all template rows for the week in one batch (filter client-side)
+      const allWeekRows = await base44.entities.TemplateRow.list("-date", 500);
+      const perDayRowArrays = [allWeekRows.filter(r => weekDates.includes(r.date))];
 
       // Fetch all assignments at once and filter client-side to reduce API calls
-      const allWorkerAssignments = await base44.entities.Assignment.list();
+      const allWorkerAssignments = await base44.entities.Assignment.list("-date", 500);
       const assignmentsData = allWorkerAssignments.filter(a => a.chef_id === worker.id);
       const sousAssignments = allWorkerAssignments.filter(a => a.sous_chef_id === worker.id);
       const additionalAssignments = allWorkerAssignments.filter(a => a.additional_chef_id === worker.id);
