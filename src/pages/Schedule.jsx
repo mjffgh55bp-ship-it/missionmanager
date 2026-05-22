@@ -85,6 +85,7 @@ export default function Schedule() {
   const lastWeekStart = useRef(null);
   const initialLoadStarted = useRef(false);
   const isLoadingAll = useRef(false);
+  const openRegSettingIdRef = useRef(null);
 
   useEffect(() => {
     if (!initialLoadStarted.current) {
@@ -218,7 +219,10 @@ export default function Schedule() {
     } else {
       setTasksList(Object.keys(parsedTaskQual));
     }
-    if (openRegSettings.length > 0) setOpenRegistrations(JSON.parse(openRegSettings[0].setting_value) || []);
+    if (openRegSettings.length > 0) {
+      openRegSettingIdRef.current = openRegSettings[0].id;
+      setOpenRegistrations(JSON.parse(openRegSettings[0].setting_value) || []);
+    }
     setAllTemplates(allTemplatesData);
     setWorkers(workersData);
   };
@@ -340,21 +344,6 @@ export default function Schedule() {
       const aO = a.values?._order ?? new Date(a.created_date || 0).getTime();
       const bO = b.values?._order ?? new Date(b.created_date || 0).getTime();
       return aO - bO;
-    });
-
-    console.log("DUPLICATE MOKED SOURCE", {
-      templateId: group.template_id,
-      sourceGroupId: originalGroupId,
-      newGroupId,
-      sourceRowCount: sourceRows.length,
-      sourceRows: sourceRows.map((r, i) => ({
-        id: r.id,
-        group_id: r.group_id,
-        date: r.date,
-        order: r.values?._order,
-        index: i,
-        values: r.values
-      }))
     });
 
     // Create rows sequentially (not in parallel) to preserve order and avoid rate limits
@@ -841,10 +830,13 @@ export default function Schedule() {
                                             updated = [...openRegistrations, entry];
                                           }
                                           setOpenRegistrations(updated);
-                                          const settings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
-                                          const data = { setting_key: "open_registrations", setting_value: JSON.stringify(updated) };
-                                          if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                                          else await base44.entities.AppSettings.create(data);
+                                          const regData = { setting_key: "open_registrations", setting_value: JSON.stringify(updated) };
+                                          if (openRegSettingIdRef.current) {
+                                           await base44.entities.AppSettings.update(openRegSettingIdRef.current, regData);
+                                          } else {
+                                           const created = await base44.entities.AppSettings.create(regData);
+                                           openRegSettingIdRef.current = created.id;
+                                          }
                                           toast.success(!isOpen ? `הרשמה לـ"${template.name}" נפתחה` : `הרשמה לـ"${template.name}" נסגרה`);
                                         }}>
                                         <UserCheck className="w-3 h-3" />

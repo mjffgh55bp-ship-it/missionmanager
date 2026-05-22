@@ -348,13 +348,6 @@ export default function Availability() {
       setAllTemplates(templatesData);
       setWeekAvailabilities(weekAvailsData);
 
-      // Use cached open_registrations from allSettings (already loaded) — only re-fetch if not available
-      if (!staticLoaded.current) {
-        const allSettings = await getCachedAllSettings(base44.entities);
-        const freshOpenReg = parseSetting(allSettings, "open_registrations", []);
-        setOpenRegistrations(freshOpenReg);
-      }
-
       loadedWeekKeyRef.current = weekKey;
       console.log("AVAILABILITY LOAD", { phase: "dynamic_done", weekKey, durationMs: Date.now() - t0 });
     } finally {

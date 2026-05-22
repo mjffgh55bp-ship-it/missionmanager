@@ -207,18 +207,6 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
     unified.requiredCount = unified.possibleInstances.size;
   });
 
-  // Debug table — temporary, helps verify architecture
-  console.table([...map.values()].map(s => ({
-    date:         s.operational_date,
-    mokedName:    s.mokedName,
-    start:        s.startTime,
-    end:          s.endTime,
-    signupKey:    s.signupKey,
-    requiredCount: s.requiredCount,
-    instances:    s.possibleInstances.size,
-    instanceKeys: [...s.possibleInstances.keys()].join(", "),
-  })));
-
   return map;
 }
 

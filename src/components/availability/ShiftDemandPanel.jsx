@@ -33,7 +33,7 @@ function dateLabel(dateStr) {
 // Only the chip at index 0 shows a personal selection highlight when the worker signed up.
 // Chips at index >= 1 always show count but never the personal highlight (they are
 // identical-key duplicates caused by same-name same-time mokeds).
-function ShiftChip({ shift, chipIndex = 0, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
+function ShiftChip({ shift, chipIndex = 0, signedCount, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
   // requiredCount = number of row instances (not worker columns)
   const requiredCount = shift.requiredCount || 1;
 
@@ -45,7 +45,7 @@ function ShiftChip({ shift, chipIndex = 0, allAvailabilities, workers, myRoles, 
     ? true   // template has no worker columns — show to everyone
     : [...myRoles].some(r => eligibleRoles.has(r));
 
-  const signed = getSignupsForShift(allAvailabilities, shift);
+  const signed = signedCount ?? 0;
   const { isFull, isOver, blocked } = calculateRoleStatus(requiredCount, signed, signupMode);
 
   const operationalDate = shift.operational_date || shift.date;
@@ -82,22 +82,6 @@ function ShiftChip({ shift, chipIndex = 0, allAvailabilities, workers, myRoles, 
   // Only the first chip (chipIndex 0) shows the personal selection highlight.
   // Duplicate chips (same signupKey, index >= 1) show the shared count but not the highlight.
   const showPersonalHighlight = chipIndex === 0;
-
-  // Debug log — helps verify architecture correctness
-  console.log("SHIFT CHIP DEBUG", {
-    mokedName: shift.mokedName,
-    signupKey: shift.signupKey,
-    requiredCount,
-    registeredCount: signed,
-    currentWorkerEntry: currentEntry ? { moked_name: currentEntry.moked_name, signupKey: currentEntry.signupKey, type: currentEntry.type } : null,
-    selectedShifts: selectedShifts.map(s => ({
-      moked_name: s.moked_name,
-      signupKey: s.signupKey,
-      start_time: s.start_time,
-      end_time: s.end_time,
-      type: s.type
-    }))
-  });
 
   const isSignedWanted = currentType === "wanted" && showPersonalHighlight;
   const isSignedAvailable = currentType === "available" && showPersonalHighlight;
@@ -215,7 +199,7 @@ function ShiftChip({ shift, chipIndex = 0, allAvailabilities, workers, myRoles, 
 }
 
 // ── Day column ─────────────────────────────────────────────────────────────────
-function DayColumn({ dateStr, shifts, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
+function DayColumn({ dateStr, shifts, signupCountByKey, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
   if (shifts.length === 0) return null;
 
   const { dayName, shortDate, hebrewDate } = dateLabel(dateStr);
@@ -254,6 +238,7 @@ function DayColumn({ dateStr, shifts, allAvailabilities, workers, myRoles, selec
                   key={shift.key}
                   shift={shift}
                   chipIndex={chipIndex}
+                  signedCount={signupCountByKey.get(shift.signupKey) ?? 0}
                   allAvailabilities={allAvailabilities}
                   workers={workers}
                   myRoles={myRoles}
@@ -335,6 +320,15 @@ export default function ShiftDemandPanel({
     return new Set(Array.isArray(currentWorker.role) ? currentWorker.role : [currentWorker.role].filter(Boolean));
   }, [currentWorker]);
 
+  // Precompute signup counts once per allAvailabilities change, not per chip render
+  const signupCountByKey = useMemo(() => {
+    const map = new Map();
+    weekDemand.forEach(shift => {
+      map.set(shift.signupKey, getSignupsForShift(allAvailabilities, shift));
+    });
+    return map;
+  }, [allAvailabilities, weekDemand]);
+
   const byDate = {};
   weekDemand.forEach(s => {
     // Skip Saturday (day 6)
@@ -371,6 +365,7 @@ export default function ShiftDemandPanel({
                   key={date}
                   dateStr={date}
                   shifts={byDate[date]}
+                  signupCountByKey={signupCountByKey}
                   allAvailabilities={allAvailabilities}
                   workers={workers}
                   myRoles={myRoles}
