@@ -30,14 +30,13 @@ export default function MokedSignupBar({ signups, startTime, endTime, dayIndex, 
   const borderColor = hasWanted ? '#16a34a' : '#0891b2';
   const bgColor = hasWanted ? 'rgba(22, 163, 74, 0.12)' : 'rgba(8, 145, 178, 0.12)';
 
-  // Deduplicate moked names for tooltip — extract from moked_name or signupKey
+  // Deduplicate moked names for tooltip — extract from moked_name or sharedMokedKey
   const extractMokedName = (s) => {
     if (s.moked_name) return s.moked_name;
-    // signupKey format: "date__name:מוקד מלא 1__startTime__endTime"
-    if (s.signupKey) {
-      const parts = s.signupKey.split('__');
-      const namePart = parts.find(p => p.startsWith('name:'));
-      if (namePart) return namePart.slice(5);
+    // sharedMokedKey format: "name:מוקד מלא 1" or "group:groupId"
+    if (s.sharedMokedKey) {
+      const parts = s.sharedMokedKey.split(':');
+      if (parts[0] === 'name' && parts[1]) return parts.slice(1).join(':');
     }
     return null;
   };
