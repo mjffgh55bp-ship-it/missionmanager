@@ -310,9 +310,22 @@ export default function Settings() {
   };
 
   const handleSavePopulation = async (idx, updatedItem) => {
+    const oldName = normalizeItem(populations[idx]).name;
+    const newName = updatedItem.name;
     const updated = populations.map((p, i) => i === idx ? updatedItem : p);
     await saveListSetting("worker_populations", updated);
     setPopulations(updated);
+
+    // Propagate rename to Worker records
+    if (newName && newName !== oldName) {
+      const allWorkers = await base44.entities.Worker.list();
+      await Promise.all(
+        allWorkers
+          .filter(w => w.population === oldName)
+          .map(w => base44.entities.Worker.update(w.id, { population: newName }))
+      );
+      invalidateStaticCache();
+    }
   };
 
   const handleAddWorkerRole = async () => {

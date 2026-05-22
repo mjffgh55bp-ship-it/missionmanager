@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, invalidateTemplatesCache } from "@/lib/appDataCache";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, invalidateTemplatesCache, invalidateSettingsCache } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -531,6 +531,7 @@ export default function Schedule() {
           const created = await base44.entities.AppSettings.create(data);
           columnOrderSettingIdRef.current = created.id;
         }
+        invalidateSettingsCache();
       }
     }, 500);
   };
@@ -900,12 +901,13 @@ export default function Schedule() {
                               if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
                                 const isDailyColumn = (dailyCustomColumns[template.id] || []).some((c) => c.name === col.name);
                                 if (isDailyColumn) {
-                                 const updatedDailyColumns = { ...dailyCustomColumns, [template.id]: (dailyCustomColumns[template.id] || []).filter((c) => c.name !== col.name) };
-                                 setDailyCustomColumns(updatedDailyColumns);
-                                 const dcKey = `schedule_daily_columns_${dateString}`;
-                                 const data = { setting_key: dcKey, setting_value: JSON.stringify(updatedDailyColumns) };
-                                 const cachedDcId = appSettingsIdCache.current[dcKey];
-                                 if (cachedDcId) await base44.entities.AppSettings.update(cachedDcId, data);
+                                const updatedDailyColumns = { ...dailyCustomColumns, [template.id]: (dailyCustomColumns[template.id] || []).filter((c) => c.name !== col.name) };
+                                setDailyCustomColumns(updatedDailyColumns);
+                                const dcKey = `schedule_daily_columns_${dateString}`;
+                                const data = { setting_key: dcKey, setting_value: JSON.stringify(updatedDailyColumns) };
+                                const cachedDcId = appSettingsIdCache.current[dcKey];
+                                if (cachedDcId) await base44.entities.AppSettings.update(cachedDcId, data);
+                                invalidateSettingsCache();
                                 } else {
                                   const updatedColumns = template.columns.filter((c) => c.name !== col.name);
                                   setAllTemplates(prev => prev.map(t => t.id === template.id ? { ...t, columns: updatedColumns } : t));
@@ -1193,11 +1195,11 @@ export default function Schedule() {
                   const addColData = { setting_key: addColKey, setting_value: JSON.stringify(updatedDailyColumns) };
                   const cachedAddColId = appSettingsIdCache.current[addColKey];
                   if (cachedAddColId) { await base44.entities.AppSettings.update(cachedAddColId, addColData); } else { const created = await base44.entities.AppSettings.create(addColData); appSettingsIdCache.current[addColKey] = created.id; }
+                  invalidateSettingsCache();
                   setShowAddTemplateColumnDialog(false);
                   setNewTemplateColumnName("");
                   setNewTemplateColumnType("text");
                   setSelectedTemplate(null);
-                  await loadData();
                   toast.success('עמודה נוספה בהצלחה');
                 }}
                 disabled={!newTemplateColumnName || (newTemplateColumnName === "worker_member" && !newTemplateColumnRole)}
