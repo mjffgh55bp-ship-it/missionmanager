@@ -215,7 +215,7 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
  * Counts workers where normalizeSignupType === "wanted" AND signupKey matches.
  * Only "wanted" consumes capacity. "available" and "unavailable" do not.
  */
-export function getSignupsForShift(availabilities, unifiedShift, allSignupKeysForSlot = null) {
+export function getSignupsForShift(availabilities, unifiedShift, slotSignupKeyCount = 1) {
   const { signupKey } = unifiedShift;
   const operationalDate = unifiedShift.operational_date || unifiedShift.date;
   const { startTime, endTime } = unifiedShift;
@@ -258,10 +258,9 @@ export function getSignupsForShift(availabilities, unifiedShift, allSignupKeysFo
     if (hasOtherMokedKeyedEntry) return;
 
     // Phase 3: naked entry (no moked identity) — legacy data
-    // ONLY run if there is exactly ONE signup group for this date+time slot.
-    // If allSignupKeysForSlot has more than 1 entry, naked entries are AMBIGUOUS —
-    // they cannot be assigned to any specific moked, so skip Phase 3 entirely.
-    if (allSignupKeysForSlot !== null && allSignupKeysForSlot.size > 1) return;
+    // ONLY run if this is the single moked at this date+time slot.
+    // If slotSignupKeyCount > 1, naked entries are ambiguous — skip entirely.
+    if (slotSignupKeyCount > 1) return;
 
     const hasNakedMatch = shifts.some(s => {
       if (normalizeSignupType(s) !== "wanted") return false;

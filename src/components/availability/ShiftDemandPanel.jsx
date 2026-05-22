@@ -62,17 +62,8 @@ function ShiftChip({ shift, chipIndex = 0, signedCount, allAvailabilities, worke
           const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
           return legacyKey === shift.signupKey;
         }
-        // 3. Naked entry — only match if NO keyed entry exists for this date+time slot
-        if (s.signupKey || s.sharedMokedKey) return false;
-        const sDate = s.operational_date || s.date;
-        if (sDate !== operationalDate || s.start_time !== shift.startTime || s.end_time !== shift.endTime) return false;
-        const hasKeyedEntry = selectedShifts.some(other => {
-          if (other === s) return false;
-          const oDate = other.operational_date || other.date;
-          if (oDate !== operationalDate || other.start_time !== shift.startTime || other.end_time !== shift.endTime) return false;
-          return !!(other.signupKey || other.sharedMokedKey);
-        });
-        return !hasKeyedEntry;
+        // Naked entries are cleaned/upgraded on load — no fallback needed here
+        return false;
       })
     : null; // chipIndex > 0: never show as personally selected
   const currentType = currentEntry?.type || null;
@@ -328,29 +319,27 @@ export default function ShiftDemandPanel({
     return new Set(Array.isArray(currentWorker.role) ? currentWorker.role : [currentWorker.role].filter(Boolean));
   }, [currentWorker]);
 
-  // Build: slotKey (date__start__end) → Set of signupKeys at that slot
-  const slotSignupKeysMap = useMemo(() => {
+  // Build: slotKey (date__start__end) → count of distinct signupKeys at that slot
+  const slotSignupKeyCountMap = useMemo(() => {
     const map = new Map();
     weekDemand.forEach(shift => {
       const slotKey = `${shift.date}__${shift.startTime}__${shift.endTime}`;
-      if (!map.has(slotKey)) map.set(slotKey, new Set());
-      map.get(slotKey).add(shift.signupKey);
+      map.set(slotKey, (map.get(slotKey) ?? 0) + 1);
     });
     return map;
   }, [weekDemand]);
 
   // Precompute signup counts once per allAvailabilities change, not per chip render.
-  // Pass per-slot key set so Phase 3 (naked entry fallback) is disabled when multiple
-  // differently-named mokeds share the same date+time slot.
+  // Pass per-slot count so Phase 3 (naked entry fallback) is skipped for multi-moked slots.
   const signupCountByKey = useMemo(() => {
     const map = new Map();
     weekDemand.forEach(shift => {
       const slotKey = `${shift.date}__${shift.startTime}__${shift.endTime}`;
-      const keysForSlot = slotSignupKeysMap.get(slotKey) ?? new Set([shift.signupKey]);
-      map.set(shift.signupKey, getSignupsForShift(allAvailabilities, shift, keysForSlot));
+      const count = slotSignupKeyCountMap.get(slotKey) ?? 1;
+      map.set(shift.signupKey, getSignupsForShift(allAvailabilities, shift, count));
     });
     return map;
-  }, [allAvailabilities, weekDemand, slotSignupKeysMap]);
+  }, [allAvailabilities, weekDemand, slotSignupKeyCountMap]);
 
   const byDate = {};
   weekDemand.forEach(s => {

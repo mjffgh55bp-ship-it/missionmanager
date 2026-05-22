@@ -17,7 +17,7 @@ import { formatHebrewDate } from "../components/utils/HebrewDate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import ShiftDemandPanel from "@/components/availability/ShiftDemandPanel";
-import { buildSignupKey, serializePossibleInstances } from "@/lib/shiftDemand";
+import { buildSignupKey, serializePossibleInstances, buildUnifiedShiftDemand } from "@/lib/shiftDemand";
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const HEBREW_DAYS_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -334,8 +334,38 @@ export default function Availability() {
             : `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`);
           return seenKeys.get(key) === idx;
         });
-        setSelectedShifts(deduped);
-        setOriginalShifts(JSON.parse(JSON.stringify(deduped)));
+        // Step 4: upgrade naked entries to keyed entries using the current week's demand map.
+        // If a naked entry matches exactly ONE signupKey this week → upgrade it.
+        // If it matches zero (stale) or 2+ (ambiguous multi-moked) → drop it.
+        const weekRowsForUpgrade = allWeekRows.filter(r => weekDates.includes(r.date) && !r.values?.is_hidden && !r.values?.hidden);
+        const demandMapForUpgrade = buildUnifiedShiftDemand(weekRowsForUpgrade, templatesData);
+        const slotToSignupKeys = new Map();
+        demandMapForUpgrade.forEach((shift, key) => {
+          const slotKey = `${shift.date}__${shift.startTime}__${shift.endTime}`;
+          if (!slotToSignupKeys.has(slotKey)) slotToSignupKeys.set(slotKey, []);
+          slotToSignupKeys.get(slotKey).push(key);
+        });
+
+        const upgraded = deduped.map(s => {
+          if (s.signupKey || s.sharedMokedKey) return s; // already keyed — keep
+          const slotKey = `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`;
+          const keys = slotToSignupKeys.get(slotKey);
+          if (!keys || keys.length === 0) return null; // stale — drop
+          if (keys.length === 1) {
+            const matched = demandMapForUpgrade.get(keys[0]);
+            return {
+              ...s,
+              signupKey: matched.signupKey,
+              sharedMokedKey: matched.sharedMokedKey,
+              moked_name: matched.mokedName,
+              operational_date: s.operational_date || s.date,
+            };
+          }
+          return null; // ambiguous (2+ mokeds at same slot) — drop
+        }).filter(Boolean);
+
+        setSelectedShifts(upgraded);
+        setOriginalShifts(JSON.parse(JSON.stringify(upgraded)));
       } else {
         setExistingAvailability(null);
         setSelectedShifts([]);
