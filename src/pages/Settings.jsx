@@ -10,6 +10,7 @@ import MappingSettings from "@/components/settings/MappingSettings";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
 import MappableItemRow, { normalizeItem, suggestMappingId } from "@/components/settings/MappableItemRow";
+import { invalidateStaticCache } from "@/lib/appDataCache";
 
 
 export default function Settings() {
@@ -338,7 +339,7 @@ export default function Settings() {
 
     // Propagate rename to Worker records and Template columns
     if (newName && newName !== oldName) {
-      // 1. Update Worker records that have the old role
+      // 1. Update Worker records that have the old role (all workers, not just active)
       const allWorkers = await base44.entities.Worker.list();
       for (const w of allWorkers) {
         if (!w.role) continue;
@@ -372,6 +373,9 @@ export default function Settings() {
         delete newValues[oldName];
         await base44.entities.TemplateRow.update(row.id, { values: newValues });
       }
+
+      // Invalidate caches so Schedule/Availability pick up fresh data
+      invalidateStaticCache();
     }
   };
 
