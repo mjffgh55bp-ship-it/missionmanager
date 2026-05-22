@@ -199,6 +199,7 @@ export default function Matrix() {
   const [signupMode, setSignupMode] = useState("allow_over_sign_up");
   const [savingSignupMode, setSavingSignupMode] = useState(false);
   const settingsIdCache = useRef({});
+  const trackerEntriesCache = useRef(null);
 
   // ── Row selection ─────────────────────────────────────────────────────────────
   const [selectedWorkerIds, setSelectedWorkerIds] = useState(new Set());
@@ -412,7 +413,7 @@ export default function Matrix() {
     // Same-tab fast sync from WorkerCell/Schedule — immediate local patch + fast refetch
     const onTemplateRowsUpdated = (e) => {
       const { rowId, updatedValues } = e.detail || {};
-      console.log("SCHEDULE MATRIX SYNC", { source: "same-tab", rowId, patchedLocalState: !!rowId });
+
       if (rowId && updatedValues) {
         setTemplateRows(prev => prev.map(row => row.id === rowId ? { ...row, values: updatedValues } : row));
       }
@@ -427,7 +428,7 @@ export default function Matrix() {
       bc.onmessage = (e) => {
         if (e.data?.type === 'templateRowsUpdated') {
           const { rowId, updatedValues } = e.data;
-          console.log("SCHEDULE MATRIX SYNC", { source: "broadcast-channel", rowId, patchedLocalState: !!rowId });
+
           if (rowId && updatedValues) {
             setTemplateRows(prev => prev.map(row => row.id === rowId ? { ...row, values: updatedValues } : row));
           }
@@ -442,7 +443,7 @@ export default function Matrix() {
         try {
           const data = JSON.parse(e.newValue || '{}');
           if (data.type === 'templateRowsUpdated') {
-            console.log("SCHEDULE MATRIX SYNC", { source: "localStorage", rowId: data.rowId });
+  
             debouncedLoadDataRef.current(true, true); // fast: 200ms
           }
         } catch {}
@@ -506,40 +507,49 @@ export default function Matrix() {
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
       const dateStrLocal = format(currentDate, "yyyy-MM-dd");
 
-      // Fetch availabilities, unavailabilities, template rows, and templates all in parallel
       const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
-      const [availabilitiesData, unavailabilitiesData, allTemplatesData, trackerEntriesData] = await Promise.all([
+      // Fetch core data in parallel (4 requests max)
+      const [availabilitiesData, unavailabilitiesData, allTemplatesData] = await Promise.all([
         base44.entities.Availability.filter({ week_start_date: weekStartStr }),
         viewMode === "daily"
           ? base44.entities.Unavailability.filter({ date: dateStrLocal })
           : base44.entities.Unavailability.list(),
         getCachedTemplates(base44.entities),
-        base44.entities.TrackerEntry.list(),
       ]);
 
-      // Fetch template rows for visible range + adjacent days (for cross-day briefing markers)
+      // Fetch tracker entries only once (cache for the session)
+      if (!trackerEntriesCache.current) {
+        trackerEntriesCache.current = await base44.entities.TrackerEntry.list();
+      }
+      const trackerEntriesData = trackerEntriesCache.current;
+
+      // Fetch template rows in small batches (max 3 parallel) to avoid rate limits
+      const batchFetch = async (dates) => {
+        const results = [];
+        for (let i = 0; i < dates.length; i += 3) {
+          const batch = dates.slice(i, i + 3);
+          const batchResults = await Promise.all(batch.map(d => base44.entities.TemplateRow.filter({ date: d })));
+          results.push(...batchResults);
+        }
+        return results;
+      };
+
       let templateRowArrays;
       if (viewMode === "daily") {
-        // Load D-1, D, D+1 so briefing markers on adjacent operational days are visible
         const adjacentDates = [
           addDaysString(dateStrLocal, -1),
           dateStrLocal,
           addDaysString(dateStrLocal, 1),
         ];
-        templateRowArrays = await Promise.all(
-          adjacentDates.map(d => base44.entities.TemplateRow.filter({ date: d }))
-        );
+        templateRowArrays = await batchFetch(adjacentDates);
       } else {
-        // Load week-1 through week+1
         const extendedDates = [
           addDaysString(weekStartStr, -1),
           ...weekDates,
           addDaysString(weekDates[weekDates.length - 1], 1),
         ];
-        templateRowArrays = await Promise.all(
-          extendedDates.map(d => base44.entities.TemplateRow.filter({ date: d }))
-        );
+        templateRowArrays = await batchFetch(extendedDates);
       }
 
       let filteredTemplateRows = templateRowArrays.flat();
