@@ -114,10 +114,12 @@ export function buildSharedMokedKey(template, row) {
 
 /**
  * Build the full canonical signup key.
- * Format: `${operational_date}__${sharedMokedKey}__${start_time}__${end_time}`
+ * Format: `${operational_date}__${sharedMokedKey}__${start_time}__${end_time}[__role:${roleName}]`
+ * roleName is appended when provided so each worker-column role has its own key.
  */
-export function buildSignupKey(operationalDate, sharedMokedKey, startTime, endTime) {
-  return `${operationalDate}__${sharedMokedKey}__${startTime}__${endTime}`;
+export function buildSignupKey(operationalDate, sharedMokedKey, startTime, endTime, roleName = null) {
+  const base = `${operationalDate}__${sharedMokedKey}__${startTime}__${endTime}`;
+  return roleName ? `${base}__role:${roleName}` : base;
 }
 
 // ── Status normalization ──────────────────────────────────────────────────────
@@ -140,12 +142,15 @@ function getShiftOperationalDate(shift) {
 /**
  * Returns Map: signupKey → unified shift descriptor.
  *
- * CRITICAL: requiredCount = number of distinct moked INSTANCES (by mokedInstanceKey),
- * NOT the number of TemplateRows.  A single moked instance with 3 worker columns
- * (= 3 rows) must produce requiredCount = 1, not 3.
+ * Each entry is PER ROLE: a moked with columns "נהג" and "ליד נהג" at the same
+ * time produces TWO separate entries — one per worker-column (role).
+ * Workers only see entries that match their role.
  *
- * Two same-named moked instances (different group_ids) at the same date+time
- * share one signup group with requiredCount = 2.
+ * signupKey format includes the role:
+ *   `${date}__${sharedMokedKey}__${startTime}__${endTime}__role:${roleName}`
+ *
+ * For mokedim with NO worker columns (no role columns), a single entry is
+ * produced with roleName = null (visible to everyone).
  */
 export function buildUnifiedShiftDemand(templateRows, templates) {
   const templateById = {};
@@ -164,47 +169,51 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
     const endTime   = values["סיום"]  || values["שעת סיום"];
     const operationalDate = row.date;
 
-    const mokedName       = getMokedDisplayName(row, tmpl);
-    const sharedMokedKey  = buildSharedMokedKey(tmpl, row);
-    const signupKey       = buildSignupKey(operationalDate, sharedMokedKey, startTime, endTime);
-    const instanceKey     = getMokedInstanceKey(row);
+    const mokedName      = getMokedDisplayName(row, tmpl);
+    const sharedMokedKey = buildSharedMokedKey(tmpl, row);
+    const instanceKey    = getMokedInstanceKey(row);
 
-    if (!map.has(signupKey)) {
-      map.set(signupKey, {
-        key: signupKey, signupKey, sharedMokedKey,
-        date: operationalDate, operational_date: operationalDate,
-        mokedName, startTime, endTime,
-        requiredCount: 0,
-        eligibleRoles: new Set(),
-        // Map: mokedInstanceKey → { mokedInstanceKey, template_id, group_id, row_ids[] }
-        possibleInstances: new Map(),
-      });
-    }
-    const unified = map.get(signupKey);
-
-    // ── Track moked instances (not individual rows) ───────────────────────────
-    if (!unified.possibleInstances.has(instanceKey)) {
-      unified.possibleInstances.set(instanceKey, {
-        mokedInstanceKey: instanceKey,
-        template_id: tmpl.id,
-        group_id: row.group_id || "default",
-        mokedName,
-        row_ids: [],
-      });
-    }
-    const instance = unified.possibleInstances.get(instanceKey);
-
-    // Deduplicate: never add the same row_id twice to the same instance
-    if (!instance.row_ids.includes(row.id)) {
-      instance.row_ids.push(row.id);
-    }
-
-    // Collect worker-column names for hasMyRole check (not for counting)
     const workerCols = (tmpl.columns || []).filter(c => c.type === "worker");
-    workerCols.forEach(col => unified.eligibleRoles.add(col.name));
 
-    // requiredCount = number of distinct moked INSTANCES
-    unified.requiredCount = unified.possibleInstances.size;
+    // If no worker columns — create one generic entry (role-agnostic)
+    const roleEntries = workerCols.length > 0
+      ? workerCols.map(col => ({ roleName: col.name }))
+      : [{ roleName: null }];
+
+    roleEntries.forEach(({ roleName }) => {
+      const signupKey = buildSignupKey(operationalDate, sharedMokedKey, startTime, endTime, roleName);
+
+      if (!map.has(signupKey)) {
+        map.set(signupKey, {
+          key: signupKey, signupKey, sharedMokedKey,
+          date: operationalDate, operational_date: operationalDate,
+          mokedName, startTime, endTime,
+          roleName,
+          requiredCount: 0,
+          eligibleRoles: roleName ? new Set([roleName]) : new Set(),
+          possibleInstances: new Map(),
+        });
+      }
+      const unified = map.get(signupKey);
+
+      // Track moked instances per role
+      if (!unified.possibleInstances.has(instanceKey)) {
+        unified.possibleInstances.set(instanceKey, {
+          mokedInstanceKey: instanceKey,
+          template_id: tmpl.id,
+          group_id: row.group_id || "default",
+          mokedName,
+          row_ids: [],
+        });
+      }
+      const instance = unified.possibleInstances.get(instanceKey);
+      if (!instance.row_ids.includes(row.id)) {
+        instance.row_ids.push(row.id);
+      }
+
+      // requiredCount = distinct moked instances for this role
+      unified.requiredCount = unified.possibleInstances.size;
+    });
   });
 
   return map;
@@ -214,9 +223,10 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
 /**
  * Counts workers where normalizeSignupType === "wanted" AND signupKey matches.
  * Only "wanted" consumes capacity. "available" and "unavailable" do not.
+ * When unifiedShift.roleName is set, only counts entries for that specific role.
  */
 export function getSignupsForShift(availabilities, unifiedShift, slotSignupKeyCount = 1) {
-  const { signupKey } = unifiedShift;
+  const { signupKey, roleName } = unifiedShift;
   const operationalDate = unifiedShift.operational_date || unifiedShift.date;
   const { startTime, endTime } = unifiedShift;
 
@@ -228,6 +238,8 @@ export function getSignupsForShift(availabilities, unifiedShift, slotSignupKeyCo
     // Phase 1: exact signupKey match (new-style records)
     const hasKeyedMatch = shifts.some(s => {
       if (normalizeSignupType(s) !== "wanted") return false;
+      // Role filter: when the shift has a role, only count entries for that role
+      if (roleName && s.role_or_qualification && s.role_or_qualification !== roleName) return false;
       if (s.signupKey) return s.signupKey === signupKey;
       if (s.sharedMokedKey) {
         const legacyKey = buildSignupKey(getShiftOperationalDate(s), s.sharedMokedKey, s.start_time, s.end_time);

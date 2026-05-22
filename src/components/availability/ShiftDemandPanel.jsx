@@ -37,13 +37,13 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
   // requiredCount = number of row instances (not worker columns)
   const requiredCount = shift.requiredCount || 1;
 
-  // eligibleRoles = Set of worker-column names from the template
-  const eligibleRoles = shift.eligibleRoles || new Set();
-  const hasMyRole = myRoles.size === 0
-    ? false  // no roles on worker record
-    : eligibleRoles.size === 0
-    ? true   // template has no worker columns — show to everyone
-    : [...myRoles].some(r => eligibleRoles.has(r));
+  // roleName = the specific worker-column role this chip is for (null = all roles)
+  const roleName = shift.roleName || null;
+  const hasMyRole = roleName === null
+    ? true   // no role restriction — show to everyone
+    : myRoles.size === 0
+    ? false  // worker has no roles
+    : myRoles.has(roleName);
 
   const signed = signedCount ?? 0;
   const { isFull, isOver, blocked } = calculateRoleStatus(requiredCount, signed, signupMode);
@@ -105,9 +105,6 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
     // signed up for this group → ignore the click to prevent double-registration
     if (chipIndex > 0 && selectedShifts.some(s => s.signupKey === shift.signupKey)) return;
 
-    // Use first eligible role name (or null) as the roleName passed to onSignup
-    const roleName = eligibleRoles.size > 0 ? [...eligibleRoles][0] : null;
-
     if (currentType === null) {
       onSignup && onSignup(shift, roleName, "wanted");
     } else if (currentType === "wanted") {
@@ -161,6 +158,8 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
       title={!hasMyRole ? "אין תפקיד מתאים" : blocked && !isSelected ? "המשמרת מלאה" : "לחץ לבחירה"}
       disabled={!canEdit}
     >
+      {/* Role label */}
+      {roleName && <div className="text-[9px] font-semibold text-purple-700 truncate leading-tight">{roleName}</div>}
       {/* Time range */}
       <div className="text-[10px] sm:text-[11px] text-gray-600">{shift.startTime}–{shift.endTime}</div>
 
@@ -325,30 +324,41 @@ export default function ShiftDemandPanel({
     return new Set(Array.isArray(currentWorker.role) ? currentWorker.role : [currentWorker.role].filter(Boolean));
   }, [currentWorker]);
 
+  // Filter demand to only show shifts relevant to this worker's roles
+  // (shifts with roleName=null are shown to everyone; role-specific shifts
+  //  are shown only if the worker has that role)
+  const filteredWeekDemand = useMemo(() => {
+    if (!currentWorker) return [];
+    return weekDemand.filter(shift => {
+      if (!shift.roleName) return true; // no role restriction
+      if (myRoles.size === 0) return false; // worker has no role
+      return myRoles.has(shift.roleName);
+    });
+  }, [weekDemand, myRoles, currentWorker]);
+
   // Build: slotKey (date__start__end) → count of distinct signupKeys at that slot
   const slotSignupKeyCountMap = useMemo(() => {
     const map = new Map();
-    weekDemand.forEach(shift => {
+    filteredWeekDemand.forEach(shift => {
       const slotKey = `${shift.date}__${shift.startTime}__${shift.endTime}`;
       map.set(slotKey, (map.get(slotKey) ?? 0) + 1);
     });
     return map;
-  }, [weekDemand]);
+  }, [filteredWeekDemand]);
 
   // Precompute signup counts once per allAvailabilities change, not per chip render.
-  // Pass per-slot count so Phase 3 (naked entry fallback) is skipped for multi-moked slots.
   const signupCountByKey = useMemo(() => {
     const map = new Map();
-    weekDemand.forEach(shift => {
+    filteredWeekDemand.forEach(shift => {
       const slotKey = `${shift.date}__${shift.startTime}__${shift.endTime}`;
       const count = slotSignupKeyCountMap.get(slotKey) ?? 1;
       map.set(shift.signupKey, getSignupsForShift(allAvailabilities, shift, count));
     });
     return map;
-  }, [allAvailabilities, weekDemand, slotSignupKeyCountMap]);
+  }, [allAvailabilities, filteredWeekDemand, slotSignupKeyCountMap]);
 
   const byDate = {};
-  weekDemand.forEach(s => {
+  filteredWeekDemand.forEach(s => {
     // Skip Saturday (day 6)
     const dayOfWeek = new Date(s.date + "T00:00:00").getDay();
     if (dayOfWeek === 6) return;
@@ -365,7 +375,7 @@ export default function ShiftDemandPanel({
   return (
     <Card className={`border-none shadow-lg mb-4 ${isLocked ? "opacity-60" : ""}`}>
       <CardContent className="py-3 px-4" dir="rtl">
-        {weekDemand.length === 0 ? (
+        {filteredWeekDemand.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">אין משמרות שהוגדרו בלוח לשבוע זה</p>
         ) : (
           <>
