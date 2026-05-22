@@ -87,6 +87,7 @@ export default function Availability() {
     multiDay: false
   });
   const [desiredShiftsCount, setDesiredShiftsCount] = useState("");
+  const [extraTaskStates, setExtraTaskStates] = useState({});
   const [openRegistrations, setOpenRegistrations] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
   const [allTemplateRowsForCalendar, setAllTemplateRowsForCalendar] = useState([]);
@@ -335,41 +336,49 @@ export default function Availability() {
           return seenKeys.get(key) === idx;
         });
         // Step 4: upgrade naked entries to keyed entries using the current week's demand map.
-        // If a naked entry matches exactly ONE signupKey this week → upgrade it.
-        // If it matches zero (stale) or 2+ (ambiguous multi-moked) → drop it.
         const weekRowsForUpgrade = allWeekRows.filter(r => weekDates.includes(r.date) && !r.values?.is_hidden && !r.values?.hidden);
-        const demandMapForUpgrade = buildUnifiedShiftDemand(weekRowsForUpgrade, templatesData);
-        const slotToSignupKeys = new Map();
-        demandMapForUpgrade.forEach((shift, key) => {
-          const slotKey = `${shift.date}__${shift.startTime}__${shift.endTime}`;
-          if (!slotToSignupKeys.has(slotKey)) slotToSignupKeys.set(slotKey, []);
-          slotToSignupKeys.get(slotKey).push(key);
-        });
 
-        const upgraded = deduped.map(s => {
-          if (s.signupKey || s.sharedMokedKey) return s; // already keyed — keep
-          const slotKey = `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`;
-          const keys = slotToSignupKeys.get(slotKey);
-          if (!keys || keys.length === 0) return null; // stale — drop
-          if (keys.length === 1) {
-            const matched = demandMapForUpgrade.get(keys[0]);
-            return {
-              ...s,
-              signupKey: matched.signupKey,
-              sharedMokedKey: matched.sharedMokedKey,
-              moked_name: matched.mokedName,
-              operational_date: s.operational_date || s.date,
-            };
-          }
-          return null; // ambiguous (2+ mokeds at same slot) — drop
-        }).filter(Boolean);
+        if (weekRowsForUpgrade.length === 0) {
+          // No schedule set up for this week — skip upgrade, keep deduped as-is
+          setSelectedShifts(deduped);
+          setOriginalShifts(JSON.parse(JSON.stringify(deduped)));
+          setExtraTaskStates(availabilities[0].extra_tasks || {});
+        } else {
+          const demandMapForUpgrade = buildUnifiedShiftDemand(weekRowsForUpgrade, templatesData);
+          const slotToSignupKeys = new Map();
+          demandMapForUpgrade.forEach((shift, key) => {
+            const slotKey = `${shift.date}__${shift.startTime}__${shift.endTime}`;
+            if (!slotToSignupKeys.has(slotKey)) slotToSignupKeys.set(slotKey, []);
+            slotToSignupKeys.get(slotKey).push(key);
+          });
 
-        setSelectedShifts(upgraded);
-        setOriginalShifts(JSON.parse(JSON.stringify(upgraded)));
+          const upgraded = deduped.map(s => {
+            if (s.signupKey || s.sharedMokedKey) return s; // already keyed — always keep
+            const slotKey = `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`;
+            const keys = slotToSignupKeys.get(slotKey);
+            if (!keys || keys.length === 0) return s; // no demand for slot → keep as-is
+            if (keys.length === 1) {
+              const matched = demandMapForUpgrade.get(keys[0]);
+              return {
+                ...s,
+                signupKey: matched.signupKey,
+                sharedMokedKey: matched.sharedMokedKey,
+                moked_name: matched.mokedName,
+                operational_date: s.operational_date || s.date,
+              };
+            }
+            return s; // ambiguous (2+ mokeds at same slot) → keep as-is, don't drop
+          });
+
+          setSelectedShifts(upgraded);
+          setOriginalShifts(JSON.parse(JSON.stringify(upgraded)));
+          setExtraTaskStates(availabilities[0].extra_tasks || {});
+        }
       } else {
         setExistingAvailability(null);
         setSelectedShifts([]);
         setOriginalShifts([]);
+        setExtraTaskStates({});
       }
 
       const weekUnavailabilities = unavailabilitiesData.filter((u) => {
@@ -433,7 +442,8 @@ export default function Availability() {
       week_start_date: weekStartStr,
       shifts: selectedShifts,
       status: "submitted",
-      desired_shifts: desiredShiftsCount ? parseInt(desiredShiftsCount) : null
+      desired_shifts: desiredShiftsCount ? parseInt(desiredShiftsCount) : null,
+      extra_tasks: extraTaskStates,
     };
 
     let updatedAvailability;
@@ -854,6 +864,7 @@ END:VEVENT
       shifts: cleanedShifts,
       status: existingAvailability?.status || "draft",
       desired_shifts: desiredShiftsCount ? parseInt(desiredShiftsCount) : null,
+      extra_tasks: extraTaskStates,
     };
 
     // 3. Optimistic weekAvailabilities update so ShiftDemandPanel sees new count immediately
@@ -892,6 +903,21 @@ END:VEVENT
         timestamp: Date.now(),
       }
     }));
+  };
+
+  const cycleExtraTask = (taskName) => {
+    if (existingAvailability?.status === "approved" && !showEditMode) return;
+    if (currentWorker?.availability_locked) return;
+    const current = extraTaskStates[taskName] || null;
+    let next;
+    if (current === null || current === undefined) next = "wanted";
+    else if (current === "wanted") next = "available";
+    else if (current === "available") next = "unavailable";
+    else next = null;
+    const updated = { ...extraTaskStates };
+    if (next === null) delete updated[taskName];
+    else updated[taskName] = next;
+    setExtraTaskStates(updated);
   };
 
   // Stale registration name denylist — permanently ignored regardless of any other check

@@ -33,7 +33,7 @@ function dateLabel(dateStr) {
 // Only the chip at index 0 shows a personal selection highlight when the worker signed up.
 // Chips at index >= 1 always show count but never the personal highlight (they are
 // identical-key duplicates caused by same-name same-time mokeds).
-function ShiftChip({ shift, chipIndex = 0, signedCount, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
+function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
   // requiredCount = number of row instances (not worker columns)
   const requiredCount = shift.requiredCount || 1;
 
@@ -62,8 +62,11 @@ function ShiftChip({ shift, chipIndex = 0, signedCount, allAvailabilities, worke
           const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
           return legacyKey === shift.signupKey;
         }
-        // Naked entries are cleaned/upgraded on load — no fallback needed here
-        return false;
+        // 3. Naked fallback — only for unambiguous single-moked slots
+        if (!isUnambiguousSlot) return false;
+        if (s.signupKey || s.sharedMokedKey) return false;
+        const sDate = s.operational_date || s.date;
+        return sDate === operationalDate && s.start_time === shift.startTime && s.end_time === shift.endTime;
       })
     : null; // chipIndex > 0: never show as personally selected
   const currentType = currentEntry?.type || null;
@@ -191,7 +194,7 @@ function ShiftChip({ shift, chipIndex = 0, signedCount, allAvailabilities, worke
 }
 
 // ── Day column ─────────────────────────────────────────────────────────────────
-function DayColumn({ dateStr, shifts, signupCountByKey, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
+function DayColumn({ dateStr, shifts, signupCountByKey, slotSignupKeyCountMap, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
   if (shifts.length === 0) return null;
 
   const { dayName, shortDate, hebrewDate } = dateLabel(dateStr);
@@ -230,11 +233,14 @@ function DayColumn({ dateStr, shifts, signupCountByKey, allAvailabilities, worke
                 return mokedShifts.map((shift) => {
                   const chipIndex = signupKeyIndexTracker[shift.signupKey] ?? 0;
                   signupKeyIndexTracker[shift.signupKey] = chipIndex + 1;
+                  const slotKey = `${shift.date}__${shift.startTime}__${shift.endTime}`;
+                  const isUnambiguousSlot = (slotSignupKeyCountMap?.get(slotKey) ?? 0) <= 1;
                   return (
                 <ShiftChip
                   key={`${shift.key}-${chipIndex}`}
                   shift={shift}
                   chipIndex={chipIndex}
+                  isUnambiguousSlot={isUnambiguousSlot}
                   signedCount={signupCountByKey.get(shift.signupKey) ?? 0}
                   allAvailabilities={allAvailabilities}
                   workers={workers}
@@ -378,6 +384,7 @@ export default function ShiftDemandPanel({
                   dateStr={date}
                   shifts={byDate[date]}
                   signupCountByKey={signupCountByKey}
+                  slotSignupKeyCountMap={slotSignupKeyCountMap}
                   allAvailabilities={allAvailabilities}
                   workers={workers}
                   myRoles={myRoles}
