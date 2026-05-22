@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Pencil, Check, X, BookmarkPlus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, X, BookmarkPlus, GripVertical } from "lucide-react";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import toast from "react-hot-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -213,17 +214,39 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
               <div className="overflow-x-auto bg-white">
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <DragDropContext onDragEnd={(result) => {
+                      if (!result.destination || result.source.index === result.destination.index) return;
+                      const cols = [...editingPreset.template_config.columns];
+                      const [moved] = cols.splice(result.source.index, 1);
+                      cols.splice(result.destination.index, 0, moved);
+                      setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
+                    }}>
+                    <Droppable droppableId="preset-cols" direction="horizontal">
+                      {(provided) => (
+                    <TableRow ref={provided.innerRef} {...provided.droppableProps}>
                       {editingPreset.template_config.columns.map((col, idx) => (
-                        <TableHead key={idx} className="text-center p-1" dir="rtl" style={{ minWidth: 90 }}>
+                        <Draggable key={`preset-col-${idx}`} draggableId={`preset-col-${idx}`} index={idx}>
+                          {(drag, snapshot) => (
+                        <TableHead
+                          ref={drag.innerRef}
+                          {...drag.draggableProps}
+                          className={`text-center p-1 ${snapshot.isDragging ? "bg-blue-50 shadow-lg" : ""}`}
+                          dir="rtl"
+                          style={{ minWidth: 90, ...drag.draggableProps.style }}
+                        >
                           <div className="flex flex-col items-center gap-1">
-                            <Input
-                              value={col.name}
-                              onChange={(e) => updateColumn(idx, "name", e.target.value)}
-                              placeholder={`עמודה ${idx + 1}`}
-                              className="h-6 text-xs text-center px-1 border-dashed"
-                              dir="rtl"
-                            />
+                            <div className="flex items-center gap-0.5 w-full">
+                              <span {...drag.dragHandleProps} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 flex-shrink-0">
+                                <GripVertical className="w-3 h-3" />
+                              </span>
+                              <Input
+                                value={col.name}
+                                onChange={(e) => updateColumn(idx, "name", e.target.value)}
+                                placeholder={`עמודה ${idx + 1}`}
+                                className="h-6 text-xs text-center px-1 border-dashed flex-1"
+                                dir="rtl"
+                              />
+                            </div>
                             <div className="flex items-center gap-0.5">
                               <Select value={col.type} onValueChange={(v) => updateColumn(idx, "type", v)}>
                                 <SelectTrigger className="h-5 w-20 text-[10px] px-1">
@@ -235,22 +258,6 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                                   ))}
                                 </SelectContent>
                               </Select>
-                              <Button size="icon" variant="ghost" className="h-5 w-5 p-0" disabled={idx === 0}
-                                onClick={() => {
-                                  const cols = [...editingPreset.template_config.columns];
-                                  [cols[idx - 1], cols[idx]] = [cols[idx], cols[idx - 1]];
-                                  setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
-                                }}>
-                                <ChevronRight className="w-3 h-3" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-5 w-5 p-0" disabled={idx === editingPreset.template_config.columns.length - 1}
-                                onClick={() => {
-                                  const cols = [...editingPreset.template_config.columns];
-                                  [cols[idx], cols[idx + 1]] = [cols[idx + 1], cols[idx]];
-                                  setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
-                                }}>
-                                <ChevronLeft className="w-3 h-3" />
-                              </Button>
                               <Button size="icon" variant="ghost" className="h-5 w-5 p-0 text-red-500 hover:text-red-700"
                                 onClick={() => removeColumn(idx)}>
                                 <Trash2 className="w-3 h-3" />
@@ -258,9 +265,15 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                             </div>
                           </div>
                         </TableHead>
+                          )}
+                        </Draggable>
                       ))}
+                      {provided.placeholder}
                       <TableHead className="text-center text-xs w-20" dir="rtl">סטטוס</TableHead>
                     </TableRow>
+                      )}
+                    </Droppable>
+                    </DragDropContext>
                   </TableHeader>
                   <TableBody>
                     {(editingPreset.template_config.default_rows || [{}]).map((row, rowIdx) => (

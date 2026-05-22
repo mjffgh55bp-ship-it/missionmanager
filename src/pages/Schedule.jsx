@@ -4,7 +4,7 @@ import { getCachedWorkers, getCachedTemplates, getCachedAllSettings } from "@/li
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Pencil, X, Copy, UserCheck, Users } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Copy, UserCheck, Users, GripVertical } from "lucide-react";
 import { format, addDays, subDays, startOfWeek, differenceInDays } from "date-fns";
 import { getHebrewDate } from "../components/utils/HebrewDate";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -38,6 +38,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import ColumnCell from "../components/schedule/ColumnCell";
 import WorkerCell from "../components/schedule/WorkerCell";
 import TimeCell from "../components/schedule/TimeCell";
@@ -512,6 +513,15 @@ export default function Schedule() {
     setEditingMokedNameValue("");
   };
 
+  const saveColumnOrder = async (templateId, newOrderedColumns) => {
+    const newCustomOrders = { ...customColumnOrders, [templateId]: newOrderedColumns.map((c) => c.name) };
+    setCustomColumnOrders(newCustomOrders);
+    const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
+    const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
+    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+    else await base44.entities.AppSettings.create(data);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8 flex items-center justify-center">
@@ -862,81 +872,84 @@ export default function Schedule() {
                       </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              {editMode && <TableHead className="w-[60px] text-center" dir="rtl"></TableHead>}
-                              {orderedColumns.map((col, idx) => (
-                                <TableHead key={idx} style={{ width: `${col.width}px` }} dir="rtl" className="text-center">
-                                  <div className="flex items-center gap-1 justify-center">
-                                    <span>{col.name}</span>
-                                    {editMode && (
-                                      <div className="flex gap-0.5">
-                                        <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === 0}
-                                          onClick={async () => {
-                                            const newOrder = [...orderedColumns];
-                                            [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
-                                            const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map((c) => c.name) };
-                                            setCustomColumnOrders(newCustomOrders);
-                                            const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
-                                            const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
-                                            if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data); else await base44.entities.AppSettings.create(data);
-                                          }}>
-                                          <ChevronRight className="w-3 h-3" />
-                                        </Button>
-                                        <Button size="icon" variant="ghost" className="h-4 w-4 p-0" disabled={idx === orderedColumns.length - 1}
-                                          onClick={async () => {
-                                            const newOrder = [...orderedColumns];
-                                            [newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]];
-                                            const newCustomOrders = { ...customColumnOrders, [template.id]: newOrder.map((c) => c.name) };
-                                            setCustomColumnOrders(newCustomOrders);
-                                            const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
-                                            const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
-                                            if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data); else await base44.entities.AppSettings.create(data);
-                                          }}>
-                                          <ChevronLeft className="w-3 h-3" />
-                                        </Button>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <DragDropContext onDragEnd={async (result) => {
+                            if (!result.destination || result.source.index === result.destination.index) return;
+                            const newOrder = [...orderedColumns];
+                            const [moved] = newOrder.splice(result.source.index, 1);
+                            newOrder.splice(result.destination.index, 0, moved);
+                            await saveColumnOrder(template.id, newOrder);
+                          }}>
+                          <Droppable droppableId={`cols-${group.key}`} direction="horizontal">
+                            {(provided) => (
+                          <TableRow ref={provided.innerRef} {...provided.droppableProps}>
+                            {editMode && <TableHead className="w-[60px] text-center" dir="rtl"></TableHead>}
+                            {orderedColumns.map((col, idx) => (
+                              editMode ? (
+                                <Draggable key={col.name} draggableId={`${group.key}-${col.name}`} index={idx}>
+                                  {(drag, snapshot) => (
+                                    <TableHead
+                                      ref={drag.innerRef}
+                                      {...drag.draggableProps}
+                                      style={{ width: `${col.width}px`, ...drag.draggableProps.style }}
+                                      dir="rtl"
+                                      className={`text-center select-none ${snapshot.isDragging ? "bg-blue-50 shadow-lg" : ""}`}
+                                    >
+                                      <div className="flex items-center gap-1 justify-center">
+                                        <span {...drag.dragHandleProps} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+                                          <GripVertical className="w-3 h-3" />
+                                        </span>
+                                        <span>{col.name}</span>
                                         <Button size="icon" variant="ghost" className="h-4 w-4 p-0 text-red-500 hover:text-red-700"
-                                           onClick={async () => {
-                                             if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
-                                               const isDailyColumn = (dailyCustomColumns[template.id] || []).some((c) => c.name === col.name);
-                                               if (isDailyColumn) {
-                                                 const updatedDailyColumns = { ...dailyCustomColumns, [template.id]: (dailyCustomColumns[template.id] || []).filter((c) => c.name !== col.name) };
-                                                 setDailyCustomColumns(updatedDailyColumns);
-                                                 const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
-                                                 const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
-                                                 if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                                               } else {
-                                                 const updatedColumns = template.columns.filter((c) => c.name !== col.name);
-                                                 // Optimistic update — no need to reload
-                                                 setAllTemplates(prev => prev.map(t => t.id === template.id ? { ...t, columns: updatedColumns } : t));
-                                                 setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, columns: updatedColumns } : t));
-                                                 await base44.entities.Template.update(template.id, { columns: updatedColumns });
-                                               }
-                                             }
-                                           }}>
+                                          onClick={async () => {
+                                            if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
+                                              const isDailyColumn = (dailyCustomColumns[template.id] || []).some((c) => c.name === col.name);
+                                              if (isDailyColumn) {
+                                                const updatedDailyColumns = { ...dailyCustomColumns, [template.id]: (dailyCustomColumns[template.id] || []).filter((c) => c.name !== col.name) };
+                                                setDailyCustomColumns(updatedDailyColumns);
+                                                const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
+                                                const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
+                                                if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+                                              } else {
+                                                const updatedColumns = template.columns.filter((c) => c.name !== col.name);
+                                                setAllTemplates(prev => prev.map(t => t.id === template.id ? { ...t, columns: updatedColumns } : t));
+                                                setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, columns: updatedColumns } : t));
+                                                await base44.entities.Template.update(template.id, { columns: updatedColumns });
+                                              }
+                                            }
+                                          }}>
                                           <Trash2 className="w-3 h-3" />
                                         </Button>
                                       </div>
-                                    )}
-                                  </div>
+                                    </TableHead>
+                                  )}
+                                </Draggable>
+                              ) : (
+                                <TableHead key={col.name} style={{ width: `${col.width}px` }} dir="rtl" className="text-center">
+                                  <span>{col.name}</span>
                                 </TableHead>
-                              ))}
-                              <TableHead className="w-[100px] text-center" dir="rtl">סטטוס</TableHead>
-                              {editMode && <TableHead className="w-[60px] text-center" dir="rtl"></TableHead>}
-                              {editMode && (
-                                <TableHead className="w-[40px] p-0 text-center">
-                                  <button
-                                    onClick={() => { setSelectedTemplate(template); setShowAddTemplateColumnDialog(true); }}
-                                    className="flex items-center justify-center w-full h-full px-2 py-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors rounded"
-                                    title="הוסף עמודה">
-                                    <Plus className="w-4 h-4" />
-                                  </button>
-                                </TableHead>
-                              )}
-                            </TableRow>
-                          </TableHeader>
+                              )
+                            ))}
+                            {provided.placeholder}
+                            <TableHead className="w-[100px] text-center" dir="rtl">סטטוס</TableHead>
+                            {editMode && <TableHead className="w-[60px] text-center" dir="rtl"></TableHead>}
+                            {editMode && (
+                              <TableHead className="w-[40px] p-0 text-center">
+                                <button
+                                  onClick={() => { setSelectedTemplate(template); setShowAddTemplateColumnDialog(true); }}
+                                  className="flex items-center justify-center w-full h-full px-2 py-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors rounded"
+                                  title="הוסף עמודה">
+                                  <Plus className="w-4 h-4" />
+                                </button>
+                              </TableHead>
+                            )}
+                          </TableRow>
+                            )}
+                          </Droppable>
+                          </DragDropContext>
+                        </TableHeader>
                           <TableBody>
                             {templateRowsForTemplate.length === 0 ? (
                               <TableRow>
