@@ -30,21 +30,28 @@ const COLUMN_TYPE_OPTIONS = [
 // Inner component so useColumnDrag hook is called with the live columns array
 function PresetColumnHeaderRow({ columns, onReorder, onRemove, updateColumn }) {
   const { dragState, getDragHandleProps, getHeaderProps } = useColumnDrag(columns, onReorder);
+  const { dragging, dropIndex } = dragState;
   return (
     <TableRow>
       {columns.map((col, idx) => {
-        const isDragging = dragState.dragging === col.name;
-        const showIndicatorBefore = dragState.dropIndex === idx;
+        const isDragging = dragging === col.name;
+        const showBefore = dragging && dropIndex === idx;
+        const showAfter = dragging && idx === columns.length - 1 && dropIndex === columns.length;
         return (
           <TableHead
             key={`${col.name}-${idx}`}
-            className={`text-center p-1 relative ${isDragging ? "opacity-40 bg-blue-50" : ""}`}
+            className={`text-center p-1 relative transition-colors ${isDragging ? "opacity-30 bg-blue-50" : ""} ${
+              !isDragging && dragging && dropIndex !== null && (dropIndex === idx || dropIndex === idx + 1) ? "bg-blue-50/40" : ""
+            }`}
             dir="rtl"
             style={{ minWidth: 90 }}
             {...getHeaderProps(col.name, idx)}
           >
-            {showIndicatorBefore && (
-              <span style={{ position: "absolute", right: -2, top: 0, bottom: 0, width: 3, background: "#3b82f6", zIndex: 10, borderRadius: 2, pointerEvents: "none" }} />
+            {showBefore && (
+              <span style={{ position: "absolute", left: -2, top: 2, bottom: 2, width: 4, background: "#3b82f6", zIndex: 20, borderRadius: 2, pointerEvents: "none", boxShadow: "0 0 4px #3b82f6aa" }} />
+            )}
+            {showAfter && (
+              <span style={{ position: "absolute", right: -2, top: 2, bottom: 2, width: 4, background: "#3b82f6", zIndex: 20, borderRadius: 2, pointerEvents: "none", boxShadow: "0 0 4px #3b82f6aa" }} />
             )}
             <div className="flex flex-col items-center gap-1">
               <div className="flex items-center gap-0.5 w-full">

@@ -4,64 +4,65 @@ import { Button } from "@/components/ui/button";
 import { GripVertical, Trash2, Plus } from "lucide-react";
 import { useColumnDrag } from "@/hooks/useColumnDrag";
 
-/**
- * Renders a draggable table header row for column reordering.
- * Uses native HTML5 drag events + DOM midpoint calculation for accurate drop-between-columns.
- */
+const DropIndicator = () => (
+  <span
+    style={{
+      position: "absolute",
+      left: -2,
+      top: 2,
+      bottom: 2,
+      width: 4,
+      background: "#3b82f6",
+      zIndex: 20,
+      borderRadius: 2,
+      pointerEvents: "none",
+      boxShadow: "0 0 4px #3b82f6aa",
+    }}
+  />
+);
+
 export default function DraggableColumnHeader({
   groupKey,
   orderedColumns,
   editMode,
-  dailyCustomColumns,
   templateId,
-  template,
-  dateString,
   onReorder,
   onDeleteColumn,
   onAddColumn,
-  setDailyCustomColumns,
-  setAllTemplates,
-  setTemplates,
-  base44,
 }) {
   const { dragState, getDragHandleProps, getHeaderProps } = useColumnDrag(
     orderedColumns,
     onReorder
   );
 
+  const { dragging, dropIndex } = dragState;
+
   return (
     <TableRow>
       {editMode && <TableHead className="w-[60px] text-center" dir="rtl" />}
       {orderedColumns.map((col, idx) => {
-        const isDragging = dragState.dragging === col.name;
-        const isDropTarget = dragState.dragging && dragState.dragging !== col.name && dragState.dropIndex !== null;
-        const showIndicatorBefore = dragState.dropIndex === idx;
-        const showIndicatorAfter = dragState.dropIndex === idx + 1 && idx === orderedColumns.length - 1;
+        const isDragging = dragging === col.name;
+        // Show indicator on left edge of this column when dropIndex === idx
+        const showBefore = editMode && dragging && dropIndex === idx;
+        // Show indicator on right edge of last column when dropIndex === length
+        const showAfter = editMode && dragging && idx === orderedColumns.length - 1 && dropIndex === orderedColumns.length;
 
         return (
           <TableHead
             key={col.name}
             dir="rtl"
-            className={`text-center select-none relative ${isDragging ? "opacity-40 bg-blue-50" : ""}`}
+            className={`text-center select-none relative transition-colors ${
+              isDragging ? "opacity-30 bg-blue-50" : ""
+            } ${
+              !isDragging && dragging && dropIndex !== null && (dropIndex === idx || dropIndex === idx + 1)
+                ? "bg-blue-50/40"
+                : ""
+            }`}
             style={{ width: `${col.width}px` }}
             {...(editMode ? getHeaderProps(col.name, idx) : {})}
           >
-            {/* Drop indicator — vertical line before this column */}
-            {editMode && showIndicatorBefore && (
-              <span
-                style={{
-                  position: "absolute",
-                  right: -2,
-                  top: 0,
-                  bottom: 0,
-                  width: 3,
-                  background: "#3b82f6",
-                  zIndex: 10,
-                  borderRadius: 2,
-                  pointerEvents: "none",
-                }}
-              />
-            )}
+            {/* Drop indicator on LEFT edge (in LTR layout = before this column) */}
+            {showBefore && <DropIndicator />}
 
             {editMode ? (
               <div className="flex items-center gap-1 justify-center">
@@ -84,6 +85,24 @@ export default function DraggableColumnHeader({
               </div>
             ) : (
               <span>{col.name}</span>
+            )}
+
+            {/* Drop indicator on RIGHT edge (after last column) */}
+            {showAfter && (
+              <span
+                style={{
+                  position: "absolute",
+                  right: -2,
+                  top: 2,
+                  bottom: 2,
+                  width: 4,
+                  background: "#3b82f6",
+                  zIndex: 20,
+                  borderRadius: 2,
+                  pointerEvents: "none",
+                  boxShadow: "0 0 4px #3b82f6aa",
+                }}
+              />
             )}
           </TableHead>
         );
