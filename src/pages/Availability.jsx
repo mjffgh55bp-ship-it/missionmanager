@@ -1131,9 +1131,14 @@ END:VEVENT
               </Card>
             )}
 
-            {/* 3.4 Shift demand panel */}
+            {/* 3.4 Shift demand panel — only show rows for mokeds with open registration */}
             <ShiftDemandPanel
-              templateRows={templateRows}
+              templateRows={openRegistrations.length === 0
+                ? []
+                : templateRows.filter(row => {
+                    const key = `${row.template_id}_${row.group_id || 'default'}`;
+                    return openRegistrations.some(r => r && r.key === key);
+                  })}
               allTemplates={allTemplates}
               allAvailabilities={weekAvailabilities}
               workers={workers}
