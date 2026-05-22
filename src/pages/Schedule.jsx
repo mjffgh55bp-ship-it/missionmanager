@@ -1143,7 +1143,10 @@ export default function Schedule() {
                     <Select value={newTemplateColumnRole} onValueChange={(val) => { setNewTemplateColumnRole(val); setNewTemplateColumnType(val); }}>
                       <SelectTrigger dir="rtl"><SelectValue placeholder="בחר תפקיד..." /></SelectTrigger>
                       <SelectContent>
-                        {workerRoles.map((role) => <SelectItem key={role} value={role}>{role}</SelectItem>)}
+                        {workerRoles.map((role, i) => {
+                          const roleName = typeof role === "string" ? role : role.name;
+                          return <SelectItem key={i} value={roleName}>{roleName}</SelectItem>;
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
