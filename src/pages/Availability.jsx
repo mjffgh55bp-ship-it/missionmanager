@@ -305,15 +305,33 @@ export default function Availability() {
           return !slotsWithKeyedEntry.has(slotKey); // remove naked only if a keyed entry exists for this slot
         });
 
+        // Step 2b: remove naked entries for slots that have multiple distinct signupKeys.
+        // These entries are permanently ambiguous — cannot be assigned to either moked.
+        const slotSignupKeys = new Map(); // slotKey → Set<signupKey>
+        rawShifts.forEach(s => {
+          if (s.signupKey) {
+            const slotKey = `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`;
+            if (!slotSignupKeys.has(slotKey)) slotSignupKeys.set(slotKey, new Set());
+            slotSignupKeys.get(slotKey).add(s.signupKey);
+          }
+        });
+        const withoutAmbiguousNakeds = withoutNakedDupes.filter(s => {
+          if (s.signupKey || s.sharedMokedKey) return true;
+          const slotKey = `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`;
+          const keysAtSlot = slotSignupKeys.get(slotKey);
+          if (keysAtSlot && keysAtSlot.size > 1) return false; // ambiguous — remove
+          return true;
+        });
+
         // Step 3: deduplicate remaining entries by their canonical key (keep last occurrence)
         const seenKeys = new Map();
-        withoutNakedDupes.forEach((s, idx) => {
+        withoutAmbiguousNakeds.forEach((s, idx) => {
           const key = s.signupKey || (s.sharedMokedKey
             ? buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time)
             : `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`);
           seenKeys.set(key, idx);
         });
-        const deduped = withoutNakedDupes.filter((s, idx) => {
+        const deduped = withoutAmbiguousNakeds.filter((s, idx) => {
           const key = s.signupKey || (s.sharedMokedKey
             ? buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time)
             : `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`);

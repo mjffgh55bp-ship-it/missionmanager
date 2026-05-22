@@ -215,7 +215,7 @@ export function buildUnifiedShiftDemand(templateRows, templates) {
  * Counts workers where normalizeSignupType === "wanted" AND signupKey matches.
  * Only "wanted" consumes capacity. "available" and "unavailable" do not.
  */
-export function getSignupsForShift(availabilities, unifiedShift) {
+export function getSignupsForShift(availabilities, unifiedShift, allSignupKeysForSlot = null) {
   const { signupKey } = unifiedShift;
   const operationalDate = unifiedShift.operational_date || unifiedShift.date;
   const { startTime, endTime } = unifiedShift;
@@ -258,9 +258,11 @@ export function getSignupsForShift(availabilities, unifiedShift) {
     if (hasOtherMokedKeyedEntry) return;
 
     // Phase 3: naked entry (no moked identity) — legacy data
-    // Only count if there is exactly ONE signup group for this date+time slot.
-    // If there are multiple possible groups (different signupKeys share same date+time),
-    // we cannot assign the naked entry to any specific moked — log a warning and skip.
+    // ONLY run if there is exactly ONE signup group for this date+time slot.
+    // If allSignupKeysForSlot has more than 1 entry, naked entries are AMBIGUOUS —
+    // they cannot be assigned to any specific moked, so skip Phase 3 entirely.
+    if (allSignupKeysForSlot !== null && allSignupKeysForSlot.size > 1) return;
+
     const hasNakedMatch = shifts.some(s => {
       if (normalizeSignupType(s) !== "wanted") return false;
       if (s.signupKey || s.sharedMokedKey) return false;
@@ -269,13 +271,6 @@ export function getSignupsForShift(availabilities, unifiedShift) {
         s.end_time === endTime;
     });
     if (hasNakedMatch) {
-      console.warn("AMBIGUOUS LEGACY SIGNUP — counting for shift but no moked identity:", {
-        worker_id: avail.worker_id,
-        signupKey,
-        operationalDate,
-        startTime,
-        endTime,
-      });
       signedWorkerIds.add(avail.worker_id);
     }
   });

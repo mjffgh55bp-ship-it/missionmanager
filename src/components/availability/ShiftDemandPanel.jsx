@@ -328,14 +328,29 @@ export default function ShiftDemandPanel({
     return new Set(Array.isArray(currentWorker.role) ? currentWorker.role : [currentWorker.role].filter(Boolean));
   }, [currentWorker]);
 
-  // Precompute signup counts once per allAvailabilities change, not per chip render
+  // Build: slotKey (date__start__end) → Set of signupKeys at that slot
+  const slotSignupKeysMap = useMemo(() => {
+    const map = new Map();
+    weekDemand.forEach(shift => {
+      const slotKey = `${shift.date}__${shift.startTime}__${shift.endTime}`;
+      if (!map.has(slotKey)) map.set(slotKey, new Set());
+      map.get(slotKey).add(shift.signupKey);
+    });
+    return map;
+  }, [weekDemand]);
+
+  // Precompute signup counts once per allAvailabilities change, not per chip render.
+  // Pass per-slot key set so Phase 3 (naked entry fallback) is disabled when multiple
+  // differently-named mokeds share the same date+time slot.
   const signupCountByKey = useMemo(() => {
     const map = new Map();
     weekDemand.forEach(shift => {
-      map.set(shift.signupKey, getSignupsForShift(allAvailabilities, shift));
+      const slotKey = `${shift.date}__${shift.startTime}__${shift.endTime}`;
+      const keysForSlot = slotSignupKeysMap.get(slotKey) ?? new Set([shift.signupKey]);
+      map.set(shift.signupKey, getSignupsForShift(allAvailabilities, shift, keysForSlot));
     });
     return map;
-  }, [allAvailabilities, weekDemand]);
+  }, [allAvailabilities, weekDemand, slotSignupKeysMap]);
 
   const byDate = {};
   weekDemand.forEach(s => {
