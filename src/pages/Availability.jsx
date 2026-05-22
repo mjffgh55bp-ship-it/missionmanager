@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Calendar as CalendarIcon, Check, X, AlertCircle, Info, GripVertical, Plus, XCircle, Star, Ban, ChevronLeft, ChevronRight, PartyPopper, Pencil, Download, Lock, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Check, X, Info, GripVertical, Plus, XCircle, Star, Ban, ChevronLeft, ChevronRight, PartyPopper, Pencil, Download, Lock } from "lucide-react";
 import { format, startOfWeek, addDays, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -88,7 +88,6 @@ export default function Availability() {
   });
   const [desiredShiftsCount, setDesiredShiftsCount] = useState("");
   const [openRegistrations, setOpenRegistrations] = useState([]);
-  const [extraTaskStates, setExtraTaskStates] = useState({});
   const [templateRows, setTemplateRows] = useState([]);
   const [allTemplateRowsForCalendar, setAllTemplateRowsForCalendar] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
@@ -98,9 +97,7 @@ export default function Availability() {
   const [editingTips, setEditingTips] = useState(false);
   const [tipsEditValue, setTipsEditValue] = useState("");
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
-  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
-  const [cleanupPreview, setCleanupPreview] = useState(null);
-  const [cleanupLoading, setCleanupLoading] = useState(false);
+
   const initialLoadStarted = useRef(false);
   const lastWeekStart = useRef(null);
   const staticLoaded = useRef(false);
@@ -339,7 +336,6 @@ export default function Availability() {
         });
         setSelectedShifts(deduped);
         setOriginalShifts(JSON.parse(JSON.stringify(deduped)));
-        setExtraTaskStates(availabilities[0].extra_tasks || {});
       } else {
         setExistingAvailability(null);
         setSelectedShifts([]);
@@ -380,20 +376,6 @@ export default function Availability() {
     await loadDynamicData(cachedWorker.current, cachedUser.current);
   };
 
-  const cycleExtraTask = (taskName) => {
-    if (existingAvailability?.status === "approved" && !showEditMode) return;
-    if (currentWorker?.availability_locked) return;
-    const current = extraTaskStates[taskName] || null;
-    let next;
-    if (current === null || current === undefined) next = "wanted";else
-    if (current === "wanted") next = "available";else
-    if (current === "available") next = "unavailable";else
-    next = null;
-    const updated = { ...extraTaskStates };
-    if (next === null) delete updated[taskName];else
-    updated[taskName] = next;
-    setExtraTaskStates(updated);
-  };
 
   const handleDragEnd = (result, listType) => {
     if (!result.destination) return;
@@ -420,7 +402,6 @@ export default function Availability() {
       worker_name: currentWorker.nickname,
       week_start_date: weekStartStr,
       shifts: selectedShifts,
-      extra_tasks: extraTaskStates,
       status: "submitted",
       desired_shifts: desiredShiftsCount ? parseInt(desiredShiftsCount) : null
     };
@@ -841,7 +822,6 @@ END:VEVENT
       worker_name: currentWorker.nickname,
       week_start_date: weekStartStr,
       shifts: cleanedShifts,
-      extra_tasks: extraTaskStates,
       status: existingAvailability?.status || "draft",
       desired_shifts: desiredShiftsCount ? parseInt(desiredShiftsCount) : null,
     };
@@ -899,131 +879,7 @@ END:VEVENT
     return keys;
   }, [templateRows]);
 
-  // A registration is valid only if its key maps to a real TemplateRow group in this week,
-  // it has shifts, its date is in the week, and its name is not denylisted.
-  // openRegistrations state is already pre-filtered by loadDynamicData — this is a final UI guard.
-  const validOpenRegistrations = useMemo(() => {
-    // If templateRows not loaded yet, show nothing to avoid flash of stale data
-    if (activeGroupKeys.size === 0) return [];
-    const weekStartStr = format(weekStart, "yyyy-MM-dd");
-    const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-    return openRegistrations.filter(reg => {
-      const regName = reg?.name || (typeof reg === 'string' ? reg : '');
-      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
-      const regDate = reg?.date || null;
-      const regShifts = reg?.shifts || [];
-      if (STALE_REG_DENYLIST.some(d => regName.includes(d) || regKey.includes(d))) return false;
-      if (regShifts.length === 0) return false;
-      if (regDate && (regDate < weekStartStr || regDate > weekEndStr)) return false;
-      if (!activeGroupKeys.has(regKey)) return false;
-      return true;
-    });
-  }, [openRegistrations, activeGroupKeys, weekStart]);
 
-  // Compute stale keys for cleanup (inverse of valid)
-  const staleRegistrations = useMemo(() => {
-    if (templateRows.length === 0) return [];
-    const weekStartStr = format(weekStart, "yyyy-MM-dd");
-    const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-    return openRegistrations.filter(reg => {
-      const regName = reg?.name || (typeof reg === 'string' ? reg : '');
-      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
-      const regDate = reg?.date || null;
-      const regShifts = reg?.shifts || [];
-      if (STALE_REG_DENYLIST.some(d => regName.includes(d) || regKey.includes(d))) return true;
-      if (regShifts.length === 0) return true;
-      if (regDate && (regDate < weekStartStr || regDate > weekEndStr)) return true;
-      if (!activeGroupKeys.has(regKey)) return true;
-      return false;
-    });
-  }, [openRegistrations, activeGroupKeys, templateRows, weekStart]);
-
-  // Build stale extra_tasks keys from a list of stale registrations
-  const buildStaleTaskKeys = (staleRegs) => {
-    const staleKeys = new Set();
-    // Also always add denylist patterns
-    STALE_REG_DENYLIST.forEach(name => staleKeys.add(name));
-    staleRegs.forEach(reg => {
-      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
-      const regShifts = reg?.shifts || [];
-      if (regShifts.length > 0) {
-        regShifts.forEach((_, si) => staleKeys.add(`${regKey}__${si}`));
-      }
-      staleKeys.add(regKey);
-    });
-    return staleKeys;
-  };
-
-  const handleOpenCleanupDialog = async () => {
-    setCleanupLoading(true);
-    setShowCleanupDialog(true);
-    const stale = staleRegistrations;
-    const staleKeys = buildStaleTaskKeys(stale);
-
-    // Also find any extra_tasks keys matching denylist patterns directly
-    const allAvails = await base44.entities.Availability.list();
-    let affectedAvails = 0;
-    allAvails.forEach(avail => {
-      const tasks = avail.extra_tasks || {};
-      const hasStale = Object.keys(tasks).some(k => {
-        if (staleKeys.has(k)) return true;
-        // Also check if key contains any denylist name
-        return STALE_REG_DENYLIST.some(d => k.includes(d));
-      });
-      if (hasStale) affectedAvails++;
-    });
-    setCleanupPreview({ stale, staleKeys, affectedAvails, allAvails });
-    setCleanupLoading(false);
-  };
-
-  const handleRunCleanup = async () => {
-    if (!cleanupPreview) return;
-    setCleanupLoading(true);
-    const { staleKeys, allAvails } = cleanupPreview;
-
-    // 1. Remove stale entries from open_registrations in AppSettings
-    // Keep ALL registrations that pass validation (valid for any week, not just current)
-    // We remove: denylist names, and entries whose key is in staleKeys
-    const cleaned = openRegistrations.filter(reg => {
-      const regName = reg?.name || (typeof reg === 'string' ? reg : '');
-      const regKey = reg?.key || (typeof reg === 'string' ? reg : '');
-      if (STALE_REG_DENYLIST.some(d => regName.includes(d) || regKey.includes(d))) return false;
-      if (staleKeys.has(regKey)) return false;
-      return true;
-    });
-    const openRegSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
-    if (openRegSettings.length > 0) {
-      await base44.entities.AppSettings.update(openRegSettings[0].id, {
-        setting_value: JSON.stringify(cleaned)
-      });
-    } else if (cleaned.length < openRegistrations.length) {
-      await base44.entities.AppSettings.create({
-        setting_key: "open_registrations",
-        setting_value: JSON.stringify(cleaned)
-      });
-    }
-    setOpenRegistrations(cleaned);
-
-    // 2. Clean extra_tasks from each Availability record
-    for (const avail of allAvails) {
-      const tasks = avail.extra_tasks || {};
-      const keysToRemove = Object.keys(tasks).filter(k => {
-        if (staleKeys.has(k)) return true;
-        return STALE_REG_DENYLIST.some(d => k.includes(d));
-      });
-      if (keysToRemove.length > 0) {
-        const cleanedTasks = { ...tasks };
-        keysToRemove.forEach(k => delete cleanedTasks[k]);
-        await base44.entities.Availability.update(avail.id, { extra_tasks: cleanedTasks });
-      }
-    }
-
-    setCleanupLoading(false);
-    setShowCleanupDialog(false);
-    setCleanupPreview(null);
-    // Reload dynamic data to reflect changes
-    await loadDynamicData(cachedWorker.current, cachedUser.current);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-2 md:p-4">
@@ -1235,101 +1091,6 @@ END:VEVENT
               onAddConstraint={() => setShowUnavailabilityDialog(true)}
             />
 
-            {/* Extra Tasks */}
-            {validOpenRegistrations.length > 0 && (
-              <Card className="border-none shadow-sm">
-                <CardHeader className="border-b bg-white py-2 px-4">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm">משימות נוספות</CardTitle>
-                    {isManager && (
-                      <Button size="sm" variant="ghost" className="text-orange-500 h-6 text-xs px-2" onClick={handleOpenCleanupDialog}>
-                        <Trash2 className="w-3 h-3 mr-1" />נקה ישנות
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="py-3 px-4 space-y-3">
-                  {validOpenRegistrations.map((reg) => {
-                    const regKey = reg?.key || reg;
-                    const regName = reg?.name || reg;
-                    const regDate = reg?.date || null;
-                    const regShifts = reg?.shifts || [];
-                    const parseTime = (t) => {
-                      if (!t) return { days: 0, time: t };
-                      const m = t.match(/^(\+(\d+))\s+(\d{2}:\d{2})$/);
-                      if (m) return { days: parseInt(m[2]), time: m[3] };
-                      return { days: 0, time: t };
-                    };
-                    return (
-                      <div key={regKey} className="border rounded-lg p-3">
-                        <div className="font-semibold text-sm mb-2">
-                          {regName}
-                          {regDate && <span className="text-xs text-gray-400 font-normal mr-2">{regDate}</span>}
-                        </div>
-                        {regShifts.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {regShifts.map((shift, si) => {
-                              const taskKey = `${regKey}__${si}`;
-                              const state = extraTaskStates[taskKey] || null;
-                              const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white" :
-                                state === "available" ? "bg-cyan-500 border-cyan-600 text-white" :
-                                state === "unavailable" ? "bg-red-500 border-red-600 text-white" :
-                                "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
-                              const stateIcon = state === "wanted" ? <Star className="w-3 h-3" /> :
-                                state === "available" ? <Check className="w-3 h-3" /> :
-                                state === "unavailable" ? <Ban className="w-3 h-3" /> : null;
-                              const endParsed = parseTime(shift.end_time);
-                              const isMultiDay = endParsed.days > 0 && endParsed.time >= "06:00";
-                              const disabled = !canEdit || currentWorker?.availability_locked;
-                              if (isMultiDay) {
-                                return (
-                                  <div key={si} className="flex items-stretch">
-                                    <button onClick={() => cycleExtraTask(taskKey)} disabled={disabled}
-                                      className={`flex flex-col items-start px-2 py-1.5 rounded-r-lg border-2 border-l-0 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                                      <div className="flex items-center gap-1">{stateIcon}<span>{shift.start_time} - 06:00</span></div>
-                                      <div className="text-[9px] opacity-70 mt-0.5">יום א׳</div>
-                                    </button>
-                                    <button onClick={() => cycleExtraTask(taskKey)} disabled={disabled}
-                                      className={`flex flex-col items-start px-2 py-1.5 rounded-l-lg border-2 border-dashed text-xs font-medium transition-all relative ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                                      <span className="absolute top-0.5 left-0.5 text-[9px] font-bold bg-orange-300 text-orange-900 rounded px-0.5">+1</span>
-                                      <div className="flex items-center gap-1">{stateIcon}<span>06:00 - {endParsed.time}</span></div>
-                                      <div className="text-[9px] opacity-70 mt-0.5">יום ב׳</div>
-                                    </button>
-                                  </div>
-                                );
-                              }
-                              return (
-                                <button key={si} onClick={() => cycleExtraTask(taskKey)} disabled={disabled}
-                                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                                  {stateIcon}<span>{shift.start_time} - {shift.end_time}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : (() => {
-                          const taskKey = regKey;
-                          const state = extraTaskStates[taskKey] || null;
-                          const stateStyle = state === "wanted" ? "bg-green-500 border-green-600 text-white" :
-                            state === "available" ? "bg-cyan-500 border-cyan-600 text-white" :
-                            state === "unavailable" ? "bg-red-500 border-red-600 text-white" :
-                            "bg-white border-gray-300 text-gray-700 hover:border-blue-300 hover:bg-blue-50";
-                          const stateIcon = state === "wanted" ? <Star className="w-3 h-3 ml-1" /> :
-                            state === "available" ? <Check className="w-3 h-3 ml-1" /> :
-                            state === "unavailable" ? <Ban className="w-3 h-3 ml-1" /> : null;
-                          const stateLabel = state === "wanted" ? "רצוי" : state === "available" ? "זמין" : state === "unavailable" ? "לא זמין" : "לחץ לסימון";
-                          return (
-                            <button onClick={() => cycleExtraTask(taskKey)} disabled={!canEdit || currentWorker?.availability_locked}
-                              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${stateStyle} ${!canEdit || currentWorker?.availability_locked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
-                              {stateIcon}<span>{stateLabel}</span>
-                            </button>
-                          );
-                        })()}
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            )}
 
             {/* 3.5 Submit form */}
             <div className="flex flex-wrap items-center justify-between gap-2 bg-white border rounded-xl px-3 py-2 shadow-sm">
@@ -1551,48 +1312,6 @@ END:VEVENT
           </DialogContent>
         </Dialog>
 
-        {/* Cleanup Dialog — manager only — cleans stale open_registrations + extra_tasks */}
-        <Dialog open={showCleanupDialog} onOpenChange={(v) => { if (!v) { setShowCleanupDialog(false); setCleanupPreview(null); } }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle dir="rtl">נקה הרשמות ישנות</DialogTitle></DialogHeader>
-            <div className="py-4 space-y-4" dir="rtl">
-              {cleanupLoading ? (
-                <p className="text-sm text-gray-500 text-center">בודק נתונים...</p>
-              ) : cleanupPreview ? (
-                <>
-                  {cleanupPreview.stale.length === 0 ? (
-                    <p className="text-sm text-green-700 font-semibold">אין הרשמות ישנות — הכל תקין!</p>
-                  ) : (
-                    <>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800 mb-1">הרשמות שיוסרו ({cleanupPreview.stale.length}):</p>
-                        <div className="space-y-1">
-                          {cleanupPreview.stale.map((reg, i) => (
-                            <div key={i} className="text-xs bg-red-50 border border-red-200 rounded px-2 py-1 text-red-800">
-                              {reg?.name || reg?.key || reg}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        {cleanupPreview.affectedAvails} רשומות זמינות יעודכנו (מפתחות ישנים יוסרו מ-extra_tasks)
-                      </p>
-                      <p className="text-xs text-orange-600 font-semibold">פעולה זו לא ניתנת לביטול</p>
-                    </>
-                  )}
-                </>
-              ) : null}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setShowCleanupDialog(false); setCleanupPreview(null); }} dir="rtl">ביטול</Button>
-              {cleanupPreview && cleanupPreview.stale.length > 0 && (
-                <Button onClick={handleRunCleanup} disabled={cleanupLoading} className="bg-red-600 hover:bg-red-700" dir="rtl">
-                  {cleanupLoading ? "מנקה..." : "נקה עכשיו"}
-                </Button>
-              )}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         <Dialog open={showDateDetails} onOpenChange={setShowDateDetails}>
           <DialogContent className="sm:max-w-md">
