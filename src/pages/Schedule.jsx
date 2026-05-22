@@ -87,6 +87,8 @@ export default function Schedule() {
   const initialLoadStarted = useRef(false);
   const isLoadingAll = useRef(false);
   const openRegSettingIdRef = useRef(null);
+  const columnOrderSaveTimer = useRef(null);
+  const columnOrderSettingIdRef = useRef(null);
 
   useEffect(() => {
     if (!initialLoadStarted.current) {
@@ -231,8 +233,13 @@ export default function Schedule() {
   const applyDailyData = ({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData }) => {
     if (mokedOrderSettings.length > 0) setMokedOrder(JSON.parse(mokedOrderSettings[0].setting_value) || []);
     else setMokedOrder([]);
-    if (columnOrderSettings.length > 0) setCustomColumnOrders(JSON.parse(columnOrderSettings[0].setting_value) || {});
-    else setCustomColumnOrders({});
+    if (columnOrderSettings.length > 0) {
+      columnOrderSettingIdRef.current = columnOrderSettings[0].id;
+      setCustomColumnOrders(JSON.parse(columnOrderSettings[0].setting_value) || {});
+    } else {
+      columnOrderSettingIdRef.current = null;
+      setCustomColumnOrders({});
+    }
     if (dailyColumnsSettings.length > 0) setDailyCustomColumns(JSON.parse(dailyColumnsSettings[0].setting_value) || {});
     else setDailyCustomColumns({});
     if (availabilitiesData) setAvailabilities(availabilitiesData);
@@ -548,13 +555,27 @@ export default function Schedule() {
     setEditingMokedNameValue("");
   };
 
-  const saveColumnOrder = async (templateId, newOrderedColumns) => {
+  const saveColumnOrder = (templateId, newOrderedColumns) => {
     const newCustomOrders = { ...customColumnOrders, [templateId]: newOrderedColumns.map((c) => c.name) };
     setCustomColumnOrders(newCustomOrders);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_column_order_${dateString}` });
-    const data = { setting_key: `schedule_column_order_${dateString}`, setting_value: JSON.stringify(newCustomOrders) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
+    // Debounce: only write to DB once the user stops dragging (500ms idle)
+    if (columnOrderSaveTimer.current) clearTimeout(columnOrderSaveTimer.current);
+    columnOrderSaveTimer.current = setTimeout(async () => {
+      const key = `schedule_column_order_${dateString}`;
+      const data = { setting_key: key, setting_value: JSON.stringify(newCustomOrders) };
+      if (columnOrderSettingIdRef.current) {
+        await base44.entities.AppSettings.update(columnOrderSettingIdRef.current, data);
+      } else {
+        const settings = await base44.entities.AppSettings.filter({ setting_key: key });
+        if (settings.length > 0) {
+          columnOrderSettingIdRef.current = settings[0].id;
+          await base44.entities.AppSettings.update(settings[0].id, data);
+        } else {
+          const created = await base44.entities.AppSettings.create(data);
+          columnOrderSettingIdRef.current = created.id;
+        }
+      }
+    }, 500);
   };
 
   if (loading) {
