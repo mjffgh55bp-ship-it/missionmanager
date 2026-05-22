@@ -447,9 +447,12 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
               <Select value={newColumnRole} onValueChange={setNewColumnRole}>
                 <SelectTrigger dir="rtl"><SelectValue placeholder="בחר תפקיד..." /></SelectTrigger>
                 <SelectContent>
-                  {workerRoles.map(role => (
-                    <SelectItem key={role} value={role}>{role}</SelectItem>
-                  ))}
+                  {workerRoles.map((role, i) => {
+                    const roleName = typeof role === "string" ? role : role.name;
+                    return (
+                      <SelectItem key={i} value={roleName}>{roleName}</SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
