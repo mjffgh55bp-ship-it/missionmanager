@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { GripVertical, Trash2, Plus } from "lucide-react";
 import { useColumnDrag } from "@/hooks/useColumnDrag";
 
-const DropIndicator = () => (
+// In RTL layout, "before column N" visually = right edge of the cell
+const DropIndicator = ({ side = "right" }) => (
   <span
     style={{
       position: "absolute",
-      left: -2,
+      [side]: -2,
       top: 2,
       bottom: 2,
       width: 4,
@@ -61,8 +62,8 @@ export default function DraggableColumnHeader({
             style={{ width: `${col.width}px` }}
             {...(editMode ? getHeaderProps(col.name, idx) : {})}
           >
-            {/* Drop indicator on LEFT edge (in LTR layout = before this column) */}
-            {showBefore && <DropIndicator />}
+            {/* Drop indicator: RTL "before col N" = right edge */}
+            {showBefore && <DropIndicator side="right" />}
 
             {editMode ? (
               <div className="flex items-center gap-1 justify-center">
@@ -87,23 +88,8 @@ export default function DraggableColumnHeader({
               <span>{col.name}</span>
             )}
 
-            {/* Drop indicator on RIGHT edge (after last column) */}
-            {showAfter && (
-              <span
-                style={{
-                  position: "absolute",
-                  right: -2,
-                  top: 2,
-                  bottom: 2,
-                  width: 4,
-                  background: "#3b82f6",
-                  zIndex: 20,
-                  borderRadius: 2,
-                  pointerEvents: "none",
-                  boxShadow: "0 0 4px #3b82f6aa",
-                }}
-              />
-            )}
+            {/* Drop indicator: RTL "after last col" = left edge */}
+            {showAfter && <DropIndicator side="left" />}
           </TableHead>
         );
       })}

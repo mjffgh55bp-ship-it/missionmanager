@@ -48,10 +48,10 @@ function PresetColumnHeaderRow({ columns, onReorder, onRemove, updateColumn }) {
             {...getHeaderProps(col.name, idx)}
           >
             {showBefore && (
-              <span style={{ position: "absolute", left: -2, top: 2, bottom: 2, width: 4, background: "#3b82f6", zIndex: 20, borderRadius: 2, pointerEvents: "none", boxShadow: "0 0 4px #3b82f6aa" }} />
+              <span style={{ position: "absolute", right: -2, top: 2, bottom: 2, width: 4, background: "#3b82f6", zIndex: 20, borderRadius: 2, pointerEvents: "none", boxShadow: "0 0 4px #3b82f6aa" }} />
             )}
             {showAfter && (
-              <span style={{ position: "absolute", right: -2, top: 2, bottom: 2, width: 4, background: "#3b82f6", zIndex: 20, borderRadius: 2, pointerEvents: "none", boxShadow: "0 0 4px #3b82f6aa" }} />
+              <span style={{ position: "absolute", left: -2, top: 2, bottom: 2, width: 4, background: "#3b82f6", zIndex: 20, borderRadius: 2, pointerEvents: "none", boxShadow: "0 0 4px #3b82f6aa" }} />
             )}
             <div className="flex flex-col items-center gap-1">
               <div className="flex items-center gap-0.5 w-full">

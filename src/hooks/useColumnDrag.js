@@ -83,12 +83,14 @@ export function useColumnDrag(columns, onReorder) {
       const fromIndex = columns.findIndex((c) => c.name === dragged);
       if (fromIndex === -1) return;
 
-      // dropIndex is where to insert AFTER removing the dragged item
+      // dropIndex is the insertion point in the original array (before removal).
+      // A drop at fromIndex or fromIndex+1 is a no-op (same position).
+      if (dropIndex === fromIndex || dropIndex === fromIndex + 1) return;
+
       const next = [...columns];
       const [moved] = next.splice(fromIndex, 1);
-      // Adjust for the removal
+      // After removing the item, the target index shifts by -1 if we removed before it
       const toIndex = dropIndex > fromIndex ? dropIndex - 1 : dropIndex;
-      if (toIndex === fromIndex) return; // no-op
       next.splice(toIndex, 0, moved);
 
       onReorder(next);
