@@ -373,54 +373,6 @@ export default function Availability() {
     await loadDynamicData(cachedWorker.current, cachedUser.current);
   };
 
-  const getShiftState = (date, shiftBlock) => {
-    const shift = selectedShifts.find(
-      (s) => s.date === date && s.start_time === shiftBlock.start && s.end_time === shiftBlock.end
-    );
-    return shift?.type || null;
-  };
-
-  const cycleShiftState = (date, shiftBlock) => {
-    if (existingAvailability?.status === "approved" && !showEditMode) return;
-    if (currentWorker?.availability_locked) return;
-
-    const currentState = getShiftState(date, shiftBlock);
-
-    let newShifts = selectedShifts.filter(
-      (s) => !(s.date === date && s.start_time === shiftBlock.start && s.end_time === shiftBlock.end)
-    );
-
-    if (currentState === null) {
-      const wantedCount = newShifts.filter((s) => s.type === "wanted").length;
-      newShifts.push({
-        date,
-        start_time: shiftBlock.start,
-        end_time: shiftBlock.end,
-        type: "wanted",
-        priority: wantedCount + 1
-      });
-    } else if (currentState === "wanted") {
-      const availableCount = newShifts.filter((s) => s.type === "available").length;
-      newShifts.push({
-        date,
-        start_time: shiftBlock.start,
-        end_time: shiftBlock.end,
-        type: "available",
-        priority: availableCount + 1
-      });
-    } else if (currentState === "available") {
-      newShifts.push({
-        date,
-        start_time: shiftBlock.start,
-        end_time: shiftBlock.end,
-        type: "unavailable",
-        priority: 0
-      });
-    }
-
-    setSelectedShifts(newShifts);
-  };
-
   const cycleExtraTask = (taskName) => {
     if (existingAvailability?.status === "approved" && !showEditMode) return;
     if (currentWorker?.availability_locked) return;
@@ -1483,7 +1435,7 @@ END:VEVENT
                       {(provided) =>
                       <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1 max-h-64 overflow-y-auto">
                           {wantedShifts.map((shift, index) =>
-                        <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`wanted-${shift.date}-${shift.start_time}`} index={index}>
+                        <Draggable key={shift.signupKey || `${shift.date}-${shift.start_time}-${index}`} draggableId={`wanted-${shift.signupKey || `${shift.date}-${shift.start_time}-${index}`}`} index={index}>
                               {(provided, snapshot) =>
                           <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
                           className={`flex items-center gap-1 p-1.5 rounded border ${snapshot.isDragging ? 'bg-green-50 border-green-300 shadow-lg' : 'bg-white border-gray-200'}`}>
@@ -1515,7 +1467,7 @@ END:VEVENT
                       {(provided) =>
                       <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1 max-h-64 overflow-y-auto">
                           {availableShifts.map((shift, index) =>
-                        <Draggable key={`${shift.date}-${shift.start_time}`} draggableId={`available-${shift.date}-${shift.start_time}`} index={index}>
+                        <Draggable key={shift.signupKey || `${shift.date}-${shift.start_time}-${index}`} draggableId={`available-${shift.signupKey || `${shift.date}-${shift.start_time}-${index}`}`} index={index}>
                               {(provided, snapshot) =>
                           <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
                           className={`flex items-center gap-1 p-1.5 rounded border ${snapshot.isDragging ? 'bg-blue-50 border-blue-300 shadow-lg' : 'bg-white border-gray-200'}`}>

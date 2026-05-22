@@ -29,7 +29,11 @@ function dateLabel(dateStr) {
 }
 
 // ── Shift chip — a single time-slot button ─────────────────────────────────────
-function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
+// chipIndex: position of this chip among same-signupKey chips in this group (0-based).
+// Only the chip at index 0 shows a personal selection highlight when the worker signed up.
+// Chips at index >= 1 always show count but never the personal highlight (they are
+// identical-key duplicates caused by same-name same-time mokeds).
+function ShiftChip({ shift, chipIndex = 0, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
   // requiredCount = number of row instances (not worker columns)
   const requiredCount = shift.requiredCount || 1;
 
@@ -75,6 +79,10 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
   });
   const currentType = currentEntry?.type || null;
 
+  // Only the first chip (chipIndex 0) shows the personal selection highlight.
+  // Duplicate chips (same signupKey, index >= 1) show the shared count but not the highlight.
+  const showPersonalHighlight = chipIndex === 0;
+
   // Debug log — helps verify architecture correctness
   console.log("SHIFT CHIP DEBUG", {
     mokedName: shift.mokedName,
@@ -91,9 +99,9 @@ function ShiftChip({ shift, allAvailabilities, workers, myRoles, selectedShifts,
     }))
   });
 
-  const isSignedWanted = currentType === "wanted";
-  const isSignedAvailable = currentType === "available";
-  const isSignedUnavailable = currentType === "unavailable";
+  const isSignedWanted = currentType === "wanted" && showPersonalHighlight;
+  const isSignedAvailable = currentType === "available" && showPersonalHighlight;
+  const isSignedUnavailable = currentType === "unavailable" && showPersonalHighlight;
 
   let chipClass = "border-2 rounded-md px-1 py-1 text-xs text-center transition-all select-none w-full ";
   if (isSignedWanted) {
@@ -241,10 +249,11 @@ function DayColumn({ dateStr, shifts, allAvailabilities, workers, myRoles, selec
           <div key={mokedName}>
             <div className="text-[10px] font-semibold text-blue-700 mb-1 text-center bg-blue-50 rounded px-1 py-0.5">{mokedName}</div>
             <div className="flex flex-col gap-1.5">
-              {mokedShifts.map(shift => (
+              {mokedShifts.map((shift, chipIndex) => (
                 <ShiftChip
                   key={shift.key}
                   shift={shift}
+                  chipIndex={chipIndex}
                   allAvailabilities={allAvailabilities}
                   workers={workers}
                   myRoles={myRoles}
