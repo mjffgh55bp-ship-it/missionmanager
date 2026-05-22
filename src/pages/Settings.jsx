@@ -116,6 +116,35 @@ export default function Settings() {
     setScheduleColumns(updated);
   };
 
+  // Rename a schedule column name globally — updates Templates and all TemplateRows
+  const handleRenameColumnName = async (idx, oldName, newName) => {
+    if (!newName.trim() || newName.trim() === oldName) return;
+    const trimmed = newName.trim();
+
+    // 1. Update custom_schedule_params setting
+    const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, name: trimmed } : c);
+    await saveScheduleColumns(updated);
+
+    // 2. Update all Templates that have a column with the old name
+    const allTemplatesData = await base44.entities.Template.list();
+    for (const tmpl of allTemplatesData) {
+      if (!tmpl.columns) continue;
+      const hasCol = tmpl.columns.some(c => c.name === oldName);
+      if (!hasCol) continue;
+      const updatedCols = tmpl.columns.map(c => c.name === oldName ? { ...c, name: trimmed } : c);
+      await base44.entities.Template.update(tmpl.id, { columns: updatedCols });
+    }
+
+    // 3. Update all TemplateRows that have values under the old column name
+    const allRows = await base44.entities.TemplateRow.list();
+    for (const row of allRows) {
+      if (!row.values || !(oldName in row.values)) continue;
+      const newValues = { ...row.values, [trimmed]: row.values[oldName] };
+      delete newValues[oldName];
+      await base44.entities.TemplateRow.update(row.id, { values: newValues });
+    }
+  };
+
   const handleAddScheduleColumn = async () => {
     if (!newColName.trim()) return;
     const col = { name: newColName.trim(), report_type: newColReportType, options: [], quantitative_items: [] };
@@ -518,14 +547,13 @@ export default function Settings() {
                          <div>
                            <label className="text-xs text-gray-500 block mb-1">שם מקומי</label>
                            <Input
-                             value={col.name}
-                             onChange={e => {
-                               const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, name: e.target.value } : c);
-                               saveScheduleColumns(updated);
-                             }}
+                             defaultValue={col.name}
+                             onBlur={e => handleRenameColumnName(idx, col.name, e.target.value)}
+                             onKeyDown={e => { if (e.key === 'Enter') { e.target.blur(); } }}
                              className="h-7 text-sm"
                              dir="rtl"
                            />
+                           <p className="text-[10px] text-orange-500 mt-0.5">שינוי שם יעדכן את כל הלוחות והשורות הקיימות</p>
                          </div>
                          <div>
                            <label className="text-xs text-gray-500 block mb-1">ID / מזהה</label>
