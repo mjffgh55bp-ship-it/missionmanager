@@ -50,37 +50,34 @@ function ShiftChip({ shift, chipIndex = 0, signedCount, allAvailabilities, worke
 
   const operationalDate = shift.operational_date || shift.date;
 
-  // STRICT matching — same logic as workerSignedForShift in shiftDemand.js.
-  // When the chip has a signupKey, NEVER fall back to date+time matching:
-  // that is what caused signing to one moked to affect another moked at the same time.
-  const currentEntry = selectedShifts.find(s => {
-    if (!s.type) return false;
-
-    // 1. Exact signupKey match (new records)
-    if (s.signupKey && shift.signupKey) return s.signupKey === shift.signupKey;
-
-    // 2. Legacy: reconstruct from sharedMokedKey
-    if (s.sharedMokedKey && shift.signupKey) {
-      const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
-      return legacyKey === shift.signupKey;
-    }
-
-    // 3. Naked entry — only match if NO keyed entry exists for this date+time slot
-    if (s.signupKey || s.sharedMokedKey) return false;
-    const sDate = s.operational_date || s.date;
-    if (sDate !== operationalDate || s.start_time !== shift.startTime || s.end_time !== shift.endTime) return false;
-    const hasKeyedEntry = selectedShifts.some(other => {
-      if (other === s) return false;
-      const oDate = other.operational_date || other.date;
-      if (oDate !== operationalDate || other.start_time !== shift.startTime || other.end_time !== shift.endTime) return false;
-      return !!(other.signupKey || other.sharedMokedKey);
-    });
-    return !hasKeyedEntry;
-  });
+  // chipIndex > 0 means this is a duplicate chip sharing the same signupKey as an earlier chip.
+  // Only chipIndex 0 can show a personal selection highlight.
+  const currentEntry = chipIndex === 0
+    ? selectedShifts.find(s => {
+        if (!s.type) return false;
+        // 1. Exact signupKey match (new records)
+        if (s.signupKey && shift.signupKey) return s.signupKey === shift.signupKey;
+        // 2. Legacy: reconstruct from sharedMokedKey
+        if (s.sharedMokedKey && shift.signupKey) {
+          const legacyKey = buildSignupKey(s.operational_date || s.date, s.sharedMokedKey, s.start_time, s.end_time);
+          return legacyKey === shift.signupKey;
+        }
+        // 3. Naked entry — only match if NO keyed entry exists for this date+time slot
+        if (s.signupKey || s.sharedMokedKey) return false;
+        const sDate = s.operational_date || s.date;
+        if (sDate !== operationalDate || s.start_time !== shift.startTime || s.end_time !== shift.endTime) return false;
+        const hasKeyedEntry = selectedShifts.some(other => {
+          if (other === s) return false;
+          const oDate = other.operational_date || other.date;
+          if (oDate !== operationalDate || other.start_time !== shift.startTime || other.end_time !== shift.endTime) return false;
+          return !!(other.signupKey || other.sharedMokedKey);
+        });
+        return !hasKeyedEntry;
+      })
+    : null; // chipIndex > 0: never show as personally selected
   const currentType = currentEntry?.type || null;
 
   // Only the first chip (chipIndex 0) shows the personal selection highlight.
-  // Duplicate chips (same signupKey, index >= 1) show the shared count but not the highlight.
   const showPersonalHighlight = chipIndex === 0;
 
   const isSignedWanted = currentType === "wanted" && showPersonalHighlight;
@@ -109,6 +106,10 @@ function ShiftChip({ shift, chipIndex = 0, signedCount, allAvailabilities, worke
 
     // If not yet signed up and capacity is full in limit mode → block
     if (currentType === null && blocked) return;
+
+    // If this is a duplicate chip (same signupKey, not the primary) and worker is already
+    // signed up for this group → ignore the click to prevent double-registration
+    if (chipIndex > 0 && selectedShifts.some(s => s.signupKey === shift.signupKey)) return;
 
     // Use first eligible role name (or null) as the roleName passed to onSignup
     const roleName = eligibleRoles.size > 0 ? [...eligibleRoles][0] : null;
@@ -233,9 +234,14 @@ function DayColumn({ dateStr, shifts, signupCountByKey, allAvailabilities, worke
           <div key={mokedName}>
             <div className="text-[10px] font-semibold text-blue-700 mb-1 text-center bg-blue-50 rounded px-1 py-0.5">{mokedName}</div>
             <div className="flex flex-col gap-1.5">
-              {mokedShifts.map((shift, chipIndex) => (
+              {(() => {
+                const signupKeyIndexTracker = {};
+                return mokedShifts.map((shift) => {
+                  const chipIndex = signupKeyIndexTracker[shift.signupKey] ?? 0;
+                  signupKeyIndexTracker[shift.signupKey] = chipIndex + 1;
+                  return (
                 <ShiftChip
-                  key={shift.key}
+                  key={`${shift.key}-${chipIndex}`}
                   shift={shift}
                   chipIndex={chipIndex}
                   signedCount={signupCountByKey.get(shift.signupKey) ?? 0}
@@ -247,7 +253,9 @@ function DayColumn({ dateStr, shifts, signupCountByKey, allAvailabilities, worke
                   onSignup={onSignup}
                   canEdit={canEdit}
                 />
-              ))}
+                  );
+                });
+              })()}
             </div>
           </div>
         ))}

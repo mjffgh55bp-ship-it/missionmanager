@@ -1424,7 +1424,7 @@ END:VEVENT
                       {(provided) =>
                       <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1 max-h-64 overflow-y-auto">
                           {wantedShifts.map((shift, index) =>
-                        <Draggable key={shift.signupKey || `${shift.date}-${shift.start_time}-${index}`} draggableId={`wanted-${shift.signupKey || `${shift.date}-${shift.start_time}-${index}`}`} index={index}>
+                        <Draggable key={shift.signupKey || `${shift.date}-${shift.start_time}-${index}`} draggableId={shift.signupKey || `wanted-${shift.date}-${shift.start_time}-${index}`} index={index}>
                               {(provided, snapshot) =>
                           <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
                           className={`flex items-center gap-1 p-1.5 rounded border ${snapshot.isDragging ? 'bg-green-50 border-green-300 shadow-lg' : 'bg-white border-gray-200'}`}>
@@ -1433,6 +1433,7 @@ END:VEVENT
                                   <div className="flex-1 min-w-0">
                                     <p className="font-semibold text-gray-900 text-[11px] truncate" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
                                     <p className="text-[9px] text-gray-600">{shift.start_time}-{shift.end_time}</p>
+                                    {shift.moked_name && <p className="text-[9px] text-blue-600 font-medium truncate" dir="rtl">{shift.moked_name}</p>}
                                   </div>
                                 </div>
                           }
@@ -1456,7 +1457,7 @@ END:VEVENT
                       {(provided) =>
                       <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1 max-h-64 overflow-y-auto">
                           {availableShifts.map((shift, index) =>
-                        <Draggable key={shift.signupKey || `${shift.date}-${shift.start_time}-${index}`} draggableId={`available-${shift.signupKey || `${shift.date}-${shift.start_time}-${index}`}`} index={index}>
+                        <Draggable key={shift.signupKey || `${shift.date}-${shift.start_time}-${index}`} draggableId={shift.signupKey || `available-${shift.date}-${shift.start_time}-${index}`} index={index}>
                               {(provided, snapshot) =>
                           <div ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps}
                           className={`flex items-center gap-1 p-1.5 rounded border ${snapshot.isDragging ? 'bg-blue-50 border-blue-300 shadow-lg' : 'bg-white border-gray-200'}`}>
@@ -1465,6 +1466,7 @@ END:VEVENT
                                   <div className="flex-1 min-w-0">
                                     <p className="font-semibold text-gray-900 text-[11px] truncate" dir="rtl">{formatDateHebrew(shift.date, "short")}</p>
                                     <p className="text-[9px] text-gray-600">{shift.start_time}-{shift.end_time}</p>
+                                    {shift.moked_name && <p className="text-[9px] text-blue-600 font-medium truncate" dir="rtl">{shift.moked_name}</p>}
                                   </div>
                                 </div>
                           }
