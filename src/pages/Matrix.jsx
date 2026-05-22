@@ -1654,7 +1654,11 @@ export default function Matrix() {
         {/* Bars layer — pointer events enabled; individual bars have their own handlers; create-drag is guarded at the row level */}
         <div className="absolute inset-0">
           {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
-            const px = timeToPixels("06:00", day, 'weekly', ppm);
+            // Day boundary: right edge of day d's 05:00 slot = left edge of day d's 06:00 slot
+            // That's (d*1440 + 1380)*ppm from right (05:00 = 1380 op-mins... but we want left edge of 06:00)
+            // 06:00 = opMin 0, so right edge of 06:00 slot is day*1440*ppm and left edge is (day*1440+60)*ppm.
+            // The boundary between "05:xx" of previous day and "06:00" of new day = left edge of 06:00 slot:
+            const px = (day * 1440 + 60) * ppm;
             return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
           })}
           {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}

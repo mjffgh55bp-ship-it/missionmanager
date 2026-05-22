@@ -243,7 +243,8 @@ export default function ClassicTimelineRow({
       </div>
       <div className="absolute inset-0">
         {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
-          const px = timeToPixels("06:00", day, 'weekly', ppm);
+          // Day boundary at left edge of 06:00 slot = (day*1440 + 60)*ppm from right
+          const px = (day * 1440 + 60) * ppm;
           return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
         })}
         {availabilityShifts.map((shift, idx) => <AvailabilityBarLocal key={`avail-${idx}`} shift={shift} />)}
