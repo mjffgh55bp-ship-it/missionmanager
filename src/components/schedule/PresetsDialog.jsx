@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Pencil, Check, X, BookmarkPlus, GripVertical } from "lucide-react";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { useColumnDrag } from "@/hooks/useColumnDrag";
 import toast from "react-hot-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,6 +26,67 @@ const COLUMN_TYPE_OPTIONS = [
   { value: "task", label: "משימה" },
   { value: "text", label: "טקסט" },
 ];
+
+// Inner component so useColumnDrag hook is called with the live columns array
+function PresetColumnHeaderRow({ columns, onReorder, onRemove, updateColumn }) {
+  const { dragState, getDragHandleProps, getHeaderProps } = useColumnDrag(columns, onReorder);
+  return (
+    <TableRow>
+      {columns.map((col, idx) => {
+        const isDragging = dragState.dragging === col.name;
+        const showIndicatorBefore = dragState.dropIndex === idx;
+        return (
+          <TableHead
+            key={`${col.name}-${idx}`}
+            className={`text-center p-1 relative ${isDragging ? "opacity-40 bg-blue-50" : ""}`}
+            dir="rtl"
+            style={{ minWidth: 90 }}
+            {...getHeaderProps(col.name, idx)}
+          >
+            {showIndicatorBefore && (
+              <span style={{ position: "absolute", right: -2, top: 0, bottom: 0, width: 3, background: "#3b82f6", zIndex: 10, borderRadius: 2, pointerEvents: "none" }} />
+            )}
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex items-center gap-0.5 w-full">
+                <span
+                  {...getDragHandleProps(col.name)}
+                  className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                  title="גרור לשינוי סדר"
+                >
+                  <GripVertical className="w-3 h-3" />
+                </span>
+                <Input
+                  value={col.name}
+                  onChange={(e) => updateColumn(idx, "name", e.target.value)}
+                  placeholder={`עמודה ${idx + 1}`}
+                  className="h-6 text-xs text-center px-1 border-dashed flex-1"
+                  dir="rtl"
+                />
+              </div>
+              <div className="flex items-center gap-0.5">
+                <Select value={col.type} onValueChange={(v) => updateColumn(idx, "type", v)}>
+                  <SelectTrigger className="h-5 w-20 text-[10px] px-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COLUMN_TYPE_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="icon" variant="ghost" className="h-5 w-5 p-0 text-red-500 hover:text-red-700"
+                  onClick={() => onRemove(idx)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          </TableHead>
+        );
+      })}
+      <TableHead className="text-center text-xs w-20" dir="rtl">סטטוס</TableHead>
+    </TableRow>
+  );
+}
 
 export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
   const [presets, setPresets] = useState([]);
@@ -214,66 +275,12 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
               <div className="overflow-x-auto bg-white">
                 <Table>
                   <TableHeader>
-                    <DragDropContext onDragEnd={(result) => {
-                      if (!result.destination || result.source.index === result.destination.index) return;
-                      const cols = [...editingPreset.template_config.columns];
-                      const [moved] = cols.splice(result.source.index, 1);
-                      cols.splice(result.destination.index, 0, moved);
-                      setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
-                    }}>
-                    <Droppable droppableId="preset-cols" direction="horizontal">
-                      {(provided) => (
-                    <TableRow ref={provided.innerRef} {...provided.droppableProps}>
-                      {editingPreset.template_config.columns.map((col, idx) => (
-                        <Draggable key={`preset-col-${idx}`} draggableId={`preset-col-${idx}`} index={idx}>
-                          {(drag, snapshot) => (
-                        <TableHead
-                          ref={drag.innerRef}
-                          {...drag.draggableProps}
-                          className={`text-center p-1 ${snapshot.isDragging ? "bg-blue-50 shadow-lg" : ""}`}
-                          dir="rtl"
-                          style={{ minWidth: 90, ...drag.draggableProps.style }}
-                        >
-                          <div className="flex flex-col items-center gap-1">
-                            <div className="flex items-center gap-0.5 w-full">
-                              <span {...drag.dragHandleProps} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 flex-shrink-0">
-                                <GripVertical className="w-3 h-3" />
-                              </span>
-                              <Input
-                                value={col.name}
-                                onChange={(e) => updateColumn(idx, "name", e.target.value)}
-                                placeholder={`עמודה ${idx + 1}`}
-                                className="h-6 text-xs text-center px-1 border-dashed flex-1"
-                                dir="rtl"
-                              />
-                            </div>
-                            <div className="flex items-center gap-0.5">
-                              <Select value={col.type} onValueChange={(v) => updateColumn(idx, "type", v)}>
-                                <SelectTrigger className="h-5 w-20 text-[10px] px-1">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {COLUMN_TYPE_OPTIONS.map((o) => (
-                                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Button size="icon" variant="ghost" className="h-5 w-5 p-0 text-red-500 hover:text-red-700"
-                                onClick={() => removeColumn(idx)}>
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        </TableHead>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                      <TableHead className="text-center text-xs w-20" dir="rtl">סטטוס</TableHead>
-                    </TableRow>
-                      )}
-                    </Droppable>
-                    </DragDropContext>
+                    <PresetColumnHeaderRow
+                      columns={editingPreset.template_config.columns}
+                      onReorder={(newCols) => setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: newCols } })}
+                      onRemove={removeColumn}
+                      updateColumn={updateColumn}
+                    />
                   </TableHeader>
                   <TableBody>
                     {(editingPreset.template_config.default_rows || [{}]).map((row, rowIdx) => (
