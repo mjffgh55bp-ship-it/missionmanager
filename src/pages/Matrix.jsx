@@ -495,14 +495,12 @@ export default function Matrix() {
   const loadDynamicData = async (silent = false) => {
     if (isLoadingRef.current) {
       queuedMatrixRefreshRef.current = true;
-      console.log("MATRIX LOAD", { phase: "queued", skippedDuplicate: true });
       return;
     }
     isLoadingRef.current = true;
     if (!silent && !initialLoaded) setLoading(true);
-    const t0 = Date.now();
     const dateStr = format(currentDate, "yyyy-MM-dd");
-    console.log("MATRIX LOAD", { phase: "start", dateStr, viewMode });
+
     try {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
       const weekStartStr = format(weekStart, "yyyy-MM-dd");
@@ -511,15 +509,17 @@ export default function Matrix() {
       // Fetch availabilities, unavailabilities, template rows, and templates all in parallel
       const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
-      const availabilitiesData = await base44.entities.Availability.list();
-      const unavailabilitiesData = await (viewMode === "daily"
-        ? base44.entities.Unavailability.filter({ date: dateStrLocal })
-        : base44.entities.Unavailability.list());
-      const allTemplatesData = await getCachedTemplates(base44.entities);
-      const trackerEntriesData = await base44.entities.TrackerEntry.list();
+      const [availabilitiesData, unavailabilitiesData, allTemplatesData, trackerEntriesData] = await Promise.all([
+        base44.entities.Availability.filter({ week_start_date: weekStartStr }),
+        viewMode === "daily"
+          ? base44.entities.Unavailability.filter({ date: dateStrLocal })
+          : base44.entities.Unavailability.list(),
+        getCachedTemplates(base44.entities),
+        base44.entities.TrackerEntry.list(),
+      ]);
 
       // Fetch template rows for visible range + adjacent days (for cross-day briefing markers)
-      const templateRowArrays = [];
+      let templateRowArrays;
       if (viewMode === "daily") {
         // Load D-1, D, D+1 so briefing markers on adjacent operational days are visible
         const adjacentDates = [
@@ -527,9 +527,9 @@ export default function Matrix() {
           dateStrLocal,
           addDaysString(dateStrLocal, 1),
         ];
-        for (const d of adjacentDates) {
-          templateRowArrays.push(await base44.entities.TemplateRow.filter({ date: d }));
-        }
+        templateRowArrays = await Promise.all(
+          adjacentDates.map(d => base44.entities.TemplateRow.filter({ date: d }))
+        );
       } else {
         // Load week-1 through week+1
         const extendedDates = [
@@ -537,9 +537,9 @@ export default function Matrix() {
           ...weekDates,
           addDaysString(weekDates[weekDates.length - 1], 1),
         ];
-        for (const d of extendedDates) {
-          templateRowArrays.push(await base44.entities.TemplateRow.filter({ date: d }));
-        }
+        templateRowArrays = await Promise.all(
+          extendedDates.map(d => base44.entities.TemplateRow.filter({ date: d }))
+        );
       }
 
       let filteredTemplateRows = templateRowArrays.flat();
@@ -550,10 +550,10 @@ export default function Matrix() {
         const uniqueSourceIds = [...new Set(continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean))];
         if (uniqueSourceIds.length > 0) {
           const missingSourceIds = uniqueSourceIds.filter(id => !filteredTemplateRows.some(r => r.id === id));
-          for (const id of missingSourceIds) {
-            const row = await base44.entities.TemplateRow.get(id).catch(() => null);
-            if (row) filteredTemplateRows.push(row);
-          }
+          const sourceRows = await Promise.all(
+            missingSourceIds.map(id => base44.entities.TemplateRow.get(id).catch(() => null))
+          );
+          filteredTemplateRows.push(...sourceRows.filter(Boolean));
         }
       }
 
@@ -563,14 +563,14 @@ export default function Matrix() {
       setAllTemplates(allTemplatesData);
       setTrackerEntries(trackerEntriesData);
       setInitialLoaded(true);
-      console.log("MATRIX LOAD", { phase: "done", durationMs: Date.now() - t0 });
+
     } catch (error) { console.error('Error loading matrix data:', error); }
     finally {
       setLoading(false);
       isLoadingRef.current = false;
       if (queuedMatrixRefreshRef.current) {
         queuedMatrixRefreshRef.current = false;
-        console.log("MATRIX LOAD", { phase: "running_queued_refresh" });
+
         loadDynamicData(true);
       }
     }
@@ -620,10 +620,7 @@ export default function Matrix() {
       const weekStartStr2 = format(weekStart, "yyyy-MM-dd");
       if (viewMode === 'weekly' && (row.date < weekStartStr2 || row.date > weekEnd)) return;
       // Skip invalid zero-duration continuation rows
-      if (isInvalidContinuationRow(row)) {
-        console.log("MATRIX SKIP INVALID CONTINUATION", { rowId: row.id, rowDate: row.date, values: row.values });
-        return;
-      }
+      if (isInvalidContinuationRow(row)) return;
       const template = allTemplates.find(t => t.id === row.template_id);
       if (!template) return;
       const isContinuation = row.values.is_continuation;
@@ -847,16 +844,7 @@ export default function Matrix() {
       const found = el.closest?.("[data-matrix-time-slot='true']");
       if (found) { slot = found; break; }
     }
-    if (debug) {
-      console.log("MATRIX SLOT HIT DEBUG", {
-        visualPointerClientX: e.clientX,
-        slotTime: slot?.dataset?.time,
-        operationalMinute: slot?.dataset?.operationalMinute,
-        operationalDate: slot?.dataset?.operationalDate,
-        dayIndex: slot?.dataset?.dayIndex,
-        foundSlot: !!slot,
-      });
-    }
+
     return slot;
   };
 
@@ -887,7 +875,7 @@ export default function Matrix() {
     e.stopPropagation();
     if (action === 'move' && e.detail === 2) return;
 
-    const slot = getSlotFromPointer(e, true);
+    const slot = getSlotFromPointer(e);
 
     let startAbsMinute;
     let startOpDate;
@@ -897,15 +885,6 @@ export default function Matrix() {
       const slotOpMin = Number(slot.dataset.operationalMinute || 0);
       startAbsMinute = slotDay * 1440 + slotOpMin;
       startOpDate = slot.dataset.operationalDate || dateString;
-
-      console.log("MATRIX SLOT DRAG START", {
-        workerId: worker.id,
-        slotDate: slot.dataset.operationalDate,
-        minute: slot.dataset.operationalMinute,
-        time: slot.dataset.time,
-        dayIndex: slot.dataset.dayIndex,
-        action,
-      });
     } else {
       // Fallback to X-math
       const { opMinutes, dayIndex: fbDay } = clientXToOpMinutes(e.clientX);
@@ -934,7 +913,7 @@ export default function Matrix() {
     const { worker, shift, action, startAbsMinute, originalStart, originalEnd, originalDay } = dragging;
 
     // ── Slot-based path (primary) ────────────────────────────────────────────
-    const slot = getSlotFromPointer(e, action === 'create');
+    const slot = getSlotFromPointer(e);
 
     let currentAbsMinute;
 
@@ -962,17 +941,6 @@ export default function Matrix() {
       const endOpMins = endAbs - newDay * 1440;
       newStart = operationalMinutesToTime(Math.max(0, Math.min(1440, startOpMins)));
       newEnd = operationalMinutesToTime(Math.max(0, Math.min(1440, endOpMins)));
-
-      console.log("MATRIX SLOT DRAG PREVIEW", {
-        workerId: dragging.workerId,
-        previewDate: viewMode === 'weekly'
-          ? format(addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), newDay), 'yyyy-MM-dd')
-          : dateString,
-        previewStartTime: newStart,
-        previewEndTime: newEnd,
-        startAbs,
-        endAbs,
-      });
     } else if (action === 'resize-start') {
       newDay = Math.max(0, Math.min(6, Math.floor(currentAbsMinute / 1440)));
       newStart = operationalMinutesToTime(Math.max(0, currentAbsMinute - newDay * 1440));
@@ -1003,15 +971,6 @@ export default function Matrix() {
     // Save exactly what the preview shows — no recalculation from mouse position
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const targetDate = viewMode === 'weekly' ? format(addDays(weekStart, day || 0), 'yyyy-MM-dd') : dateString;
-
-    console.log("MATRIX SLOT DRAG SAVE", {
-      workerId,
-      savedDate: targetDate,
-      savedStartTime: start,
-      savedEndTime: end,
-      action,
-    });
-    console.log("MATRIX CREATE DRAG SAVE", { dragPreview });
 
     if (start === end) { setDragging(null); setDragPreview(null); return; }
     const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
@@ -1354,21 +1313,6 @@ export default function Matrix() {
       if (assignedWorkerIds.length === 0) return;
 
       assignedWorkerIds.forEach(workerId => {
-        const workerObj = workers.find(w => w.id === workerId);
-        const workerName = workerObj?.nickname || workerId;
-
-        console.log("PAPS BRIEFING BUILT", {
-          workerName,
-          rowId: row.id,
-          rowDate: row.date,
-          originalBriefingTime,
-          visualOperationalDate,
-          visualTime,
-          linkedShiftDate: row.date,
-          startTime,
-          endTime,
-        });
-
         markers.push({
           id: `briefing_${row.id}_${workerId}`,
           worker_id: workerId,
@@ -1537,21 +1481,6 @@ export default function Matrix() {
       if (viewMode === 'daily') {
         // Only show marker if its VISUAL date matches the selected day
         const show = m.visual_operational_date === dateString;
-        if (m.original_briefing_time?.startsWith("-1 ")) {
-          const workerObj = workers.find(w => w.id === workerId);
-          const dayIndex = 0;
-          const pointPx = timeToPixels(m.visual_time, dayIndex, viewMode, ppm);
-          console.log("PAPS BRIEFING RENDER", {
-            selectedDate: dateString,
-            viewMode,
-            workerName: workerObj?.nickname,
-            visualOperationalDate: m.visual_operational_date,
-            visualTime: m.visual_time,
-            dayIndex,
-            pointPx,
-            willRender: show,
-          });
-        }
         return show;
       } else {
         // Weekly: marker visual date must be within the visible week
@@ -1559,21 +1488,6 @@ export default function Matrix() {
         const weekEnd = addDays(weekStart, 6);
         const vd = new Date(m.visual_operational_date + "T12:00:00");
         const show = vd >= weekStart && vd <= weekEnd;
-        if (m.original_briefing_time?.startsWith("-1 ") && show) {
-          const workerObj = workers.find(w => w.id === workerId);
-          const dayIndex = getDayIndexFromDate(m.visual_operational_date);
-          const pointPx = timeToPixels(m.visual_time, dayIndex, viewMode, ppm);
-          console.log("PAPS BRIEFING RENDER", {
-            selectedDate: dateString,
-            viewMode,
-            workerName: workerObj?.nickname,
-            visualOperationalDate: m.visual_operational_date,
-            visualTime: m.visual_time,
-            dayIndex,
-            pointPx,
-            willRender: show,
-          });
-        }
         return show;
       }
     });

@@ -89,6 +89,7 @@ export default function Schedule() {
   const openRegSettingIdRef = useRef(null);
   const columnOrderSaveTimer = useRef(null);
   const columnOrderSettingIdRef = useRef(null);
+  const appSettingsIdCache = useRef({}); // key → setting id
 
   useEffect(() => {
     if (!initialLoadStarted.current) {
@@ -137,10 +138,12 @@ export default function Schedule() {
     const workersData = await getCachedWorkers(base44.entities);
     const allTemplatesData = await getCachedTemplates(base44.entities);
     const allSettings = await getCachedAllSettings(base44.entities);
-    // Live fetches — sequential to avoid rate-limit spikes (cache calls already fired above)
-    const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
-    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
-    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
+    // Live fetches — run in parallel
+    const [availabilitiesData, unavailabilitiesData, templateRowsData] = await Promise.all([
+      fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })),
+      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
+      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
+    ]);
 
     // Filter settings client-side
     const colTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
@@ -153,6 +156,7 @@ export default function Schedule() {
     const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
     const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
 
+    allSettings.forEach(s => { appSettingsIdCache.current[s.setting_key] = s.id; });
     applyStaticData({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData });
     applyDailyData({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     staticDataLoaded.current = true;
@@ -169,13 +173,12 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
 
-    console.time("Schedule date change");
-    // Fetch sequentially to avoid rate-limit spikes.
-    // Cache calls (settings, templates) are cheap; live entity fetches are spaced out.
     const allSettings = await getCachedAllSettings(base44.entities);
     const freshTemplates = await getCachedTemplates(base44.entities);
-    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
-    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
+    const [templateRowsData, unavailabilitiesData] = await Promise.all([
+      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
+      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
+    ]);
     const availabilitiesData = weekChanged
       ? await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }))
       : null;
@@ -188,9 +191,9 @@ export default function Schedule() {
     const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
     const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
 
+    allSettings.forEach(s => { appSettingsIdCache.current[s.setting_key] = s.id; });
     applyDailyData({ dateString, templateRowsData, allTemplatesData: freshTemplates, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     setDailyLoading(false);
-    console.timeEnd("Schedule date change");
   };
 
   const applyStaticData = ({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData }) => {
@@ -299,19 +302,17 @@ export default function Schedule() {
     const newValues = isLocked
       ? { moked_instance_name: existingGroupRow.values.moked_instance_name, moked_instance_name_locked: true }
       : {};
-    await base44.entities.TemplateRow.create({
+    const newRow = await base44.entities.TemplateRow.create({
       template_id: templateId,
       template_name: template.name,
       date: dateString,
       values: newValues,
       group_id: groupId
     });
-    await loadData();
+    setTemplateRows(prev => [...prev, newRow]);
   };
 
   const handleAddPresetToSchedule = async (preset) => {
-    console.log("CREATE MOKED DEBUG - START", { preset, dateString });
-
     const config = preset.template_config;
     const newTemplate = await base44.entities.Template.create({
       name: preset.name,
@@ -321,8 +322,6 @@ export default function Schedule() {
       active: true
     });
 
-    console.log("CREATE MOKED DEBUG - TEMPLATE", { templateId: newTemplate?.id, templateName: newTemplate?.name });
-
     // Invalidate templates cache so the next reload fetches fresh data including the new template
     invalidateTemplatesCache();
 
@@ -331,48 +330,28 @@ export default function Schedule() {
       : `group_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 
     const rowsToCreate = config.default_rows && config.default_rows.length > 0 ? config.default_rows : [{}];
-    const createdRows = [];
-    for (let i = 0; i < rowsToCreate.length; i++) {
-      const rowValues = rowsToCreate[i];
-      // Do not set moked_instance_name — getMokedDisplayName uses template.name (which IS preset.name).
-      const { moked_instance_name, moked_instance_name_locked, ...cleanRowValues } = rowValues;
-      cleanRowValues._order = i;
-      const newRow = await base44.entities.TemplateRow.create({
-        template_id: newTemplate.id,
-        template_name: newTemplate.name,
-        date: dateString,
-        values: cleanRowValues,
-        group_id: newGroupId
-      });
-      createdRows.push(newRow);
-    }
 
-    console.log("CREATE MOKED DEBUG - ROWS CREATED", {
-      groupId: newGroupId,
-      rows: createdRows.map(r => ({
-        id: r.id,
-        template_id: r.template_id,
-        template_name: r.template_name,
-        date: r.date,
-        group_id: r.group_id,
-        values: r.values
-      }))
-    });
+    // Create all rows in parallel
+    const createdRows = await Promise.all(
+      rowsToCreate.map((rowValues, i) => {
+        const { moked_instance_name, moked_instance_name_locked, ...cleanRowValues } = rowValues;
+        cleanRowValues._order = i;
+        return base44.entities.TemplateRow.create({
+          template_id: newTemplate.id,
+          template_name: newTemplate.name,
+          date: dateString,
+          values: cleanRowValues,
+          group_id: newGroupId
+        });
+      })
+    );
 
-    // Update local state immediately so moked appears without waiting for reload
+    // Update local state — no reload needed
     setAllTemplates(prev => [...prev, newTemplate]);
     setTemplates(prev => [...prev, newTemplate]);
     setTemplateRows(prev => [...prev, ...createdRows]);
 
     toast.success(`מוקד "${preset.name}" נוסף ללוח`);
-
-    // Reload from DB to confirm persistence (uses fresh template cache after invalidation)
-    await loadData();
-
-    console.log("CREATE MOKED DEBUG - AFTER RELOAD", {
-      dateString,
-      newGroupId,
-    });
   };
 
   const handleDuplicateMoked = async (group) => {
@@ -432,19 +411,6 @@ export default function Schedule() {
       createdRows.push(created);
     }
 
-    console.log("DUPLICATE MOKED CREATED", {
-      newGroupId,
-      createdRowCount: createdRows.length,
-      createdRows: createdRows.map(r => ({
-        id: r.id,
-        group_id: r.group_id,
-        date: r.date,
-        order: r.values?._order,
-        duplicatedFrom: r.values?._duplicated_from_row_id,
-        values: r.values
-      }))
-    });
-
     // Add duplicated rows to state using only the real DB-returned rows
     setTemplateRows(prev => [...prev, ...createdRows]);
 
@@ -467,15 +433,6 @@ export default function Schedule() {
     const realEndTime = `${plusMatch[3]}:${plusMatch[4]}`;
 
     // +1 06:00 is the exact end boundary of the same operational day — not a continuation
-    console.log("CONTINUATION DECISION", {
-      rowId: row.id,
-      rowDate: row.date,
-      endTime,
-      daysAhead,
-      realEndTime,
-      shouldCreateContinuation: !(daysAhead === 1 && realEndTime <= "06:00")
-    });
-
     if (daysAhead === 1 && realEndTime <= "06:00") return;
 
     for (let d = 1; d <= daysAhead; d++) {
@@ -788,9 +745,10 @@ export default function Schedule() {
                                   const newOrder = groups.map(g => g.key);
                                   [newOrder[groupIndex - 1], newOrder[groupIndex]] = [newOrder[groupIndex], newOrder[groupIndex - 1]];
                                   setMokedOrder(newOrder);
-                                  const settings = await base44.entities.AppSettings.filter({ setting_key: `moked_order_${dateString}` });
-                                  const data = { setting_key: `moked_order_${dateString}`, setting_value: JSON.stringify(newOrder) };
-                                  if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data); else await base44.entities.AppSettings.create(data);
+                                  const key = `moked_order_${dateString}`;
+                                  const data = { setting_key: key, setting_value: JSON.stringify(newOrder) };
+                                  const cachedId = appSettingsIdCache.current[key];
+                                  if (cachedId) { await base44.entities.AppSettings.update(cachedId, data); } else { const created = await base44.entities.AppSettings.create(data); appSettingsIdCache.current[key] = created.id; }
                                 }}>
                                 <ChevronUp className="w-4 h-4" />
                               </Button>
@@ -800,9 +758,10 @@ export default function Schedule() {
                                   const newOrder = groups.map(g => g.key);
                                   [newOrder[groupIndex], newOrder[groupIndex + 1]] = [newOrder[groupIndex + 1], newOrder[groupIndex]];
                                   setMokedOrder(newOrder);
-                                  const settings = await base44.entities.AppSettings.filter({ setting_key: `moked_order_${dateString}` });
-                                  const data = { setting_key: `moked_order_${dateString}`, setting_value: JSON.stringify(newOrder) };
-                                  if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data); else await base44.entities.AppSettings.create(data);
+                                  const key = `moked_order_${dateString}`;
+                                  const data = { setting_key: key, setting_value: JSON.stringify(newOrder) };
+                                  const cachedId = appSettingsIdCache.current[key];
+                                  if (cachedId) { await base44.entities.AppSettings.update(cachedId, data); } else { const created = await base44.entities.AppSettings.create(data); appSettingsIdCache.current[key] = created.id; }
                                 }}>
                                 <ChevronDown className="w-4 h-4" />
                               </Button>
@@ -941,11 +900,12 @@ export default function Schedule() {
                               if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
                                 const isDailyColumn = (dailyCustomColumns[template.id] || []).some((c) => c.name === col.name);
                                 if (isDailyColumn) {
-                                  const updatedDailyColumns = { ...dailyCustomColumns, [template.id]: (dailyCustomColumns[template.id] || []).filter((c) => c.name !== col.name) };
-                                  setDailyCustomColumns(updatedDailyColumns);
-                                  const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
-                                  const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
-                                  if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+                                 const updatedDailyColumns = { ...dailyCustomColumns, [template.id]: (dailyCustomColumns[template.id] || []).filter((c) => c.name !== col.name) };
+                                 setDailyCustomColumns(updatedDailyColumns);
+                                 const dcKey = `schedule_daily_columns_${dateString}`;
+                                 const data = { setting_key: dcKey, setting_value: JSON.stringify(updatedDailyColumns) };
+                                 const cachedDcId = appSettingsIdCache.current[dcKey];
+                                 if (cachedDcId) await base44.entities.AppSettings.update(cachedDcId, data);
                                 } else {
                                   const updatedColumns = template.columns.filter((c) => c.name !== col.name);
                                   setAllTemplates(prev => prev.map(t => t.id === template.id ? { ...t, columns: updatedColumns } : t));
@@ -1046,9 +1006,8 @@ export default function Schedule() {
                                             rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
                                             taskQualifiedWorkerIds={col.task_name ? Object.values(taskQualifications[col.task_name] || {}).flat() : (row.values?.task ? Object.values(taskQualifications[row.values.task] || {}).flat() : undefined)}
                                             onSaved={(workerId) => {
-                                             const newValues = { ...row.values, [col.name]: workerId };
-                                             console.log("SCHEDULE CELL SAVE", { rowId: row.id, columnName: col.name, value: workerId, updatedValues: newValues });
-                                             setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                            const newValues = { ...row.values, [col.name]: workerId };
+                                            setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                             }} />
                                         ) : col.type === "time" ? (
                                           <TimeCell
@@ -1057,8 +1016,7 @@ export default function Schedule() {
                                             value={row.values?.[col.name] || ""}
                                             defaultValue={col.default_value || ""}
                                             onSaved={(newValues) => {
-                                             console.log("SCHEDULE CELL SAVE", { rowId: row.id, columnName: col.name, value: newValues[col.name], updatedValues: newValues });
-                                             setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                            setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                              handleTimeSaved(row, newValues);
                                             }}
                                             rowValues={row.values || {}} />
@@ -1088,9 +1046,8 @@ export default function Schedule() {
                                             isTemplateRow={true}
                                             isQuantitative={!!columnQuantitative[col.name]}
                                             onSaved={(updatedColumnValues) => {
-                                             const newValues = { ...row.values, ...updatedColumnValues };
-                                             console.log("SCHEDULE CELL SAVE", { rowId: row.id, columnName: col.name, value: updatedColumnValues, updatedValues: newValues });
-                                             base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                            const newValues = { ...row.values, ...updatedColumnValues };
+                                            base44.entities.TemplateRow.update(row.id, { values: newValues });
                                              setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                             }} />
                                         ) : (
@@ -1229,10 +1186,10 @@ export default function Schedule() {
                     [selectedTemplate.id]: [...(dailyCustomColumns[selectedTemplate.id] || []), columnToAdd]
                   };
                   setDailyCustomColumns(updatedDailyColumns);
-                  const settings = await base44.entities.AppSettings.filter({ setting_key: `schedule_daily_columns_${dateString}` });
-                  const data = { setting_key: `schedule_daily_columns_${dateString}`, setting_value: JSON.stringify(updatedDailyColumns) };
-                  if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-                  else await base44.entities.AppSettings.create(data);
+                  const addColKey = `schedule_daily_columns_${dateString}`;
+                  const addColData = { setting_key: addColKey, setting_value: JSON.stringify(updatedDailyColumns) };
+                  const cachedAddColId = appSettingsIdCache.current[addColKey];
+                  if (cachedAddColId) { await base44.entities.AppSettings.update(cachedAddColId, addColData); } else { const created = await base44.entities.AppSettings.create(addColData); appSettingsIdCache.current[addColKey] = created.id; }
                   setShowAddTemplateColumnDialog(false);
                   setNewTemplateColumnName("");
                   setNewTemplateColumnType("text");

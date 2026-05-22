@@ -171,8 +171,6 @@ export default function Availability() {
   const loadAllData = async () => {
     if (isLoadingAllRef.current) return;
     isLoadingAllRef.current = true;
-    const t0 = Date.now();
-    console.log("AVAILABILITY LOAD", { phase: "start" });
     try {
       // Step 1: identify user FIRST — critical path
       const user = await base44.auth.me();
@@ -181,14 +179,13 @@ export default function Availability() {
 
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      // Step 2: fetch static data sequentially with small delays to stay within rate limits
-      const workersData = await getCachedWorkers(base44.entities);
-      await new Promise(r => setTimeout(r, 100));
-      const allSettings = await getCachedAllSettings(base44.entities);
-      await new Promise(r => setTimeout(r, 100));
-      const eventsData = await base44.entities.CompanyEvent.list("-date");
-      await new Promise(r => setTimeout(r, 100));
-      const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
+      // Step 2: fetch static data in parallel (cache calls are instant; network calls run together)
+      const [workersData, allSettings, eventsData, yearlyEventsData] = await Promise.all([
+        getCachedWorkers(base44.entities),
+        getCachedAllSettings(base44.entities),
+        base44.entities.CompanyEvent.list("-date"),
+        base44.entities.YearlyEvent.list("-start_date", 500),
+      ]);
 
       // Extract settings client-side (no extra API calls)
       const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -229,7 +226,6 @@ export default function Availability() {
       }
 
       staticLoaded.current = true;
-      console.log("AVAILABILITY LOAD", { phase: "static_done", durationMs: Date.now() - t0 });
 
       // Step 3: load dynamic (week-scoped) data immediately — no artificial delay
       if (worker) {
@@ -238,22 +234,17 @@ export default function Availability() {
     } finally {
       isLoadingAllRef.current = false;
     }
-    console.log("AVAILABILITY LOAD", { phase: "complete", durationMs: Date.now() - t0 });
   };
 
   // Week-change reload: only dynamic data, use cached templates
   const loadDynamicData = async (worker, user) => {
     if (!worker) return;
     if (isLoadingDynamicRef.current) {
-      // Queue one refresh — will run after current finishes
       queuedRefreshRef.current = true;
-      console.log("AVAILABILITY LOAD", { phase: "queued", skippedDuplicate: true });
       return;
     }
     isLoadingDynamicRef.current = true;
     const weekKey = weekStart.toISOString();
-    const t0 = Date.now();
-    console.log("AVAILABILITY LOAD", { phase: "dynamic_start", weekKey });
 
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
@@ -277,10 +268,7 @@ export default function Availability() {
       const additionalAssignments = allWorkerAssignments.filter(a => a.additional_chef_id === worker.id);
 
       // Drop stale results if week changed while loading
-      if (weekStart.toISOString() !== weekKey && weekKey !== lastWeekStart.current) {
-        console.log("AVAILABILITY LOAD", { phase: "stale_drop", weekKey });
-        return;
-      }
+      if (weekStart.toISOString() !== weekKey && weekKey !== lastWeekStart.current) return;
 
       if (availabilities.length > 0) {
         setExistingAvailability(availabilities[0]);
@@ -398,13 +386,10 @@ export default function Availability() {
       setWeekAvailabilities(weekAvailsData);
 
       loadedWeekKeyRef.current = weekKey;
-      console.log("AVAILABILITY LOAD", { phase: "dynamic_done", weekKey, durationMs: Date.now() - t0 });
     } finally {
       isLoadingDynamicRef.current = false;
-      // Run queued refresh if one was requested while we were loading
       if (queuedRefreshRef.current) {
         queuedRefreshRef.current = false;
-        console.log("AVAILABILITY LOAD", { phase: "running_queued_refresh" });
         loadDynamicData(worker, user);
       }
     }
@@ -828,14 +813,6 @@ END:VEVENT
         role_or_qualification: roleName,
         possibleInstances: serializePossibleInstances(unifiedShift.possibleInstances),
       };
-      console.log("SIGNUP SAVE DEBUG", {
-        workerId: currentWorker.id,
-        mokedName,
-        sharedMokedKey,
-        signupKey,
-        type,
-        possibleInstances: newEntry.possibleInstances,
-      });
       newShifts.push(newEntry);
     }
 
