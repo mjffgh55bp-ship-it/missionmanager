@@ -330,9 +330,49 @@ export default function Settings() {
   };
 
   const handleSaveWorkerRole = async (idx, updatedItem) => {
+    const oldName = normalizeItem(workerRoles[idx]).name;
+    const newName = updatedItem.name;
     const updated = workerRoles.map((r, i) => i === idx ? updatedItem : r);
     await saveListSetting("worker_roles", updated);
     setWorkerRoles(updated);
+
+    // Propagate rename to Worker records and Template columns
+    if (newName && newName !== oldName) {
+      // 1. Update Worker records that have the old role
+      const allWorkers = await base44.entities.Worker.list();
+      for (const w of allWorkers) {
+        if (!w.role) continue;
+        const roles = Array.isArray(w.role) ? w.role : [w.role];
+        if (roles.includes(oldName)) {
+          const updatedRoles = roles.map(r => r === oldName ? newName : r);
+          await base44.entities.Worker.update(w.id, { role: updatedRoles });
+        }
+      }
+      // 2. Update Template columns that have role_filter or name matching old role
+      const allTemplates = await base44.entities.Template.list();
+      for (const tmpl of allTemplates) {
+        if (!tmpl.columns) continue;
+        const hasMatch = tmpl.columns.some(c => c.role_filter === oldName || (c.type === "worker" && c.name === oldName));
+        if (!hasMatch) continue;
+        const updatedCols = tmpl.columns.map(c => {
+          if (c.type !== "worker") return c;
+          return {
+            ...c,
+            name: c.name === oldName ? newName : c.name,
+            role_filter: c.role_filter === oldName ? newName : c.role_filter,
+          };
+        });
+        await base44.entities.Template.update(tmpl.id, { columns: updatedCols });
+      }
+      // 3. Update TemplateRow values: rename column key in row values
+      const allRows = await base44.entities.TemplateRow.list();
+      for (const row of allRows) {
+        if (!row.values || !(oldName in row.values)) continue;
+        const newValues = { ...row.values, [newName]: row.values[oldName] };
+        delete newValues[oldName];
+        await base44.entities.TemplateRow.update(row.id, { values: newValues });
+      }
+    }
   };
 
   const handleAddShiftStatus = async () => {
