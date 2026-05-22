@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { getCachedWorkers, getCachedTemplates, getCachedAllSettings } from "@/lib/appDataCache";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, invalidateTemplatesCache } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -169,24 +169,27 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
 
-    // Fetch daily AppSettings in one batch by fetching all settings with date suffix
-    // then filter client-side — avoids 3 separate rate-limited calls
     console.time("Schedule date change");
-    // Parallel fetches — avoids sequential rate-limit hits
+    // Always fetch fresh templates alongside daily data so newly created templates are included.
+    // getCachedTemplates returns from cache unless invalidateTemplatesCache() was called first.
     const parallelFetches = [
       fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
       fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
       getCachedAllSettings(base44.entities),
+      getCachedTemplates(base44.entities),
       weekChanged ? fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })) : Promise.resolve(null),
     ];
-    const [templateRowsData, unavailabilitiesData, allSettings, availabilitiesData] = await Promise.all(parallelFetches);
+    const [templateRowsData, unavailabilitiesData, allSettings, freshTemplates, availabilitiesData] = await Promise.all(parallelFetches);
     if (weekChanged) lastWeekStart.current = weekStartStr;
+
+    // Update allTemplates state with the fresh list so the render loop finds new templates
+    setAllTemplates(freshTemplates);
 
     const mokedOrderSettings = allSettings.filter(s => s.setting_key === `moked_order_${dateString}`);
     const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
     const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
 
-    applyDailyData({ dateString, templateRowsData, allTemplatesData: allTemplates, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
+    applyDailyData({ dateString, templateRowsData, allTemplatesData: freshTemplates, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     setDailyLoading(false);
     console.timeEnd("Schedule date change");
   };
@@ -303,6 +306,8 @@ export default function Schedule() {
   };
 
   const handleAddPresetToSchedule = async (preset) => {
+    console.log("CREATE MOKED DEBUG - START", { preset, dateString });
+
     const config = preset.template_config;
     const newTemplate = await base44.entities.Template.create({
       name: preset.name,
@@ -311,12 +316,23 @@ export default function Schedule() {
       default_rows: config.default_rows || [],
       active: true
     });
-    const newGroupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+    console.log("CREATE MOKED DEBUG - TEMPLATE", { templateId: newTemplate?.id, templateName: newTemplate?.name });
+
+    // Invalidate templates cache so the next reload fetches fresh data including the new template
+    invalidateTemplatesCache();
+
+    const newGroupId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `group_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
     const rowsToCreate = config.default_rows && config.default_rows.length > 0 ? config.default_rows : [{}];
     const createdRows = [];
-    for (const rowValues of rowsToCreate) {
+    for (let i = 0; i < rowsToCreate.length; i++) {
+      const rowValues = rowsToCreate[i];
       // Do not set moked_instance_name — getMokedDisplayName uses template.name (which IS preset.name).
       const { moked_instance_name, moked_instance_name_locked, ...cleanRowValues } = rowValues;
+      cleanRowValues._order = i;
       const newRow = await base44.entities.TemplateRow.create({
         template_id: newTemplate.id,
         template_name: newTemplate.name,
@@ -326,11 +342,33 @@ export default function Schedule() {
       });
       createdRows.push(newRow);
     }
+
+    console.log("CREATE MOKED DEBUG - ROWS CREATED", {
+      groupId: newGroupId,
+      rows: createdRows.map(r => ({
+        id: r.id,
+        template_id: r.template_id,
+        template_name: r.template_name,
+        date: r.date,
+        group_id: r.group_id,
+        values: r.values
+      }))
+    });
+
+    // Update local state immediately so moked appears without waiting for reload
     setAllTemplates(prev => [...prev, newTemplate]);
     setTemplates(prev => [...prev, newTemplate]);
     setTemplateRows(prev => [...prev, ...createdRows]);
+
     toast.success(`מוקד "${preset.name}" נוסף ללוח`);
+
+    // Reload from DB to confirm persistence (uses fresh template cache after invalidation)
     await loadData();
+
+    console.log("CREATE MOKED DEBUG - AFTER RELOAD", {
+      dateString,
+      newGroupId,
+    });
   };
 
   const handleDuplicateMoked = async (group) => {
