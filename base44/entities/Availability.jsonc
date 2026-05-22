@@ -24,6 +24,11 @@
             "type": "string",
             "format": "date"
           },
+          "operational_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Operational date (may differ from calendar date for overnight shifts)"
+          },
           "start_time": {
             "type": "string"
           },
@@ -42,6 +47,29 @@
               "unavailable"
             ],
             "description": "Type of availability"
+          },
+          "signupKey": {
+            "type": "string",
+            "description": "Canonical signup key identifying the specific moked instance: date__name:mokedName__startTime__endTime"
+          },
+          "sharedMokedKey": {
+            "type": "string",
+            "description": "Shared moked key component (name:mokedName or group:groupId)"
+          },
+          "moked_name": {
+            "type": "string",
+            "description": "Display name of the moked this signup belongs to"
+          },
+          "role_or_qualification": {
+            "type": "string",
+            "description": "Role or qualification name for this signup"
+          },
+          "possibleInstances": {
+            "type": "array",
+            "description": "Serialized moked instance info for scheduling",
+            "items": {
+              "type": "object"
+            }
           }
         }
       },
