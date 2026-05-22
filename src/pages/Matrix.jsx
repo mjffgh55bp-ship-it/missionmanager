@@ -524,11 +524,12 @@ export default function Matrix() {
       }
       const trackerEntriesData = trackerEntriesCache.current;
 
-      // Fetch template rows sequentially to stay well within rate limits
+      // Fetch template rows sequentially with delay to stay well within rate limits
       const seqFetch = async (dates) => {
         const results = [];
         for (const d of dates) {
           results.push(await base44.entities.TemplateRow.filter({ date: d }));
+          await new Promise(r => setTimeout(r, 120));
         }
         return results;
       };
