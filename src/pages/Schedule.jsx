@@ -135,12 +135,10 @@ export default function Schedule() {
     const workersData = await getCachedWorkers(base44.entities);
     const allTemplatesData = await getCachedTemplates(base44.entities);
     const allSettings = await getCachedAllSettings(base44.entities);
-    // Live fetches — run in parallel to avoid sequential rate-limit hits
-    const [availabilitiesData, unavailabilitiesData, templateRowsData] = await Promise.all([
-      fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })),
-      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
-      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
-    ]);
+    // Live fetches — sequential to avoid rate-limit spikes (cache calls already fired above)
+    const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
+    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
+    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
 
     // Filter settings client-side
     const colTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
@@ -170,16 +168,15 @@ export default function Schedule() {
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
 
     console.time("Schedule date change");
-    // Always fetch fresh templates alongside daily data so newly created templates are included.
-    // getCachedTemplates returns from cache unless invalidateTemplatesCache() was called first.
-    const parallelFetches = [
-      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
-      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
-      getCachedAllSettings(base44.entities),
-      getCachedTemplates(base44.entities),
-      weekChanged ? fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })) : Promise.resolve(null),
-    ];
-    const [templateRowsData, unavailabilitiesData, allSettings, freshTemplates, availabilitiesData] = await Promise.all(parallelFetches);
+    // Fetch sequentially to avoid rate-limit spikes.
+    // Cache calls (settings, templates) are cheap; live entity fetches are spaced out.
+    const allSettings = await getCachedAllSettings(base44.entities);
+    const freshTemplates = await getCachedTemplates(base44.entities);
+    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
+    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
+    const availabilitiesData = weekChanged
+      ? await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }))
+      : null;
     if (weekChanged) lastWeekStart.current = weekStartStr;
 
     // Update allTemplates state with the fresh list so the render loop finds new templates
