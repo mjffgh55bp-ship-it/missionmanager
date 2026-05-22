@@ -389,9 +389,9 @@ export default function Matrix() {
   }, [viewMode]);
 
   // ── Data loading ─────────────────────────────────────────────────────────────
-  useEffect(() => { loadStaticData(); }, []);
+  useEffect(() => { loadStaticData(); }, []); // loadStaticData calls loadDynamicData when done
   useEffect(() => {
-    if (!initialLoadDoneRef.current) return;
+    if (!initialLoadDoneRef.current) return; // guard: skip until static data is ready
     loadDynamicData(false);
   }, [currentDate, viewMode]);
   useEffect(() => {
@@ -472,7 +472,7 @@ export default function Matrix() {
     try {
       const workersData = await getCachedWorkers(base44.entities);
       const allSettings = await getCachedAllSettings(base44.entities);
-      const trackersData = await base44.entities.Tracker.list();
+      const trackersData = await base44.entities.Tracker.list('-created_date', 200);
       const parseSetting = (key) => { const s = allSettings.find(x => x.setting_key === key); return s ? JSON.parse(s.setting_value) : null; };
       const rawPops = parseSetting("worker_populations") || ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
       setPopulations(rawPops.map(p => (typeof p === "string" ? p : p.name)));
@@ -524,32 +524,28 @@ export default function Matrix() {
       }
       const trackerEntriesData = trackerEntriesCache.current;
 
-      // Fetch template rows in small batches (max 3 parallel) to avoid rate limits
-      const batchFetch = async (dates) => {
+      // Fetch template rows sequentially to stay well within rate limits
+      const seqFetch = async (dates) => {
         const results = [];
-        for (let i = 0; i < dates.length; i += 3) {
-          const batch = dates.slice(i, i + 3);
-          const batchResults = await Promise.all(batch.map(d => base44.entities.TemplateRow.filter({ date: d })));
-          results.push(...batchResults);
+        for (const d of dates) {
+          results.push(await base44.entities.TemplateRow.filter({ date: d }));
         }
         return results;
       };
 
       let templateRowArrays;
       if (viewMode === "daily") {
-        const adjacentDates = [
+        templateRowArrays = await seqFetch([
           addDaysString(dateStrLocal, -1),
           dateStrLocal,
           addDaysString(dateStrLocal, 1),
-        ];
-        templateRowArrays = await batchFetch(adjacentDates);
+        ]);
       } else {
-        const extendedDates = [
+        templateRowArrays = await seqFetch([
           addDaysString(weekStartStr, -1),
           ...weekDates,
           addDaysString(weekDates[weekDates.length - 1], 1),
-        ];
-        templateRowArrays = await batchFetch(extendedDates);
+        ]);
       }
 
       let filteredTemplateRows = templateRowArrays.flat();
