@@ -195,7 +195,7 @@ export default function Workers() {
                 const query = searchQuery.toLowerCase();
                 return (
                   worker.nickname?.toLowerCase().includes(query) ||
-                  worker.role?.toLowerCase().includes(query) ||
+                  (Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).some(r => r?.toLowerCase().includes(query)) ||
                   worker.population?.toLowerCase().includes(query) ||
                   worker.training?.toLowerCase().includes(query) ||
                   worker.email?.toLowerCase().includes(query)
