@@ -53,8 +53,20 @@ export default function Workers() {
   }, []);
 
   const loadWorkers = async () => {
-    const workersData = await base44.entities.Worker.list("-created_date");
+    const [workersData, allSettings] = await Promise.all([
+      base44.entities.Worker.list("-created_date"),
+      base44.entities.AppSettings.list(),
+    ]);
     setWorkers(workersData);
+
+    const getSetting = (key) => allSettings.find(s => s.setting_key === key);
+    const workerRolesSettings = getSetting("worker_roles");
+    const tasksSettings = getSetting("tasks_list");
+    const taskQualSettings = getSetting("task_qualifications");
+    const rawRoles = workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : ["שף", "סו-שף"];
+    setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
+    if (tasksSettings) setTasks(JSON.parse(tasksSettings.setting_value) || []);
+    if (taskQualSettings) setTaskQualifications(JSON.parse(taskQualSettings.setting_value) || {});
   };
 
   const loadData = async () => {
