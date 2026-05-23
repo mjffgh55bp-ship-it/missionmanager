@@ -112,7 +112,7 @@ export default function Schedule() {
   }, [currentDate]);
 
   // Retry helper for rate-limited calls with exponential backoff
-  const fetchWithRetry = async (fn, retries = 5, baseDelay = 2000) => {
+  const fetchWithRetry = async (fn, retries = 4, baseDelay = 800) => {
     for (let i = 0; i < retries; i++) {
       try { return await fn(); }
       catch (e) {
@@ -138,12 +138,12 @@ export default function Schedule() {
     const workersData = await getCachedWorkers(base44.entities);
     const allTemplatesData = await getCachedTemplates(base44.entities);
     const allSettings = await getCachedAllSettings(base44.entities);
-    // Live fetches — run in parallel
-    const [availabilitiesData, unavailabilitiesData, templateRowsData] = await Promise.all([
-      fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })),
-      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
-      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
-    ]);
+    // Live fetches — sequential with small delays to avoid rate limits
+    const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
+    await new Promise(r => setTimeout(r, 150));
+    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
+    await new Promise(r => setTimeout(r, 150));
+    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
 
     // Filter settings client-side
     const colTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
@@ -175,10 +175,9 @@ export default function Schedule() {
 
     const allSettings = await getCachedAllSettings(base44.entities);
     const freshTemplates = await getCachedTemplates(base44.entities);
-    const [templateRowsData, unavailabilitiesData] = await Promise.all([
-      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
-      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
-    ]);
+    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
+    await new Promise(r => setTimeout(r, 150));
+    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
     const availabilitiesData = weekChanged
       ? await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }))
       : null;
