@@ -45,6 +45,13 @@ export default function Workers() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Reload workers when the tab regains focus (e.g., after editing roles in Settings)
+  useEffect(() => {
+    const handleFocus = () => { loadWorkers(); };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, []);
+
   const loadWorkers = async () => {
     const workersData = await base44.entities.Worker.list("-created_date");
     setWorkers(workersData);

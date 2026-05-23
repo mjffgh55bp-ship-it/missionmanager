@@ -468,6 +468,22 @@ export default function Settings() {
         return base44.entities.Availability.update(a.id, { shifts: updatedShifts });
       }));
 
+      // ── Step 9: Update task_qualifications keys (role name → new name) ─────────
+      const taskQualSetting = await base44.entities.AppSettings.filter({ setting_key: "task_qualifications" });
+      if (taskQualSetting.length > 0) {
+        const currentQuals = JSON.parse(taskQualSetting[0].setting_value || "{}");
+        const updatedQuals = {};
+        for (const [taskName, roleMap] of Object.entries(currentQuals)) {
+          const updatedRoleMap = {};
+          for (const [roleName, workerIds] of Object.entries(roleMap)) {
+            updatedRoleMap[roleName === oldName ? newName : roleName] = workerIds;
+          }
+          updatedQuals[taskName] = updatedRoleMap;
+        }
+        await base44.entities.AppSettings.update(taskQualSetting[0].id, { setting_value: JSON.stringify(updatedQuals) });
+        setTaskQualifications(updatedQuals);
+      }
+
       // Invalidate caches so Schedule/Availability pick up fresh data immediately
       invalidateStaticCache();
     }
