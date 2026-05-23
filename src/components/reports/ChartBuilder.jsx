@@ -399,7 +399,7 @@ export default function ChartBuilder({ open, onOpenChange, chart, onSaved, sched
               <div>
                 <Label className="text-sm">סנן לפי אוכלוסייה</Label>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {populations.map(p => (
+                  {(populations || []).map(p => typeof p === "string" ? p : p.name).filter(Boolean).map(p => (
                     <button key={p} type="button" onClick={() => toggleArr("filter_populations", p)}
                       className={`px-2 py-0.5 rounded-full text-xs border transition-colors ${(form.filter_populations || []).includes(p) ? "bg-blue-900 text-white border-blue-900" : "border-gray-300 text-gray-600 hover:border-gray-500"}`}>
                       {p}
@@ -413,7 +413,7 @@ export default function ChartBuilder({ open, onOpenChange, chart, onSaved, sched
               <div>
                 <Label className="text-sm">סנן לפי תפקיד</Label>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {workerRoles.map(r => (
+                  {(workerRoles || []).map(r => typeof r === "string" ? r : r.name).filter(Boolean).map(r => (
                     <button key={r} type="button" onClick={() => toggleArr("filter_roles", r)}
                       className={`px-2 py-0.5 rounded-full text-xs border transition-colors ${(form.filter_roles || []).includes(r) ? "bg-blue-900 text-white border-blue-900" : "border-gray-300 text-gray-600 hover:border-gray-500"}`}>
                       {r}

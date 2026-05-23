@@ -1415,8 +1415,20 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 </div>
               )}
               <div className="p-3 bg-gray-50 rounded-lg border space-y-2">
-                <WorkerPillFilter label="אוכלוסייה" options={populations} selected={selectedPopulations} onChange={setSelectedPopulations} color="orange" />
-                <WorkerPillFilter label="תפקיד" options={workerRoles} selected={selectedRoles} onChange={setSelectedRoles} color="indigo" />
+                <WorkerPillFilter
+                  label="אוכלוסייה"
+                  options={(populations || []).map(p => typeof p === "string" ? p : p.name).filter(Boolean)}
+                  selected={selectedPopulations}
+                  onChange={setSelectedPopulations}
+                  color="orange"
+                />
+                <WorkerPillFilter
+                  label="תפקיד"
+                  options={(workerRoles || []).map(r => typeof r === "string" ? r : r.name).filter(Boolean)}
+                  selected={selectedRoles}
+                  onChange={setSelectedRoles}
+                  color="indigo"
+                />
                 <WorkerPillFilter label="כשירות" options={qualifications.map(q => ({ value: q.id, label: q.name }))} selected={selectedQualifications} onChange={setSelectedQualifications} color="teal" />
                 <div>
                   <p className="text-xs font-semibold text-gray-500 mb-1">עובדים ({selectedWorkerIds.length > 0 ? `${selectedWorkerIds.length} נבחרו` : "כולם"})</p>

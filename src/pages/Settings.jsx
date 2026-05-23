@@ -316,7 +316,7 @@ export default function Settings() {
     await saveListSetting("worker_populations", updated);
     setPopulations(updated);
 
-    // Propagate rename to Worker records
+    // Propagate rename to Worker records and ChartWidget.filter_populations
     if (newName && newName !== oldName) {
       const allWorkers = await base44.entities.Worker.list();
       await Promise.all(
@@ -324,6 +324,18 @@ export default function Settings() {
           .filter(w => w.population === oldName)
           .map(w => base44.entities.Worker.update(w.id, { population: newName }))
       );
+
+      // ── Step 2: Update ChartWidget.filter_populations ─────────────────────────
+      const allCharts = await base44.entities.ChartWidget.list();
+      const chartsToUpdate = allCharts.filter(c =>
+        (c.filter_populations || []).includes(oldName)
+      );
+      await Promise.all(chartsToUpdate.map(c =>
+        base44.entities.ChartWidget.update(c.id, {
+          filter_populations: (c.filter_populations || []).map(p => p === oldName ? newName : p)
+        })
+      ));
+
       invalidateStaticCache();
     }
   };
@@ -397,6 +409,64 @@ export default function Settings() {
             })
         );
       }
+
+      // ── Step 5: Update ChartWidget.filter_roles ────────────────────────────────
+      const allCharts = await base44.entities.ChartWidget.list();
+      const chartsToUpdate = allCharts.filter(c =>
+        (c.filter_roles || []).includes(oldName)
+      );
+      await Promise.all(chartsToUpdate.map(c =>
+        base44.entities.ChartWidget.update(c.id, {
+          filter_roles: (c.filter_roles || []).map(r => r === oldName ? newName : r)
+        })
+      ));
+
+      // ── Step 6: Update Tracker.columns[].criteria[].col_name ──────────────────
+      const allTrackers = await base44.entities.Tracker.list();
+      const trackersToUpdate = allTrackers.filter(t =>
+        (t.columns || []).some(col =>
+          (col.criteria || []).some(c => c.col_name === oldName)
+        )
+      );
+      await Promise.all(trackersToUpdate.map(t => {
+        const updatedColumns = (t.columns || []).map(col => ({
+          ...col,
+          criteria: (col.criteria || []).map(c => ({
+            ...c,
+            col_name: c.col_name === oldName ? newName : c.col_name,
+          })),
+        }));
+        return base44.entities.Tracker.update(t.id, { columns: updatedColumns });
+      }));
+
+      // ── Step 7: Update Assignment.column_values keys ───────────────────────────
+      if (templatesToUpdate.length > 0) {
+        const affectedTemplateIds = new Set(templatesToUpdate.map(t => t.id));
+        const allAssignments = await base44.entities.Assignment.list();
+        const assignmentsToUpdate = allAssignments.filter(a =>
+          affectedTemplateIds.has(a.template_id) &&
+          a.column_values &&
+          oldName in a.column_values
+        );
+        await Promise.all(assignmentsToUpdate.map(a => {
+          const newColumnValues = { ...a.column_values, [newName]: a.column_values[oldName] };
+          delete newColumnValues[oldName];
+          return base44.entities.Assignment.update(a.id, { column_values: newColumnValues });
+        }));
+      }
+
+      // ── Step 8: Update Availability.shifts[].role_or_qualification ────────────
+      const allAvailabilities = await base44.entities.Availability.list();
+      const availsToUpdate = allAvailabilities.filter(a =>
+        (a.shifts || []).some(s => s.role_or_qualification === oldName)
+      );
+      await Promise.all(availsToUpdate.map(a => {
+        const updatedShifts = (a.shifts || []).map(s => ({
+          ...s,
+          role_or_qualification: s.role_or_qualification === oldName ? newName : s.role_or_qualification,
+        }));
+        return base44.entities.Availability.update(a.id, { shifts: updatedShifts });
+      }));
 
       // Invalidate caches so Schedule/Availability pick up fresh data immediately
       invalidateStaticCache();

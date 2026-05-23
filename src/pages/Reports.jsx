@@ -136,8 +136,14 @@ export default function Reports() {
     ];
     setQualifications(merged);
     setWorkerQualifications(workerQualsData);
-    if (populationsSettings.length > 0) setPopulations(JSON.parse(populationsSettings[0].setting_value) || []);
-    if (workerRolesSettings.length > 0) setWorkerRoles(JSON.parse(workerRolesSettings[0].setting_value) || []);
+    if (populationsSettings.length > 0) {
+      const raw = JSON.parse(populationsSettings[0].setting_value) || [];
+      setPopulations(raw.map(p => typeof p === "string" ? p : p.name).filter(Boolean));
+    }
+    if (workerRolesSettings.length > 0) {
+      const raw = JSON.parse(workerRolesSettings[0].setting_value) || [];
+      setWorkerRoles(raw.map(r => typeof r === "string" ? r : r.name).filter(Boolean));
+    }
 
     // Collect all unique schedule columns from global + cart params
     const globalCols = globalColSettings.length > 0 ? (JSON.parse(globalColSettings[0].setting_value) || []) : [];
