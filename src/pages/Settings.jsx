@@ -352,42 +352,53 @@ export default function Settings() {
 
     // Propagate rename to Worker records and Template columns
     if (newName && newName !== oldName) {
-      // 1. Update Worker records that have the old role (all workers, not just active)
+      // 1. Update ALL Worker records that have the old role (both active and inactive)
       const allWorkers = await base44.entities.Worker.list();
-      for (const w of allWorkers) {
-        if (!w.role) continue;
-        const roles = Array.isArray(w.role) ? w.role : [w.role];
-        if (roles.includes(oldName)) {
-          const updatedRoles = roles.map(r => r === oldName ? newName : r);
-          await base44.entities.Worker.update(w.id, { role: updatedRoles });
-        }
-      }
-      // 2. Update Template columns that have role_filter or name matching old role
+      await Promise.all(
+        allWorkers
+          .filter(w => {
+            const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
+            return roles.includes(oldName);
+          })
+          .map(w => {
+            const roles = Array.isArray(w.role) ? w.role : [w.role];
+            return base44.entities.Worker.update(w.id, { role: roles.map(r => r === oldName ? newName : r) });
+          })
+      );
+
+      // 2. Update ALL Template columns that reference the old role name
+      // (both 'name' field and 'role_filter' field, for ALL column types — not just type==="worker")
       const allTemplates = await base44.entities.Template.list();
-      for (const tmpl of allTemplates) {
-        if (!tmpl.columns) continue;
-        const hasMatch = tmpl.columns.some(c => c.role_filter === oldName || (c.type === "worker" && c.name === oldName));
-        if (!hasMatch) continue;
-        const updatedCols = tmpl.columns.map(c => {
-          if (c.type !== "worker") return c;
-          return {
+      const templatesToUpdate = allTemplates.filter(t =>
+        (t.columns || []).some(c => c.name === oldName || c.role_filter === oldName)
+      );
+      await Promise.all(
+        templatesToUpdate.map(t => {
+          const updatedCols = (t.columns || []).map(c => ({
             ...c,
             name: c.name === oldName ? newName : c.name,
             role_filter: c.role_filter === oldName ? newName : c.role_filter,
-          };
-        });
-        await base44.entities.Template.update(tmpl.id, { columns: updatedCols });
-      }
+          }));
+          return base44.entities.Template.update(t.id, { columns: updatedCols });
+        })
+      );
+
       // 3. Update TemplateRow values: rename column key in row values
-      const allRows = await base44.entities.TemplateRow.list();
-      for (const row of allRows) {
-        if (!row.values || !(oldName in row.values)) continue;
-        const newValues = { ...row.values, [newName]: row.values[oldName] };
-        delete newValues[oldName];
-        await base44.entities.TemplateRow.update(row.id, { values: newValues });
+      if (templatesToUpdate.length > 0) {
+        const affectedTemplateIds = new Set(templatesToUpdate.map(t => t.id));
+        const allRows = await base44.entities.TemplateRow.list("-date", 5000);
+        await Promise.all(
+          allRows
+            .filter(r => affectedTemplateIds.has(r.template_id) && r.values && oldName in r.values)
+            .map(r => {
+              const newValues = { ...r.values, [newName]: r.values[oldName] };
+              delete newValues[oldName];
+              return base44.entities.TemplateRow.update(r.id, { values: newValues });
+            })
+        );
       }
 
-      // Invalidate caches so Schedule/Availability pick up fresh data
+      // Invalidate caches so Schedule/Availability pick up fresh data immediately
       invalidateStaticCache();
     }
   };

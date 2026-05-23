@@ -297,6 +297,7 @@ export default function ShiftDemandPanel({
   canEdit,
   isLocked,
   onAddConstraint,
+  workerRolesSettings = [],
 }) {
   const weekTemplateRows = useMemo(() => {
     const dates = new Set();
@@ -324,17 +325,45 @@ export default function ShiftDemandPanel({
     return new Set(Array.isArray(currentWorker.role) ? currentWorker.role : [currentWorker.role].filter(Boolean));
   }, [currentWorker]);
 
+  // Build a set of ALL role names the worker is eligible for, including aliases via mapping_id.
+  // This handles the case where a role was renamed: worker still has old name in DB ("שף")
+  // but template column now has new name ("נהג"). If both share the same mapping_id,
+  // the worker should still see those shifts.
+  const myEligibleRoleNames = useMemo(() => {
+    if (myRoles.size === 0) return new Set();
+
+    // Build mapping_id → [all names with that id] from settings
+    const mappingIdToNames = new Map();
+    (workerRolesSettings || []).forEach(r => {
+      if (r.mapping_id) {
+        if (!mappingIdToNames.has(r.mapping_id)) mappingIdToNames.set(r.mapping_id, new Set());
+        mappingIdToNames.get(r.mapping_id).add(r.name);
+      }
+    });
+
+    // For each role the worker has, add all aliases (same mapping_id)
+    const eligible = new Set(myRoles);
+    myRoles.forEach(roleName => {
+      const roleObj = (workerRolesSettings || []).find(r => r.name === roleName);
+      if (roleObj?.mapping_id) {
+        const aliases = mappingIdToNames.get(roleObj.mapping_id);
+        if (aliases) aliases.forEach(alias => eligible.add(alias));
+      }
+    });
+    return eligible;
+  }, [myRoles, workerRolesSettings]);
+
   // Filter demand to only show shifts relevant to this worker's roles
   // (shifts with roleName=null are shown to everyone; role-specific shifts
-  //  are shown only if the worker has that role)
+  //  are shown only if the worker has that role — including aliases via mapping_id)
   const filteredWeekDemand = useMemo(() => {
     if (!currentWorker) return [];
     return weekDemand.filter(shift => {
       if (!shift.roleName) return true; // no role restriction
-      if (myRoles.size === 0) return false; // worker has no role
-      return myRoles.has(shift.roleName);
+      if (myEligibleRoleNames.size === 0) return false; // worker has no role
+      return myEligibleRoleNames.has(shift.roleName);
     });
-  }, [weekDemand, myRoles, currentWorker]);
+  }, [weekDemand, myEligibleRoleNames, currentWorker]);
 
   // Build: slotKey (date__start__end) → count of distinct signupKeys at that slot
   const slotSignupKeyCountMap = useMemo(() => {
@@ -397,7 +426,7 @@ export default function ShiftDemandPanel({
                   slotSignupKeyCountMap={slotSignupKeyCountMap}
                   allAvailabilities={allAvailabilities}
                   workers={workers}
-                  myRoles={myRoles}
+                  myRoles={myEligibleRoleNames}
                   selectedShifts={selectedShifts}
                   signupMode={signupMode || "allow_over_sign_up"}
                   onSignup={onSignup}

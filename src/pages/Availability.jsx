@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
-import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, parseSetting } from "@/lib/appDataCache";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, parseSetting, parseListSetting } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +89,7 @@ export default function Availability() {
   const [desiredShiftsCount, setDesiredShiftsCount] = useState("");
   const [extraTaskStates, setExtraTaskStates] = useState({});
   const [openRegistrations, setOpenRegistrations] = useState([]);
+  const [workerRolesSettings, setWorkerRolesSettings] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
   const [allTemplateRowsForCalendar, setAllTemplateRowsForCalendar] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
@@ -189,6 +190,11 @@ export default function Availability() {
 
       // Extract settings client-side (no extra API calls)
       const openReg = parseSetting(allSettings, "open_registrations", []);
+      const workerRolesRaw = parseSetting(allSettings, "worker_roles", null);
+      const workerRolesList = workerRolesRaw
+        ? workerRolesRaw.map(r => (typeof r === "string" ? { name: r, mapping_id: "" } : r))
+        : [];
+      setWorkerRolesSettings(workerRolesList);
       const userRoles = parseSetting(allSettings, "user_roles", {});
       const signupModeSetting = parseSetting(allSettings, "availability_signup_mode", "allow_over_sign_up");
       setSignupMode(signupModeSetting);
@@ -1127,6 +1133,7 @@ END:VEVENT
               canEdit={canEdit && !currentWorker?.availability_locked}
               isLocked={!!currentWorker?.availability_locked}
               onAddConstraint={() => setShowUnavailabilityDialog(true)}
+              workerRolesSettings={workerRolesSettings}
             />
 
 
