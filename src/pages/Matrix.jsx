@@ -311,7 +311,7 @@ export default function Matrix() {
   const applyZoom = useCallback((newPpmRaw, focalClientX = null) => {
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     const oldPpm = ppmRef.current;
-    if (!containerWidth) return;
+    if (!containerWidth || !sc) return;
     const fixedW = pinned ? 0 : (WORKER_COL_WIDTH +
       (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH + SUMMARY_ADD_COL_WIDTH : 0));
     const available = Math.max(300, containerWidth - fixedW);
@@ -320,39 +320,35 @@ export default function Matrix() {
 
     if (Math.abs(newPpm - oldPpm) < 0.0001) return;
 
-    // Capture anchor BEFORE state update so we have stable old values
-    let anchorRightPx = null; // px from right edge (RTL coordinate) under cursor
-    let cursorX = sc ? sc.clientWidth / 2 : 0;
+    // ── Capture anchor synchronously, BEFORE any state update ────────────────
+    // RTL coordinate system:
+    //   scrollLeft=0 → left edge of content (= latest time visually)
+    //   The timeline bars use `right: X px` where X = opMinutes * ppm
+    //   So "time under cursor" in RTL coords = (timelineWidth - (scrollLeft + cursorX))
+    //   That value is invariant across zoom: anchorRightPx / ppm = constant minutes.
+    const rect = sc.getBoundingClientRect();
+    const cursorX = focalClientX !== null ? (focalClientX - rect.left) : sc.clientWidth / 2;
+    const oldTimelineWidth = totalMins * oldPpm;
+    const cursorFromLeft = sc.scrollLeft + cursorX;
+    const anchorRightPx = oldTimelineWidth - cursorFromLeft; // px from right = op-time px
 
-    if (sc && focalClientX !== null) {
-      const rect = sc.getBoundingClientRect();
-      cursorX = focalClientX - rect.left;
-      const oldTimelineWidth = totalMins * oldPpm;
-      // cursorFromLeft: absolute px from the left edge of the scrollable content
-      const cursorFromLeft = sc.scrollLeft + cursorX;
-      // In RTL: right edge = 06:00 (px=0), left edge = end-of-day/week
-      // cursorFromRight = distance from right edge = operational time in pixels
-      anchorRightPx = oldTimelineWidth - cursorFromLeft;
-    }
+    // Compute new scrollLeft now (synchronously) — don't wait for rAF to re-read ppm
+    const newTimelineWidth = totalMins * newPpm;
+    const scaledAnchorRightPx = anchorRightPx * (newPpm / oldPpm);
+    const newCursorFromLeft = newTimelineWidth - scaledAnchorRightPx;
+    const targetScrollLeft = newCursorFromLeft - cursorX;
 
     setZoomPreset('custom');
     setCustomPpm(newPpm);
 
+    // Apply scroll after React re-renders with the new ppm / timelineWidth
     requestAnimationFrame(() => {
-      const s = pinned ? timelineScrollRef.current : scrollContainerRef.current;
-      if (!s) return;
-      const maxScroll = s.scrollWidth - s.clientWidth;
-
-      if (anchorRightPx !== null) {
-        // Scale the anchor to the new zoom level
-        const scaledAnchorRightPx = anchorRightPx * (newPpm / oldPpm);
-        const newTimelineWidth = totalMins * newPpm;
-        // newCursorFromLeft = distance from left edge of content to cursor
-        const newCursorFromLeft = newTimelineWidth - scaledAnchorRightPx;
-        const newScrollLeft = newCursorFromLeft - cursorX;
-        s.scrollLeft = Math.max(0, Math.min(newScrollLeft, maxScroll));
-      }
-      // If no focal point (button zoom), leave scroll position as-is (centered naturally)
+      requestAnimationFrame(() => {
+        const s = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+        if (!s) return;
+        const maxScroll = s.scrollWidth - s.clientWidth;
+        s.scrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScroll));
+      });
     });
   }, [containerWidth, totalMins, viewMode, summaryColumns, pinned]);
 
