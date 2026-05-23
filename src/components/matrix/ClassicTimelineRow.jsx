@@ -243,9 +243,9 @@ export default function ClassicTimelineRow({
       </div>
       <div className="absolute inset-0">
         {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
-          // Day boundary at left edge of 06:00 slot = (day*1440 + 60)*ppm from right
-          const px = (day * 1440 + 60) * ppm;
-          return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '1px', backgroundColor: 'rgba(80,80,80,0.25)', zIndex: 15 }} />;
+          // Day boundary at 06:00 = opMin 0, i.e. the RIGHT edge of each day's operational block
+          const px = day * 1440 * ppm;
+          return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '2px', backgroundColor: 'rgba(80,80,80,0.35)', zIndex: 15 }} />;
         })}
         {availabilityShifts.map((shift, idx) => <AvailabilityBarLocal key={`avail-${idx}`} shift={shift} />)}
         {workerUnavailabilities.map(unavail => <UnavailabilityBarLocal key={unavail.id} unavail={unavail} />)}
