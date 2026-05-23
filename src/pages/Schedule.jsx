@@ -45,6 +45,7 @@ import TimeCell from "../components/schedule/TimeCell";
 import PresetsDialog from "../components/schedule/PresetsDialog";
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 import { getMokedDisplayName } from "@/lib/shiftDemand";
+import { useMemo } from "react";
 
 export default function Schedule() {
   const [currentDate, setCurrentDate] = useState(() => {
@@ -535,6 +536,25 @@ export default function Schedule() {
     }, 500);
   };
 
+  const workerDayAssignments = useMemo(() => {
+    const map = new Map();
+    templateRows.forEach(row => {
+      const tmpl = allTemplates.find(t => t.id === row.template_id);
+      if (!tmpl) return;
+      const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
+      const endTime   = row.values?.["סיום"]   || row.values?.["שעת סיום"];
+      if (!startTime || !endTime) return;
+      (tmpl.columns || []).forEach(col => {
+        if (col.type !== "worker") return;
+        const workerId = row.values?.[col.name];
+        if (!workerId) return;
+        if (!map.has(workerId)) map.set(workerId, []);
+        map.get(workerId).push({ rowId: row.id, columnName: col.name, startTime, endTime });
+      });
+    });
+    return map;
+  }, [templateRows, allTemplates]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8 flex items-center justify-center">
@@ -1006,6 +1026,7 @@ export default function Schedule() {
                                             rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
                                             rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
                                             taskQualifiedWorkerIds={col.task_name ? Object.values(taskQualifications[col.task_name] || {}).flat() : (row.values?.task ? Object.values(taskQualifications[row.values.task] || {}).flat() : undefined)}
+                                            workerDayAssignments={workerDayAssignments}
                                             onSaved={(workerId) => {
                                             const newValues = { ...row.values, [col.name]: workerId };
                                             setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));

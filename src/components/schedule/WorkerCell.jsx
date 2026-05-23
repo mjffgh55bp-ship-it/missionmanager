@@ -17,6 +17,7 @@ export default function WorkerCell({
   rowStartTime,
   rowEndTime,
   taskQualifiedWorkerIds,
+  workerDayAssignments,
   onSaved
 }) {
   const [editing, setEditing] = useState(false);
@@ -116,6 +117,26 @@ export default function WorkerCell({
     return taskQualifiedWorkerIds.includes(workerId);
   };
 
+  const timesOverlap = (aStart, aEnd, bStart, bEnd) => {
+    if (!aStart || !aEnd || !bStart || !bEnd) return false;
+    const toMins = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + (m || 0); };
+    const as = toMins(aStart), ae = toMins(aEnd);
+    const bs = toMins(bStart), be = toMins(bEnd);
+    const expand = (s, e) => e <= s ? [[s, 1440], [0, e]] : [[s, e]];
+    const segsA = expand(as, ae);
+    const segsB = expand(bs, be);
+    return segsA.some(([a1, a2]) => segsB.some(([b1, b2]) => a1 < b2 && b1 < a2));
+  };
+
+  const isWorkerDoubleBooked = (workerId) => {
+    if (!workerId || !rowStartTime || !rowEndTime || !workerDayAssignments) return false;
+    const assignments = workerDayAssignments.get(workerId) || [];
+    return assignments.some(a => {
+      if (a.rowId === rowId && a.columnName === columnName) return false;
+      return timesOverlap(rowStartTime, rowEndTime, a.startTime, a.endTime);
+    });
+  };
+
   const getWorkerCategory = (workerId) => {
     if (!rowStartTime || !rowEndTime) return 'no-info';
     const isUnavail = isWorkerUnavailable(workerId, rowStartTime, rowEndTime);
@@ -159,6 +180,7 @@ export default function WorkerCell({
     isWorkerUnavailable(selectedWorker.id, rowStartTime, rowEndTime);
   const isCurrentUnqualified = selectedWorker && taskQualifiedWorkerIds &&
     !taskQualifiedWorkerIds.includes(selectedWorker.id);
+  const isCurrentDoubleBooked = selectedWorker ? isWorkerDoubleBooked(selectedWorker.id) : false;
 
   return (
     <div ref={containerRef} className="relative w-full h-full min-h-full" style={{ height: '100%' }} dir="rtl">
@@ -193,6 +215,9 @@ export default function WorkerCell({
                 {selectedWorker.nickname}
               </span>
               {isCurrentUnavailable && <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />}
+              {isCurrentDoubleBooked && !isCurrentUnavailable && (
+                <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" title="עובד זה כבר שובץ למשמרת חופפת" />
+              )}
               {isCurrentUnqualified && <span className="text-[10px] text-orange-500 flex-shrink-0">⚠</span>}
             </div>
           ) : (
@@ -249,6 +274,7 @@ export default function WorkerCell({
               const category = getWorkerCategory(worker.id);
               const isSelected = worker.id === currentValue;
               const qualified = isWorkerQualified(worker.id);
+              const doubleBooked = isWorkerDoubleBooked(worker.id);
 
               const bgClass = isSelected
                 ? "bg-blue-100 text-blue-800"
@@ -278,6 +304,12 @@ export default function WorkerCell({
                   <span className={`flex-1 text-right font-medium ${!qualified ? 'text-orange-600' : getSeniorityColor(worker.seniority)}`}>
                     {worker.nickname}{!qualified ? ' ⚠' : ''}
                   </span>
+                  {doubleBooked && (
+                    <span className="flex-shrink-0 flex items-center gap-0.5 text-amber-600 text-[10px] font-semibold" title="משובץ כבר במשמרת חופפת">
+                      <AlertTriangle className="w-3 h-3 text-amber-500" />
+                      <span>כפל</span>
+                    </span>
+                  )}
                   {roleDisplay && (
                     <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 flex-shrink-0">
                       {roleDisplay}
