@@ -544,7 +544,11 @@ export default function Schedule() {
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
       const endTime   = row.values?.["סיום"]   || row.values?.["שעת סיום"];
       if (!startTime || !endTime) return;
-      (tmpl.columns || []).forEach(col => {
+      const allCols = [
+        ...(tmpl.columns || []),
+        ...(dailyCustomColumns[row.template_id] || [])
+      ];
+      allCols.forEach(col => {
         if (col.type !== "worker") return;
         const workerId = row.values?.[col.name];
         if (!workerId) return;
@@ -553,7 +557,7 @@ export default function Schedule() {
       });
     });
     return map;
-  }, [templateRows, allTemplates]);
+  }, [templateRows, allTemplates, dailyCustomColumns]);
 
   if (loading) {
     return (

@@ -132,8 +132,8 @@ export default function WorkerCell({
     if (!workerId || !rowStartTime || !rowEndTime || !workerDayAssignments) return false;
     const assignments = workerDayAssignments.get(workerId) || [];
     return assignments.some(a => {
-      // Skip any assignment on the same row (same time slot, different columns = not a double-booking)
-      if (a.rowId === rowId) return false;
+      // Skip only the exact cell being evaluated
+      if (a.rowId === rowId && a.columnName === columnName) return false;
       return timesOverlap(rowStartTime, rowEndTime, a.startTime, a.endTime);
     });
   };
