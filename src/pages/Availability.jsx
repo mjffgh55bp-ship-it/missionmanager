@@ -180,11 +180,13 @@ export default function Availability() {
 
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      // Step 2: fetch static data sequentially to avoid rate limits
-      const workersData = await getCachedWorkers(base44.entities);
-      const allSettings = await getCachedAllSettings(base44.entities);
-      const eventsData = await base44.entities.CompanyEvent.list("-date");
-      const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
+      // Step 2: fetch static data in parallel (cache calls are instant; network calls run together)
+      const [workersData, allSettings, eventsData, yearlyEventsData] = await Promise.all([
+        getCachedWorkers(base44.entities),
+        getCachedAllSettings(base44.entities),
+        base44.entities.CompanyEvent.list("-date"),
+        base44.entities.YearlyEvent.list("-start_date", 500),
+      ]);
 
       // Extract settings client-side (no extra API calls)
       const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -257,18 +259,13 @@ export default function Availability() {
     try {
       // Fetch sequentially to stay within rate limits
       const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
-      await new Promise(r => setTimeout(r, 120));
       const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
-      await new Promise(r => setTimeout(r, 120));
       const templatesData = await getCachedTemplates(base44.entities);
-      await new Promise(r => setTimeout(r, 120));
       const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-      await new Promise(r => setTimeout(r, 120));
 
       // Fetch all template rows for the week in one batch (filter client-side)
       const allWeekRows = await base44.entities.TemplateRow.list("-date", 500);
       const perDayRowArrays = [allWeekRows.filter(r => weekDates.includes(r.date))];
-      await new Promise(r => setTimeout(r, 120));
 
       // Fetch all assignments at once and filter client-side to reduce API calls
       const allWorkerAssignments = await base44.entities.Assignment.list("-date", 500);
