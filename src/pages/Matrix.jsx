@@ -218,6 +218,8 @@ export default function Matrix() {
   const midMouseDragRef = useRef(null);
   const ppmRef = useRef(ppm);
   ppmRef.current = ppm;
+  // Pending zoom scroll: applied once the timeline DOM actually reaches the expected width
+  const pendingZoomScrollRef = useRef(null); // { targetScrollLeft, expectedWidth }
 
   const timelineWidth = useMemo(() => totalMins * ppm, [totalMins, ppm]);
   const totalMatrixWidth = useMemo(() => fixedColumnsWidth + timelineWidth, [fixedColumnsWidth, timelineWidth]);
@@ -336,22 +338,38 @@ export default function Matrix() {
     const scaledAnchorRightPx = anchorRightPx * (newPpm / oldPpm);
     const targetScrollLeft = (newTimelineWidth - scaledAnchorRightPx) - cursorX;
 
+    // Store pending scroll — will be applied once the DOM actually reflects the new width
+    pendingZoomScrollRef.current = { targetScrollLeft, expectedWidth: newTimelineWidth };
+
     setZoomPreset('custom');
     setCustomPpm(newPpm);
-
-    // Apply scroll after React re-renders with the new ppm / timelineWidth.
-    // Three rAF frames: 1st triggers layout, 2nd paints, 3rd confirms geometry.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const s = pinned ? timelineScrollRef.current : scrollContainerRef.current;
-          if (!s) return;
-          const maxScroll = s.scrollWidth - s.clientWidth;
-          s.scrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScroll));
-        });
-      });
-    });
   }, [containerWidth, totalMins, viewMode, summaryColumns, pinned]);
+
+  // ── Apply pending zoom scroll once the DOM resizes to the expected width ─────
+  // Using ResizeObserver on the scroll content ensures we apply ONLY after the
+  // browser has laid out the new timeline width — no rAF timing guesses needed.
+  useEffect(() => {
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+    if (!sc) return;
+
+    // The actual scrollable content is the first child div
+    const content = sc.firstElementChild;
+    if (!content) return;
+
+    const ro = new ResizeObserver(() => {
+      const pending = pendingZoomScrollRef.current;
+      if (!pending) return;
+      // Check if the content has reached (or passed) the expected width
+      if (Math.abs(sc.scrollWidth - pending.expectedWidth) < 2) {
+        const maxScroll = sc.scrollWidth - sc.clientWidth;
+        sc.scrollLeft = Math.max(0, Math.min(pending.targetScrollLeft, maxScroll));
+        pendingZoomScrollRef.current = null;
+      }
+    });
+
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [pinned]);
 
   const handleWheel = useCallback((e) => {
     if (e.ctrlKey || e.metaKey) {

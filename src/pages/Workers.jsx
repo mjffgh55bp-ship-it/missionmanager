@@ -73,8 +73,10 @@ export default function Workers() {
     if (loadingRef.current) return;
     loadingRef.current = true;
     try {
-      const workersData = await base44.entities.Worker.list("-created_date");
-      const allSettings = await base44.entities.AppSettings.list();
+      const [workersData, allSettings] = await Promise.all([
+        base44.entities.Worker.list("-created_date"),
+        base44.entities.AppSettings.list(),
+      ]);
 
       setWorkers(workersData);
 
