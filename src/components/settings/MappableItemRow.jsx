@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,9 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState(item);
   const [saving, setSaving] = useState(false);
+
+  // Sync draft when item prop changes (after parent saves)
+  useEffect(() => { setDraft(item); }, [item.name, item.mapping_id, item.export_name]);
 
   const isDuplicate = draft.mapping_id &&
     allItems.filter(i => normalizeItem(i).mapping_id === draft.mapping_id).length > 1;
@@ -112,9 +115,21 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
               <Input
                 value={draft.name}
                 onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
+                onBlur={async e => {
+                  const newName = e.target.value.trim();
+                  if (newName && newName !== item.name) {
+                    setSaving(true);
+                    await onSave({ ...draft, name: newName });
+                    setSaving(false);
+                  }
+                }}
+                onKeyDown={async e => {
+                  if (e.key === 'Enter') e.target.blur();
+                }}
                 className="h-7 text-sm"
                 dir="rtl"
               />
+              <p className="text-[10px] text-orange-500 mt-0.5">שינוי שם יעדכן את כל הנתונים הקשורים</p>
             </div>
             {/* mapping_id / ID */}
             <div>
