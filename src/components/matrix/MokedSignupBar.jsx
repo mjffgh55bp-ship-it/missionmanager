@@ -56,13 +56,20 @@ export default function MokedSignupBar({ signups, startTime, endTime, dayIndex, 
             }}
           />
         </TooltipTrigger>
-        <TooltipContent className="bg-gray-800 text-white border-none" dir="rtl">
+        <TooltipContent className="bg-gray-800 text-white border-none max-w-[220px]" dir="rtl">
           <p className="font-bold text-xs mb-1">זמינות למוקד:</p>
           {mokedNames.length > 0
             ? mokedNames.map((n, i) => {
                 const signup = signups.find(s => extractMokedName(s) === n);
                 const typeLabel = signup?.type === 'wanted' ? '⭐ רצוי' : signup?.type === 'available' ? '✓ זמין' : '';
-                return <p key={i} className="text-xs">• {n}{typeLabel ? ` (${typeLabel})` : ''}</p>;
+                const role = signup?.role_or_qualification;
+                return (
+                  <div key={i} className="text-xs mb-0.5">
+                    <span className="font-semibold">• {n}</span>
+                    {role && <span className="text-gray-300"> | {role}</span>}
+                    {typeLabel && <span className="text-gray-400"> ({typeLabel})</span>}
+                  </div>
+                );
               })
             : <p className="text-xs">מוקד לא ידוע</p>
           }
