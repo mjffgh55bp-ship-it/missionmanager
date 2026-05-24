@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -921,6 +921,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_by_task", "count_quantitative"].includes(type);
 
+  // Pre-compute all cell values — only recomputes when actual data changes, not on every render
+  const cellValueMap = useMemo(() => {
+    const map = new Map();
+    if (!tracker?.columns || !filteredWorkers) return map;
+    tracker.columns.forEach(col => {
+      filteredWorkers.forEach(worker => {
+        map.set(`${col.id}_${worker.id}`, computeAutoValue(col, worker.id));
+      });
+    });
+    return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracker?.columns, filteredWorkers, assignments, templateRows, entries, dateFilterMode, startDate, endDate]);
+
   const displayColumns = editMode ? editColumns : (tracker.columns || []);
 
   const filteredWorkers = workers.filter(w => {
@@ -954,8 +967,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         }
         return 0;
       };
-      const va = extractNum(computeAutoValue(col, a.id));
-      const vb = extractNum(computeAutoValue(col, b.id));
+      const va = extractNum(cellValueMap.get(`${col.id}_${a.id}`));
+      const vb = extractNum(cellValueMap.get(`${col.id}_${b.id}`));
       return mult * (va - vb);
     }
     const va = getEntry(a.id, sortColId)?.value || "";
@@ -987,7 +1000,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const getColValues = (col) => {
     if (!isAuto(col.type)) return [];
     return filteredWorkers.map(w => {
-      const v = computeAutoValue(col, w.id);
+      const v = cellValueMap.get(`${col.id}_${w.id}`);
       if (typeof v === "number") return v;
       if (typeof v === "object" && v !== null) {
         if (col.quantitative_single_item) return v[col.quantitative_single_item] || 0;
@@ -1172,7 +1185,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         {displayColumns.map(col => {
           const auto = isAuto(col.type);
           const entryValue = getEntry(worker.id, col.id)?.value || "";
-          const value = auto ? computeAutoValue(col, worker.id) : entryValue;
+          const value = auto ? cellValueMap.get(`${col.id}_${worker.id}`) : entryValue;
           const isEditing = editingCell?.workerId === worker.id && editingCell?.colId === col.id;
 
           if (col.type === "count_by_task") {
@@ -1282,7 +1295,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         {displayColumns.map(col => {
           if (col.type === "count_by_task") {
             const grandTotal = filteredWorkers.reduce((sum, w) => {
-              const taskHours = computeAutoValue(col, w.id);
+              const taskHours = cellValueMap.get(`${col.id}_${w.id}`);
               return sum + (typeof taskHours === "object" && taskHours !== null
                 ? Object.values(taskHours).reduce((s, h) => s + (h || 0), 0)
                 : 0);
@@ -1300,7 +1313,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               : (sc?.quantitative_items || []);
             if (col.quantitative_single_item) {
               const total = filteredWorkers.reduce((sum, w) => {
-                const counts = computeAutoValue(col, w.id);
+                const counts = cellValueMap.get(`${col.id}_${w.id}`);
                 return sum + ((typeof counts === "object" && counts !== null) ? (counts[col.quantitative_single_item] || 0) : 0);
               }, 0);
               return (
@@ -1312,7 +1325,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             const totals = {};
             allOpts.forEach(opt => {
               totals[opt] = filteredWorkers.reduce((sum, w) => {
-                const counts = computeAutoValue(col, w.id);
+                const counts = cellValueMap.get(`${col.id}_${w.id}`);
                 return sum + ((typeof counts === "object" && counts !== null) ? (counts[opt] || 0) : 0);
               }, 0);
             });
@@ -1339,7 +1352,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               );
             }
             const total = filteredWorkers.reduce((sum, w) => {
-              const v = computeAutoValue(col, w.id);
+              const v = cellValueMap.get(`${col.id}_${w.id}`);
               return sum + (typeof v === "number" ? v : 0);
             }, 0);
             const quantCriteriaCheckTotal = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);

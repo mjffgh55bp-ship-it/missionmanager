@@ -554,25 +554,19 @@ export default function Matrix() {
       }
       const trackerEntriesData = trackerEntriesCache.current;
 
-      // Fetch template rows sequentially with delay to stay well within rate limits
-      const seqFetch = async (dates) => {
-        const results = [];
-        for (const d of dates) {
-          results.push(await base44.entities.TemplateRow.filter({ date: d }));
-          await new Promise(r => setTimeout(r, 120));
-        }
-        return results;
-      };
+      // Fetch all dates in parallel — no delays needed
+      const parallelFetch = (dates) =>
+        Promise.all(dates.map(d => base44.entities.TemplateRow.filter({ date: d })));
 
       let templateRowArrays;
       if (viewMode === "daily") {
-        templateRowArrays = await seqFetch([
+        templateRowArrays = await parallelFetch([
           addDaysString(dateStrLocal, -1),
           dateStrLocal,
           addDaysString(dateStrLocal, 1),
         ]);
       } else {
-        templateRowArrays = await seqFetch([
+        templateRowArrays = await parallelFetch([
           addDaysString(weekStartStr, -1),
           ...weekDates,
           addDaysString(weekDates[weekDates.length - 1], 1),

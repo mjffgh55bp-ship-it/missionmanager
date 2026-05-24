@@ -38,6 +38,7 @@ export default function Workers() {
   });
 
   const loadingRef = useRef(false);
+  const taskQualSettingIdRef = useRef(null);
 
   useEffect(() => {
     // Small delay to avoid firing simultaneously with other pages on initial mount
@@ -94,7 +95,10 @@ export default function Workers() {
       const rawRoles = workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : ["שף", "סו-שף"];
       setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
       if (tasksSettings) setTasks(JSON.parse(tasksSettings.setting_value) || []);
-      if (taskQualSettings) setTaskQualifications(JSON.parse(taskQualSettings.setting_value) || {});
+      if (taskQualSettings) {
+        taskQualSettingIdRef.current = taskQualSettings.id;
+        setTaskQualifications(JSON.parse(taskQualSettings.setting_value) || {});
+      }
     } finally {
       loadingRef.current = false;
     }
@@ -108,10 +112,13 @@ export default function Workers() {
       : [...current, workerId];
     const updated = { ...taskQualifications, [taskName]: { ...taskRoles, [role]: updatedRole } };
     setTaskQualifications(updated);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "task_qualifications" });
     const data = { setting_key: "task_qualifications", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
+    if (taskQualSettingIdRef.current) {
+      await base44.entities.AppSettings.update(taskQualSettingIdRef.current, data);
+    } else {
+      const created = await base44.entities.AppSettings.create(data);
+      taskQualSettingIdRef.current = created.id;
+    }
   };
 
   const handlePhotoUpload = async (e) => {

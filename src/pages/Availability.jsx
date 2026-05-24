@@ -257,18 +257,15 @@ export default function Availability() {
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
     try {
-      // Fetch sequentially to stay within rate limits
-      const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
-      const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
-      const templatesData = await getCachedTemplates(base44.entities);
-      const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-
-      // Fetch all template rows for the week in one batch (filter client-side)
-      const allWeekRows = await base44.entities.TemplateRow.list("-date", 500);
+      const [availabilities, unavailabilitiesData, templatesData, weekAvailsData, allWeekRows, allWorkerAssignments] = await Promise.all([
+        base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
+        base44.entities.Unavailability.filter({ worker_id: worker.id }),
+        getCachedTemplates(base44.entities),
+        base44.entities.Availability.filter({ week_start_date: weekStartStr }),
+        base44.entities.TemplateRow.list("-date", 500),
+        base44.entities.Assignment.list("-date", 500),
+      ]);
       const perDayRowArrays = [allWeekRows.filter(r => weekDates.includes(r.date))];
-
-      // Fetch all assignments at once and filter client-side to reduce API calls
-      const allWorkerAssignments = await base44.entities.Assignment.list("-date", 500);
       const assignmentsData = allWorkerAssignments.filter(a => a.chef_id === worker.id);
       const sousAssignments = allWorkerAssignments.filter(a => a.sous_chef_id === worker.id);
       const additionalAssignments = allWorkerAssignments.filter(a => a.additional_chef_id === worker.id);

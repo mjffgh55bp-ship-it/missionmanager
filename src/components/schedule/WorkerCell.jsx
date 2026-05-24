@@ -91,7 +91,7 @@ export default function WorkerCell({
     try {
       localStorage.setItem("schedule-sync-event", JSON.stringify(payload));
     } catch {}
-    console.log("SCHEDULE MATRIX SYNC", { source: "WorkerCell", rowId, date, patchedLocalState: true });
+
   };
 
   const handleWorkerSelect = async (workerId) => {
@@ -236,15 +236,6 @@ export default function WorkerCell({
         const openUpward = spaceBelow < dropdownHeight && rect?.top > dropdownHeight;
         const top = rect ? (openUpward ? rect.top - dropdownHeight : rect.bottom) : 0;
         const right = rect ? Math.max(0, window.innerWidth - rect.right) : 0;
-
-        console.log("WORKER DROPDOWN OPEN", {
-          rowId,
-          columnName,
-          triggerRect: rect,
-          openUpward,
-          top,
-          right
-        });
 
         return (
         <div

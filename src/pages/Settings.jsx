@@ -318,7 +318,10 @@ export default function Settings() {
 
     // Propagate rename to Worker records and ChartWidget.filter_populations
     if (newName && newName !== oldName) {
-      const allWorkers = await base44.entities.Worker.list();
+      const [allWorkers, allCharts] = await Promise.all([
+        base44.entities.Worker.list(),
+        base44.entities.ChartWidget.list(),
+      ]);
       await Promise.all(
         allWorkers
           .filter(w => w.population === oldName)
@@ -326,7 +329,6 @@ export default function Settings() {
       );
 
       // ── Step 2: Update ChartWidget.filter_populations ─────────────────────────
-      const allCharts = await base44.entities.ChartWidget.list();
       const chartsToUpdate = allCharts.filter(c =>
         (c.filter_populations || []).includes(oldName)
       );
@@ -364,8 +366,17 @@ export default function Settings() {
 
     // Propagate rename to Worker records and Template columns
     if (newName && newName !== oldName) {
+      // Fetch all independent collections in parallel
+      const [allWorkers, allTemplates, allCharts, allTrackers, allAvailabilities, taskQualSetting] = await Promise.all([
+        base44.entities.Worker.list(),
+        base44.entities.Template.list(),
+        base44.entities.ChartWidget.list(),
+        base44.entities.Tracker.list(),
+        base44.entities.Availability.list(),
+        base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
+      ]);
+
       // 1. Update ALL Worker records that have the old role (both active and inactive)
-      const allWorkers = await base44.entities.Worker.list();
       await Promise.all(
         allWorkers
           .filter(w => {
@@ -380,7 +391,6 @@ export default function Settings() {
 
       // 2. Update ALL Template columns that reference the old role name
       // (both 'name' field and 'role_filter' field, for ALL column types — not just type==="worker")
-      const allTemplates = await base44.entities.Template.list();
       const templatesToUpdate = allTemplates.filter(t =>
         (t.columns || []).some(c => c.name === oldName || c.role_filter === oldName)
       );
@@ -411,7 +421,6 @@ export default function Settings() {
       }
 
       // ── Step 5: Update ChartWidget.filter_roles ────────────────────────────────
-      const allCharts = await base44.entities.ChartWidget.list();
       const chartsToUpdate = allCharts.filter(c =>
         (c.filter_roles || []).includes(oldName)
       );
@@ -422,7 +431,6 @@ export default function Settings() {
       ));
 
       // ── Step 6: Update Tracker.columns[].criteria[].col_name ──────────────────
-      const allTrackers = await base44.entities.Tracker.list();
       const trackersToUpdate = allTrackers.filter(t =>
         (t.columns || []).some(col =>
           (col.criteria || []).some(c => c.col_name === oldName)
@@ -456,7 +464,6 @@ export default function Settings() {
       }
 
       // ── Step 8: Update Availability.shifts[].role_or_qualification ────────────
-      const allAvailabilities = await base44.entities.Availability.list();
       const availsToUpdate = allAvailabilities.filter(a =>
         (a.shifts || []).some(s => s.role_or_qualification === oldName)
       );
@@ -469,7 +476,6 @@ export default function Settings() {
       }));
 
       // ── Step 9: Update task_qualifications keys (role name → new name) ─────────
-      const taskQualSetting = await base44.entities.AppSettings.filter({ setting_key: "task_qualifications" });
       if (taskQualSetting.length > 0) {
         const currentQuals = JSON.parse(taskQualSetting[0].setting_value || "{}");
         const updatedQuals = {};
