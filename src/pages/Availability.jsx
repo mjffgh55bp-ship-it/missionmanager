@@ -180,15 +180,11 @@ export default function Availability() {
 
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      // Step 2: fetch static data — cache calls are instant, live calls staggered to avoid rate limits
-      const [workersData, allSettings] = await Promise.all([
-        getCachedWorkers(base44.entities),
-        getCachedAllSettings(base44.entities),
-      ]);
-      const [eventsData, yearlyEventsData] = await Promise.all([
-        base44.entities.CompanyEvent.list("-date"),
-        base44.entities.YearlyEvent.list("-start_date", 500),
-      ]);
+      // Step 2: fetch static data sequentially to avoid rate limits
+      const workersData = await getCachedWorkers(base44.entities);
+      const allSettings = await getCachedAllSettings(base44.entities);
+      const eventsData = await base44.entities.CompanyEvent.list("-date");
+      const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
 
       // Extract settings client-side (no extra API calls)
       const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -259,14 +255,13 @@ export default function Availability() {
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
     try {
-      const [availabilities, unavailabilitiesData, templatesData, weekAvailsData, allWeekRows, allWorkerAssignments] = await Promise.all([
-        base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
-        base44.entities.Unavailability.filter({ worker_id: worker.id }),
-        getCachedTemplates(base44.entities),
-        base44.entities.Availability.filter({ week_start_date: weekStartStr }),
-        base44.entities.TemplateRow.list("-date", 500),
-        base44.entities.Assignment.list("-date", 500),
-      ]);
+      // Sequential fetches to avoid rate limits
+      const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
+      const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
+      const templatesData = await getCachedTemplates(base44.entities);
+      const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
+      const allWeekRows = await base44.entities.TemplateRow.list("-date", 500);
+      const allWorkerAssignments = await base44.entities.Assignment.list("-date", 500);
       const perDayRowArrays = [allWeekRows.filter(r => weekDates.includes(r.date))];
       const assignmentsData = allWorkerAssignments.filter(a => a.chef_id === worker.id);
       const sousAssignments = allWorkerAssignments.filter(a => a.sous_chef_id === worker.id);
