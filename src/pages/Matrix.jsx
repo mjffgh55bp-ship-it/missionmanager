@@ -312,6 +312,7 @@ export default function Matrix() {
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     const oldPpm = ppmRef.current;
     if (!containerWidth || !sc) return;
+
     const fixedW = pinned ? 0 : (WORKER_COL_WIDTH +
       (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH + SUMMARY_ADD_COL_WIDTH : 0));
     const available = Math.max(300, containerWidth - fixedW);
@@ -320,35 +321,39 @@ export default function Matrix() {
 
     if (Math.abs(newPpm - oldPpm) < 0.0001) return;
 
-    // ── Capture anchor synchronously, BEFORE any state update ────────────────
-    // RTL coordinate system:
-    //   scrollLeft=0 → left edge of content (= latest time visually)
-    //   The timeline bars use `right: X px` where X = opMinutes * ppm
-    //   So "time under cursor" in RTL coords = (timelineWidth - (scrollLeft + cursorX))
-    //   That value is invariant across zoom: anchorRightPx / ppm = constant minutes.
+    // In unpinned mode, rect.left is the left edge of the full matrix container
+    // (including sticky worker/summary columns). Subtract fixedW to get cursor position
+    // relative to the timeline area only. In pinned mode sc IS the timeline — no offset needed.
     const rect = sc.getBoundingClientRect();
-    const cursorX = focalClientX !== null ? (focalClientX - rect.left) : sc.clientWidth / 2;
+    let cursorX;
+    if (focalClientX !== null) {
+      cursorX = Math.max(0, focalClientX - rect.left - fixedW);
+    } else {
+      cursorX = available / 2;
+    }
+
+    // RTL anchor: time 06:00 is at right=0, later times extend leftward.
+    // anchorRightPx = operational time in pixels = invariant across zoom.
     const oldTimelineWidth = totalMins * oldPpm;
     const cursorFromLeft = sc.scrollLeft + cursorX;
-    const anchorRightPx = oldTimelineWidth - cursorFromLeft; // px from right = op-time px
+    const anchorRightPx = oldTimelineWidth - cursorFromLeft;
 
-    // Compute new scrollLeft now (synchronously) — don't wait for rAF to re-read ppm
     const newTimelineWidth = totalMins * newPpm;
     const scaledAnchorRightPx = anchorRightPx * (newPpm / oldPpm);
     const newCursorFromLeft = newTimelineWidth - scaledAnchorRightPx;
     const targetScrollLeft = newCursorFromLeft - cursorX;
 
+    // Compute maxScroll from pre-calculated values — DOM scrollWidth may be stale
+    // at the time the rAF fires (React hasn't committed the new layout yet).
+    const maxScroll = Math.max(0, newTimelineWidth - available);
+
     setZoomPreset('custom');
     setCustomPpm(newPpm);
 
-    // Apply scroll after React re-renders with the new ppm / timelineWidth
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const s = pinned ? timelineScrollRef.current : scrollContainerRef.current;
-        if (!s) return;
-        const maxScroll = s.scrollWidth - s.clientWidth;
-        s.scrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScroll));
-      });
+      const s = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+      if (!s) return;
+      s.scrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScroll));
     });
   }, [containerWidth, totalMins, viewMode, summaryColumns, pinned]);
 
