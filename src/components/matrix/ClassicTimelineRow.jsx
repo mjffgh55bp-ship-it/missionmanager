@@ -9,7 +9,7 @@ import MokedSignupBar from "./MokedSignupBar";
  * Renders the timeline portion of a single worker row in the classic (unpinned) layout.
  * Extracted to keep Matrix.jsx under the size limit.
  */
-export default function ClassicTimelineRow({
+function ClassicTimelineRow({
   worker,
   index,
   isSelected,
@@ -288,3 +288,5 @@ export default function ClassicTimelineRow({
     </div>
   );
 }
+
+export default React.memo(ClassicTimelineRow);

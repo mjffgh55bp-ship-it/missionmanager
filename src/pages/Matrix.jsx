@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { usePageState } from "@/hooks/usePageState";
 import { base44 } from "@/api/base44Client";
 import { getCachedAllSettings, getCachedWorkers, getCachedTemplates } from "@/lib/appDataCache";
@@ -216,6 +216,11 @@ export default function Matrix() {
   const vScrollSyncRef = useRef(false);       // guard against scroll loop
 
   const midMouseDragRef = useRef(null);
+  const pendingScrollRef = useRef(null);
+  // Stores { targetScrollLeft, maxScroll } computed in applyZoom,
+  // consumed by useLayoutEffect after React commits the new ppm.
+  const wheelAccumRef = useRef(null);
+  // Accumulates Ctrl+wheel delta between animation frames.
   const ppmRef = useRef(ppm);
   ppmRef.current = ppm;
 
@@ -342,26 +347,46 @@ export default function Matrix() {
     const scaledAnchorRightPx = anchorRightPx * (newPpm / oldPpm);
     const newCursorFromLeft = newTimelineWidth - scaledAnchorRightPx;
     const targetScrollLeft = newCursorFromLeft - cursorX;
-
-    // Compute maxScroll from pre-calculated values — DOM scrollWidth may be stale
-    // at the time the rAF fires (React hasn't committed the new layout yet).
     const maxScroll = Math.max(0, newTimelineWidth - available);
+
+    // Store scroll target — useLayoutEffect applies it after React commits the new ppm,
+    // eliminating the one-frame gap with mismatched zoom level and scroll position.
+    pendingScrollRef.current = { targetScrollLeft, maxScroll };
 
     setZoomPreset('custom');
     setCustomPpm(newPpm);
-
-    requestAnimationFrame(() => {
-      const s = pinned ? timelineScrollRef.current : scrollContainerRef.current;
-      if (!s) return;
-      s.scrollLeft = Math.max(0, Math.min(targetScrollLeft, maxScroll));
-    });
   }, [containerWidth, totalMins, viewMode, summaryColumns, pinned]);
 
+  // Apply pending zoom scroll synchronously after React commits the new ppm to the DOM.
+  // Fires after DOM mutations but before the browser paints — no visible jump frame.
+  useLayoutEffect(() => {
+    const pending = pendingScrollRef.current;
+    if (!pending) return;
+    pendingScrollRef.current = null;
+
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+    if (!sc) return;
+    sc.scrollLeft = Math.max(0, Math.min(pending.targetScrollLeft, pending.maxScroll));
+  }, [ppm, pinned]);
+
   const handleWheel = useCallback((e) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      const factor = e.deltaY > 0 ? 0.85 : 1.18;
-      applyZoom(ppmRef.current * factor, e.clientX);
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault();
+
+    // Accumulate multiplicative zoom factor within this animation frame
+    const factor = e.deltaY > 0 ? 0.85 : 1.18;
+    if (!wheelAccumRef.current) {
+      // First event this frame — schedule a single applyZoom call
+      wheelAccumRef.current = { totalFactor: factor, clientX: e.clientX };
+      requestAnimationFrame(() => {
+        const accum = wheelAccumRef.current;
+        wheelAccumRef.current = null;
+        if (accum) applyZoom(ppmRef.current * accum.totalFactor, accum.clientX);
+      });
+    } else {
+      // Subsequent events same frame — multiply factors, keep last cursor position
+      wheelAccumRef.current.totalFactor *= factor;
+      wheelAccumRef.current.clientX = e.clientX;
     }
   }, [applyZoom]);
 
