@@ -143,23 +143,24 @@ export default function Availability() {
   // Live sync: real-time DB subscription + BroadcastChannel + localStorage + focus
   useEffect(() => {
     // ── Real-time DB subscription — fires on ANY device/browser ──────────────
+    // Updates weekAvailabilities directly from the event payload — NO extra API call
+    const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const unsubAvailability = base44.entities.Availability.subscribe((event) => {
-      // Only care about records for the current week
       const record = event.data;
-      if (!record || record.week_start_date !== format(weekStart, "yyyy-MM-dd")) return;
-      // Don't override our own optimistic update (we already set it locally)
+      if (!record || record.week_start_date !== weekStartStr) return;
+      // Don't override our own optimistic update (already set locally)
       if (record.worker_id === cachedWorker.current?.id) return;
-      // Patch weekAvailabilities with the incoming record
       setWeekAvailabilities(prev => {
-        const without = prev.filter(a => a.id !== record.id && !(a.worker_id === record.worker_id && a.week_start_date === record.week_start_date));
+        const without = prev.filter(a => !(a.worker_id === record.worker_id && a.week_start_date === record.week_start_date));
         if (event.type === 'delete') return without;
         return [...without, record];
       });
     });
 
-    // BroadcastChannel for same-origin cross-tab sync (fast path)
+    // BroadcastChannel for same-origin cross-tab sync (fast path, no extra API call)
     const bc = new BroadcastChannel("availability-sync");
     broadcastRef.current = bc;
+    // Cross-tab: only refetch if it's a different tab updating (we can't get the record directly)
     bc.onmessage = () => refetchWeekAvailabilities();
 
     // localStorage fallback
