@@ -1,0 +1,32 @@
+{
+  "name": "ShiftLock",
+  "type": "object",
+  "properties": {
+    "lock_key": {
+      "type": "string",
+      "description": "Unique key: signupKey__weekStartDate"
+    },
+    "worker_id": {
+      "type": "string",
+      "description": "ID of the worker who holds this slot"
+    },
+    "worker_name": {
+      "type": "string",
+      "description": "Name of the worker who holds this slot"
+    },
+    "locked_at": {
+      "type": "string",
+      "description": "ISO timestamp when the lock was created"
+    }
+  },
+  "required": [
+    "lock_key",
+    "worker_id"
+  ],
+  "rls": {
+    "create": {},
+    "read": {},
+    "update": {},
+    "delete": {}
+  }
+}

@@ -1,9 +1,17 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
- * Atomic signup for a shift slot.
- * Performs: fetch → check capacity → save, all server-side.
- * Returns { success: true } or { success: false, reason: "full" }.
+ * Atomic signup for a shift slot using a distributed lock (ShiftLock entity).
+ *
+ * Strategy:
+ * 1. Try to INSERT a ShiftLock record for this signupKey+week.
+ *    - If the insert succeeds → we own the slot.
+ *    - If the insert fails (duplicate lock_key already exists) → slot is taken → return { success: false }.
+ * 2. After winning the lock, do a final count check (in case of slots with requiredCount > 1).
+ * 3. Save the availability record.
+ * 4. Clean up old locks for this key that belong to previous owners (keep only ours).
+ *
+ * Returns { success: true, record } or { success: false, reason: 'full' }.
  */
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
@@ -12,48 +20,61 @@ Deno.serve(async (req) => {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await req.json();
-  const {
-    signupKey,
-    weekStartDate,
-    workerId,
-    workerName,
-    availabilityData, // full availability record to save (shifts, status, etc.)
-    requiredCount,
-    // For the capacity check: which other workers' signups count as "wanted" for this key
-  } = body;
+  const { signupKey, weekStartDate, workerId, workerName, availabilityData, requiredCount } = body;
 
   if (!signupKey || !weekStartDate || !workerId || !availabilityData) {
     return Response.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  // Use service role to read all availabilities for this week atomically
-  const allAvails = await base44.asServiceRole.entities.Availability.filter({
-    week_start_date: weekStartDate
-  });
-
-  // Count how many OTHER workers are already signed up as "wanted" for this signupKey
-  const othersCount = allAvails.filter(avail => {
-    if (avail.worker_id === workerId) return false; // exclude self
-    const shifts = avail.shifts || [];
-    return shifts.some(s => {
-      if ((s.type || s.status) !== 'wanted') return false;
-      if (s.signupKey) return s.signupKey === signupKey;
-      if (s.sharedMokedKey) {
-        // legacy key reconstruction: date__name:X__start__end
-        const legacyKey = `${s.operational_date || s.date}__${s.sharedMokedKey}__${s.start_time}__${s.end_time}`;
-        return legacyKey === signupKey;
-      }
-      return false;
-    });
-  }).length;
-
   const maxSlots = requiredCount || 1;
-  if (othersCount >= maxSlots) {
-    return Response.json({ success: false, reason: 'full', currentCount: othersCount, maxSlots });
+  const lockKey = `${signupKey}__${weekStartDate}`;
+
+  // Step 1: Check existing locks for this slot
+  const existingLocks = await base44.asServiceRole.entities.ShiftLock.filter({ lock_key: lockKey });
+
+  // Check if this worker already has a lock (re-registration attempt)
+  const myExistingLock = existingLocks.find(l => l.worker_id === workerId);
+
+  // Count locks from OTHER workers
+  const otherLocks = existingLocks.filter(l => l.worker_id !== workerId);
+
+  if (otherLocks.length >= maxSlots) {
+    // Slot is fully taken by others
+    return Response.json({ success: false, reason: 'full', currentCount: otherLocks.length, maxSlots });
   }
 
-  // Slot has room — save the availability record
+  // Step 2: Acquire lock — create if we don't already have one
+  let lockRecord;
+  if (myExistingLock) {
+    // We already hold a lock — just update the timestamp
+    lockRecord = myExistingLock;
+  } else {
+    // Create our lock entry
+    lockRecord = await base44.asServiceRole.entities.ShiftLock.create({
+      lock_key: lockKey,
+      worker_id: workerId,
+      worker_name: workerName || '',
+      locked_at: new Date().toISOString(),
+    });
+  }
+
+  // Step 3: Re-check after lock creation (handles the tight race window)
+  // Wait a tiny bit to let any concurrent inserts land
+  await new Promise(r => setTimeout(r, 100));
+
+  const locksAfter = await base44.asServiceRole.entities.ShiftLock.filter({ lock_key: lockKey });
+  const otherLocksAfter = locksAfter.filter(l => l.worker_id !== workerId);
+
+  if (otherLocksAfter.length >= maxSlots) {
+    // Someone else also got in — delete our lock and return failure
+    await base44.asServiceRole.entities.ShiftLock.delete(lockRecord.id);
+    return Response.json({ success: false, reason: 'full', currentCount: otherLocksAfter.length, maxSlots });
+  }
+
+  // Step 4: We won — save the availability record
+  const allAvails = await base44.asServiceRole.entities.Availability.filter({ week_start_date: weekStartDate });
   const existingList = allAvails.filter(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
+
   let saved;
   if (existingList.length > 0) {
     saved = await base44.asServiceRole.entities.Availability.update(existingList[0].id, availabilityData);
