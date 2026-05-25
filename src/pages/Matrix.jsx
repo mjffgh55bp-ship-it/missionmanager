@@ -768,10 +768,11 @@ export default function Matrix() {
 
   const getWorkerAvailabilityForDate = (workerId, date = null) => {
     const targetDate = date || dateString;
-    const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate && (a.status === "approved" || a.status === "submitted"));
+    const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
     if (!workerAvail || !workerAvail.shifts) return [];
     if (viewMode === 'weekly') return workerAvail.shifts || [];
-    return workerAvail.shifts.filter(s => s.date === targetDate);
+    // Match on operational_date OR date — shifts from ShiftDemandPanel store the date in operational_date
+    return workerAvail.shifts.filter(s => (s.operational_date || s.date) === targetDate);
   };
 
   const getWorkerUnavailabilityForDate = (workerId, date = null) => {
@@ -1258,7 +1259,8 @@ export default function Matrix() {
   };
 
   const AvailabilityBar = ({ shift, worker }) => {
-    const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
+    const shiftDate = shift.operational_date || shift.date;
+    const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shiftDate) : 0;
     const startPx = timeToPixels(shift.start_time, dayIndex, viewMode, ppm);
     const endPx = endTimeToPixels(shift.start_time, shift.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 0);
@@ -1268,7 +1270,7 @@ export default function Matrix() {
     const borderColors = { wanted: '#16a34a', available: '#3b82f6', unavailable: '#dc2626' };
     const borderColor = borderColors[shift.type] || '#3b82f6';
     const overlappingAssignments = templateRows.filter(r => {
-      if (r.date !== shift.date || !r.values) return false;
+      if (r.date !== shiftDate || !r.values) return false;
       const tmpl = allTemplates.find(t => t.id === r.template_id);
       if (!tmpl) return false;
       const { assigned } = isWorkerAssignedToRow(r, worker.id, tmpl);
