@@ -140,9 +140,24 @@ export default function Availability() {
     }, 300);
   };
 
-  // Live sync: BroadcastChannel + localStorage + focus
+  // Live sync: real-time DB subscription + BroadcastChannel + localStorage + focus
   useEffect(() => {
-    // BroadcastChannel for same-origin cross-tab sync
+    // ── Real-time DB subscription — fires on ANY device/browser ──────────────
+    const unsubAvailability = base44.entities.Availability.subscribe((event) => {
+      // Only care about records for the current week
+      const record = event.data;
+      if (!record || record.week_start_date !== format(weekStart, "yyyy-MM-dd")) return;
+      // Don't override our own optimistic update (we already set it locally)
+      if (record.worker_id === cachedWorker.current?.id) return;
+      // Patch weekAvailabilities with the incoming record
+      setWeekAvailabilities(prev => {
+        const without = prev.filter(a => a.id !== record.id && !(a.worker_id === record.worker_id && a.week_start_date === record.week_start_date));
+        if (event.type === 'delete') return without;
+        return [...without, record];
+      });
+    });
+
+    // BroadcastChannel for same-origin cross-tab sync (fast path)
     const bc = new BroadcastChannel("availability-sync");
     broadcastRef.current = bc;
     bc.onmessage = () => refetchWeekAvailabilities();
@@ -153,7 +168,7 @@ export default function Availability() {
     };
     window.addEventListener("storage", onStorage);
 
-    // Refetch on tab focus (catches cases where BroadcastChannel or storage missed)
+    // Refetch on tab focus (catches cases where subscription or storage missed)
     const onFocus = () => refetchWeekAvailabilities();
     window.addEventListener("focus", onFocus);
 
@@ -162,6 +177,7 @@ export default function Availability() {
     window.addEventListener("availabilityUpdated", onUpdated);
 
     return () => {
+      unsubAvailability();
       bc.close();
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", onFocus);
