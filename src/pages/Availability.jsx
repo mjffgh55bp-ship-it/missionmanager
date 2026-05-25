@@ -105,6 +105,8 @@ export default function Availability() {
   const staticLoaded = useRef(false);
   const cachedUser = useRef(null);
   const cachedWorker = useRef(null);
+  const cachedAllTemplateRows = useRef(null);
+  const cachedAllAssignments = useRef(null);
   const isLoadingAllRef = useRef(false);
   const isLoadingDynamicRef = useRef(false);
   const queuedRefreshRef = useRef(false);
@@ -261,16 +263,25 @@ export default function Availability() {
     try {
       // Sequential fetches with delays to avoid rate limits
       const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400));
       const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400));
       const templatesData = await getCachedTemplates(base44.entities);
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400));
       const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-      await new Promise(r => setTimeout(r, 300));
-      const allWeekRows = await base44.entities.TemplateRow.list("-date", 500);
-      await new Promise(r => setTimeout(r, 300));
-      const allWorkerAssignments = await base44.entities.Assignment.list("-date", 500);
+      await new Promise(r => setTimeout(r, 400));
+
+      // Cache heavy lists — only fetch once per page session
+      if (!cachedAllTemplateRows.current) {
+        cachedAllTemplateRows.current = await base44.entities.TemplateRow.list("-date", 500);
+        await new Promise(r => setTimeout(r, 400));
+      }
+      const allWeekRows = cachedAllTemplateRows.current;
+
+      if (!cachedAllAssignments.current) {
+        cachedAllAssignments.current = await base44.entities.Assignment.list("-date", 500);
+      }
+      const allWorkerAssignments = cachedAllAssignments.current;
       const perDayRowArrays = [allWeekRows.filter(r => weekDates.includes(r.date))];
       const assignmentsData = allWorkerAssignments.filter(a => a.chef_id === worker.id);
       const sousAssignments = allWorkerAssignments.filter(a => a.sous_chef_id === worker.id);
