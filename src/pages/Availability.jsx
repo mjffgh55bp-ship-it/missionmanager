@@ -839,7 +839,7 @@ END:VEVENT
       worker_name: currentWorker.nickname,
       week_start_date: weekStartStr,
       shifts: cleanedShifts,
-      status: existingAvailability?.status || "draft",
+      status: (existingAvailability?.status && existingAvailability.status !== "draft") ? existingAvailability.status : "submitted",
       desired_shifts: desiredShiftsCount ? parseInt(desiredShiftsCount) : null,
       extra_tasks: extraTaskStates,
     };
