@@ -856,23 +856,25 @@ END:VEVENT
       newShifts.push(newEntry);
     }
 
-    // 1. Optimistic local update — also strip any remaining naked entries for slots
-    // that now have a keyed entry (mirrors the deduplication done on load).
-    const slotsWithKey = new Set();
-    newShifts.forEach(s => {
-      if (s.signupKey || s.sharedMokedKey) {
-        const d = s.operational_date || s.date;
-        slotsWithKey.add(`${d}__${s.start_time}__${s.end_time}`);
-      }
-    });
-    const cleanedShifts = newShifts.filter(s => {
-      if (s.signupKey || s.sharedMokedKey) return true;
-      const slotKey = `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`;
-      return !slotsWithKey.has(slotKey);
-    });
-    setSelectedShifts(cleanedShifts);
+    // Helper: clean naked legacy entries that are superseded by keyed entries
+    const cleanShifts = (shifts) => {
+      const slotsWithKey = new Set();
+      shifts.forEach(s => {
+        if (s.signupKey || s.sharedMokedKey) {
+          const d = s.operational_date || s.date;
+          slotsWithKey.add(`${d}__${s.start_time}__${s.end_time}`);
+        }
+      });
+      return shifts.filter(s => {
+        if (s.signupKey || s.sharedMokedKey) return true;
+        const slotKey = `${s.operational_date || s.date}__${s.start_time}__${s.end_time}`;
+        return !slotsWithKey.has(slotKey);
+      });
+    };
 
-    // 2. Build availability record
+    const cleanedShifts = cleanShifts(newShifts);
+
+    // Build availability record
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const availabilityData = {
       worker_id: currentWorker.id,
@@ -884,17 +886,14 @@ END:VEVENT
       extra_tasks: extraTaskStates,
     };
 
-    // 3. Optimistic weekAvailabilities update so ShiftDemandPanel sees new count immediately
-    const optimisticRecord = { ...(existingAvailability || {}), ...availabilityData, shifts: cleanedShifts };
-    setWeekAvailabilities(prev => {
-      const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
-      return [...withoutMine, optimisticRecord];
-    });
+    // In limit_sign_up mode with a "wanted" registration:
+    // Do NOT do optimistic UI update — wait for server confirmation first to prevent
+    // two users seeing an open slot simultaneously and both succeeding.
+    const isLimitedWanted = type === "wanted" && signupMode === "limit_sign_up";
 
-    // 4. Persist to DB (atomic server-side check in limit mode to prevent race conditions)
     let savedRecord;
-    if (type === "wanted" && signupMode === "limit_sign_up") {
-      const weekStartStr = format(weekStart, "yyyy-MM-dd");
+    if (isLimitedWanted) {
+      // 1. Persist atomically on server FIRST, then update UI
       const result = await signupForShift({
         signupKey,
         weekStartDate: weekStartStr,
@@ -904,28 +903,49 @@ END:VEVENT
         requiredCount: unifiedShift.requiredCount || 1,
       });
       if (!result.data?.success) {
-        // Slot was taken by someone else — revert optimistic update and refresh
+        // Slot was taken — refresh counts from server and do NOT apply local change
         const freshAvails = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
         setWeekAvailabilities(freshAvails);
-        // Revert our optimistic local shift selection
+        // Revert optimistic selectedShifts (restore pre-click state)
         setSelectedShifts(selectedShifts.filter(s => s.signupKey !== signupKey));
         return;
       }
       savedRecord = result.data.record;
-    } else if (existingAvailability) {
-      savedRecord = await base44.entities.Availability.update(existingAvailability.id, availabilityData);
+      // Only update UI after confirmed success
+      setSelectedShifts(cleanedShifts);
+      setWeekAvailabilities(prev => {
+        const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
+        return [...withoutMine, savedRecord];
+      });
     } else {
-      savedRecord = await base44.entities.Availability.create(availabilityData);
+      // For non-limit mode or non-wanted types: optimistic update first, then persist
+      // 1. Optimistic local update
+      setSelectedShifts(cleanedShifts);
+
+      // 2. Optimistic weekAvailabilities update so ShiftDemandPanel sees new count immediately
+      const optimisticRecord = { ...(existingAvailability || {}), ...availabilityData, shifts: cleanedShifts };
+      setWeekAvailabilities(prev => {
+        const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
+        return [...withoutMine, optimisticRecord];
+      });
+
+      // 3. Persist to DB
+      if (existingAvailability) {
+        savedRecord = await base44.entities.Availability.update(existingAvailability.id, availabilityData);
+      } else {
+        savedRecord = await base44.entities.Availability.create(availabilityData);
+      }
+
+      // 4. Replace optimistic record with real DB record
+      setWeekAvailabilities(prev => {
+        const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
+        return [...withoutMine, savedRecord];
+      });
     }
+
     setExistingAvailability(savedRecord);
 
-    // 5. Replace optimistic record with real DB record
-    setWeekAvailabilities(prev => {
-      const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
-      return [...withoutMine, savedRecord];
-    });
-
-    // 6. Broadcast to other tabs
+    // Broadcast to other tabs
     try { broadcastRef.current?.postMessage("update"); } catch {}
     try { localStorage.setItem("availability-sync-event", JSON.stringify({ ts: Date.now() })); } catch {}
     window.dispatchEvent(new CustomEvent("availabilityUpdated", {
