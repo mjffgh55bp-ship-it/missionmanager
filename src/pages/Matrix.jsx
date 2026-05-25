@@ -637,10 +637,18 @@ export default function Matrix() {
     }
   };
 
-  // Fast debounce for schedule sync events (200ms), slower for noisy subscriptions (500ms)
-  const debouncedLoadData = (silent = false, fast = false) => {
+  const debouncedLoadData = (silent = false, fast = false, postsave = false) => {
     if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
-    loadingTimeoutRef.current = setTimeout(() => loadDynamicData(silent), fast ? 200 : 500);
+    const delay = postsave ? 100 : fast ? 200 : 500;
+    loadingTimeoutRef.current = setTimeout(() => loadDynamicData(silent), delay);
+  };
+  const applyOptimisticAvailability = (workerId, newShifts, newRecord = null) => {
+    setAvailabilities(prev => {
+      const existing = prev.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
+      if (existing) return prev.map(a => a.worker_id === workerId && a.week_start_date === weekStartDate ? { ...a, shifts: newShifts } : a);
+      if (newRecord) return [...prev, { ...newRecord, shifts: newShifts }];
+      return prev;
+    });
   };
   const debouncedLoadDataRef = useRef(null);
   debouncedLoadDataRef.current = debouncedLoadData;
@@ -1042,9 +1050,14 @@ export default function Matrix() {
       updatedShifts = updatedShifts.map(s => s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time ? { ...s, date: targetDate, start_time: start, end_time: end } : s);
     }
     const availData = { worker_id: workerId, worker_name: worker.nickname, week_start_date: weekStartDate, shifts: updatedShifts, status: workerAvail?.status || "approved" };
-    if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
-    else await base44.entities.Availability.create(availData);
-    setDragging(null); setDragPreview(null); debouncedLoadData();
+    const prevAvails = availabilities;
+    applyOptimisticAvailability(workerId, updatedShifts, availData);
+    setDragging(null); setDragPreview(null);
+    try {
+      if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
+      else await base44.entities.Availability.create(availData);
+    } catch { setAvailabilities(prevAvails); }
+    debouncedLoadData(true, false, true);
   };
 
   const handleTypeClick = async (e, worker, shift) => {
@@ -1053,13 +1066,17 @@ export default function Matrix() {
     if (!workerAvail) return;
     const typeMap = { available: 'wanted', wanted: 'unavailable', unavailable: 'available' };
     const updatedShifts = workerAvail.shifts.map(s => s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time ? { ...s, type: typeMap[shift.type || 'available'] } : s);
+    const previousAvailabilities = availabilities;
+    applyOptimisticAvailability(worker.id, updatedShifts);
     try {
       await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
-      debouncedLoadData();
-    } catch (error) {
-      await new Promise(r => setTimeout(r, 500));
-      try { await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts }); debouncedLoadData(); } catch {}
+    } catch {
+      setAvailabilities(previousAvailabilities);
+      setTimeout(async () => {
+        try { await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts }); } catch {}
+      }, 500);
     }
+    debouncedLoadData(true, false, true);
   };
 
   const handleChangeType = async (newType) => {
@@ -1067,8 +1084,13 @@ export default function Matrix() {
     const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForType.id && a.week_start_date === weekStartDate);
     if (!workerAvail) return;
     const updatedShifts = workerAvail.shifts.map(s => s.date === selectedShiftForType.date && s.start_time === selectedShiftForType.start_time && s.end_time === selectedShiftForType.end_time ? { ...s, type: newType } : s);
-    await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
-    setShowTypeDialog(false); setSelectedShiftForType(null); setSelectedWorkerForType(null); debouncedLoadData();
+    const previousAvailabilities = availabilities;
+    applyOptimisticAvailability(selectedWorkerForType.id, updatedShifts);
+    setShowTypeDialog(false); setSelectedShiftForType(null); setSelectedWorkerForType(null);
+    try {
+      await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
+    } catch { setAvailabilities(previousAvailabilities); }
+    debouncedLoadData(true, false, true);
   };
 
   const handleManualShiftAdd = (worker) => {
@@ -1097,9 +1119,14 @@ export default function Matrix() {
       updatedShifts.push({ date: targetDate, start_time: manualShiftData.start_time, end_time: manualShiftData.end_time, type: manualShiftData.type, priority: updatedShifts.length + 1 });
     }
     const availData = { worker_id: selectedWorkerForManual.id, worker_name: selectedWorkerForManual.nickname, week_start_date: weekStartDate, shifts: updatedShifts, status: workerAvail?.status || "approved" };
-    if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
-    else await base44.entities.Availability.create(availData);
-    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null); debouncedLoadData();
+    const previousAvailabilities = availabilities;
+    applyOptimisticAvailability(selectedWorkerForManual.id, updatedShifts, availData);
+    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null);
+    try {
+      if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
+      else await base44.entities.Availability.create(availData);
+    } catch { setAvailabilities(previousAvailabilities); }
+    debouncedLoadData(true, false, true);
   };
 
   const deleteManualShift = async () => {
@@ -1107,8 +1134,12 @@ export default function Matrix() {
     const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForManual.id && a.week_start_date === weekStartDate);
     if (!workerAvail) return;
     const updatedShifts = workerAvail.shifts.filter(s => !(s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type));
-    await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
-    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null); debouncedLoadData();
+    const prevAvails2 = availabilities;
+    applyOptimisticAvailability(selectedWorkerForManual.id, updatedShifts);
+    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null);
+    try { await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts }); }
+    catch { setAvailabilities(prevAvails2); }
+    debouncedLoadData(true, false, true);
   };
 
   const saveSignupMode = async (newMode) => {
@@ -1184,7 +1215,6 @@ export default function Matrix() {
     return 0;
   };
 
-  // ── Bar Components ────────────────────────────────────────────────────────────
   const AssignmentBar = ({ assignment }) => {
     const positionDate = assignment.operational_date || assignment.schedule_date || assignment.date;
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(positionDate) : 0;
@@ -1322,9 +1352,6 @@ export default function Matrix() {
     return <div className="flex gap-0.5 items-center">{days.map((d, i) => <div key={i} className={`text-[9px] font-medium leading-tight ${d.working ? 'text-green-600' : 'text-gray-300'}`} title={`${d.day}: ${d.working ? d.hours.toFixed(1) + 'h' : 'חופש'}`}>{d.day}</div>)}</div>;
   };
 
-  // ── Derived briefing markers ──────────────────────────────────────────────────
-  // Built from ALL loaded templateRows (including adjacent days).
-  // Each marker has a visual_operational_date that may differ from row.date.
   const briefingMarkers = useMemo(() => {
     const markers = [];
     templateRows.forEach(row => {
@@ -1434,9 +1461,6 @@ export default function Matrix() {
   // ── Row height: fixed 32px (h-8) — constant for both panels ──────────────────
   const ROW_H = 32;
 
-  // ── Render helpers ────────────────────────────────────────────────────────────
-  // ── Moked signup windows ──────────────────────────────────────────────────────
-  // Returns grouped signup bars for a worker: array of { startTime, endTime, date, signups[] }
   const getWorkerMokedSignups = (workerId) => {
     const workerAvail = availabilities.find(
       a => a.worker_id === workerId && a.week_start_date === weekStartDate &&
