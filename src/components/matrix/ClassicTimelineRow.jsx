@@ -79,8 +79,8 @@ function ClassicTimelineRow({
     );
   };
 
-  const AvailabilityBarLocal = ({ shift }) => {
-    const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.date) : 0;
+  const AvailabilityBarLocal = ({ shift, shiftIdx }) => {
+    const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shift.operational_date || shift.date) : 0;
     const startPx = timeToPixels(shift.start_time, dayIndex, viewMode, ppm);
     const endPx = endTimeToPixels(shift.start_time, shift.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 0);
@@ -99,7 +99,7 @@ function ClassicTimelineRow({
       return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
     }).map(r => ({ start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"], end_time: r.values?.["סיום"] || r.values?.["שעת סיום"], status: r.values?.status || null }));
 
-    const handleBarDblClick = (e) => { e.stopPropagation(); e.preventDefault(); handleShiftDoubleClick(e, worker, shift); };
+    const handleBarDblClick = (e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); };
     const handleBarMouseDown = (action) => (e) => {
       if (e.detail >= 2) return; // let double-click fire instead
       e.stopPropagation();
@@ -109,6 +109,8 @@ function ClassicTimelineRow({
     return (
       <div
         data-matrix-existing-bar="true"
+        data-matrix-avail-bar="true"
+        data-shift-idx={shiftIdx}
         className="absolute h-full rounded-sm z-20 cursor-move overflow-visible"
         style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: `${borderColor}18`, border: `2px solid ${borderColor}` }}
         onMouseDown={handleBarMouseDown('move')}
@@ -198,9 +200,15 @@ function ClassicTimelineRow({
         handleMouseDown(e, worker, null, 'create');
       }}
       onDoubleClick={(e) => {
-        // If double-click lands on an existing bar, open editor (safety net)
-        const bar = e.target.closest("[data-matrix-existing-bar='true']");
-        if (bar) e.stopPropagation();
+        // Safety net: if dblclick lands on bar but onDoubleClick on bar didn't fire, open editor
+        const bar = e.target.closest("[data-matrix-avail-bar='true']");
+        if (bar) {
+          e.stopPropagation();
+          const shiftIdx = parseInt(bar.dataset.shiftIdx);
+          if (!isNaN(shiftIdx) && availabilityShifts[shiftIdx]) {
+            handleShiftDoubleClick(e, worker, availabilityShifts[shiftIdx]);
+          }
+        }
       }}
     >
       {/* Grid lines with data attributes for slot-based drag */}
@@ -247,7 +255,7 @@ function ClassicTimelineRow({
           const px = day * 1440 * ppm;
           return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '2px', backgroundColor: 'rgba(80,80,80,0.35)', zIndex: 15 }} />;
         })}
-        {availabilityShifts.map((shift, idx) => <AvailabilityBarLocal key={`avail-${idx}`} shift={shift} />)}
+        {availabilityShifts.map((shift, idx) => <AvailabilityBarLocal key={`avail-${idx}`} shift={shift} shiftIdx={idx} />)}
         {workerUnavailabilities.map(unavail => <UnavailabilityBarLocal key={unavail.id} unavail={unavail} />)}
         {workerTemplateShifts.map(ts => <AssignmentBarLocal key={ts.id} assignment={ts} />)}
         {workerExtraTaskShifts.map(ets => <AssignmentBarLocal key={ets.id} assignment={ets} />)}

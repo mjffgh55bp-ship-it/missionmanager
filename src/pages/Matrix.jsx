@@ -1256,7 +1256,7 @@ export default function Matrix() {
     return aStartMin < bEndMin && aEndMin > bStartMin;
   };
 
-  const AvailabilityBar = ({ shift, worker }) => {
+  const AvailabilityBar = ({ shift, worker, shiftIdx }) => {
     const shiftDate = shift.operational_date || shift.date;
     const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(shiftDate) : 0;
     const startPx = timeToPixels(shift.start_time, dayIndex, viewMode, ppm);
@@ -1277,12 +1277,14 @@ export default function Matrix() {
       const et = r.values?.["סיום"] || r.values?.["שעת סיום"];
       return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
     }).map(r => ({ start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"], end_time: r.values?.["סיום"] || r.values?.["שעת סיום"], status: r.values?.status || null }));
-    const handleBarDblClick = (e) => { e.stopPropagation(); e.preventDefault(); handleShiftDoubleClick(e, worker, shift); };
+    const handleBarDblClick = (e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); };
     const handleBarMD = (action) => (e) => { if (e.detail >= 2) return; e.stopPropagation(); handleMouseDown(e, worker, shift, action, dayIndex); };
     return (
       <div
         data-matrix-existing-bar="true"
         className="absolute h-full rounded-sm z-20 cursor-move overflow-visible"
+        data-matrix-avail-bar="true"
+        data-shift-idx={shiftIdx}
         style={{ right: `${rightPx}px`, width: `${widthPx}px`, backgroundColor: `${borderColor}18`, border: `2px solid ${borderColor}` }}
         onMouseDown={handleBarMD('move')}
         onDoubleClick={handleBarDblClick}
@@ -1653,14 +1655,13 @@ export default function Matrix() {
               })
           }
         </div>
-        {/* Bars layer — pointer events enabled; individual bars have their own handlers; create-drag is guarded at the row level */}
-        <div className="absolute inset-0">
+        <div className="absolute inset-0" onDoubleClick={(e) => { const bar = e.target.closest("[data-matrix-avail-bar='true']"); if (bar) { e.stopPropagation(); const idx = parseInt(bar.dataset.shiftIdx); const sh = getWorkerAvailabilityForDate(worker.id); if (!isNaN(idx) && sh[idx]) handleShiftDoubleClick(e, worker, sh[idx]); } }}>
           {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
             // Day boundary at 06:00 = opMin 0, i.e. the RIGHT edge of each day's operational block
             const px = day * 1440 * ppm;
             return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '2px', backgroundColor: 'rgba(80,80,80,0.35)', zIndex: 15 }} />;
           })}
-          {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} />)}
+          {availabilityShifts.map((shift, idx) => <AvailabilityBar key={`avail-${idx}`} shift={shift} worker={worker} shiftIdx={idx} />)}
           {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
           {workerTemplateShifts.map(ts => <AssignmentBar key={ts.id} assignment={ts} />)}
           {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
