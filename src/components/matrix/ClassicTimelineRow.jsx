@@ -99,7 +99,7 @@ function ClassicTimelineRow({
       return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
     }).map(r => ({ start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"], end_time: r.values?.["סיום"] || r.values?.["שעת סיום"], status: r.values?.status || null }));
 
-    const handleBarDblClick = (e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); };
+    const handleBarDblClick = (e) => { e.stopPropagation(); e.preventDefault(); setTimeout(() => handleShiftDoubleClick(e, worker, shift), 0); };
     const handleBarMouseDown = (action) => (e) => {
       if (e.detail >= 2) return; // let double-click fire instead
       e.stopPropagation();

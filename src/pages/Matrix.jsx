@@ -1100,11 +1100,15 @@ export default function Matrix() {
   };
 
   const handleShiftDoubleClick = (e, worker, shift) => {
-    e.stopPropagation(); e.preventDefault();
-    setSelectedWorkerForManual(worker);
-    setManualShiftData({ start_time: shift.start_time, end_time: shift.end_time, type: shift.type });
-    setEditingShift(shift);
-    setShowManualDialog(true);
+    e.stopPropagation();
+    e.preventDefault();
+    // Use setTimeout to ensure dialog opens after any mouseup/drag cleanup runs first
+    setTimeout(() => {
+      setSelectedWorkerForManual(worker);
+      setManualShiftData({ start_time: shift.start_time, end_time: shift.end_time, type: shift.type });
+      setEditingShift(shift);
+      setShowManualDialog(true);
+    }, 0);
   };
 
   const submitManualShift = async () => {
