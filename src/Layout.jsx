@@ -138,24 +138,24 @@ export default function Layout({ children }) {
       `}} />
       <div className="min-h-screen w-full bg-gray-50 relative" dir="rtl">
 
-        {/* Fixed icon-only sidebar */}
+        {/* Fixed icon-only sidebar: right on desktop, bottom on mobile */}
         <nav
-          className="fixed top-0 right-0 h-full z-[100] flex flex-col items-center py-4 gap-1"
-          style={{ width: 48, background: 'white', borderLeft: '1px solid #e5e7eb', boxShadow: '0 0 12px rgba(0,0,0,0.07)' }}
+          className="fixed z-[100] flex items-center gap-1 py-4 px-2 md:flex-col md:top-0 md:right-0 md:h-full md:py-4 md:px-0 bottom-0 right-0 left-0 md:left-auto justify-center md:justify-start overflow-x-auto md:overflow-x-visible"
+          style={{ background: 'white', borderTop: '1px solid #e5e7eb', borderLeft: '1px solid #e5e7eb', boxShadow: '0 0 12px rgba(0,0,0,0.07)', width: 'auto', height: 48, mdHeight: '100vh', mdWidth: 48 }}
         >
-          {/* Logo icon */}
-          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex items-center justify-center shadow mb-3 flex-shrink-0">
+          {/* Logo icon — hidden on mobile */}
+          <div className="hidden md:flex w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex-col items-center justify-center shadow mb-3 flex-shrink-0">
             <Briefcase className="w-4 h-4 text-white" />
           </div>
 
           {navigationItems.map((item) => {
             const isActive = location.pathname === item.url;
             return (
-              <div key={item.title} className="nav-icon-btn relative flex items-center" style={{ width: 40 }}>
+              <div key={item.title} className="nav-icon-btn relative flex items-center md:flex-col" style={{ width: 40 }}>
                 <Link
                   to={item.url}
                   title={item.title}
-                  className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-150 ${
+                  className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all duration-150 flex-shrink-0 ${
                     isActive
                       ? 'bg-green-500 text-white'
                       : 'text-gray-500 hover:bg-green-50 hover:text-green-700'
@@ -163,25 +163,25 @@ export default function Layout({ children }) {
                 >
                   <item.icon className="w-4 h-4" />
                 </Link>
-                <span className="nav-item-label">{item.title}</span>
+                <span className="nav-item-label hidden md:block">{item.title}</span>
               </div>
             );
           })}
 
-          {/* Open in new window */}
-          <div className="nav-icon-btn relative flex items-center mt-auto" style={{ width: 40 }}>
+          {/* Open in new window — hidden on mobile */}
+          <div className="nav-icon-btn hidden md:flex relative items-center md:mt-auto" style={{ width: 40 }}>
             <button
               onClick={() => window.open(window.location.href, '_blank')}
               className="w-10 h-10 flex items-center justify-center rounded-lg text-gray-400 hover:bg-green-50 hover:text-green-700 transition-all duration-150"
             >
               <ExternalLink className="w-4 h-4" />
             </button>
-            <span className="nav-item-label">פתח בחלון חדש</span>
+            <span className="nav-item-label hidden md:block">פתח בחלון חדש</span>
           </div>
         </nav>
 
-        {/* Main Content — offset for sidebar */}
-        <main className="min-h-screen flex flex-col" style={{ marginRight: 48 }}>
+        {/* Main Content — offset for sidebar on desktop, bottom padding on mobile */}
+        <main className="min-h-screen flex flex-col md:min-h-[calc(100vh-48px)]" style={{ marginRight: 'auto', marginBottom: 48, md: { marginRight: 48, marginBottom: 0 } }}>
           <div className="flex-1 overflow-auto">
             {children}
           </div>
