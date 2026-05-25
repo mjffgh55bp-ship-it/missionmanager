@@ -1065,7 +1065,7 @@ export default function Matrix() {
 
   const handleTypeClick = async (e, worker, shift) => {
     e.stopPropagation(); e.preventDefault();
-    const workerAvail = availabilities.find(a => a.worker_id === worker.id && a.week_start_date === weekStartDate);
+    const workerAvail = getBestAvail(worker.id);
     if (!workerAvail) return;
     const typeMap = { available: 'wanted', wanted: 'unavailable', unavailable: 'available' };
     const updatedShifts = workerAvail.shifts.map(s => s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time ? { ...s, type: typeMap[shift.type || 'available'] } : s);
@@ -1075,16 +1075,12 @@ export default function Matrix() {
       await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts });
     } catch {
       setAvailabilities(previousAvailabilities);
-      setTimeout(async () => {
-        try { await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts }); } catch {}
-      }, 500);
     }
-    debouncedLoadData(true, false, true);
   };
 
   const handleChangeType = async (newType) => {
     if (!selectedWorkerForType || !selectedShiftForType) return;
-    const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForType.id && a.week_start_date === weekStartDate);
+    const workerAvail = getBestAvail(selectedWorkerForType.id);
     if (!workerAvail) return;
     const updatedShifts = workerAvail.shifts.map(s => s.date === selectedShiftForType.date && s.start_time === selectedShiftForType.start_time && s.end_time === selectedShiftForType.end_time ? { ...s, type: newType } : s);
     const previousAvailabilities = availabilities;
@@ -1113,7 +1109,7 @@ export default function Matrix() {
 
   const submitManualShift = async () => {
     if (!selectedWorkerForManual || !manualShiftData.start_time || !manualShiftData.end_time) return;
-    const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForManual.id && a.week_start_date === weekStartDate);
+    const workerAvail = getBestAvail(selectedWorkerForManual.id);
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     const targetDate = format(currentDate, "yyyy-MM-dd");
     if (editingShift) {
@@ -1134,7 +1130,7 @@ export default function Matrix() {
 
   const deleteManualShift = async () => {
     if (!selectedWorkerForManual || !editingShift) return;
-    const workerAvail = availabilities.find(a => a.worker_id === selectedWorkerForManual.id && a.week_start_date === weekStartDate);
+    const workerAvail = getBestAvail(selectedWorkerForManual.id);
     if (!workerAvail) return;
     const updatedShifts = workerAvail.shifts.filter(s => !(s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type));
     const prevAvails2 = availabilities;
@@ -1281,8 +1277,8 @@ export default function Matrix() {
       const et = r.values?.["סיום"] || r.values?.["שעת סיום"];
       return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
     }).map(r => ({ start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"], end_time: r.values?.["סיום"] || r.values?.["שעת סיום"], status: r.values?.status || null }));
-    const handleBarDblClick = (e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); };
-    const handleBarMD = (action) => (e) => { if (e.detail === 2) return; e.stopPropagation(); handleMouseDown(e, worker, shift, action, dayIndex); };
+    const handleBarDblClick = (e) => { e.stopPropagation(); e.preventDefault(); handleShiftDoubleClick(e, worker, shift); };
+    const handleBarMD = (action) => (e) => { if (e.detail >= 2) return; e.stopPropagation(); handleMouseDown(e, worker, shift, action, dayIndex); };
     return (
       <div
         data-matrix-existing-bar="true"
