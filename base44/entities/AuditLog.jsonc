@@ -58,5 +58,19 @@
   "required": [
     "action_type",
     "user_email"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {},
+    "delete": {}
+  }
 }
