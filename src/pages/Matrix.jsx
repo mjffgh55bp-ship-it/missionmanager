@@ -739,7 +739,7 @@ export default function Matrix() {
   const getWorkerExtraTaskShifts = (workerId, date = null) => {
     const targetDate = date || dateString;
     const shifts = [];
-    const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
+    const workerAvail = getBestAvail(workerId);
     if (!workerAvail || !workerAvail.extra_tasks) return shifts;
     Object.entries(workerAvail.extra_tasks).forEach(([taskKey, taskState]) => {
       if (taskState !== 'wanted' && taskState !== 'available') return;
@@ -766,12 +766,14 @@ export default function Matrix() {
     return shifts;
   };
 
+  // Pick the record with the most shifts — handles duplicate Availability records per worker/week
+  const getBestAvail = (wid) => availabilities.filter(a => a.worker_id === wid && a.week_start_date === weekStartDate).sort((a,b)=>(b.shifts?.length||0)-(a.shifts?.length||0))[0] || null;
+
   const getWorkerAvailabilityForDate = (workerId, date = null) => {
     const targetDate = date || dateString;
-    const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
+    const workerAvail = getBestAvail(workerId);
     if (!workerAvail || !workerAvail.shifts) return [];
     if (viewMode === 'weekly') return workerAvail.shifts || [];
-    // Match on operational_date OR date — shifts from ShiftDemandPanel store the date in operational_date
     return workerAvail.shifts.filter(s => (s.operational_date || s.date) === targetDate);
   };
 
@@ -1464,12 +1466,9 @@ export default function Matrix() {
   const ROW_H = 32;
 
   const getWorkerMokedSignups = (workerId) => {
-    const workerAvail = availabilities.find(
-      a => a.worker_id === workerId && a.week_start_date === weekStartDate
-    );
+    const workerAvail = getBestAvail(workerId);
     if (!workerAvail?.shifts) return [];
-
-    const grouped = new Map(); // signupKey → { startTime, endTime, date, signups[] }
+    const grouped = new Map();
 
     workerAvail.shifts.forEach(s => {
       if (s.type !== "wanted" && s.type !== "available") return;
