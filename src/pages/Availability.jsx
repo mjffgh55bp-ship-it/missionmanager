@@ -886,14 +886,14 @@ END:VEVENT
       extra_tasks: extraTaskStates,
     };
 
-    // In limit_sign_up mode with a "wanted" registration:
-    // Do NOT do optimistic UI update — wait for server confirmation first to prevent
-    // two users seeing an open slot simultaneously and both succeeding.
-    const isLimitedWanted = type === "wanted" && signupMode === "limit_sign_up";
+    // In limit_sign_up mode: route ALL signup/removal through the server function
+    // to ensure atomic lock acquire/release — prevents two workers claiming the same slot.
+    const isLimitedMode = signupMode === "limit_sign_up";
+    const isRemoveAction = type === "remove";
 
     let savedRecord;
-    if (isLimitedWanted) {
-      // 1. Persist atomically on server FIRST, then update UI
+    if (isLimitedMode && (type === "wanted" || isRemoveAction)) {
+      // Persist atomically on server FIRST, then update UI
       const result = await signupForShift({
         signupKey,
         weekStartDate: weekStartStr,
@@ -901,13 +901,12 @@ END:VEVENT
         workerName: currentWorker.nickname,
         availabilityData,
         requiredCount: unifiedShift.requiredCount || 1,
+        isRemove: isRemoveAction,
       });
       if (!result.data?.success) {
         // Slot was taken — refresh counts from server and do NOT apply local change
         const freshAvails = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
         setWeekAvailabilities(freshAvails);
-        // Revert optimistic selectedShifts (restore pre-click state)
-        setSelectedShifts(selectedShifts.filter(s => s.signupKey !== signupKey));
         return;
       }
       savedRecord = result.data.record;

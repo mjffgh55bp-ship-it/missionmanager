@@ -26,8 +26,27 @@ Deno.serve(async (req) => {
     return Response.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
+  const isRemove = body.isRemove === true;
   const maxSlots = requiredCount || 1;
   const lockKey = `${signupKey}__${weekStartDate}`;
+
+  // Handle un-registration: release lock and save availability
+  if (isRemove) {
+    const existingLocks = await base44.asServiceRole.entities.ShiftLock.filter({ lock_key: lockKey });
+    const myLock = existingLocks.find(l => l.worker_id === workerId);
+    if (myLock) {
+      await base44.asServiceRole.entities.ShiftLock.delete(myLock.id);
+    }
+    const allAvails = await base44.asServiceRole.entities.Availability.filter({ week_start_date: weekStartDate });
+    const existingList = allAvails.filter(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
+    let saved;
+    if (existingList.length > 0) {
+      saved = await base44.asServiceRole.entities.Availability.update(existingList[0].id, availabilityData);
+    } else {
+      saved = await base44.asServiceRole.entities.Availability.create(availabilityData);
+    }
+    return Response.json({ success: true, record: saved });
+  }
 
   // Step 1: Check existing locks for this slot
   const existingLocks = await base44.asServiceRole.entities.ShiftLock.filter({ lock_key: lockKey });
