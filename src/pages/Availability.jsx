@@ -17,7 +17,7 @@ import { formatHebrewDate } from "../components/utils/HebrewDate";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import ShiftDemandPanel from "@/components/availability/ShiftDemandPanel";
-import { buildSignupKey, serializePossibleInstances, buildUnifiedShiftDemand } from "@/lib/shiftDemand";
+import { buildSignupKey, serializePossibleInstances, buildUnifiedShiftDemand, getSignupsForShift } from "@/lib/shiftDemand";
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const HEBREW_DAYS_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -813,6 +813,22 @@ END:VEVENT
     if (!canEdit || currentWorker?.availability_locked) return;
     const operationalDate = unifiedShift.operational_date || unifiedShift.date;
     const { startTime, endTime, signupKey, sharedMokedKey, mokedName } = unifiedShift;
+
+    // ── Anti-race-condition guard (only for "wanted" signups in limit mode) ──
+    // Do a fresh DB fetch to check real-time slot occupancy before saving.
+    if (type === "wanted" && signupMode === "limit_sign_up") {
+      const weekStartStr0 = format(weekStart, "yyyy-MM-dd");
+      const freshAvails = await base44.entities.Availability.filter({ week_start_date: weekStartStr0 });
+      // Update local state with fresh data immediately
+      setWeekAvailabilities(freshAvails);
+      // Count current signups for this slot from fresh data (excluding our own record)
+      const othersAvails = freshAvails.filter(a => a.worker_id !== currentWorker.id);
+      const freshCount = getSignupsForShift(othersAvails, unifiedShift, 1);
+      if (freshCount >= (unifiedShift.requiredCount || 1)) {
+        // Slot is already full — refresh UI and abort
+        return;
+      }
+    }
 
     // Remove the entry for this exact signupKey, plus any naked (no moked identity) entries
     // at the same date+time — naked entries are legacy and must be replaced by keyed entries.
