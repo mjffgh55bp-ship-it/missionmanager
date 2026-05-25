@@ -182,9 +182,13 @@ export default function Availability() {
 
       // Step 2: fetch static data sequentially to avoid rate limits
       const workersData = await getCachedWorkers(base44.entities);
+      await new Promise(r => setTimeout(r, 300));
       const allSettings = await getCachedAllSettings(base44.entities);
+      await new Promise(r => setTimeout(r, 300));
       const eventsData = await base44.entities.CompanyEvent.list("-date");
+      await new Promise(r => setTimeout(r, 300));
       const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
+      await new Promise(r => setTimeout(r, 300));
 
       // Extract settings client-side (no extra API calls)
       const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -255,17 +259,17 @@ export default function Availability() {
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
     try {
-      // Sequential fetches with small delays to avoid rate limits
+      // Sequential fetches with delays to avoid rate limits
       const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 300));
       const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 300));
       const templatesData = await getCachedTemplates(base44.entities);
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 300));
       const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 300));
       const allWeekRows = await base44.entities.TemplateRow.list("-date", 500);
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 300));
       const allWorkerAssignments = await base44.entities.Assignment.list("-date", 500);
       const perDayRowArrays = [allWeekRows.filter(r => weekDates.includes(r.date))];
       const assignmentsData = allWorkerAssignments.filter(a => a.chef_id === worker.id);
