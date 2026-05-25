@@ -255,12 +255,17 @@ export default function Availability() {
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
     try {
-      // Sequential fetches to avoid rate limits
+      // Sequential fetches with small delays to avoid rate limits
       const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
+      await new Promise(r => setTimeout(r, 120));
       const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
+      await new Promise(r => setTimeout(r, 120));
       const templatesData = await getCachedTemplates(base44.entities);
+      await new Promise(r => setTimeout(r, 120));
       const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
+      await new Promise(r => setTimeout(r, 120));
       const allWeekRows = await base44.entities.TemplateRow.list("-date", 500);
+      await new Promise(r => setTimeout(r, 120));
       const allWorkerAssignments = await base44.entities.Assignment.list("-date", 500);
       const perDayRowArrays = [allWeekRows.filter(r => weekDates.includes(r.date))];
       const assignmentsData = allWorkerAssignments.filter(a => a.chef_id === worker.id);
