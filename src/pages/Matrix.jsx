@@ -739,7 +739,7 @@ export default function Matrix() {
   const getWorkerExtraTaskShifts = (workerId, date = null) => {
     const targetDate = date || dateString;
     const shifts = [];
-    const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate && (a.status === "approved" || a.status === "submitted"));
+    const workerAvail = availabilities.find(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
     if (!workerAvail || !workerAvail.extra_tasks) return shifts;
     Object.entries(workerAvail.extra_tasks).forEach(([taskKey, taskState]) => {
       if (taskState !== 'wanted' && taskState !== 'available') return;
@@ -1463,8 +1463,7 @@ export default function Matrix() {
 
   const getWorkerMokedSignups = (workerId) => {
     const workerAvail = availabilities.find(
-      a => a.worker_id === workerId && a.week_start_date === weekStartDate &&
-           (a.status === "approved" || a.status === "submitted")
+      a => a.worker_id === workerId && a.week_start_date === weekStartDate
     );
     if (!workerAvail?.shifts) return [];
 
