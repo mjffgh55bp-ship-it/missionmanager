@@ -200,15 +200,15 @@ export default function Availability() {
 
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      // Step 2: fetch static data sequentially to avoid rate limits
+      // Step 2: fetch static data sequentially with delays to avoid rate limits
       const workersData = await getCachedWorkers(base44.entities);
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 500));
       const allSettings = await getCachedAllSettings(base44.entities);
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 500));
       const eventsData = await base44.entities.CompanyEvent.list("-date");
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 500));
       const yearlyEventsData = await base44.entities.YearlyEvent.list("-start_date", 500);
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 500));
 
       // Extract settings client-side (no extra API calls)
       const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -281,18 +281,18 @@ export default function Availability() {
     try {
       // Sequential fetches with delays to avoid rate limits
       const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 500));
       const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 500));
       const templatesData = await getCachedTemplates(base44.entities);
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 500));
       const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 500));
 
       // Cache heavy lists — only fetch once per page session
       if (!cachedAllTemplateRows.current) {
         cachedAllTemplateRows.current = await base44.entities.TemplateRow.list("-date", 500);
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 500));
       }
       const allWeekRows = cachedAllTemplateRows.current;
 
