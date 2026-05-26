@@ -834,11 +834,18 @@ export default function Matrix() {
       if (allShifts.length === 0) { emailBody += "אין משמרות מתוכננות ליום זה.\n\n"; }
       else { allShifts.forEach((a, i) => { emailBody += `משמרת ${i + 1}: ${isStandbyStatus(a.status) ? `כוננות (${a.status})` : a.food_cart_name}${a.status ? ` [${a.status}]` : ''}\n  תדריך: ${getBriefingTime(a)}\n  משמרת: ${a.start_time} - ${a.end_time}\n\n`; icsEvents.push({ shift: a, date: dStr }); }); }
     }
+    const _timeToMins = (t) => { const [h, m] = (t || '00:00').split(':').map(Number); return h * 60 + (m || 0); };
     let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Kitchen Shifts//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
     icsEvents.forEach((evt, idx) => {
       const { shift, date } = evt;
       const bt = getBriefingTime(shift);
-      icsContent += `BEGIN:VEVENT\nUID:shift-${idx}-${Date.now()}@kitchen\nDTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\nDTSTART:${date.replace(/-/g, '')}T${bt.replace(':', '')}00\nDTEND:${date.replace(/-/g, '')}T${shift.end_time.replace(':', '')}00\nSUMMARY:${isStandbyStatus(shift.status) ? `כוננות ${shift.status}` : shift.food_cart_name}\nEND:VEVENT\n`;
+      const startMins = _timeToMins(shift.start_time);
+      const endMins   = _timeToMins(shift.end_time);
+      const startDateFmt = date.replace(/-/g, '');
+      const endDateFmt = endMins < startMins
+        ? format(addDays(new Date(date + 'T12:00:00'), 1), 'yyyyMMdd')
+        : startDateFmt;
+      icsContent += `BEGIN:VEVENT\nUID:shift-${idx}-${Date.now()}@kitchen\nDTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\nDTSTART:${startDateFmt}T${bt.replace(':', '')}00\nDTEND:${endDateFmt}T${shift.end_time.replace(':', '')}00\nSUMMARY:${isStandbyStatus(shift.status) ? `כוננות ${shift.status}` : shift.food_cart_name}\nEND:VEVENT\n`;
     });
     icsContent += 'END:VCALENDAR';
     const { file_url: icsUrl } = await base44.integrations.Core.UploadFile({ file: new File([new Blob([icsContent], { type: 'text/calendar' })], 'shifts.ics', { type: 'text/calendar' }) });

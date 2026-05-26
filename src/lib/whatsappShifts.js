@@ -18,25 +18,25 @@ const timeToMins = (t) => {
 // (i.e. end < start in clock terms → end is next calendar day).
 const resolveShiftCalendarTimes = (calendarDateStr, rawBriefingTime, rawStartTime, rawEndTime) => {
   const briefingTime = stripDayOffset(rawBriefingTime);
-  const startTime = stripDayOffset(rawStartTime);
-  const endTime = stripDayOffset(rawEndTime);
+  const startTime   = stripDayOffset(rawStartTime);
+  const endTime     = stripDayOffset(rawEndTime);
 
-  const base = new Date(calendarDateStr + "T12:00:00"); // noon to avoid DST edge cases
+  const base = new Date(calendarDateStr + "T12:00:00"); // noon avoids DST edge cases
   const baseFormatted = format(base, "d.M.yyyy");
   const nextFormatted = format(addDays(base, 1), "d.M.yyyy");
 
   const startMins = timeToMins(startTime);
-  const endMins = timeToMins(endTime);
-  const briefingMins = timeToMins(briefingTime);
+  const endMins   = timeToMins(endTime);
 
-  // Shift start is always on the row's calendar date
+  // Shift start is always on the row's calendar date — never changes
   const shiftStartDate = baseFormatted;
 
-  // Shift end is next calendar day only if end time is earlier than start time (crosses midnight)
+  // Shift end is next calendar day only if end time is before start time (crosses midnight)
   const shiftEndDate = endMins < startMins ? nextFormatted : baseFormatted;
 
-  // Briefing is next calendar day only if briefing time is earlier than start time (crosses midnight)
-  const briefingDate = briefingMins < startMins ? nextFormatted : baseFormatted;
+  // Briefing is ALWAYS on the same calendar date as the shift start.
+  // A briefing happens before the shift starts — it cannot be on a later date.
+  const briefingDate = baseFormatted;
 
   return { briefingDate, briefingTime, shiftStartDate, shiftStartTime: startTime, shiftEndDate, shiftEndTime: endTime };
 };

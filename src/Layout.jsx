@@ -138,20 +138,25 @@ export default function Layout({ children }) {
       `}} />
       <div className="min-h-screen w-full bg-gray-50 relative" dir="rtl">
 
-        {/* Fixed icon-only sidebar: right on desktop, bottom on mobile */}
+        {/* Sidebar: bottom bar on mobile, right column on desktop */}
         <nav
-          className="fixed z-[100] flex items-center gap-1 py-4 px-2 md:flex-col md:top-0 md:right-0 md:h-full md:py-4 md:px-0 bottom-0 right-0 left-0 md:left-auto justify-center md:justify-start overflow-x-auto md:overflow-x-visible"
-          style={{ background: '#ffffff', borderTop: '1px solid #e5e7eb', borderLeft: '1px solid #e5e7eb', boxShadow: '-2px 0 6px rgba(0,0,0,0.08)', width: 'auto', height: 48 }}
+          className="fixed z-[100] flex items-center gap-1
+                     bottom-0 left-0 right-0 h-12 flex-row justify-center overflow-x-auto
+                     border-t border-gray-200
+                     md:top-0 md:bottom-0 md:left-auto md:right-0 md:h-full md:w-12
+                     md:flex-col md:justify-start md:overflow-x-visible md:overflow-y-auto
+                     md:border-t-0 md:border-l md:border-gray-200"
+          style={{ background: '#ffffff', boxShadow: '-2px 0 6px rgba(0,0,0,0.08)' }}
         >
-          {/* Logo icon — hidden on mobile */}
-          <div className="hidden md:flex w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex-col items-center justify-center shadow mb-3 flex-shrink-0">
+          {/* Logo icon — desktop only */}
+          <div className="hidden md:flex w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl items-center justify-center shadow mb-3 mt-2 flex-shrink-0">
             <Briefcase className="w-4 h-4 text-white" />
           </div>
 
           {navigationItems.map((item) => {
             const isActive = location.pathname === item.url;
             return (
-              <div key={item.title} className="nav-icon-btn relative flex items-center md:flex-col" style={{ width: 40 }}>
+              <div key={item.title} className="nav-icon-btn relative flex items-center" style={{ width: 40 }}>
                 <Link
                   to={item.url}
                   title={item.title}
@@ -168,7 +173,7 @@ export default function Layout({ children }) {
             );
           })}
 
-          {/* Open in new window — hidden on mobile */}
+          {/* Open in new window — desktop only */}
           <div className="nav-icon-btn hidden md:flex relative items-center md:mt-auto" style={{ width: 40 }}>
             <button
               onClick={() => window.open(window.location.href, '_blank')}
@@ -180,8 +185,8 @@ export default function Layout({ children }) {
           </div>
         </nav>
 
-        {/* Main Content — offset for sidebar on desktop, bottom padding on mobile */}
-        <main className="min-h-screen flex flex-col md:min-h-[calc(100vh-48px)]" style={{ marginRight: 'auto', marginBottom: 48, md: { marginRight: 48, marginBottom: 0 } }}>
+        {/* Main content — right margin on desktop, bottom padding on mobile */}
+        <main className="min-h-screen flex flex-col pb-12 md:pb-0 md:mr-12">
           <div className="flex-1 overflow-auto">
             {children}
           </div>
