@@ -9,6 +9,7 @@ import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, operationalMinutesToTime, addDaysString } from "@/lib/operationalDate";
 import { getTimelineRangeStyle, getTimelinePointStyle } from "@/lib/matrixTimeUtils";
 import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut } from "lucide-react";
+import { buildWhatsAppMessage } from "@/lib/whatsappShifts";
 import BriefingBar from "../components/matrix/BriefingBar";
 import MokedSignupBar from "../components/matrix/MokedSignupBar";
 import WorkerLockButton from "../components/matrix/WorkerLockButton";
@@ -797,45 +798,7 @@ export default function Matrix() {
   const sendWhatsAppNotification = async (worker) => {
     setSendingWhatsApp(true);
     try {
-      let message = `שלום ${worker.nickname}!\n\n`;
-      const getBriefingTime = (shift) => {
-        if (shift?.briefing_time) return shift.briefing_time;
-        const startOp = getOperationalMinutes(shift?.start_time || '06:00');
-        return operationalMinutesToTime(Math.max(0, startOp - 15));
-      };
-      let icsEvents = [];
-      if (viewMode === "weekly") {
-        const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-        message += `הנה לוח המשמרות שלך לשבוע של ${format(weekStart, "d.M.yyyy")}:\n\n`;
-        for (let i = 0; i < 7; i++) {
-          const d = addDays(weekStart, i);
-          const dStr = format(d, "yyyy-MM-dd");
-          const allDayShifts = [...getWorkerTemplateShifts(worker.id, dStr), ...getWorkerExtraTaskShifts(worker.id, dStr)];
-          const hebrewDays = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-          message += `*${hebrewDays[d.getDay()]}, ${format(d, "d.M")}:*\n`;
-          if (allDayShifts.length === 0) { message += "  אין משמרות\n"; }
-          else { allDayShifts.forEach(a => { const bt = getBriefingTime(a); const standby = isStandbyStatus(a.status); message += `  ${standby ? `כוננות (${a.status})` : a.food_cart_name}${a.status ? ` [${a.status}]` : ''}: תדריך ${bt}, משמרת ${a.start_time} - ${a.end_time}\n`; icsEvents.push({ shift: a, date: dStr }); }); }
-          message += "\n";
-        }
-      } else {
-        const allShifts = [...getWorkerTemplateShifts(worker.id), ...getWorkerExtraTaskShifts(worker.id)];
-        const dStr = format(currentDate, "yyyy-MM-dd");
-        message += `הנה לוח המשמרות שלך ל-${format(currentDate, "d.M.yyyy")}:\n\n`;
-        if (allShifts.length === 0) { message += "אין משמרות מתוכננות ליום זה.\n\n"; }
-        else { allShifts.forEach((a, i) => { const bt = getBriefingTime(a); const standby = isStandbyStatus(a.status); message += `*משמרת ${i + 1}:* ${standby ? `כוננות (${a.status})` : a.food_cart_name}${a.status ? ` [${a.status}]` : ''}\n  תדריך: ${bt}\n  משמרת: ${a.start_time} - ${a.end_time}\n\n`; icsEvents.push({ shift: a, date: dStr }); }); }
-      }
-      if (icsEvents.length > 0) {
-        let icsContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Kitchen Shifts//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
-        icsEvents.forEach((evt, idx) => {
-          const { shift, date } = evt;
-          const bt = getBriefingTime(shift);
-          icsContent += `BEGIN:VEVENT\nUID:shift-${idx}-${Date.now()}@kitchen\nDTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\nDTSTART:${date.replace(/-/g, '')}T${bt.replace(':', '')}00\nDTEND:${date.replace(/-/g, '')}T${shift.end_time.replace(':', '')}00\nSUMMARY:${isStandbyStatus(shift.status) ? `כוננות ${shift.status}` : shift.food_cart_name}${shift.status ? ` - ${shift.status}` : ''}\nDESCRIPTION:תדריך: ${bt}\\nמשמרת: ${shift.start_time} - ${shift.end_time}\nEND:VEVENT\n`;
-        });
-        icsContent += 'END:VCALENDAR';
-        const uploadResult = await base44.integrations.Core.UploadFile({ file: new File([new Blob([icsContent], { type: 'text/calendar;charset=utf-8' })], 'shifts.ics', { type: 'text/calendar' }) });
-        if (uploadResult?.file_url) message += `\n📅 *להוספת המשמרות ליומן:*\n${uploadResult.file_url}\n\n`;
-      }
-      message += "בהצלחה! 👨‍🍳";
+      const message = await buildWhatsAppMessage(worker, viewMode, currentDate, getWorkerTemplateShifts, getWorkerExtraTaskShifts, isStandbyStatus, base44);
       const phoneNumber = worker.phone?.replace(/[^0-9]/g, '');
       window.open(phoneNumber ? `https://wa.me/972${phoneNumber.startsWith('0') ? phoneNumber.slice(1) : phoneNumber}?text=${encodeURIComponent(message)}` : `https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
     } catch (error) { console.error('Error sending WhatsApp:', error); alert('שגיאה בשליחת ההודעה. אנא נסה שוב.'); }
