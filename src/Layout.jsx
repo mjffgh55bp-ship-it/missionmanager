@@ -141,7 +141,7 @@ export default function Layout({ children }) {
         {/* Fixed icon-only sidebar: right on desktop, bottom on mobile */}
         <nav
           className="fixed z-[100] flex items-center gap-1 py-4 px-2 md:flex-col md:top-0 md:right-0 md:h-full md:py-4 md:px-0 bottom-0 right-0 left-0 md:left-auto justify-center md:justify-start overflow-x-auto md:overflow-x-visible"
-          style={{ background: '#f9fafb', borderTop: '1px solid #d1d5db', borderLeft: '1px solid #d1d5db', boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.5), 0 2px 8px rgba(0,0,0,0.12)', width: 'auto', height: 48, mdHeight: '100vh', mdWidth: 48 }}
+          style={{ background: '#ffffff', borderTop: '1px solid #e5e7eb', borderLeft: '1px solid #e5e7eb', boxShadow: '-2px 0 6px rgba(0,0,0,0.08)', width: 'auto', height: 48 }}
         >
           {/* Logo icon — hidden on mobile */}
           <div className="hidden md:flex w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex-col items-center justify-center shadow mb-3 flex-shrink-0">
