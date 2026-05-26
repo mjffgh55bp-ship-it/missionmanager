@@ -173,15 +173,17 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
 
-    const [allSettings, freshTemplates, templateRowsData, unavailabilitiesData, availabilitiesData] = await Promise.all([
+    // Fetch cached data first (no network cost if cached), then stagger live queries to avoid rate limits
+    const [allSettings, freshTemplates] = await Promise.all([
       getCachedAllSettings(base44.entities),
       getCachedTemplates(base44.entities),
-      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
-      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
-      weekChanged
-        ? fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }))
-        : Promise.resolve(null),
     ]);
+    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
+    await new Promise(r => setTimeout(r, 200));
+    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
+    const availabilitiesData = weekChanged
+      ? (await new Promise(r => setTimeout(r, 200)), await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })))
+      : null;
     if (weekChanged) lastWeekStart.current = weekStartStr;
 
     // Update allTemplates state with the fresh list so the render loop finds new templates
