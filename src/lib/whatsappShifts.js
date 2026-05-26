@@ -1,57 +1,42 @@
 import { format, addDays, startOfWeek } from "date-fns";
 
-// Strip any operational day prefix like "-1 " or "+2 " from a time string
+// Strip operational day prefix like "-1 " or "+2 " from stored time strings
 const stripDayOffset = (timeStr) => {
   if (!timeStr) return timeStr;
   const match = timeStr.match(/^[-+]\d+\s+(\d{2}:\d{2})$/);
   return match ? match[1] : timeStr;
 };
 
-// Given a calendar base date (yyyy-MM-dd) and a time "HH:MM",
-// return the actual calendar date string "d.M.yyyy" for that time.
-// Times 00:00–05:59 that come AFTER a start time ≥ 06:00 are on the next calendar day.
-const resolveCalendarDate = (baseDateStr, timeStr, referenceTimeStr = null) => {
-  const t = stripDayOffset(timeStr);
-  const [h] = t.split(':').map(Number);
-  const base = new Date(baseDateStr + "T12:00:00"); // noon to avoid DST issues
-
-  // If referenceTimeStr is provided (e.g. shift start), and current time < reference time
-  // and reference time >= 06:00, then current time wraps to next calendar day
-  if (referenceTimeStr) {
-    const ref = stripDayOffset(referenceTimeStr);
-    const [rh] = ref.split(':').map(Number);
-    if (rh >= 6 && h < 6) {
-      return format(addDays(base, 1), "d.M.yyyy");
-    }
-  }
-
-  return format(base, "d.M.yyyy");
+const timeToMins = (t) => {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
 };
 
-// Format a shift's briefing and shift times as calendar-aware strings.
-// Returns { briefingDate, briefingTime, shiftStartDate, shiftStartTime, shiftEndDate, shiftEndTime }
+// Given the row's calendar date and the shift start/end/briefing times,
+// compute the actual calendar date for each time.
+// Rule: everything is on calendarDateStr UNLESS the time is past midnight
+// (i.e. end < start in clock terms → end is next calendar day).
 const resolveShiftCalendarTimes = (calendarDateStr, rawBriefingTime, rawStartTime, rawEndTime) => {
   const briefingTime = stripDayOffset(rawBriefingTime);
   const startTime = stripDayOffset(rawStartTime);
   const endTime = stripDayOffset(rawEndTime);
 
-  const [bh] = briefingTime.split(':').map(Number);
-  const [sh] = startTime.split(':').map(Number);
-  const [eh] = endTime.split(':').map(Number);
+  const base = new Date(calendarDateStr + "T12:00:00"); // noon to avoid DST edge cases
+  const baseFormatted = format(base, "d.M.yyyy");
+  const nextFormatted = format(addDays(base, 1), "d.M.yyyy");
 
-  const base = new Date(calendarDateStr + "T12:00:00");
+  const startMins = timeToMins(startTime);
+  const endMins = timeToMins(endTime);
+  const briefingMins = timeToMins(briefingTime);
 
-  // Shift start: if start is 00:00–05:59, it's next calendar day
-  const shiftStartDate = sh < 6 ? format(addDays(base, 1), "d.M.yyyy") : format(base, "d.M.yyyy");
+  // Shift start is always on the row's calendar date
+  const shiftStartDate = baseFormatted;
 
-  // Shift end: if end is 00:00–05:59 OR end < start (wraps midnight), it's next calendar day from start
-  const shiftEndDate = (eh < 6 || (sh >= 6 && eh < sh)) 
-    ? format(addDays(base, 1), "d.M.yyyy") 
-    : shiftStartDate;
+  // Shift end is next calendar day only if end time is earlier than start time (crosses midnight)
+  const shiftEndDate = endMins < startMins ? nextFormatted : baseFormatted;
 
-  // Briefing: if briefing >= 06:00, it's on the base calendar date
-  // if briefing is 00:00–05:59, it's next calendar day (same as overnight shift start)
-  const briefingDate = bh < 6 ? format(addDays(base, 1), "d.M.yyyy") : format(base, "d.M.yyyy");
+  // Briefing is next calendar day only if briefing time is earlier than start time (crosses midnight)
+  const briefingDate = briefingMins < startMins ? nextFormatted : baseFormatted;
 
   return { briefingDate, briefingTime, shiftStartDate, shiftStartTime: startTime, shiftEndDate, shiftEndTime: endTime };
 };
@@ -70,19 +55,21 @@ const formatShiftLine = (a, calendarDateStr, prefix = "  ") => {
   const { briefingDate, briefingTime, shiftStartDate, shiftStartTime, shiftEndDate, shiftEndTime } =
     resolveShiftCalendarTimes(calendarDateStr, rawBriefing, a.start_time, a.end_time);
 
-  const standby = /^\d+[׳']/.test(a.status || '');
+  const standby = isStandbyStr(a.status);
   const name = standby ? `כוננות (${a.status})` : a.food_cart_name;
   const statusTag = a.status && !standby ? ` [${a.status}]` : '';
 
   const briefingStr = `תדריך: ${briefingDate} בשעה ${briefingTime}`;
 
-  // If start and end are on the same calendar day, don't repeat the date
+  // If start and end are on the same calendar day, show date only once
   const shiftStr = shiftStartDate === shiftEndDate
     ? `משמרת: ${shiftStartDate} בשעה ${shiftStartTime} - ${shiftEndTime}`
     : `משמרת: ${shiftStartDate} בשעה ${shiftStartTime} - ${shiftEndDate} בשעה ${shiftEndTime}`;
 
   return `${prefix}${name}${statusTag}\n  ${briefingStr}\n  ${shiftStr}\n`;
 };
+
+const isStandbyStr = (status) => /^\d+[׳']/.test(status || '');
 
 export const buildWhatsAppMessage = async (worker, viewMode, currentDate, getWorkerTemplateShifts, getWorkerExtraTaskShifts, isStandbyStatus, base44) => {
   let message = `שלום ${worker.nickname}! משמרות קרובות:\n\n`;
@@ -130,7 +117,7 @@ export const buildWhatsAppMessage = async (worker, viewMode, currentDate, getWor
         return `${y}${String(m).padStart(2,'0')}${String(d).padStart(2,'0')}T${timeStr.replace(':','')}00`;
       };
 
-      const standby = /^\d+[׳']/.test(shift.status || '');
+      const standby = isStandbyStr(shift.status);
       icsContent += `BEGIN:VEVENT\nUID:shift-${idx}-${Date.now()}@kitchen\nDTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss")}\nDTSTART:${toIcsDateTime(briefingDate, briefingTime)}\nDTEND:${toIcsDateTime(shiftEndDate, shiftEndTime)}\nSUMMARY:${standby ? `כוננות ${shift.status}` : shift.food_cart_name}${shift.status && !standby ? ` - ${shift.status}` : ''}\nDESCRIPTION:תדריך: ${briefingDate} ${briefingTime}\\nמשמרת: ${shift.start_time} - ${shift.end_time}\nEND:VEVENT\n`;
     });
     icsContent += 'END:VCALENDAR';
