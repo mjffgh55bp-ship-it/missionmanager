@@ -140,8 +140,8 @@ export default function Layout({ children }) {
 
         {/* Fixed icon-only sidebar: right on desktop, bottom on mobile */}
         <nav
-          className="fixed z-[100] flex items-center gap-1 px-2 h-12 w-full bottom-0 right-0 left-0 justify-center overflow-x-auto md:flex-col md:top-0 md:right-0 md:bottom-auto md:left-auto md:h-full md:w-12 md:py-4 md:px-0 md:justify-start md:overflow-x-visible"
-          style={{ background: '#f9fafb', borderTop: '1px solid #d1d5db', borderLeft: '1px solid #d1d5db', boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.5), 0 2px 8px rgba(0,0,0,0.12)' }}
+          className="fixed z-[100] flex items-center gap-1 py-4 px-2 md:flex-col md:top-0 md:right-0 md:h-full md:py-4 md:px-0 bottom-0 right-0 left-0 md:left-auto justify-center md:justify-start overflow-x-auto md:overflow-x-visible"
+          style={{ background: '#f9fafb', borderTop: '1px solid #d1d5db', borderLeft: '1px solid #d1d5db', boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.5), 0 2px 8px rgba(0,0,0,0.12)', width: 'auto', height: 48, mdHeight: '100vh', mdWidth: 48 }}
         >
           {/* Logo icon — hidden on mobile */}
           <div className="hidden md:flex w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl flex-col items-center justify-center shadow mb-3 flex-shrink-0">
@@ -180,8 +180,8 @@ export default function Layout({ children }) {
           </div>
         </nav>
 
-        {/* Main Content — offset for sidebar on desktop (right margin), bottom padding on mobile */}
-        <main className="min-h-screen flex flex-col pb-12 md:pb-0 md:mr-12">
+        {/* Main Content — offset for sidebar on desktop, bottom padding on mobile */}
+        <main className="min-h-screen flex flex-col md:min-h-[calc(100vh-48px)]" style={{ marginRight: 'auto', marginBottom: 48, md: { marginRight: 48, marginBottom: 0 } }}>
           <div className="flex-1 overflow-auto">
             {children}
           </div>
