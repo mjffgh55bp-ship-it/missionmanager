@@ -921,21 +921,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_by_task", "count_quantitative"].includes(type);
 
-  // Pre-compute all cell values — only recomputes when actual data changes, not on every render
-  const cellValueMap = useMemo(() => {
-    const map = new Map();
-    if (!tracker?.columns || !filteredWorkers) return map;
-    tracker.columns.forEach(col => {
-      filteredWorkers.forEach(worker => {
-        map.set(`${col.id}_${worker.id}`, computeAutoValue(col, worker.id));
-      });
-    });
-    return map;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracker?.columns, filteredWorkers, assignments, templateRows, entries, dateFilterMode, startDate, endDate]);
-
-  const displayColumns = editMode ? editColumns : (tracker.columns || []);
-
   const filteredWorkers = workers.filter(w => {
     if (!w.active) return false;
     if (selectedPopulations.length > 0 && !selectedPopulations.includes(w.population)) return false;
@@ -975,6 +960,21 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const vb = getEntry(b.id, sortColId)?.value || "";
     return mult * va.localeCompare(vb, "he");
   });
+
+  // Pre-compute all cell values — only recomputes when actual data changes, not on every render
+  const cellValueMap = useMemo(() => {
+    const map = new Map();
+    if (!tracker?.columns || !filteredWorkers) return map;
+    tracker.columns.forEach(col => {
+      filteredWorkers.forEach(worker => {
+        map.set(`${col.id}_${worker.id}`, computeAutoValue(col, worker.id));
+      });
+    });
+    return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracker?.columns, filteredWorkers, assignments, templateRows, entries, dateFilterMode, startDate, endDate]);
+
+  const displayColumns = editMode ? editColumns : (tracker.columns || []);
 
   const parseQuantitativeValue = (raw) => {
     try { return JSON.parse(raw || "{}"); } catch { return {}; }
