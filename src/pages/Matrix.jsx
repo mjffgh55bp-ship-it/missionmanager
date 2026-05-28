@@ -371,25 +371,33 @@ export default function Matrix() {
   }, [ppm, pinned]);
 
   const handleWheel = useCallback((e) => {
-    if (!(e.ctrlKey || e.metaKey)) return;
-    e.preventDefault();
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
 
-    // Accumulate multiplicative zoom factor within this animation frame
-    const factor = e.deltaY > 0 ? 0.85 : 1.18;
-    if (!wheelAccumRef.current) {
-      // First event this frame — schedule a single applyZoom call
-      wheelAccumRef.current = { totalFactor: factor, clientX: e.clientX };
-      requestAnimationFrame(() => {
-        const accum = wheelAccumRef.current;
-        wheelAccumRef.current = null;
-        if (accum) applyZoom(ppmRef.current * accum.totalFactor, accum.clientX);
-      });
-    } else {
-      // Subsequent events same frame — multiply factors, keep last cursor position
-      wheelAccumRef.current.totalFactor *= factor;
-      wheelAccumRef.current.clientX = e.clientX;
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl+scroll → zoom
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 0.85 : 1.18;
+      if (!wheelAccumRef.current) {
+        wheelAccumRef.current = { totalFactor: factor, clientX: e.clientX };
+        requestAnimationFrame(() => {
+          const accum = wheelAccumRef.current;
+          wheelAccumRef.current = null;
+          if (accum) applyZoom(ppmRef.current * accum.totalFactor, accum.clientX);
+        });
+      } else {
+        wheelAccumRef.current.totalFactor *= factor;
+        wheelAccumRef.current.clientX = e.clientX;
+      }
+      return;
     }
-  }, [applyZoom]);
+
+    // Plain scroll (no Ctrl) → horizontal pan
+    if (!sc) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (delta === 0) return;
+    e.preventDefault();
+    sc.scrollLeft += delta;
+  }, [applyZoom, pinned]);
 
   const handlePointerDown = useCallback((e) => {
     if (e.button !== 1) return;
@@ -1952,10 +1960,6 @@ export default function Matrix() {
           <span className="text-xs text-gray-500 font-medium">רזולוציה:</span>
           <button onClick={zoomOut} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הקטן רזולוציית זמן">−</button>
           <button onClick={zoomIn} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הגדל רזולוציית זמן">+</button>
-          <div className="w-px h-5 bg-gray-300 mx-1" />
-          <button onClick={() => applyPreset('auto')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">התאם ליום</button>
-          <button onClick={() => applyPreset('full')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">24h</button>
-          <button onClick={() => applyPreset('12h')} className="text-xs px-2 py-1 rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 transition-colors">12h</button>
           <span className="text-[10px] text-gray-400 mr-auto">Ctrl+גלגל לזום · גרירת גלגל לגלילה</span>
         </div>
 
