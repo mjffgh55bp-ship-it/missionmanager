@@ -139,11 +139,11 @@ export default function Schedule() {
     const workersData = await getCachedWorkers(base44.entities);
     const allTemplatesData = await getCachedTemplates(base44.entities);
     const allSettings = await getCachedAllSettings(base44.entities);
-    const [availabilitiesData, unavailabilitiesData, templateRowsData] = await Promise.all([
-      fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })),
-      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
-      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
-    ]);
+    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
+    await new Promise(r => setTimeout(r, 200));
+    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
+    await new Promise(r => setTimeout(r, 200));
+    const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
 
     // Filter settings client-side
     const colTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
