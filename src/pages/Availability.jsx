@@ -288,18 +288,18 @@ export default function Availability() {
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
     try {
-      // Always fetch fresh settings to pick up open_registrations changes made by the manager
-      const freshSettings = await base44.entities.AppSettings.list();
-      const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
-      setOpenRegistrations(freshOpenReg);
-
-      // Fetch dynamic data in parallel
-      const [availabilities, unavailabilitiesData, templatesData, weekAvailsData] = await Promise.all([
+      // Fetch dynamic data + fresh settings all in parallel
+      const [availabilities, unavailabilitiesData, templatesData, weekAvailsData, freshSettings] = await Promise.all([
         base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
         base44.entities.Unavailability.filter({ worker_id: worker.id }),
         getCachedTemplates(base44.entities),
         base44.entities.Availability.filter({ week_start_date: weekStartStr }),
+        base44.entities.AppSettings.list(),
       ]);
+
+      // Apply fresh open_registrations from settings
+      const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
+      setOpenRegistrations(freshOpenReg);
 
       // Always fetch fresh TemplateRows so new mokeds created by the manager are visible.
       // Fetch Assignments from cache (changes rarely, no need to re-fetch every week change).
