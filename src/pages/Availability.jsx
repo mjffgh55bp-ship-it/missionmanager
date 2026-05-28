@@ -158,6 +158,16 @@ export default function Availability() {
       });
     });
 
+    // Listen for AppSettings changes — registration open/close arrives here
+    const unsubSettings = base44.entities.AppSettings.subscribe(() => {
+      base44.entities.AppSettings.list().then(freshSettings => {
+        const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
+        setOpenRegistrations(freshOpenReg);
+        // Also invalidate TemplateRows cache so new mokeds are picked up on next reload
+        cachedAllTemplateRows.current = null;
+      }).catch(() => {});
+    });
+
     // BroadcastChannel for same-origin cross-tab sync (fast path, no extra API call)
     const bc = new BroadcastChannel("availability-sync");
     broadcastRef.current = bc;
@@ -180,6 +190,7 @@ export default function Availability() {
 
     return () => {
       unsubAvailability();
+      unsubSettings();
       bc.close();
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", onFocus);
@@ -277,6 +288,11 @@ export default function Availability() {
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
     try {
+      // Always fetch fresh settings to pick up open_registrations changes made by the manager
+      const freshSettings = await base44.entities.AppSettings.list();
+      const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
+      setOpenRegistrations(freshOpenReg);
+
       // Fetch dynamic data in parallel
       const [availabilities, unavailabilitiesData, templatesData, weekAvailsData] = await Promise.all([
         base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
@@ -285,20 +301,15 @@ export default function Availability() {
         base44.entities.Availability.filter({ week_start_date: weekStartStr }),
       ]);
 
-      // Cache heavy lists — only fetch once per page session, fetch in parallel if both are missing
-      if (!cachedAllTemplateRows.current && !cachedAllAssignments.current) {
-        const [rows, assignments] = await Promise.all([
-          base44.entities.TemplateRow.list("-date", 500),
-          base44.entities.Assignment.list("-date", 500),
-        ]);
-        cachedAllTemplateRows.current = rows;
-        cachedAllAssignments.current = assignments;
-      } else if (!cachedAllTemplateRows.current) {
-        cachedAllTemplateRows.current = await base44.entities.TemplateRow.list("-date", 500);
-      } else if (!cachedAllAssignments.current) {
+      // Always fetch fresh TemplateRows so new mokeds created by the manager are visible.
+      // Fetch Assignments from cache (changes rarely, no need to re-fetch every week change).
+      const freshTemplateRows = await base44.entities.TemplateRow.list("-date", 500);
+      cachedAllTemplateRows.current = freshTemplateRows;
+      const allWeekRows = freshTemplateRows;
+
+      if (!cachedAllAssignments.current) {
         cachedAllAssignments.current = await base44.entities.Assignment.list("-date", 500);
       }
-      const allWeekRows = cachedAllTemplateRows.current;
       const allWorkerAssignments = cachedAllAssignments.current;
       const perDayRowArrays = [allWeekRows.filter(r => weekDates.includes(r.date))];
       const assignmentsData = allWorkerAssignments.filter(a => a.chef_id === worker.id);

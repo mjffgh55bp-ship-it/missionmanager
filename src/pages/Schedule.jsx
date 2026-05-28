@@ -888,6 +888,7 @@ export default function Schedule() {
                                            const created = await base44.entities.AppSettings.create(regData);
                                            openRegSettingIdRef.current = created.id;
                                           }
+                                          invalidateSettingsCache();
                                           toast.success(!isOpen ? `הרשמה לـ"${template.name}" נפתחה` : `הרשמה לـ"${template.name}" נסגרה`);
                                         }}>
                                         <UserCheck className="w-3 h-3" />
