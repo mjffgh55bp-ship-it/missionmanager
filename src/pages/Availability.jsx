@@ -288,14 +288,15 @@ export default function Availability() {
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
     try {
-      // Fetch dynamic data + fresh settings all in parallel
-      const [availabilities, unavailabilitiesData, templatesData, weekAvailsData, freshSettings] = await Promise.all([
-        base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }),
-        base44.entities.Unavailability.filter({ worker_id: worker.id }),
-        getCachedTemplates(base44.entities),
-        base44.entities.Availability.filter({ week_start_date: weekStartStr }),
-        base44.entities.AppSettings.list(),
-      ]);
+      // Fetch dynamic data sequentially with small delays to avoid rate limits
+      const templatesData = await getCachedTemplates(base44.entities);
+      const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
+      await new Promise(r => setTimeout(r, 150));
+      const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
+      await new Promise(r => setTimeout(r, 150));
+      const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
+      await new Promise(r => setTimeout(r, 150));
+      const freshSettings = await base44.entities.AppSettings.list();
 
       // Apply fresh open_registrations from settings
       const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
