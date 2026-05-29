@@ -1665,8 +1665,8 @@ export default function Matrix() {
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <div
           ref={timelineHeaderRef}
-          className="flex-shrink-0 bg-gray-100 border-b overflow-x-hidden"
-          style={{ height: '40px' }}
+          className="flex-shrink-0 bg-gray-100 border-b"
+          style={{ height: '40px', overflowX: 'clip', scrollbarWidth: 'none' }}
           dir="ltr"
         >
           <div style={{ width: `${timelineWidth}px` }}>
@@ -1676,7 +1676,7 @@ export default function Matrix() {
 
         <div
           ref={timelineScrollRef}
-          className="flex-1 min-h-0 overflow-x-auto overflow-y-auto matrix-scroll-container"
+          className="flex-1 min-h-0 overflow-x-auto overflow-y-auto matrix-scroll-container matrix-timeline-pinned"
           dir="ltr"
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove}
@@ -1839,6 +1839,12 @@ export default function Matrix() {
         }
         .matrix-scroll-container::-webkit-scrollbar-thumb:hover {
           background-color: #64748b;
+        }
+        .matrix-timeline-pinned::-webkit-scrollbar:vertical {
+          display: none;
+        }
+        .matrix-timeline-pinned {
+          scrollbar-width: thin;
         }
       `}</style>
       <div className="flex flex-col flex-1 min-h-0 w-full">
