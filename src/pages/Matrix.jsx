@@ -55,8 +55,6 @@ const timeToPixels = (timeStr, day = 0, viewMode = 'daily', ppm) => {
   if (isNaN(parsed.hour)) return 0;
   let totalMins;
   if (viewMode === 'weekly') {
-    // Use operational minutes so after-midnight times (02:00 = 1200 op-mins)
-    // stay visually within the same operational day, not pushed to the next day.
     totalMins = day * 1440 + getOperationalMinutes(timeStr);
   } else {
     totalMins = getOperationalMinutes(timeStr);
@@ -66,7 +64,6 @@ const timeToPixels = (timeStr, day = 0, viewMode = 'daily', ppm) => {
 
 const endTimeToPixels = (startTimeStr, endTimeStr, viewMode = 'daily', ppm, dayIndex = 0) => {
   if (viewMode === 'weekly') {
-    // Use operational end minutes so the width is always correct within the operational day.
     return (dayIndex * 1440 + getOperationalEndMinutes(startTimeStr, endTimeStr)) * ppm;
   }
   return getOperationalEndMinutes(startTimeStr, endTimeStr) * ppm;
@@ -78,12 +75,10 @@ const getTimelineWidth = (viewMode, ppm) =>
 const pixelsToTime = (px, viewMode = 'daily', ppm) => {
   const totalMins = px / ppm;
   if (viewMode === 'weekly') {
-    // Each operational day spans 1440 minutes in timeline space
     const day = Math.max(0, Math.min(6, Math.floor(totalMins / 1440)));
     const opMins = totalMins - day * 1440;
     return { day, time: operationalMinutesToTime(opMins) };
   }
-  // Daily: totalMins are already operational minutes (0 = 06:00)
   return { day: 0, time: operationalMinutesToTime(totalMins) };
 };
 
@@ -110,8 +105,6 @@ export default function Matrix() {
     try { return localStorage.getItem('matrix_pinned_worker_panel') === 'true'; } catch { return false; }
   });
   const togglePin = () => {
-    // Capture the current scroll position (in minutes) before toggling
-    // so we can restore it after the layout switch re-measures container width
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     const scrollMinutes = sc ? sc.scrollLeft / ppmRef.current : 0;
 
@@ -121,7 +114,6 @@ export default function Matrix() {
       return next;
     });
 
-    // After the layout re-renders and container width is remeasured, restore the scroll position
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setTimeout(() => {
@@ -208,20 +200,15 @@ export default function Matrix() {
   const filteredWorkersRef = useRef([]);
 
   // ── Scroll refs ──────────────────────────────────────────────────────────────
-  // Legacy single-container (unpinned)
   const scrollContainerRef = useRef(null);
-  // Split layout (pinned)
-  const workerPanelRef = useRef(null);        // fixed panel — vertical scroll only
-  const timelineScrollRef = useRef(null);     // timeline — both axes
-  const timelineHeaderRef = useRef(null);     // timeline header — horizontal sync only
-  const vScrollSyncRef = useRef(false);       // guard against scroll loop
+  const workerPanelRef = useRef(null);
+  const timelineScrollRef = useRef(null);
+  const timelineHeaderRef = useRef(null);
+  const vScrollSyncRef = useRef(false);
 
   const midMouseDragRef = useRef(null);
   const pendingScrollRef = useRef(null);
-  // Stores { targetScrollLeft, maxScroll } computed in applyZoom,
-  // consumed by useLayoutEffect after React commits the new ppm.
   const wheelAccumRef = useRef(null);
-  // Accumulates Ctrl+wheel delta between animation frames.
   const ppmRef = useRef(ppm);
   ppmRef.current = ppm;
 
@@ -248,7 +235,6 @@ export default function Matrix() {
     return () => ro && ro.disconnect();
   }, [pinned]);
 
-  // Also remeasure when pinned changes
   useEffect(() => {
     setTimeout(() => {
       const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
@@ -299,21 +285,6 @@ export default function Matrix() {
   }, [pinned]);
 
   // ── Zoom helpers ─────────────────────────────────────────────────────────────
-  //
-  // RTL coordinate system explanation:
-  //   The scroll container is dir="ltr" so scrollLeft works normally (0 = leftmost).
-  //   The inner content is dir="rtl": 06:00 is at the RIGHT edge (right=0),
-  //   later times extend leftward. So a bar at `right: X px` is at visual position
-  //   (timelineWidth - X) from the LEFT edge of the inner content.
-  //
-  //   To find the RTL timeline coordinate (px from right) under the cursor:
-  //     cursorFromLeft  = scrollLeft + cursorX    (absolute px from content left)
-  //     cursorFromRight = timelineWidth - cursorFromLeft  (px from right = operational time px)
-  //
-  //   After zoom, to keep the same cursorFromRight under the cursor:
-  //     newCursorFromLeft  = newTimelineWidth - cursorFromRight
-  //     newScrollLeft      = newCursorFromLeft - cursorX
-  //
   const applyZoom = useCallback((newPpmRaw, focalClientX = null) => {
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     const oldPpm = ppmRef.current;
@@ -327,9 +298,6 @@ export default function Matrix() {
 
     if (Math.abs(newPpm - oldPpm) < 0.0001) return;
 
-    // In unpinned mode, rect.left is the left edge of the full matrix container
-    // (including sticky worker/summary columns). Subtract fixedW to get cursor position
-    // relative to the timeline area only. In pinned mode sc IS the timeline — no offset needed.
     const rect = sc.getBoundingClientRect();
     let cursorX;
     if (focalClientX !== null) {
@@ -338,8 +306,6 @@ export default function Matrix() {
       cursorX = available / 2;
     }
 
-    // RTL anchor: time 06:00 is at right=0, later times extend leftward.
-    // anchorRightPx = operational time in pixels = invariant across zoom.
     const oldTimelineWidth = totalMins * oldPpm;
     const cursorFromLeft = sc.scrollLeft + cursorX;
     const anchorRightPx = oldTimelineWidth - cursorFromLeft;
@@ -350,16 +316,12 @@ export default function Matrix() {
     const targetScrollLeft = newCursorFromLeft - cursorX;
     const maxScroll = Math.max(0, newTimelineWidth - available);
 
-    // Store scroll target — useLayoutEffect applies it after React commits the new ppm,
-    // eliminating the one-frame gap with mismatched zoom level and scroll position.
     pendingScrollRef.current = { targetScrollLeft, maxScroll };
 
     setZoomPreset('custom');
     setCustomPpm(newPpm);
   }, [containerWidth, totalMins, viewMode, summaryColumns, pinned]);
 
-  // Apply pending zoom scroll synchronously after React commits the new ppm to the DOM.
-  // Fires after DOM mutations but before the browser paints — no visible jump frame.
   useLayoutEffect(() => {
     const pending = pendingScrollRef.current;
     if (!pending) return;
@@ -373,8 +335,8 @@ export default function Matrix() {
   const handleWheel = useCallback((e) => {
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
 
+    // Ctrl+scroll → zoom
     if (e.ctrlKey || e.metaKey) {
-      // Ctrl+scroll → zoom
       e.preventDefault();
       const factor = e.deltaY > 0 ? 0.85 : 1.18;
       if (!wheelAccumRef.current) {
@@ -391,12 +353,15 @@ export default function Matrix() {
       return;
     }
 
-    // Plain scroll (no Ctrl) → horizontal pan
-    if (!sc) return;
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    if (delta === 0) return;
-    e.preventDefault();
-    sc.scrollLeft += delta;
+    // Horizontal swipe (trackpad): deltaX is the dominant axis → pan horizontally
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      if (!sc) return;
+      e.preventDefault();
+      sc.scrollLeft += e.deltaX;
+      return;
+    }
+
+    // Plain vertical wheel (deltaY dominant) → let browser scroll vertically, don't intercept
   }, [applyZoom, pinned]);
 
   const handlePointerDown = useCallback((e) => {
@@ -458,62 +423,53 @@ export default function Matrix() {
   }, [viewMode]);
 
   // ── Data loading ─────────────────────────────────────────────────────────────
-  useEffect(() => { loadStaticData(); }, []); // loadStaticData calls loadDynamicData when done
+  useEffect(() => { loadStaticData(); }, []);
   useEffect(() => {
-    if (!initialLoadDoneRef.current) return; // guard: skip until static data is ready
+    if (!initialLoadDoneRef.current) return;
     loadDynamicData(false);
   }, [currentDate, viewMode]);
   useEffect(() => {
-    // Noisy real-time subscription — throttled to 500ms
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
       debouncedLoadDataRef.current(true, false);
     });
-    // Sync moked signups — reload availabilities when any worker submits/updates
     const unsubAvailability = base44.entities.Availability.subscribe(() => {
-      debouncedLoadDataRef.current(true, true); // fast: 200ms
+      debouncedLoadDataRef.current(true, true);
     });
 
-    // Visibility change — reload when tab becomes visible
     const onVisibility = () => {
       if (document.visibilityState === 'visible') debouncedLoadDataRef.current(true, false);
     };
     document.addEventListener('visibilitychange', onVisibility);
 
-    // Same-tab fast sync from WorkerCell/Schedule — immediate local patch + fast refetch
     const onTemplateRowsUpdated = (e) => {
       const { rowId, updatedValues } = e.detail || {};
-
       if (rowId && updatedValues) {
         setTemplateRows(prev => prev.map(row => row.id === rowId ? { ...row, values: updatedValues } : row));
       }
-      debouncedLoadDataRef.current(true, true); // fast: 200ms
+      debouncedLoadDataRef.current(true, true);
     };
     window.addEventListener('templateRowsUpdated', onTemplateRowsUpdated);
 
-    // Cross-tab sync via BroadcastChannel
     let bc = null;
     try {
       bc = new BroadcastChannel('schedule-sync');
       bc.onmessage = (e) => {
         if (e.data?.type === 'templateRowsUpdated') {
           const { rowId, updatedValues } = e.data;
-
           if (rowId && updatedValues) {
             setTemplateRows(prev => prev.map(row => row.id === rowId ? { ...row, values: updatedValues } : row));
           }
-          debouncedLoadDataRef.current(true, true); // fast: 200ms
+          debouncedLoadDataRef.current(true, true);
         }
       };
     } catch {}
 
-    // Cross-tab fallback via localStorage
     const onStorage = (e) => {
       if (e.key === 'schedule-sync-event') {
         try {
           const data = JSON.parse(e.newValue || '{}');
           if (data.type === 'templateRowsUpdated') {
-  
-            debouncedLoadDataRef.current(true, true); // fast: 200ms
+            debouncedLoadDataRef.current(true, true);
           }
         } catch {}
       }
@@ -578,7 +534,6 @@ export default function Matrix() {
 
       const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
-      // Fetch core data in parallel (4 requests max)
       const [availabilitiesData, unavailabilitiesData, allTemplatesData] = await Promise.all([
         base44.entities.Availability.filter({ week_start_date: weekStartStr }),
         viewMode === "daily"
@@ -587,13 +542,11 @@ export default function Matrix() {
         getCachedTemplates(base44.entities),
       ]);
 
-      // Fetch tracker entries only once (cache for the session)
       if (!trackerEntriesCache.current) {
         trackerEntriesCache.current = await base44.entities.TrackerEntry.list();
       }
       const trackerEntriesData = trackerEntriesCache.current;
 
-      // Fetch all dates in parallel — no delays needed
       const parallelFetch = (dates) =>
         Promise.all(dates.map(d => base44.entities.TemplateRow.filter({ date: d })));
 
@@ -614,7 +567,6 @@ export default function Matrix() {
 
       let filteredTemplateRows = templateRowArrays.flat();
 
-      // For daily view: also fetch missing continuation source rows
       if (viewMode === "daily") {
         const continuationRows = filteredTemplateRows.filter(r => r.values?.is_continuation && r.values?.continuation_source_row_id);
         const uniqueSourceIds = [...new Set(continuationRows.map(r => r.values.continuation_source_row_id).filter(Boolean))];
@@ -640,7 +592,6 @@ export default function Matrix() {
       isLoadingRef.current = false;
       if (queuedMatrixRefreshRef.current) {
         queuedMatrixRefreshRef.current = false;
-
         loadDynamicData(true);
       }
     }
@@ -678,7 +629,6 @@ export default function Matrix() {
     return { assigned: false, workerColumnName: null };
   };
 
-  // Returns true for zero-duration continuation rows (06:00→06:00) that should be ignored
   const isInvalidContinuationRow = (row) => {
     if (!row?.values?.is_continuation) return false;
     const start = row.values["התחלה"] || row.values["שעת התחלה"];
@@ -692,12 +642,10 @@ export default function Matrix() {
     templateRows.forEach(row => {
       if (!row.values) return;
       if (row.date !== targetDate) return;
-      // Only render assignment bars for rows within the visible date range (not adjacent preloaded days)
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
       const weekEnd = format(addDays(weekStart, 6), "yyyy-MM-dd");
       const weekStartStr2 = format(weekStart, "yyyy-MM-dd");
       if (viewMode === 'weekly' && (row.date < weekStartStr2 || row.date > weekEnd)) return;
-      // Skip invalid zero-duration continuation rows
       if (isInvalidContinuationRow(row)) return;
       const template = allTemplates.find(t => t.id === row.template_id);
       if (!template) return;
@@ -727,8 +675,6 @@ export default function Matrix() {
         group_id: row.group_id || "default",
         schedule_date: row.date,
         operational_date: row.date,
-        // date = operational day (row.date), NOT the physical calendar date.
-        // This ensures Matrix/Availability group by the correct operational day.
         date: row.date,
         calendar_start_date: getOperationalStartDate(row.date, startTime),
         worker_id: workerId,
@@ -775,7 +721,6 @@ export default function Matrix() {
     return shifts;
   };
 
-  // Pick the record with the most shifts — handles duplicate Availability records per worker/week
   const getBestAvail = (wid) => availabilities.filter(a => a.worker_id === wid && a.week_start_date === weekStartDate).sort((a,b)=>(b.shifts?.length||0)-(a.shifts?.length||0))[0] || null;
 
   const getWorkerAvailabilityForDate = (workerId, date = null) => {
@@ -877,16 +822,11 @@ export default function Matrix() {
 
   const getDayIndexFromDate = (dateStr) => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    // Use noon to avoid DST/timezone shifts
     const diff = Math.floor((new Date(dateStr + "T12:00:00") - weekStart) / (1000 * 60 * 60 * 24));
     return Math.max(0, Math.min(6, diff));
   };
 
-  // ── Slot-based drag: primary coordinate system ───────────────────────────────
-  // Finds the time slot element under the pointer using hit testing.
-  // This is immune to scroll, RTL, and fixed column offsets.
-  const getSlotFromPointer = (e, debug = false) => {
-    // Use elementsFromPoint to pierce through bar overlays and find the slot underneath
+  const getSlotFromPointer = (e) => {
     const els = document.elementsFromPoint(e.clientX, e.clientY);
     let slot = null;
     for (const el of els) {
@@ -894,11 +834,9 @@ export default function Matrix() {
       const found = el.closest?.("[data-matrix-time-slot='true']");
       if (found) { slot = found; break; }
     }
-
     return slot;
   };
 
-  // Fallback: convert clientX to operational minutes via scroll math (only used if slot hit fails)
   const clientXToOpMinutes = (clientX) => {
     console.warn("MATRIX DRAG FALLBACK X-MATH USED");
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
@@ -919,8 +857,6 @@ export default function Matrix() {
 
   // ── Drag handlers ────────────────────────────────────────────────────────────
   const handleMouseDown = (e, worker, shift, action, dayIndex = 0) => {
-    // Don't preventDefault on existing bar mousedowns — it blocks dblclick delivery.
-    // Only prevent default for create (empty slot drags) to avoid text selection.
     if (action === 'create') e.preventDefault();
     e.stopPropagation();
     if (action === 'move' && e.detail === 2) return;
@@ -936,7 +872,6 @@ export default function Matrix() {
       startAbsMinute = slotDay * 1440 + slotOpMin;
       startOpDate = slot.dataset.operationalDate || dateString;
     } else {
-      // Fallback to X-math
       const { opMinutes, dayIndex: fbDay } = clientXToOpMinutes(e.clientX);
       startAbsMinute = fbDay * 1440 + opMinutes;
       startOpDate = viewMode === 'weekly'
@@ -962,7 +897,6 @@ export default function Matrix() {
     if (!dragging) return;
     const { worker, shift, action, startAbsMinute, originalStart, originalEnd, originalDay } = dragging;
 
-    // ── Slot-based path (primary) ────────────────────────────────────────────
     const slot = getSlotFromPointer(e);
 
     let currentAbsMinute;
@@ -972,12 +906,11 @@ export default function Matrix() {
       const slotOpMin = Number(slot.dataset.operationalMinute || 0);
       currentAbsMinute = slotDay * 1440 + slotOpMin;
     } else {
-      // Fallback
       const { opMinutes, dayIndex: fbDay } = clientXToOpMinutes(e.clientX);
       currentAbsMinute = fbDay * 1440 + opMinutes;
     }
 
-    const SLOT_MINS = 60; // each slot = 1 hour
+    const SLOT_MINS = 60;
 
     let newStart = originalStart;
     let newEnd = originalEnd;
@@ -998,7 +931,6 @@ export default function Matrix() {
       const endDay = Math.max(0, Math.min(6, Math.floor(currentAbsMinute / 1440)));
       newEnd = operationalMinutesToTime(Math.max(0, currentAbsMinute - endDay * 1440 + SLOT_MINS));
     } else if (action === 'move') {
-      // For move, keep same duration, translate by delta
       const origStartPx = timeToPixels(originalStart, originalDay || 0, viewMode, ppm);
       const origEndPx = endTimeToPixels(originalStart, originalEnd, viewMode, ppm, originalDay || 0);
       const widthMins = (origEndPx - origStartPx) / ppm;
@@ -1018,7 +950,6 @@ export default function Matrix() {
     const { workerId, worker, shift, action } = dragging;
     const { start, end, day } = dragPreview;
 
-    // Save exactly what the preview shows — no recalculation from mouse position
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const targetDate = viewMode === 'weekly' ? format(addDays(weekStart, day || 0), 'yyyy-MM-dd') : dateString;
 
@@ -1080,7 +1011,6 @@ export default function Matrix() {
   const handleShiftDoubleClick = (e, worker, shift) => {
     e.stopPropagation();
     e.preventDefault();
-    // Use setTimeout to ensure dialog opens after any mouseup/drag cleanup runs first
     setTimeout(() => {
       setSelectedWorkerForManual(worker);
       setManualShiftData({ start_time: shift.start_time, end_time: shift.end_time, type: shift.type });
@@ -1152,7 +1082,6 @@ export default function Matrix() {
       const st = row.values?.['התחלה'] || row.values?.['שעת התחלה'];
       const et = row.values?.['סיום'] || row.values?.['שעת סיום'];
       if (st && et) {
-        // Use row.date (operational date) for column counting, not the physical calendar date.
         if (row.date < weekStartStr || row.date > weekEndStr) return;
         weeklyShifts.push({ date: row.date, start_time: st, end_time: et, status: row.values?.status || null, food_cart_name: allTemplates.find(t => t.id === row.template_id)?.name || row.template_name || '' });
       }
@@ -1164,7 +1093,7 @@ export default function Matrix() {
       const [from, to] = (column.criteria_value || '').split('-');
       if (!from || !to) return 0;
       const fromOp = getOperationalMinutes(from);
-      const toOp = getOperationalMinutes(to) || 1440; // if 'to' wraps to 0, treat as end-of-day
+      const toOp = getOperationalMinutes(to) || 1440;
       return weeklyShifts.filter(s => {
         const sStart = getOperationalMinutes(s.start_time);
         const sEnd = getOperationalEndMinutes(s.start_time, s.end_time);
@@ -1310,7 +1239,6 @@ export default function Matrix() {
   const DragPreviewBar = ({ preview, workerId }) => {
     if (!preview || preview.workerId !== workerId) return null;
     const dayIndex = preview.day || 0;
-    // Uses same getTimelineRangeStyle helper as all other bars — no independent positioning formula
     const { style } = getTimelineRangeStyle(preview.start, preview.end, dayIndex, viewMode, ppm);
     return <div className="absolute h-full bg-yellow-300 border-2 border-yellow-500 rounded-sm flex items-center justify-center z-30 opacity-80 pointer-events-none" style={style}><span className="text-xs font-bold">{preview.start} - {preview.end}</span></div>;
   };
@@ -1340,39 +1268,27 @@ export default function Matrix() {
     const markers = [];
     templateRows.forEach(row => {
       if (!row.values) return;
-
-      // Skip continuation rows — briefings come from the source row
       if (row.values?.is_continuation) return;
-
       const originalBriefingTime = row.values?.["תדריך"];
       if (!originalBriefingTime) return;
-
       const template = allTemplates.find(t => t.id === row.template_id);
       if (!template) return;
-
       const startTime = row.values?.["התחלה"] || row.values?.["שעת התחלה"];
       const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"];
       if (!startTime || !endTime) return;
-
       const parsed = parseTimeCellValue(originalBriefingTime);
       let visualOperationalDate;
       let visualTime;
-
       if (parsed.dayOffset === -1) {
-        // "-1 HH:MM" → marker belongs to the PREVIOUS operational day
         visualOperationalDate = addDaysString(row.date, -1);
-        visualTime = parsed.clockTime; // plain "HH:MM" e.g. "05:15"
+        visualTime = parsed.clockTime;
       } else if (parsed.dayOffset > 0) {
-        // "+N HH:MM" → marker on a future operational day
         visualOperationalDate = addDaysString(row.date, parsed.dayOffset);
         visualTime = parsed.clockTime;
       } else {
-        // plain "HH:MM" → same operational day as row
         visualOperationalDate = row.date;
         visualTime = parsed.clockTime;
       }
-
-      // Find all worker IDs assigned to this row (worker-type columns only)
       const workerCols = (template.columns || []).filter(c => c.type === "worker");
       const assignedWorkerIds = [];
       workerCols.forEach(col => {
@@ -1381,9 +1297,7 @@ export default function Matrix() {
         if (Array.isArray(val)) assignedWorkerIds.push(...val);
         else assignedWorkerIds.push(val);
       });
-
       if (assignedWorkerIds.length === 0) return;
-
       assignedWorkerIds.forEach(workerId => {
         markers.push({
           id: `briefing_${row.id}_${workerId}`,
@@ -1391,7 +1305,7 @@ export default function Matrix() {
           source_row_id: row.id,
           linked_shift_operational_date: row.date,
           visual_operational_date: visualOperationalDate,
-          visual_time: visualTime,           // ALWAYS plain "HH:MM" — never "-1 ..."
+          visual_time: visualTime,
           original_briefing_time: originalBriefingTime,
           shift_start_time: startTime,
           shift_end_time: endTime,
@@ -1442,7 +1356,7 @@ export default function Matrix() {
     }
   }, []);
 
-  // ── Row height: fixed 32px (h-8) — constant for both panels ──────────────────
+  // ── Row height: fixed 32px (h-8) ──────────────────────────────────────────────
   const ROW_H = 32;
 
   const getWorkerMokedSignups = (workerId) => {
@@ -1452,10 +1366,7 @@ export default function Matrix() {
 
     workerAvail.shifts.forEach(s => {
       if (s.type !== "wanted" && s.type !== "available") return;
-
       const opDate = s.operational_date || s.date;
-
-      // Filter by current view
       if (viewMode === 'daily') {
         if (opDate !== dateString) return;
       } else {
@@ -1464,7 +1375,6 @@ export default function Matrix() {
         const weekStartStr2 = format(weekStart2, "yyyy-MM-dd");
         if (opDate < weekStartStr2 || opDate > weekEnd2) return;
       }
-
       const key = s.signupKey || `${opDate}__${s.start_time}__${s.end_time}`;
       if (!grouped.has(key)) {
         grouped.set(key, { startTime: s.start_time, endTime: s.end_time, date: opDate, signups: [] });
@@ -1494,7 +1404,6 @@ export default function Matrix() {
               </div>
             </div>
           ))}
-          {/* Day boundary lines — same pixel position as row boundary lines */}
           {[0,1,2,3,4,5,6].map(day => {
             const px = day * 1440 * ppm;
             return <div key={`hdb-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '2px', backgroundColor: 'rgba(80,80,80,0.5)', zIndex: 5 }} />;
@@ -1504,7 +1413,6 @@ export default function Matrix() {
     </div>
   );
 
-  // Renders the inner content of a worker cell (no outer wrapper — caller provides the container)
   const renderWorkerCellContent = (worker, index) => {
     const sendStatus = getWorkerSendStatus(worker);
     const actionClass = sendStatus === 'none' ? 'text-gray-400 hover:text-gray-500' : sendStatus === 'needs_update' ? 'text-green-500 hover:text-green-600' : 'text-gray-900 hover:text-gray-700';
@@ -1546,21 +1454,16 @@ export default function Matrix() {
     </div>
   );
 
-  // Get briefing markers visible for a worker on the current view
   const getWorkerBriefingMarkers = (workerId) => {
     return briefingMarkers.filter(m => {
       if (m.worker_id !== workerId) return false;
       if (viewMode === 'daily') {
-        // Only show marker if its VISUAL date matches the selected day
-        const show = m.visual_operational_date === dateString;
-        return show;
+        return m.visual_operational_date === dateString;
       } else {
-        // Weekly: marker visual date must be within the visible week
         const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
         const weekEnd = addDays(weekStart, 6);
         const vd = new Date(m.visual_operational_date + "T12:00:00");
-        const show = vd >= weekStart && vd <= weekEnd;
-        return show;
+        return vd >= weekStart && vd <= weekEnd;
       }
     });
   };
@@ -1595,11 +1498,10 @@ export default function Matrix() {
             e.target.closest("[role='button']") ||
             e.target.closest("[data-no-drag='true']")
           ) return;
-          if (e.detail === 2) return; // double-click on empty space — skip
+          if (e.detail === 2) return;
           handleMouseDown(e, worker, null, 'create');
         }}
       >
-        {/* Grid lines — data attributes enable slot-based drag hit testing */}
         <div className="absolute inset-0 flex" dir="rtl">
           {viewMode === 'daily'
             ? dailySlots.map(hour => {
@@ -1639,7 +1541,6 @@ export default function Matrix() {
         </div>
         <div className="absolute inset-0" onDoubleClick={(e) => { const bar = e.target.closest("[data-matrix-avail-bar='true']"); if (bar) { e.stopPropagation(); const idx = parseInt(bar.dataset.shiftIdx); const sh = getWorkerAvailabilityForDate(worker.id); if (!isNaN(idx) && sh[idx]) handleShiftDoubleClick(e, worker, sh[idx]); } }}>
           {viewMode === 'weekly' && [0,1,2,3,4,5,6].map(day => {
-            // Day boundary at 06:00 = opMin 0, i.e. the RIGHT edge of each day's operational block
             const px = day * 1440 * ppm;
             return <div key={`db-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '2px', backgroundColor: 'rgba(80,80,80,0.35)', zIndex: 15 }} />;
           })}
@@ -1647,7 +1548,6 @@ export default function Matrix() {
           {workerUnavailabilities.map(unavail => <UnavailabilityBar key={unavail.id} unavail={unavail} />)}
           {workerTemplateShifts.map(ts => <AssignmentBar key={ts.id} assignment={ts} />)}
           {workerExtraTaskShifts.map(ets => <AssignmentBar key={ets.id} assignment={ets} />)}
-          {/* Moked signup candidate windows */}
           {workerMokedSignups.map((sg, i) => {
             const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(sg.date) : 0;
             return (
@@ -1663,7 +1563,6 @@ export default function Matrix() {
               />
             );
           })}
-          {/* Briefing markers — placed by visual_operational_date, not by shift date */}
           {workerBriefingMarkers.map(marker => {
             const dayIndex = viewMode === 'weekly' ? getDayIndexFromDate(marker.visual_operational_date) : 0;
             return (
@@ -1690,20 +1589,13 @@ export default function Matrix() {
   // ── PINNED LAYOUT ─────────────────────────────────────────────────────────────
   const renderPinnedLayout = () => (
     <div className="flex flex-1 min-h-0" dir="rtl">
-      {/* ── Fixed Worker Panel (right side, RTL) ── */}
       <div
         className="flex flex-col flex-shrink-0 bg-white z-20"
-        style={{
-          width: `${fixedColumnsWidth}px`,
-          boxShadow: '-4px 0 8px rgba(0,0,0,0.06)',
-          borderLeft: '1px solid #e5e7eb',
-        }}
+        style={{ width: `${fixedColumnsWidth}px`, boxShadow: '-4px 0 8px rgba(0,0,0,0.06)', borderLeft: '1px solid #e5e7eb' }}
       >
-        {/* Worker panel header */}
         <div className="flex-shrink-0 bg-gray-100 border-b z-10" style={{ height: '40px' }}>
           <div className="flex items-center h-full">
             <div className="px-2 flex items-center gap-1 h-full border-r relative" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
-              {/* Pin toggle — always top-right corner, absolute */}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1735,7 +1627,6 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* Worker panel body — vertical scroll only */}
         <div
           ref={workerPanelRef}
           className="overflow-y-auto overflow-x-hidden flex-1 min-h-0"
@@ -1756,14 +1647,12 @@ export default function Matrix() {
                   style={{ height: `${ROW_H}px` }}
                   onClick={e => handleRowClick(e, worker, index)}
                 >
-                  {/* Worker name + actions */}
                   <div
                     className={`px-1 font-medium text-gray-800 border-r flex items-center gap-1 h-full ${rowBg}`}
                     style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}
                   >
                     {renderWorkerCellContent(worker, index)}
                   </div>
-                  {/* Summary columns */}
                   {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index, isSelected))}
                   {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${rowBg}`} />}
                 </div>
@@ -1773,9 +1662,7 @@ export default function Matrix() {
         </div>
       </div>
 
-      {/* ── Scrollable Timeline Panel (left side, RTL) ── */}
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
-        {/* Timeline header — horizontal scroll synced with body, no scrollbar shown */}
         <div
           ref={timelineHeaderRef}
           className="flex-shrink-0 bg-gray-100 border-b overflow-x-hidden"
@@ -1787,10 +1674,9 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* Timeline body — both axes scrollable */}
         <div
           ref={timelineScrollRef}
-          className="flex-1 min-h-0 overflow-x-auto overflow-y-auto"
+          className="flex-1 min-h-0 overflow-x-auto overflow-y-auto matrix-scroll-container"
           dir="ltr"
           onMouseDown={handlePointerDown}
           onMouseMove={handlePointerMove}
@@ -1806,21 +1692,19 @@ export default function Matrix() {
     </div>
   );
 
-  // ── CLASSIC (UNPINNED) LAYOUT — identical to original ─────────────────────────
+  // ── CLASSIC (UNPINNED) LAYOUT ─────────────────────────────────────────────────
   const renderClassicLayout = () => (
     <div
       ref={scrollContainerRef}
       dir="ltr"
-      className="overflow-x-auto overflow-y-auto flex-1 min-h-0"
+      className="overflow-x-auto overflow-y-auto flex-1 min-h-0 matrix-scroll-container"
       onMouseDown={handlePointerDown}
       onMouseMove={handlePointerMove}
       onMouseUp={handlePointerUp}
     >
       <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
-        {/* Sticky header row */}
         <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
           <div className="p-2 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2 relative" dir="rtl" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
-            {/* Pin toggle in classic layout — always top-right corner, absolute */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1854,7 +1738,6 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* Worker rows */}
         {loading && !initialLoaded ? (
           <div className="text-center p-8" dir="rtl">טוען...</div>
         ) : workers.length === 0 ? (
@@ -1934,6 +1817,30 @@ export default function Matrix() {
       onMouseLeave={handleMouseUp}
       dir="rtl"
     >
+      <style>{`
+        .matrix-scroll-container {
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+        }
+        .matrix-scroll-container::-webkit-scrollbar {
+          height: 8px;
+          width: 6px;
+        }
+        .matrix-scroll-container::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .matrix-scroll-container::-webkit-scrollbar-thumb {
+          background-color: transparent;
+          border-radius: 4px;
+          transition: background-color 0.15s ease;
+        }
+        .matrix-scroll-container:hover::-webkit-scrollbar-thumb {
+          background-color: #94a3b8;
+        }
+        .matrix-scroll-container::-webkit-scrollbar-thumb:hover {
+          background-color: #64748b;
+        }
+      `}</style>
       <div className="flex flex-col flex-1 min-h-0 w-full">
         <Card className="border-none shadow-lg mb-2 flex-shrink-0">
           <MatrixHeader
@@ -1946,8 +1853,6 @@ export default function Matrix() {
             signupMode={signupMode} saveSignupMode={saveSignupMode} savingSignupMode={savingSignupMode}
           />
         </Card>
-
-
 
         <Card className="border-none shadow-lg flex-1 min-h-0 flex flex-col">
           <CardContent className="p-0 flex-1 min-h-0 flex flex-col">
