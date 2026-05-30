@@ -39,9 +39,11 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
 
   // roleName = the specific worker-column role this chip is for (null = all roles)
   const roleName = shift.roleName || null;
-  // All workers can interact with all chips — role columns are for manager assignment,
-  // not for restricting which workers can express availability.
-  const hasMyRole = true;
+  const hasMyRole = roleName === null
+    ? true   // no role restriction — show to everyone
+    : myRoles.size === 0
+    ? false  // worker has no roles
+    : myRoles.has(roleName);
 
   const signed = signedCount ?? 0;
   const { isFull, isOver, blocked } = calculateRoleStatus(requiredCount, signed, signupMode);
@@ -320,8 +322,7 @@ export default function ShiftDemandPanel({
 
   const myRoles = useMemo(() => {
     if (!currentWorker) return new Set();
-    const roles = Array.isArray(currentWorker.role) ? currentWorker.role : [currentWorker.role].filter(Boolean);
-    return new Set(roles.map(r => String(r).trim()));
+    return new Set(Array.isArray(currentWorker.role) ? currentWorker.role : [currentWorker.role].filter(Boolean));
   }, [currentWorker]);
 
   // Build a set of ALL role names the worker is eligible for, including aliases via mapping_id.
@@ -352,14 +353,17 @@ export default function ShiftDemandPanel({
     return eligible;
   }, [myRoles, workerRolesSettings]);
 
-  // Show ALL shifts from approved mokeds to ALL workers.
-  // Role columns (e.g. "שף", "נהג") indicate what the manager will assign —
-  // workers express availability for the whole shift, the manager assigns later.
-  // Role matching is for Schedule assignment (WorkerCell), NOT for availability signup.
+  // Filter demand to only show shifts relevant to this worker's roles
+  // (shifts with roleName=null are shown to everyone; role-specific shifts
+  //  are shown only if the worker has that role — including aliases via mapping_id)
   const filteredWeekDemand = useMemo(() => {
     if (!currentWorker) return [];
-    return weekDemand;
-  }, [weekDemand, currentWorker]);
+    return weekDemand.filter(shift => {
+      if (!shift.roleName) return true; // no role restriction
+      if (myEligibleRoleNames.size === 0) return false; // worker has no role
+      return myEligibleRoleNames.has(shift.roleName);
+    });
+  }, [weekDemand, myEligibleRoleNames, currentWorker]);
 
   // Build: slotKey (date__start__end) → count of distinct signupKeys at that slot
   const slotSignupKeyCountMap = useMemo(() => {

@@ -164,31 +164,23 @@ export default function Availability() {
         const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
         setOpenRegistrations(freshOpenReg);
 
-        // Also fetch fresh TemplateRows AND Templates so newly created mokeds appear immediately.
-        // allTemplates must be updated too — filterVisibleScheduleRows looks up each row's template
-        // by ID. If the template was created after allTemplates was last set, it won't be found
-        // and all its rows are silently filtered out, leaving the panel empty.
+        // Also fetch fresh TemplateRows so newly created mokeds appear immediately.
+        // Without this, templateRows state is stale and the filter finds no matching rows.
         try {
-          const [freshRows, freshTemplates] = await Promise.all([
-            base44.entities.TemplateRow.list("-date", 500),
-            getCachedTemplates(base44.entities),
-          ]);
+          const freshRows = await base44.entities.TemplateRow.list("-date", 500);
           cachedAllTemplateRows.current = freshRows;
-          setAllTemplates(freshTemplates);
 
-          if (weekStart) {
-            const weekStartStr = format(weekStart, "yyyy-MM-dd");
-            const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-            const weekDates = Array.from({ length: 7 }, (_, i) =>
-              format(addDays(weekStart, i), "yyyy-MM-dd")
-            );
-            const weekRows = freshRows.filter(r =>
-              weekDates.includes(r.date) &&
-              r.date >= weekStartStr &&
-              r.date <= weekEndStr
-            );
-            setTemplateRows(weekRows);
-          }
+          const weekStartStr = format(weekStart, "yyyy-MM-dd");
+          const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
+          const weekDates = Array.from({ length: 7 }, (_, i) =>
+            format(addDays(weekStart, i), "yyyy-MM-dd")
+          );
+          const weekRows = freshRows.filter(r =>
+            weekDates.includes(r.date) &&
+            r.date >= weekStartStr &&
+            r.date <= weekEndStr
+          );
+          setTemplateRows(weekRows);
         } catch {
           cachedAllTemplateRows.current = null;
         }
