@@ -160,11 +160,30 @@ export default function Availability() {
 
     // Listen for AppSettings changes — registration open/close arrives here
     const unsubSettings = base44.entities.AppSettings.subscribe(() => {
-      base44.entities.AppSettings.list().then(freshSettings => {
+      base44.entities.AppSettings.list().then(async freshSettings => {
         const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
         setOpenRegistrations(freshOpenReg);
-        // Also invalidate TemplateRows cache so new mokeds are picked up on next reload
-        cachedAllTemplateRows.current = null;
+
+        // Also fetch fresh TemplateRows so newly created mokeds appear immediately.
+        // Without this, templateRows state is stale and the filter finds no matching rows.
+        try {
+          const freshRows = await base44.entities.TemplateRow.list("-date", 500);
+          cachedAllTemplateRows.current = freshRows;
+
+          const weekStartStr = format(weekStart, "yyyy-MM-dd");
+          const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
+          const weekDates = Array.from({ length: 7 }, (_, i) =>
+            format(addDays(weekStart, i), "yyyy-MM-dd")
+          );
+          const weekRows = freshRows.filter(r =>
+            weekDates.includes(r.date) &&
+            r.date >= weekStartStr &&
+            r.date <= weekEndStr
+          );
+          setTemplateRows(weekRows);
+        } catch {
+          cachedAllTemplateRows.current = null;
+        }
       }).catch(() => {});
     });
 
