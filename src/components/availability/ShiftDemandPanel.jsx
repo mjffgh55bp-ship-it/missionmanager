@@ -42,7 +42,7 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
   const hasMyRole = roleName === null
     ? true   // no role restriction — show to everyone
     : myRoles.size === 0
-    ? false  // worker has no roles
+    ? true   // worker has no roles assigned — treat as eligible for all
     : myRoles.has(roleName);
 
   const signed = signedCount ?? 0;
@@ -359,8 +359,8 @@ export default function ShiftDemandPanel({
   const filteredWeekDemand = useMemo(() => {
     if (!currentWorker) return [];
     return weekDemand.filter(shift => {
-      if (!shift.roleName) return true; // no role restriction
-      if (myEligibleRoleNames.size === 0) return false; // worker has no role
+      if (!shift.roleName) return true; // no role restriction — visible to all
+      if (myEligibleRoleNames.size === 0) return true; // worker has no role assigned — show all shifts
       return myEligibleRoleNames.has(shift.roleName);
     });
   }, [weekDemand, myEligibleRoleNames, currentWorker]);
