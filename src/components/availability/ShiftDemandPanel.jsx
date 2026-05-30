@@ -39,11 +39,9 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
 
   // roleName = the specific worker-column role this chip is for (null = all roles)
   const roleName = shift.roleName || null;
-  const hasMyRole = roleName === null
-    ? true   // no role restriction — show to everyone
-    : myRoles.size === 0
-    ? true   // worker has no roles assigned — treat as eligible for all
-    : [...myRoles].some(r => String(r).trim() === String(roleName).trim());
+  // All workers can interact with all chips — role columns are for manager assignment,
+  // not for restricting which workers can express availability.
+  const hasMyRole = true;
 
   const signed = signedCount ?? 0;
   const { isFull, isOver, blocked } = calculateRoleStatus(requiredCount, signed, signupMode);
@@ -354,18 +352,14 @@ export default function ShiftDemandPanel({
     return eligible;
   }, [myRoles, workerRolesSettings]);
 
-  // Filter demand to only show shifts relevant to this worker's roles
-  // (shifts with roleName=null are shown to everyone; role-specific shifts
-  //  are shown only if the worker has that role — including aliases via mapping_id)
+  // Show ALL shifts from approved mokeds to ALL workers.
+  // Role columns (e.g. "שף", "נהג") indicate what the manager will assign —
+  // workers express availability for the whole shift, the manager assigns later.
+  // Role matching is for Schedule assignment (WorkerCell), NOT for availability signup.
   const filteredWeekDemand = useMemo(() => {
     if (!currentWorker) return [];
-    return weekDemand.filter(shift => {
-      if (!shift.roleName) return true; // no role restriction — visible to all
-      if (myEligibleRoleNames.size === 0) return true; // worker has no role assigned — show all shifts
-      const shiftRole = String(shift.roleName).trim();
-      return [...myEligibleRoleNames].some(r => String(r).trim() === shiftRole);
-    });
-  }, [weekDemand, myEligibleRoleNames, currentWorker]);
+    return weekDemand;
+  }, [weekDemand, currentWorker]);
 
   // Build: slotKey (date__start__end) → count of distinct signupKeys at that slot
   const slotSignupKeyCountMap = useMemo(() => {
