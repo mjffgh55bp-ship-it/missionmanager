@@ -113,6 +113,9 @@ export default function Availability() {
   const queuedRefreshRef = useRef(false);
   // Track which week key we last finished loading, to drop stale results
   const loadedWeekKeyRef = useRef(null);
+  // Debounce week navigation to avoid rate-limit bursts from rapid clicking
+  const weekNavDebounceRef = useRef(null);
+  const pendingWeekStartRef = useRef(null);
   // Live sync
   const syncDebounceRef = useRef(null);
   const broadcastRef = useRef(null);
@@ -127,8 +130,16 @@ export default function Availability() {
     }
     if (lastWeekStart.current === weekKey) return;
     lastWeekStart.current = weekKey;
-    // On week change: reload only dynamic (week-scoped) data, skip static
-    loadDynamicData(cachedWorker.current, cachedUser.current);
+
+    // Debounce rapid week navigation — only load after 400ms of no clicking.
+    // Without this, clicking the week arrow quickly fires 7 parallel TemplateRow
+    // requests per week × N weeks = rate limit errors → missing data.
+    pendingWeekStartRef.current = weekStart;
+    if (weekNavDebounceRef.current) clearTimeout(weekNavDebounceRef.current);
+    weekNavDebounceRef.current = setTimeout(() => {
+      weekNavDebounceRef.current = null;
+      loadDynamicData(cachedWorker.current, cachedUser.current);
+    }, 400);
   }, [weekStart]);
 
   // Lightweight refetch — only weekAvailabilities (for live count updates)
@@ -215,6 +226,7 @@ export default function Availability() {
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("availabilityUpdated", onUpdated);
       if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
+      if (weekNavDebounceRef.current) clearTimeout(weekNavDebounceRef.current);
     };
   }, [weekStart]);
 
