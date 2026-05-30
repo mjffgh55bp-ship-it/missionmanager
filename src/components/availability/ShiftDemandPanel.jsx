@@ -43,7 +43,7 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
     ? true   // no role restriction — show to everyone
     : myRoles.size === 0
     ? true   // worker has no roles assigned — treat as eligible for all
-    : myRoles.has(roleName);
+    : [...myRoles].some(r => String(r).trim() === String(roleName).trim());
 
   const signed = signedCount ?? 0;
   const { isFull, isOver, blocked } = calculateRoleStatus(requiredCount, signed, signupMode);
@@ -322,7 +322,8 @@ export default function ShiftDemandPanel({
 
   const myRoles = useMemo(() => {
     if (!currentWorker) return new Set();
-    return new Set(Array.isArray(currentWorker.role) ? currentWorker.role : [currentWorker.role].filter(Boolean));
+    const roles = Array.isArray(currentWorker.role) ? currentWorker.role : [currentWorker.role].filter(Boolean);
+    return new Set(roles.map(r => String(r).trim()));
   }, [currentWorker]);
 
   // Build a set of ALL role names the worker is eligible for, including aliases via mapping_id.
@@ -361,7 +362,8 @@ export default function ShiftDemandPanel({
     return weekDemand.filter(shift => {
       if (!shift.roleName) return true; // no role restriction — visible to all
       if (myEligibleRoleNames.size === 0) return true; // worker has no role assigned — show all shifts
-      return myEligibleRoleNames.has(shift.roleName);
+      const shiftRole = String(shift.roleName).trim();
+      return [...myEligibleRoleNames].some(r => String(r).trim() === shiftRole);
     });
   }, [weekDemand, myEligibleRoleNames, currentWorker]);
 
