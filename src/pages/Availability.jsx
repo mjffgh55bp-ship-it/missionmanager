@@ -173,27 +173,36 @@ export default function Availability() {
     const unsubSettings = base44.entities.AppSettings.subscribe(() => {
       base44.entities.AppSettings.list().then(async freshSettings => {
         const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
-        setOpenRegistrations(freshOpenReg);
+        // Don't set openRegistrations yet — wait until ALL data is fetched successfully
 
-        // Also fetch fresh TemplateRows so newly created mokeds appear immediately.
-        // Without this, templateRows state is stale and the filter finds no matching rows.
         try {
-          const freshRows = await base44.entities.TemplateRow.list("-date", 500);
-          cachedAllTemplateRows.current = freshRows;
-
           const weekStartStr = format(weekStart, "yyyy-MM-dd");
-          const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-          const weekDates = Array.from({ length: 7 }, (_, i) =>
+          const weekEndStr   = format(addDays(weekStart, 6), "yyyy-MM-dd");
+          const weekDates    = Array.from({ length: 7 }, (_, i) =>
             format(addDays(weekStart, i), "yyyy-MM-dd")
           );
+
+          // Fetch templates + all 7 days in parallel (subscription fires rarely, burst is acceptable)
+          const [freshTemplates, ...dayRowArrays] = await Promise.all([
+            getCachedTemplates(base44.entities),
+            ...weekDates.map(d => base44.entities.TemplateRow.filter({ date: d })),
+          ]);
+
+          const freshRows = dayRowArrays.flat();
+          cachedAllTemplateRows.current = freshRows;
+
           const weekRows = freshRows.filter(r =>
             weekDates.includes(r.date) &&
             r.date >= weekStartStr &&
             r.date <= weekEndStr
           );
+
+          // All fetches succeeded — update all state together
+          setOpenRegistrations(freshOpenReg);
+          setAllTemplates(freshTemplates);
           setTemplateRows(weekRows);
         } catch {
-          cachedAllTemplateRows.current = null;
+          // If fetch fails, don't update any state — consistency is preserved
         }
       }).catch(() => {});
     });
@@ -318,44 +327,55 @@ export default function Availability() {
     const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
+    // Retry helper — handles transient rate-limit errors without failing the whole load
+    const fetchWithRetry = async (fn, retries = 3, baseDelay = 600) => {
+      for (let i = 0; i < retries; i++) {
+        try { return await fn(); }
+        catch (e) {
+          if (i < retries - 1 && (e?.message?.includes('Rate limit') || e?.status === 429)) {
+            await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
+          } else throw e;
+        }
+      }
+    };
+
     try {
-      // Fetch dynamic data sequentially with small delays to avoid rate limits
+      // ── Phase 1: fetch ALL data before touching any state ──────────────────
+      // Sequential calls first (cheaper, less burst)
       const templatesData = await getCachedTemplates(base44.entities);
-      const availabilities = await base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr });
-      await new Promise(r => setTimeout(r, 150));
-      const unavailabilitiesData = await base44.entities.Unavailability.filter({ worker_id: worker.id });
-      await new Promise(r => setTimeout(r, 150));
-      const weekAvailsData = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-      await new Promise(r => setTimeout(r, 150));
+      const availabilities = await fetchWithRetry(() => base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }));
+      const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ worker_id: worker.id }));
+      const weekAvailsData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
       const freshSettings = await base44.entities.AppSettings.list();
-
-      // Apply fresh open_registrations from settings
       const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
-      setOpenRegistrations(freshOpenReg);
 
-      // Fetch TemplateRows for only the current week's dates in parallel.
-      // Using a global list() with a row limit was silently cutting off older dates
-      // (e.g. 500 rows only covers ~25 days of history with 4 active mokeds).
-      // Fetching by specific date avoids the limit entirely.
-      const weekRowArrays = await Promise.all(
-        weekDates.map(d => base44.entities.TemplateRow.filter({ date: d }))
-      );
-      const weekOnlyRows = weekRowArrays.flat();
-      cachedAllTemplateRows.current = weekOnlyRows;
-      const allWeekRows = weekOnlyRows;
+      // TemplateRows: fetch per-day in small batches to avoid rate-limit bursts.
+      const allDayRows = [];
+      for (let i = 0; i < weekDates.length; i += 3) {
+        const batch = weekDates.slice(i, i + 3);
+        const batchResults = await Promise.all(
+          batch.map(d => fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: d })))
+        );
+        allDayRows.push(...batchResults.flat());
+        if (i + 3 < weekDates.length) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      }
+      cachedAllTemplateRows.current = allDayRows;
+      const allWeekRows = allDayRows;
 
       if (!cachedAllAssignments.current) {
         cachedAllAssignments.current = await base44.entities.Assignment.list("-date", 500);
       }
       const allWorkerAssignments = cachedAllAssignments.current;
-      const perDayRowArrays = [allWeekRows.filter(r => weekDates.includes(r.date))];
       const assignmentsData = allWorkerAssignments.filter(a => a.chef_id === worker.id);
       const sousAssignments = allWorkerAssignments.filter(a => a.sous_chef_id === worker.id);
       const additionalAssignments = allWorkerAssignments.filter(a => a.additional_chef_id === worker.id);
 
-      // Drop stale results if week changed while loading
+      // ── Phase 2: stale-check — discard if week changed while loading ────────
       if (weekStart.toISOString() !== weekKey && weekKey !== lastWeekStart.current) return;
 
+      // ── Phase 3: process data ────────────────────────────────────────────────
       if (availabilities.length > 0) {
         setExistingAvailability(availabilities[0]);
         const rawShifts = availabilities[0].shifts || [];
@@ -459,19 +479,23 @@ export default function Availability() {
         const uDate = new Date(u.date);
         return uDate >= new Date(weekStartStr) && uDate <= new Date(weekEndStr);
       });
+
+      const weekRows = allDayRows.filter(r => weekDates.includes(r.date) && r.date >= weekStartStr && r.date <= weekEndStr);
+
+      // ── Phase 4: update ALL state at once — only reached if ALL fetches succeeded ──
+      // Key fix: no setState is called if any fetch above threw — previous week's state stays intact.
+      setOpenRegistrations(freshOpenReg);
       setUnavailabilities(weekUnavailabilities);
-
-      const allTemplateRowsData = perDayRowArrays.flat();
-      const templateRowsData = allTemplateRowsData.filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
-
-      const allAssignments = [...assignmentsData, ...sousAssignments, ...additionalAssignments];
-      setAssignments(allAssignments);
-      setTemplateRows(templateRowsData);
-      setAllTemplateRowsForCalendar(allTemplateRowsData);
+      setTemplateRows(weekRows);
+      setAllTemplateRowsForCalendar(allDayRows);
       setAllTemplates(templatesData);
       setWeekAvailabilities(weekAvailsData);
+      setAssignments([...assignmentsData, ...sousAssignments, ...additionalAssignments]);
 
       loadedWeekKeyRef.current = weekKey;
+    } catch (err) {
+      // Log the error but don't update any state — previous week's data stays intact.
+      console.error("loadDynamicData failed:", err);
     } finally {
       isLoadingDynamicRef.current = false;
       if (queuedRefreshRef.current) {
