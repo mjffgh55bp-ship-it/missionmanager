@@ -321,11 +321,16 @@ export default function Availability() {
       const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
       setOpenRegistrations(freshOpenReg);
 
-      // Always fetch fresh TemplateRows so new mokeds created by the manager are visible.
-      // Fetch Assignments from cache (changes rarely, no need to re-fetch every week change).
-      const freshTemplateRows = await base44.entities.TemplateRow.list("-date", 500);
-      cachedAllTemplateRows.current = freshTemplateRows;
-      const allWeekRows = freshTemplateRows;
+      // Fetch TemplateRows for only the current week's dates in parallel.
+      // Using a global list() with a row limit was silently cutting off older dates
+      // (e.g. 500 rows only covers ~25 days of history with 4 active mokeds).
+      // Fetching by specific date avoids the limit entirely.
+      const weekRowArrays = await Promise.all(
+        weekDates.map(d => base44.entities.TemplateRow.filter({ date: d }))
+      );
+      const weekOnlyRows = weekRowArrays.flat();
+      cachedAllTemplateRows.current = weekOnlyRows;
+      const allWeekRows = weekOnlyRows;
 
       if (!cachedAllAssignments.current) {
         cachedAllAssignments.current = await base44.entities.Assignment.list("-date", 500);
