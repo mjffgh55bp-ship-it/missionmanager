@@ -108,6 +108,7 @@ export default function Availability() {
   const cachedWorker = useRef(null);
   const cachedAllTemplateRows = useRef(null);
   const cachedAllAssignments = useRef(null);
+  const cachedUnavailabilities = useRef(null);
   const isLoadingAllRef = useRef(false);
   const isLoadingDynamicRef = useRef(false);
   const queuedRefreshRef = useRef(false);
@@ -282,6 +283,7 @@ export default function Availability() {
 
       const worker = workersData.find((w) => w.email === user.email);
       cachedWorker.current = worker;
+      cachedUnavailabilities.current = null; // reset on fresh load
       setCurrentWorker(worker);
 
       // Manager check
@@ -327,7 +329,7 @@ export default function Availability() {
     const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
 
-    // Retry helper — handles transient rate-limit errors without failing the whole load
+    // Retry helper for rate-limited requests
     const fetchWithRetry = async (fn, retries = 3, baseDelay = 600) => {
       for (let i = 0; i < retries; i++) {
         try { return await fn(); }
@@ -340,27 +342,37 @@ export default function Availability() {
     };
 
     try {
-      // ── Phase 1: fetch ALL data before touching any state ──────────────────
-      // Sequential calls first (cheaper, less burst)
-      const templatesData = await getCachedTemplates(base44.entities);
-      const availabilities = await fetchWithRetry(() => base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr }));
-      const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ worker_id: worker.id }));
-      const weekAvailsData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
-      const freshSettings = await base44.entities.AppSettings.list();
+      // ── Phase 1: fire 4 requests in parallel (~300ms total) ─────────────────
+      const [
+        templatesData,
+        availabilities,
+        unavailabilitiesData,
+        freshSettings,
+      ] = await Promise.all([
+        getCachedTemplates(base44.entities),
+        fetchWithRetry(() => base44.entities.Availability.filter({ worker_id: worker.id, week_start_date: weekStartStr })),
+        cachedUnavailabilities.current
+          ? Promise.resolve(cachedUnavailabilities.current)
+          : fetchWithRetry(() => base44.entities.Unavailability.filter({ worker_id: worker.id })),
+        getCachedAllSettings(base44.entities),
+      ]);
+      if (!cachedUnavailabilities.current) {
+        cachedUnavailabilities.current = unavailabilitiesData;
+      }
       const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
 
-      // TemplateRows: fetch per-day in small batches to avoid rate-limit bursts.
-      const allDayRows = [];
-      for (let i = 0; i < weekDates.length; i += 3) {
-        const batch = weekDates.slice(i, i + 3);
-        const batchResults = await Promise.all(
-          batch.map(d => fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: d })))
-        );
-        allDayRows.push(...batchResults.flat());
-        if (i + 3 < weekDates.length) {
-          await new Promise(r => setTimeout(r, 100));
-        }
-      }
+      // ── Phase 2: fire 7+1 requests in two batches of 4 ──────────────────────
+      const batch1 = await Promise.all(
+        weekDates.slice(0, 4).map(d => fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: d })))
+      );
+      const batch2 = await Promise.all([
+        ...weekDates.slice(4).map(d => fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: d }))),
+        fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })),
+      ]);
+
+      // Last item of batch2 is weekAvailsData, the rest are template row arrays
+      const weekAvailsData = batch2[batch2.length - 1];
+      const allDayRows = [...batch1, ...batch2.slice(0, -1)].flat();
       cachedAllTemplateRows.current = allDayRows;
       const allWeekRows = allDayRows;
 
@@ -372,10 +384,10 @@ export default function Availability() {
       const sousAssignments = allWorkerAssignments.filter(a => a.sous_chef_id === worker.id);
       const additionalAssignments = allWorkerAssignments.filter(a => a.additional_chef_id === worker.id);
 
-      // ── Phase 2: stale-check — discard if week changed while loading ────────
+      // ── Stale-check: discard if week changed while loading ───────────────────
       if (weekStart.toISOString() !== weekKey && weekKey !== lastWeekStart.current) return;
 
-      // ── Phase 3: process data ────────────────────────────────────────────────
+      // ── Process data ─────────────────────────────────────────────────────────
       if (availabilities.length > 0) {
         setExistingAvailability(availabilities[0]);
         const rawShifts = availabilities[0].shifts || [];
