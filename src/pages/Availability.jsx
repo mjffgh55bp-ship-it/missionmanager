@@ -102,6 +102,13 @@ export default function Availability() {
   const [tipsEditValue, setTipsEditValue] = useState("");
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
 
+  const weekStartRef = useRef(weekStart); // always mirrors weekStart state
+
+  const setWeekStartAndRef = (newWeekStart) => {
+    weekStartRef.current = newWeekStart;
+    setWeekStart(newWeekStart);
+  };
+
   const initialLoadStarted = useRef(false);
   const lastWeekStart = useRef(null);
   const staticLoaded = useRef(false);
@@ -122,47 +129,23 @@ export default function Availability() {
   const syncDebounceRef = useRef(null);
   const broadcastRef = useRef(null);
 
-  useEffect(() => {
-    const weekKey = weekStart.toISOString();
-    if (!initialLoadStarted.current) {
-      initialLoadStarted.current = true;
-      lastWeekStart.current = weekKey;
-      loadAllData();
-      return;
-    }
-    if (lastWeekStart.current === weekKey) return;
-    lastWeekStart.current = weekKey;
-
-    // Debounce rapid week navigation — only load after 400ms of no clicking.
-    // Without this, clicking the week arrow quickly fires 7 parallel TemplateRow
-    // requests per week × N weeks = rate limit errors → missing data.
-    pendingWeekStartRef.current = weekStart;
-    if (weekNavDebounceRef.current) clearTimeout(weekNavDebounceRef.current);
-    weekNavDebounceRef.current = setTimeout(() => {
-      weekNavDebounceRef.current = null;
-      loadDynamicData(cachedWorker.current, cachedUser.current);
-    }, 400);
-  }, [weekStart]);
-
   // Lightweight refetch — only weekAvailabilities (for live count updates)
   const refetchWeekAvailabilities = () => {
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     syncDebounceRef.current = setTimeout(async () => {
-      const weekStartStr = format(weekStart, "yyyy-MM-dd");
+      const weekStartStr = format(weekStartRef.current, "yyyy-MM-dd"); // ref, not closure
       const fresh = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
       setWeekAvailabilities(fresh);
     }, 300);
   };
 
-  // Live sync: real-time DB subscription + BroadcastChannel + localStorage + focus
+  // Effect A: Subscriptions — runs ONCE at mount, never torn down during week navigation
   useEffect(() => {
-    // ── Real-time DB subscription — fires on ANY device/browser ──────────────
-    // Updates weekAvailabilities directly from the event payload — NO extra API call
-    const weekStartStr = format(weekStart, "yyyy-MM-dd");
     const unsubAvailability = base44.entities.Availability.subscribe((event) => {
       const record = event.data;
-      if (!record || record.week_start_date !== weekStartStr) return;
-      // Don't override our own optimistic update (already set locally)
+      if (!record) return;
+      const currentWeekStr = format(weekStartRef.current, "yyyy-MM-dd");
+      if (record.week_start_date !== currentWeekStr) return;
       if (record.worker_id === cachedWorker.current?.id) return;
       setWeekAvailabilities(prev => {
         const without = prev.filter(a => !(a.worker_id === record.worker_id && a.week_start_date === record.week_start_date));
@@ -171,20 +154,15 @@ export default function Availability() {
       });
     });
 
-    // Listen for AppSettings changes — registration open/close arrives here
     const unsubSettings = base44.entities.AppSettings.subscribe(() => {
       base44.entities.AppSettings.list().then(async freshSettings => {
         const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
-        // Don't set openRegistrations yet — wait until ALL data is fetched successfully
-
         try {
-          const weekStartStr = format(weekStart, "yyyy-MM-dd");
-          const weekEndStr   = format(addDays(weekStart, 6), "yyyy-MM-dd");
-          const weekDates    = Array.from({ length: 7 }, (_, i) =>
-            format(addDays(weekStart, i), "yyyy-MM-dd")
-          );
+          const ws = weekStartRef.current;
+          const weekStartStr = format(ws, "yyyy-MM-dd");
+          const weekEndStr   = format(addDays(ws, 6), "yyyy-MM-dd");
+          const weekDates    = Array.from({ length: 7 }, (_, i) => format(addDays(ws, i), "yyyy-MM-dd"));
 
-          // Fetch templates + all 7 days in parallel (subscription fires rarely, burst is acceptable)
           const [freshTemplates, ...dayRowArrays] = await Promise.all([
             getCachedTemplates(base44.entities),
             ...weekDates.map(d => base44.entities.TemplateRow.filter({ date: d })),
@@ -192,40 +170,33 @@ export default function Availability() {
 
           const freshRows = dayRowArrays.flat();
           cachedAllTemplateRows.current = freshRows;
-
           const weekRows = freshRows.filter(r =>
-            weekDates.includes(r.date) &&
-            r.date >= weekStartStr &&
-            r.date <= weekEndStr
+            weekDates.includes(r.date) && r.date >= weekStartStr && r.date <= weekEndStr
           );
 
-          // All fetches succeeded — update all state together
+          if (format(weekStartRef.current, "yyyy-MM-dd") !== weekStartStr) return;
+
           setOpenRegistrations(freshOpenReg);
           setAllTemplates(freshTemplates);
           setTemplateRows(weekRows);
         } catch {
-          // If fetch fails, don't update any state — consistency is preserved
+          // Leave state unchanged on failure
         }
       }).catch(() => {});
     });
 
-    // BroadcastChannel for same-origin cross-tab sync (fast path, no extra API call)
     const bc = new BroadcastChannel("availability-sync");
     broadcastRef.current = bc;
-    // Cross-tab: only refetch if it's a different tab updating (we can't get the record directly)
     bc.onmessage = () => refetchWeekAvailabilities();
 
-    // localStorage fallback
     const onStorage = (e) => {
       if (e.key === "availability-sync-event") refetchWeekAvailabilities();
     };
     window.addEventListener("storage", onStorage);
 
-    // Refetch on tab focus (catches cases where subscription or storage missed)
     const onFocus = () => refetchWeekAvailabilities();
     window.addEventListener("focus", onFocus);
 
-    // Custom in-page event (same-tab immediate update)
     const onUpdated = () => refetchWeekAvailabilities();
     window.addEventListener("availabilityUpdated", onUpdated);
 
@@ -239,6 +210,26 @@ export default function Availability() {
       if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
       if (weekNavDebounceRef.current) clearTimeout(weekNavDebounceRef.current);
     };
+  }, []); // ← empty deps: never torn down during week navigation
+
+  // Effect B: Week-change trigger
+  useEffect(() => {
+    const weekKey = weekStart.toISOString();
+    if (!initialLoadStarted.current) {
+      initialLoadStarted.current = true;
+      lastWeekStart.current = weekKey;
+      loadAllData();
+      return;
+    }
+    if (lastWeekStart.current === weekKey) return;
+    lastWeekStart.current = weekKey;
+
+    pendingWeekStartRef.current = weekStart;
+    if (weekNavDebounceRef.current) clearTimeout(weekNavDebounceRef.current);
+    weekNavDebounceRef.current = setTimeout(() => {
+      weekNavDebounceRef.current = null;
+      loadDynamicData(cachedWorker.current, cachedUser.current, weekStartRef.current);
+    }, 400);
   }, [weekStart]);
 
   // First load: identify user immediately, then parallelize everything else
@@ -309,7 +300,7 @@ export default function Availability() {
 
       // Step 3: load dynamic (week-scoped) data immediately — no artificial delay
       if (worker) {
-        await loadDynamicData(worker, user);
+        await loadDynamicData(worker, user, weekStartRef.current);
       }
     } finally {
       isLoadingAllRef.current = false;
@@ -317,18 +308,20 @@ export default function Availability() {
   };
 
   // Week-change reload: only dynamic data, use cached templates
-  const loadDynamicData = async (worker, user) => {
+  const loadDynamicData = async (worker, user, forWeekStart) => {
     if (!worker) return;
     if (isLoadingDynamicRef.current) {
       queuedRefreshRef.current = true;
       return;
     }
     isLoadingDynamicRef.current = true;
-    const weekKey = weekStart.toISOString();
+    // Use the explicitly passed weekStart — never reads from stale closure
+    const ws = forWeekStart || weekStartRef.current;
+    const weekKey = ws.toISOString();
 
-    const weekStartStr = format(weekStart, "yyyy-MM-dd");
-    const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-    const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
+    const weekStartStr = format(ws, "yyyy-MM-dd");
+    const weekEndStr = format(addDays(ws, 6), "yyyy-MM-dd");
+    const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(ws, i), "yyyy-MM-dd"));
 
     // Retry helper for rate-limited requests
     const fetchWithRetry = async (fn, retries = 3, baseDelay = 600) => {
@@ -387,7 +380,7 @@ export default function Availability() {
       const additionalAssignments = allWorkerAssignments.filter(a => a.additional_chef_id === worker.id);
 
       // ── Stale-check: discard if week changed while loading ───────────────────
-      if (weekStart.toISOString() !== weekKey && weekKey !== lastWeekStart.current) return;
+      if (weekStartRef.current.toISOString() !== weekKey) return;
 
       // ── Process data ─────────────────────────────────────────────────────────
       if (availabilities.length > 0) {
@@ -514,14 +507,14 @@ export default function Availability() {
       isLoadingDynamicRef.current = false;
       if (queuedRefreshRef.current) {
         queuedRefreshRef.current = false;
-        loadDynamicData(worker, user);
+        loadDynamicData(worker, user, weekStartRef.current);
       }
     }
   };
 
   // Legacy alias for components that call loadData()
   const loadData = async () => {
-    await loadDynamicData(cachedWorker.current, cachedUser.current);
+    await loadDynamicData(cachedWorker.current, cachedUser.current, weekStartRef.current);
   };
 
 
@@ -1195,10 +1188,10 @@ END:VEVENT
             {/* 3.1 Week navigation */}
             <div className="flex items-center justify-between bg-white border rounded-xl px-3 py-2 shadow-sm">
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(addDays(weekStart, -7), { weekStartsOn: 0 }))}>
+                <Button variant="outline" size="sm" onClick={() => setWeekStartAndRef(startOfWeek(addDays(weekStart, -7), { weekStartsOn: 0 }))}>
                   <ChevronRight className="w-4 h-4" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(addDays(weekStart, 7), { weekStartsOn: 0 }))}>
+                <Button variant="outline" size="sm" onClick={() => setWeekStartAndRef(startOfWeek(addDays(weekStart, 7), { weekStartsOn: 0 }))}>
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
               </div>
