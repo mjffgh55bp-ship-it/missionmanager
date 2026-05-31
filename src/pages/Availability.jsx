@@ -96,6 +96,7 @@ export default function Availability() {
   const [allTemplates, setAllTemplates] = useState([]);
   const [isManager, setIsManager] = useState(false);
   const [weekAvailabilities, setWeekAvailabilities] = useState([]);
+  const [allUnavailabilities, setAllUnavailabilities] = useState([]);
   const [signupMode, setSignupMode] = useState("allow_over_sign_up");
   const [editingTips, setEditingTips] = useState(false);
   const [tipsEditValue, setTipsEditValue] = useState("");
@@ -358,6 +359,7 @@ export default function Availability() {
       ]);
       if (!cachedUnavailabilities.current) {
         cachedUnavailabilities.current = unavailabilitiesData;
+        setAllUnavailabilities(unavailabilitiesData);
       }
       const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
 
@@ -642,6 +644,10 @@ export default function Availability() {
       return uDate >= new Date(weekStartStr) && uDate <= new Date(weekEndStr);
     });
     setUnavailabilities([...unavailabilities, ...weekUnavailabilities]);
+    // Keep allUnavailabilities and cache in sync
+    const updatedAll = [...(cachedUnavailabilities.current || []), ...newUnavailabilities];
+    cachedUnavailabilities.current = updatedAll;
+    setAllUnavailabilities(updatedAll);
 
     // Also mark affected shifts as unavailable in selectedShifts
     if (unavailabilityForm.multiDay) {
@@ -676,6 +682,9 @@ export default function Availability() {
   const handleDeleteUnavailability = async (id) => {
     await base44.entities.Unavailability.delete(id);
     setUnavailabilities(unavailabilities.filter((u) => u.id !== id));
+    const updatedAll = (cachedUnavailabilities.current || []).filter(u => u.id !== id);
+    cachedUnavailabilities.current = updatedAll;
+    setAllUnavailabilities(updatedAll);
   };
 
   const generateICSFile = () => {
@@ -846,6 +855,11 @@ END:VEVENT
       right: `${startMins / totalMins * 100}%`,
       width: `${(endMins - startMins) / totalMins * 100}%`
     };
+  };
+
+  const getUnavailabilitiesForDate = (date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return allUnavailabilities.filter(u => u.date === dateStr);
   };
 
   const getAssignmentForDate = (date) => {
@@ -1129,6 +1143,7 @@ END:VEVENT
                     const dayAssignments = getAssignmentForDate(day);
                     const event = getEventForDate(day);
                     const workerYearlyEvents = getYearlyEventsForDate(day);
+                    const dayUnavailabilities = getUnavailabilitiesForDate(day);
                     const isCurrentMonth = isSameMonth(day, calendarMonth);
                     const isToday = isSameDay(day, new Date());
                     return (
@@ -1147,6 +1162,9 @@ END:VEVENT
                             </div>
                           );
                         })}
+                        {dayUnavailabilities.length > 0 && (
+                          <div className="bg-red-100 text-red-600 rounded text-[8px] leading-tight mt-0.5">🚫</div>
+                        )}
                         {dayAssignments.length + workerYearlyEvents.length > 1 && (
                           <div className="text-gray-400 text-[8px]">+{dayAssignments.length + workerYearlyEvents.length - 1}</div>
                         )}
@@ -1521,6 +1539,22 @@ END:VEVENT
             </DialogHeader>
             {selectedDate &&
             <div className="space-y-4 py-4">
+                {getUnavailabilitiesForDate(selectedDate).length > 0 &&
+              <div>
+                    <p className="font-semibold text-red-700 mb-2" dir="rtl">אילוצים:</p>
+                    {getUnavailabilitiesForDate(selectedDate).map((u, i) =>
+                <div key={i} className="p-3 bg-red-50 border border-red-200 rounded-lg mb-2 flex items-center justify-between">
+                        <div dir="rtl">
+                          <p className="text-sm font-medium text-red-800">{u.start_time} – {u.end_time}</p>
+                          <p className="text-xs text-red-600">{u.reason === "overseas" ? "בחו\"ל" : "תפוס"}</p>
+                        </div>
+                        <button onClick={() => handleDeleteUnavailability(u.id)} className="text-red-400 hover:text-red-600 ml-2">
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      </div>
+                )}
+                  </div>
+              }
                 {getEventForDate(selectedDate) &&
               <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
                     <p className="font-semibold text-purple-800 flex items-center gap-2" dir="rtl">
