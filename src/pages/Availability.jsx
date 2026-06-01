@@ -608,51 +608,75 @@ export default function Availability() {
   const handleAddUnavailability = async () => {
     if (!currentWorker) return;
 
-    const startDate = new Date(unavailabilityForm.start_date);
-    const endDate = unavailabilityForm.multiDay ? new Date(unavailabilityForm.end_date) : startDate;
+    // ── Validate dates ────────────────────────────────────────────────────────
+    if (!unavailabilityForm.start_date) {
+      alert("יש לבחור תאריך");
+      return;
+    }
 
-    // Create unavailabilities for each day in range
+    const startDate = new Date(unavailabilityForm.start_date + "T12:00:00");
+    const endDate = unavailabilityForm.multiDay && unavailabilityForm.end_date
+      ? new Date(unavailabilityForm.end_date + "T12:00:00")
+      : startDate;
+
+    if (isNaN(startDate.getTime())) {
+      alert("תאריך לא תקין");
+      return;
+    }
+    if (endDate < startDate) {
+      alert("תאריך הסיום חייב להיות אחרי תאריך ההתחלה");
+      return;
+    }
+
+    // ── Build list of dates ───────────────────────────────────────────────────
     const datesToAdd = [];
     let currentD = new Date(startDate);
-    while (currentD <= endDate) {
+    while (currentD <= endDate && datesToAdd.length < 60) {
       datesToAdd.push(format(currentD, "yyyy-MM-dd"));
       currentD = addDays(currentD, 1);
     }
 
+    // ── Create records with error handling ───────────────────────────────────
     const newUnavailabilities = [];
-    for (const dateStr of datesToAdd) {
-      const created = await base44.entities.Unavailability.create({
-        worker_id: currentWorker.id,
-        worker_name: currentWorker.nickname,
-        date: dateStr,
-        start_time: unavailabilityForm.start_time,
-        end_time: unavailabilityForm.end_time,
-        reason: unavailabilityForm.reason
-      });
-      newUnavailabilities.push(created);
+    try {
+      for (const dateStr of datesToAdd) {
+        const created = await base44.entities.Unavailability.create({
+          worker_id: currentWorker.id,
+          worker_name: currentWorker.nickname,
+          date: dateStr,
+          start_time: unavailabilityForm.start_time,
+          end_time: unavailabilityForm.end_time,
+          reason: unavailabilityForm.reason,
+        });
+        newUnavailabilities.push(created);
+      }
+    } catch (err) {
+      console.error("Failed to create unavailability:", err);
+      alert("שגיאה בשמירת האילוץ. אנא נסה שוב.");
+      return;
     }
 
-    // Update state with new unavailabilities
-    const weekStartStr = format(weekStart, "yyyy-MM-dd");
-    const weekEndStr = format(addDays(weekStart, 6), "yyyy-MM-dd");
-    const weekUnavailabilities = newUnavailabilities.filter((u) => {
-      const uDate = new Date(u.date);
-      return uDate >= new Date(weekStartStr) && uDate <= new Date(weekEndStr);
-    });
-    setUnavailabilities([...unavailabilities, ...weekUnavailabilities]);
-    // Keep allUnavailabilities and cache in sync
+    // ── Update state ─────────────────────────────────────────────────────────
+    const weekStartStr = format(weekStartRef.current, "yyyy-MM-dd");
+    const weekEndStr = format(addDays(weekStartRef.current, 6), "yyyy-MM-dd");
+
+    const weekUnavailabilities = newUnavailabilities.filter(u =>
+      u.date >= weekStartStr && u.date <= weekEndStr
+    );
+    setUnavailabilities(prev => [...prev, ...weekUnavailabilities]);
+
     const updatedAll = [...(cachedUnavailabilities.current || []), ...newUnavailabilities];
     cachedUnavailabilities.current = updatedAll;
     setAllUnavailabilities(updatedAll);
 
-    // Also mark affected shifts as unavailable in selectedShifts
+    // Auto-mark shifts as unavailable for multi-day constraints
     if (unavailabilityForm.multiDay) {
       const newShifts = [...selectedShifts];
       for (const dateStr of datesToAdd) {
-        SHIFT_BLOCKS.forEach((block) => {
+        (SHIFT_BLOCKS || []).forEach(block => {
           const overlaps = unavailabilityForm.start_time <= block.end && unavailabilityForm.end_time >= block.start;
           if (overlaps) {
-            const existingIdx = newShifts.findIndex((s) => s.date === dateStr && s.start_time === block.start && s.end_time === block.end);
+            const existingIdx = newShifts.findIndex(s => s.date === dateStr && s.start_time === block.start && s.end_time === block.end);
             if (existingIdx >= 0) {
               newShifts[existingIdx] = { ...newShifts[existingIdx], type: "unavailable", priority: 0 };
             } else {
@@ -664,6 +688,7 @@ export default function Availability() {
       setSelectedShifts(newShifts);
     }
 
+    // ── Reset and close ───────────────────────────────────────────────────────
     setShowUnavailabilityDialog(false);
     setUnavailabilityForm({
       start_date: format(new Date(), "yyyy-MM-dd"),
@@ -671,7 +696,7 @@ export default function Availability() {
       start_time: "09:00",
       end_time: "17:00",
       reason: "occupied",
-      multiDay: false
+      multiDay: false,
     });
   };
 
