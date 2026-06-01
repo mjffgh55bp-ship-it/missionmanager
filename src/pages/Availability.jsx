@@ -1282,6 +1282,9 @@ END:VEVENT
                   {["א", "ב", "ג", "ד", "ה", "ו", "ש"].map((d, i) => (
                     <div key={i} className="font-semibold text-gray-400 py-1 text-[10px]">{d}</div>
                   ))}
+                  {Array.from({ length: startOfMonth(calendarMonth).getDay() }).map((_, i) => (
+                    <div key={`blank-${i}`} />
+                  ))}
                   {calendarDays.map((day, idx) => {
                     const dayAssignments = getAssignmentForDate(day);
                     const event = getEventForDate(day);
