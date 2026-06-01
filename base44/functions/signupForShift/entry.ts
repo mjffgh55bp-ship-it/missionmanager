@@ -86,7 +86,10 @@ Deno.serve(async (req) => {
 
   if (otherLocksAfter.length >= maxSlots) {
     // Someone else also got in — delete our lock and return failure
-    await base44.asServiceRole.entities.ShiftLock.delete(lockRecord.id);
+    // Guard against 404 if lock was already deleted by a concurrent request
+    try {
+      await base44.asServiceRole.entities.ShiftLock.delete(lockRecord.id);
+    } catch (_) { /* already gone — that's fine */ }
     return Response.json({ success: false, reason: 'full', currentCount: otherLocksAfter.length, maxSlots });
   }
 
