@@ -1670,7 +1670,7 @@ export default function Matrix() {
         <div
           ref={timelineHeaderRef}
           className="flex-shrink-0 bg-gray-100 border-b"
-          style={{ height: '40px', overflowX: 'clip', scrollbarWidth: 'none' }}
+          style={{ height: '40px', overflowX: 'hidden', scrollbarWidth: 'none' }}
           dir="ltr"
         >
           <div style={{ width: `${timelineWidth}px` }}>
