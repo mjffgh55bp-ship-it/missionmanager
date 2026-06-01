@@ -101,6 +101,7 @@ export default function Availability() {
   const [editingTips, setEditingTips] = useState(false);
   const [tipsEditValue, setTipsEditValue] = useState("");
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
+  const [pendingSignupKeys, setPendingSignupKeys] = useState(new Set());
 
   const weekStartRef = useRef(weekStart); // always mirrors weekStart state
 
@@ -984,29 +985,84 @@ END:VEVENT
 
     let savedRecord;
     if (isLimitedMode && (type === "wanted" || isRemoveAction)) {
-      // Persist atomically on server FIRST, then update UI
-      const result = await signupForShift({
-        signupKey,
-        weekStartDate: weekStartStr,
-        workerId: currentWorker.id,
-        workerName: currentWorker.nickname,
-        availabilityData,
-        requiredCount: unifiedShift.requiredCount || 1,
-        isRemove: isRemoveAction,
-      });
-      if (!result.data?.success) {
-        // Slot was taken — refresh counts from server and do NOT apply local change
-        const freshAvails = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
-        setWeekAvailabilities(freshAvails);
-        return;
+      if (!isRemoveAction) {
+        // ── STEP 1: Show pending state immediately ──────────────────────────────
+        setPendingSignupKeys(prev => new Set([...prev, signupKey]));
+        setSelectedShifts(prev => {
+          const without = prev.filter(s => s.signupKey !== signupKey);
+          return [...without, {
+            date: operationalDate,
+            operational_date: operationalDate,
+            start_time: startTime,
+            end_time: endTime,
+            type: "wanted",
+            _pending: true,
+            priority: cleanedShifts.filter(s => s.type === "wanted").length + 1,
+            moked_name: mokedName,
+            sharedMokedKey,
+            signupKey,
+            role_or_qualification: roleName,
+            possibleInstances: serializePossibleInstances(unifiedShift.possibleInstances),
+          }];
+        });
+
+        // ── STEP 2: Call server atomically ──────────────────────────────────────
+        let result;
+        try {
+          result = await signupForShift({
+            signupKey,
+            weekStartDate: weekStartStr,
+            workerId: currentWorker.id,
+            workerName: currentWorker.nickname,
+            availabilityData,
+            requiredCount: unifiedShift.requiredCount || 1,
+            isRemove: false,
+          });
+        } catch {
+          setPendingSignupKeys(prev => { const n = new Set(prev); n.delete(signupKey); return n; });
+          setSelectedShifts(prev => prev.filter(s => s.signupKey !== signupKey));
+          return;
+        }
+
+        // ── STEP 3: Resolve based on server response ────────────────────────────
+        setPendingSignupKeys(prev => { const n = new Set(prev); n.delete(signupKey); return n; });
+
+        if (!result.data?.success) {
+          setSelectedShifts(prev => prev.filter(s => s.signupKey !== signupKey));
+          const freshAvails = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
+          setWeekAvailabilities(freshAvails);
+          return;
+        }
+
+        savedRecord = result.data.record;
+        setSelectedShifts(cleanedShifts);
+        setWeekAvailabilities(prev => {
+          const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
+          return [...withoutMine, savedRecord];
+        });
+      } else {
+        // Remove action — no pending state needed
+        const result = await signupForShift({
+          signupKey,
+          weekStartDate: weekStartStr,
+          workerId: currentWorker.id,
+          workerName: currentWorker.nickname,
+          availabilityData,
+          requiredCount: unifiedShift.requiredCount || 1,
+          isRemove: true,
+        });
+        if (!result.data?.success) {
+          const freshAvails = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
+          setWeekAvailabilities(freshAvails);
+          return;
+        }
+        savedRecord = result.data.record;
+        setSelectedShifts(cleanedShifts);
+        setWeekAvailabilities(prev => {
+          const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
+          return [...withoutMine, savedRecord];
+        });
       }
-      savedRecord = result.data.record;
-      // Only update UI after confirmed success
-      setSelectedShifts(cleanedShifts);
-      setWeekAvailabilities(prev => {
-        const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
-        return [...withoutMine, savedRecord];
-      });
     } else {
       // For non-limit mode or non-wanted types: optimistic update first, then persist
       // 1. Optimistic local update
@@ -1301,6 +1357,7 @@ END:VEVENT
               isLocked={!!currentWorker?.availability_locked}
               onAddConstraint={() => setShowUnavailabilityDialog(true)}
               workerRolesSettings={workerRolesSettings}
+              pendingSignupKeys={pendingSignupKeys}
             />
 
 

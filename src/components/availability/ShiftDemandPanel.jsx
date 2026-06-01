@@ -33,7 +33,7 @@ function dateLabel(dateStr) {
 // Only the chip at index 0 shows a personal selection highlight when the worker signed up.
 // Chips at index >= 1 always show count but never the personal highlight (they are
 // identical-key duplicates caused by same-name same-time mokeds).
-function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
+function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit, pendingSignupKeys = new Set() }) {
   // requiredCount = number of row instances (not worker columns)
   const requiredCount = shift.requiredCount || 1;
 
@@ -78,8 +78,12 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
   const isSignedAvailable = currentType === "available" && showPersonalHighlight;
   const isSignedUnavailable = currentType === "unavailable" && showPersonalHighlight;
 
+  const isPending = shift.signupKey ? pendingSignupKeys.has(shift.signupKey) : false;
+
   let chipClass = "border-2 rounded-md px-1 py-1 text-xs text-center transition-all select-none w-full ";
-  if (isSignedWanted) {
+  if (isPending) {
+    chipClass += "bg-amber-50 border-amber-400 text-amber-800 cursor-wait animate-pulse";
+  } else if (isSignedWanted) {
     chipClass += "bg-green-50 border-green-400 text-green-800 cursor-pointer";
   } else if (isSignedAvailable) {
     chipClass += "bg-blue-50 border-blue-400 text-blue-800 cursor-pointer";
@@ -97,6 +101,7 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
 
   const handleClick = () => {
     if (!canEdit || !hasMyRole) return;
+    if (isPending) return;
 
     // If not yet signed up and capacity is full in limit mode → block
     if (currentType === null && blocked) return;
@@ -128,12 +133,14 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
 
   const isSelected = isSignedWanted || isSignedAvailable || isSignedUnavailable;
 
-  const statusIcon = isSignedWanted ? <Star className="w-3 h-3" /> :
+  const statusIcon = isPending ? null :
+    isSignedWanted ? <Star className="w-3 h-3" /> :
     isSignedAvailable ? <Check className="w-3 h-3" /> :
     isSignedUnavailable ? <Ban className="w-3 h-3" /> :
     null;
 
-  const statusText = isSignedWanted ? "רצוי" :
+  const statusText = isPending ? "מעבד..." :
+    isSignedWanted ? "רצוי" :
     isSignedAvailable ? "זמין" :
     isSignedUnavailable ? "לא זמין" :
     null;
@@ -177,15 +184,20 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
 
       {/* Count + status row */}
       <div className="flex items-center justify-center gap-1 mt-0.5 flex-wrap">
-        {isSelected && statusIcon && (
+        {isPending && (
+          <span className="flex items-center gap-1 text-[10px] text-amber-700 font-semibold">
+            <span className="animate-spin inline-block w-2.5 h-2.5 border-2 border-amber-400 border-t-amber-700 rounded-full" />
+          </span>
+        )}
+        {!isPending && isSelected && statusIcon && (
           <span className="flex items-center gap-0.5 text-[10px]">{statusIcon}</span>
         )}
         <span className={`text-[10px] font-semibold ${isOver ? "text-orange-700" : blocked ? "text-red-600" : "text-gray-700"}`}>
           {countLabel}
         </span>
         {statusBadge}
-        {isSelected && statusText && (
-          <span className="text-[10px] font-medium">{statusText}</span>
+        {(isSelected || isPending) && statusText && (
+          <span className={`text-[10px] font-medium ${isPending ? "text-amber-700" : ""}`}>{statusText}</span>
         )}
       </div>
     </button>
@@ -193,7 +205,7 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
 }
 
 // ── Day column ─────────────────────────────────────────────────────────────────
-function DayColumn({ dateStr, shifts, signupCountByKey, slotSignupKeyCountMap, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit }) {
+function DayColumn({ dateStr, shifts, signupCountByKey, slotSignupKeyCountMap, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit, pendingSignupKeys = new Set() }) {
   if (shifts.length === 0) return null;
 
   const { dayName, shortDate, hebrewDate } = dateLabel(dateStr);
@@ -236,18 +248,19 @@ function DayColumn({ dateStr, shifts, signupCountByKey, slotSignupKeyCountMap, a
                   const isUnambiguousSlot = (slotSignupKeyCountMap?.get(slotKey) ?? 0) <= 1;
                   return (
                 <ShiftChip
-                  key={`${shift.key}-${chipIndex}`}
-                  shift={shift}
-                  chipIndex={chipIndex}
-                  isUnambiguousSlot={isUnambiguousSlot}
-                  signedCount={signupCountByKey.get(shift.signupKey) ?? 0}
-                  allAvailabilities={allAvailabilities}
-                  workers={workers}
-                  myRoles={myRoles}
-                  selectedShifts={selectedShifts}
-                  signupMode={signupMode}
-                  onSignup={onSignup}
-                  canEdit={canEdit}
+                 key={`${shift.key}-${chipIndex}`}
+                 shift={shift}
+                 chipIndex={chipIndex}
+                 isUnambiguousSlot={isUnambiguousSlot}
+                 signedCount={signupCountByKey.get(shift.signupKey) ?? 0}
+                 allAvailabilities={allAvailabilities}
+                 workers={workers}
+                 myRoles={myRoles}
+                 selectedShifts={selectedShifts}
+                 signupMode={signupMode}
+                 onSignup={onSignup}
+                 canEdit={canEdit}
+                 pendingSignupKeys={pendingSignupKeys}
                 />
                   );
                 });
@@ -298,6 +311,7 @@ export default function ShiftDemandPanel({
   isLocked,
   onAddConstraint,
   workerRolesSettings = [],
+  pendingSignupKeys = new Set(),
 }) {
   const weekTemplateRows = useMemo(() => {
     const dates = new Set();
@@ -431,6 +445,7 @@ export default function ShiftDemandPanel({
                   signupMode={signupMode || "allow_over_sign_up"}
                   onSignup={onSignup}
                   canEdit={canEdit}
+                  pendingSignupKeys={pendingSignupKeys}
                 />
               ))}
             </div>
