@@ -33,7 +33,7 @@ function dateLabel(dateStr) {
 // Only the chip at index 0 shows a personal selection highlight when the worker signed up.
 // Chips at index >= 1 always show count but never the personal highlight (they are
 // identical-key duplicates caused by same-name same-time mokeds).
-function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit, pendingSignupKeys = new Set() }) {
+function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit, pendingSignupKeys = new Set(), onCancelPendingToAvailable }) {
   // requiredCount = number of row instances (not worker columns)
   const requiredCount = shift.requiredCount || 1;
 
@@ -82,7 +82,7 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
 
   let chipClass = "border-2 rounded-md px-1 py-1 text-xs text-center transition-all select-none w-full ";
   if (isPending) {
-    chipClass += "bg-amber-50 border-amber-400 text-amber-800 cursor-wait animate-pulse";
+    chipClass += "bg-amber-50 border-amber-400 text-amber-800 cursor-pointer animate-pulse";
   } else if (isSignedWanted) {
     chipClass += "bg-green-50 border-green-400 text-green-800 cursor-pointer";
   } else if (isSignedAvailable) {
@@ -101,7 +101,10 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
 
   const handleClick = () => {
     if (!canEdit || !hasMyRole) return;
-    if (isPending) return;
+    if (isPending) {
+      onCancelPendingToAvailable && onCancelPendingToAvailable(shift, roleName);
+      return;
+    }
 
     // If not yet signed up and capacity is full in limit mode → block
     if (currentType === null && blocked) return;
@@ -205,7 +208,7 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
 }
 
 // ── Day column ─────────────────────────────────────────────────────────────────
-function DayColumn({ dateStr, shifts, signupCountByKey, slotSignupKeyCountMap, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit, pendingSignupKeys = new Set() }) {
+function DayColumn({ dateStr, shifts, signupCountByKey, slotSignupKeyCountMap, allAvailabilities, workers, myRoles, selectedShifts, signupMode, onSignup, canEdit, pendingSignupKeys = new Set(), onCancelPendingToAvailable }) {
   if (shifts.length === 0) return null;
 
   const { dayName, shortDate, hebrewDate } = dateLabel(dateStr);
@@ -261,7 +264,8 @@ function DayColumn({ dateStr, shifts, signupCountByKey, slotSignupKeyCountMap, a
                  onSignup={onSignup}
                  canEdit={canEdit}
                  pendingSignupKeys={pendingSignupKeys}
-                />
+                 onCancelPendingToAvailable={onCancelPendingToAvailable}
+                 />
                   );
                 });
               })()}
@@ -312,6 +316,7 @@ export default function ShiftDemandPanel({
   onAddConstraint,
   workerRolesSettings = [],
   pendingSignupKeys = new Set(),
+  onCancelPendingToAvailable,
 }) {
   const weekTemplateRows = useMemo(() => {
     const dates = new Set();
@@ -446,6 +451,7 @@ export default function ShiftDemandPanel({
                   onSignup={onSignup}
                   canEdit={canEdit}
                   pendingSignupKeys={pendingSignupKeys}
+                  onCancelPendingToAvailable={onCancelPendingToAvailable}
                 />
               ))}
             </div>

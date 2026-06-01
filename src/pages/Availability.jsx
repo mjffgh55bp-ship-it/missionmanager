@@ -126,6 +126,8 @@ export default function Availability() {
   // Debounce week navigation to avoid rate-limit bursts from rapid clicking
   const weekNavDebounceRef = useRef(null);
   const pendingWeekStartRef = useRef(null);
+  // Tracks signupKeys where user clicked during pending to override "wanted" → "available"
+  const pendingOverrideRef = useRef({});
   // Live sync
   const syncDebounceRef = useRef(null);
   const broadcastRef = useRef(null);
@@ -901,6 +903,32 @@ END:VEVENT
   const wantedShifts = selectedShifts.filter((s) => s.type === "wanted").sort((a, b) => (a.priority || 0) - (b.priority || 0));
   const availableShifts = selectedShifts.filter((s) => s.type === "available").sort((a, b) => (a.priority || 0) - (b.priority || 0));
 
+  const handleCancelPendingToAvailable = (shift, roleName) => {
+    const { signupKey, startTime, endTime, mokedName, sharedMokedKey } = shift;
+    const operationalDate = shift.operational_date || shift.date;
+
+    pendingOverrideRef.current[signupKey] = "available";
+
+    setPendingSignupKeys(prev => { const n = new Set(prev); n.delete(signupKey); return n; });
+
+    setSelectedShifts(prev => {
+      const without = prev.filter(s => s.signupKey !== signupKey);
+      return [...without, {
+        date: operationalDate,
+        operational_date: operationalDate,
+        start_time: startTime,
+        end_time: endTime,
+        type: "available",
+        _pending: false,
+        priority: without.filter(s => s.type === "available").length + 1,
+        moked_name: mokedName,
+        sharedMokedKey,
+        signupKey,
+        role_or_qualification: roleName,
+      }];
+    });
+  };
+
   // Handle signup from the demand panel: write-through save + optimistic weekAvailabilities update
   const handleDemandSignup = async (unifiedShift, roleName, type) => {
     if (!canEdit || currentWorker?.availability_locked) return;
@@ -1027,6 +1055,66 @@ END:VEVENT
         // ── STEP 3: Resolve based on server response ────────────────────────────
         setPendingSignupKeys(prev => { const n = new Set(prev); n.delete(signupKey); return n; });
 
+        // Check if user clicked during pending to override to "available"
+        const override = pendingOverrideRef.current[signupKey];
+        if (override === "available") {
+          delete pendingOverrideRef.current[signupKey];
+
+          if (result.data?.success) {
+            // Server claimed "wanted" slot — now switch to "available"
+            const availableShifts = selectedShifts
+              .filter(s => s.signupKey !== signupKey)
+              .concat([{
+                date: operationalDate,
+                operational_date: operationalDate,
+                start_time: startTime,
+                end_time: endTime,
+                type: "available",
+                priority: 1,
+                moked_name: mokedName,
+                sharedMokedKey,
+                signupKey,
+                role_or_qualification: roleName,
+                possibleInstances: serializePossibleInstances(unifiedShift.possibleInstances),
+              }]);
+            const availableRecord = { ...availabilityData, shifts: availableShifts };
+            const existingForUpdate = result.data.record;
+            let finalRecord;
+            if (existingForUpdate?.id) {
+              finalRecord = await base44.entities.Availability.update(existingForUpdate.id, availableRecord);
+            } else if (existingAvailability?.id) {
+              finalRecord = await base44.entities.Availability.update(existingAvailability.id, availableRecord);
+            } else {
+              finalRecord = await base44.entities.Availability.create(availableRecord);
+            }
+            setExistingAvailability(finalRecord);
+            setWeekAvailabilities(prev => {
+              const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
+              return [...withoutMine, finalRecord];
+            });
+          } else {
+            // Server rejected "wanted" — "available" is still fine, persist it
+            const availableShifts = cleanedShifts.map(s =>
+              s.signupKey === signupKey ? { ...s, type: "available" } : s
+            );
+            const availableRecord = { ...availabilityData, shifts: availableShifts };
+            let finalRecord;
+            if (existingAvailability?.id) {
+              finalRecord = await base44.entities.Availability.update(existingAvailability.id, availableRecord);
+            } else {
+              finalRecord = await base44.entities.Availability.create(availableRecord);
+            }
+            setExistingAvailability(finalRecord);
+            setSelectedShifts(availableShifts);
+            setWeekAvailabilities(prev => {
+              const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
+              return [...withoutMine, finalRecord];
+            });
+          }
+          return;
+        }
+
+        // Normal flow (no override):
         if (!result.data?.success) {
           setSelectedShifts(prev => prev.filter(s => s.signupKey !== signupKey));
           const freshAvails = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
@@ -1358,6 +1446,7 @@ END:VEVENT
               onAddConstraint={() => setShowUnavailabilityDialog(true)}
               workerRolesSettings={workerRolesSettings}
               pendingSignupKeys={pendingSignupKeys}
+              onCancelPendingToAvailable={handleCancelPendingToAvailable}
             />
 
 
