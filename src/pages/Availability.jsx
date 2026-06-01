@@ -1129,7 +1129,14 @@ END:VEVENT
           return [...withoutMine, savedRecord];
         });
       } else {
-        // Remove action — no pending state needed
+        // Remove action — optimistic UI update first, then server call
+        setSelectedShifts(cleanedShifts);
+        const optimisticRecord = { ...(existingAvailability || {}), ...availabilityData, shifts: cleanedShifts };
+        setWeekAvailabilities(prev => {
+          const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
+          return [...withoutMine, optimisticRecord];
+        });
+
         const result = await signupForShift({
           signupKey,
           weekStartDate: weekStartStr,
@@ -1145,7 +1152,6 @@ END:VEVENT
           return;
         }
         savedRecord = result.data.record;
-        setSelectedShifts(cleanedShifts);
         setWeekAvailabilities(prev => {
           const withoutMine = prev.filter(a => a.worker_id !== currentWorker.id);
           return [...withoutMine, savedRecord];
