@@ -16,6 +16,8 @@ export default function Reports() {
   const [trackers, setTrackers] = useState([]);
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
+  const [roleObjects, setRoleObjects] = useState([]);       // [{name, mapping_id}]
+  const [populationObjects, setPopulationObjects] = useState([]); // [{name, mapping_id}]
   const [scheduleColumns, setScheduleColumns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("tables");
@@ -138,11 +140,15 @@ export default function Reports() {
     setWorkerQualifications(workerQualsData);
     if (populationsSettings.length > 0) {
       const raw = JSON.parse(populationsSettings[0].setting_value) || [];
-      setPopulations(raw.map(p => typeof p === "string" ? p : p.name).filter(Boolean));
+      const objs = raw.map(p => typeof p === "string" ? { name: p, mapping_id: p } : p).filter(p => p.name);
+      setPopulations(objs.map(p => p.name));
+      setPopulationObjects(objs);
     }
     if (workerRolesSettings.length > 0) {
       const raw = JSON.parse(workerRolesSettings[0].setting_value) || [];
-      setWorkerRoles(raw.map(r => typeof r === "string" ? r : r.name).filter(Boolean));
+      const objs = raw.map(r => typeof r === "string" ? { name: r, mapping_id: r } : r).filter(r => r.name);
+      setWorkerRoles(objs.map(r => r.name));
+      setRoleObjects(objs);
     }
 
     // Collect all unique schedule columns from global + cart params
@@ -311,6 +317,10 @@ export default function Reports() {
                 allTemplates={allTemplates}
                 trackers={trackers}
                 trackerEntries={trackerEntries}
+                workerQualifications={workerQualifications}
+                qualifications={qualifications}
+                roleObjects={roleObjects}
+                populationObjects={populationObjects}
                 onEdit={(chart) => { setEditingChart(chart); setChartBuilderOpen(true); }}
                 onDelete={handleDeleteChart}
               />
@@ -340,10 +350,14 @@ export default function Reports() {
         workers={workers}
         populations={populations}
         workerRoles={workerRoles}
+        roleObjects={roleObjects}
+        populationObjects={populationObjects}
         assignments={assignments}
         templateRows={templateRows}
         allTemplates={allTemplates}
         trackerEntries={trackerEntries}
+        workerQualifications={workerQualifications}
+        qualifications={qualifications}
       />
     </div>
   );

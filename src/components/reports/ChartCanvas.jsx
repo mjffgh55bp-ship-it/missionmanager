@@ -12,6 +12,8 @@ const MIN_H = 200;
 export default function ChartCanvas({
   charts, workers, assignments, templateRows, allTemplates,
   trackers, trackerEntries,
+  workerQualifications, qualifications,
+  roleObjects, populationObjects,
   onEdit, onDelete,
 }) {
   const STORAGE_KEY = "chart_canvas_positions";
@@ -194,6 +196,10 @@ export default function ChartCanvas({
                 allTemplates={allTemplates}
                 trackers={trackers}
                 trackerEntries={trackerEntries}
+                workerQualifications={workerQualifications}
+                qualifications={qualifications}
+                roleObjects={roleObjects}
+                populationObjects={populationObjects}
                 onEdit={() => onEdit(chart)}
                 onDelete={() => onDelete(chart.id)}
               />

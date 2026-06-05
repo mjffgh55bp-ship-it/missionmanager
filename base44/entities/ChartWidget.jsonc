@@ -11,9 +11,73 @@
       "enum": [
         "bar",
         "line",
-        "pie"
+        "pie",
+        "area",
+        "horizontal_bar"
       ],
       "description": "Type of chart"
+    },
+    "group_by": {
+      "type": "string",
+      "enum": [
+        "worker",
+        "time",
+        "category"
+      ],
+      "default": "worker",
+      "description": "What each X-axis point represents"
+    },
+    "time_bucket": {
+      "type": "string",
+      "enum": [
+        "day",
+        "week",
+        "month"
+      ],
+      "default": "week",
+      "description": "Time granularity when group_by = time"
+    },
+    "metrics": {
+      "type": "array",
+      "description": "Array of metric definitions (replaces single data_source)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "schedule_col_name": {
+            "type": "string"
+          },
+          "schedule_col_value": {
+            "type": "string"
+          },
+          "tracker_id": {
+            "type": "string"
+          },
+          "tracker_col_id": {
+            "type": "string"
+          },
+          "quantitative_item": {
+            "type": "string"
+          },
+          "task_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
     },
     "data_source": {
       "type": "string",
@@ -21,21 +85,22 @@
         "shifts_per_worker",
         "hours_per_worker",
         "schedule_col_values",
-        "quantitative_col"
+        "quantitative_col",
+        "tracker_col"
       ],
-      "description": "Data source"
+      "description": "Legacy: single data source (kept for backward compat)"
     },
     "schedule_col_name": {
       "type": "string",
-      "description": "For schedule_col_values source"
+      "description": "Legacy: schedule column name"
     },
     "quantitative_col_id": {
       "type": "string",
-      "description": "For quantitative_col source: tracker column id"
+      "description": "Legacy: quantitative column id"
     },
-    "tracker_id": {
+    "tracker_col_id": {
       "type": "string",
-      "description": "Tracker to read data from (for quantitative)"
+      "description": "Legacy: tracker column id"
     },
     "date_mode": {
       "type": "string",
@@ -44,6 +109,8 @@
         "week",
         "month",
         "half_year",
+        "half_year_start",
+        "year_start",
         "custom"
       ],
       "default": "month"
@@ -54,21 +121,50 @@
     "date_end": {
       "type": "string"
     },
+    "tracker_id": {
+      "type": "string",
+      "description": "Legacy or for quantitative source"
+    },
+    "filter_worker_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Explicit worker IDs to include"
+    },
     "filter_populations": {
       "type": "array",
       "items": {
         "type": "string"
-      }
+      },
+      "description": "Population mapping_ids (or legacy names)"
     },
     "filter_roles": {
       "type": "array",
       "items": {
         "type": "string"
-      }
+      },
+      "description": "Role mapping_ids (or legacy names)"
+    },
+    "sort_mode": {
+      "type": "string",
+      "enum": [
+        "value_desc",
+        "value_asc",
+        "name",
+        "none"
+      ],
+      "default": "value_desc"
+    },
+    "top_n": {
+      "type": "number",
+      "default": 0,
+      "description": "Show only top N results (0 = all)"
     },
     "color": {
       "type": "string",
-      "default": "#1e3a5f"
+      "default": "#1e3a5f",
+      "description": "Legacy primary color"
     },
     "order": {
       "type": "number",
@@ -77,7 +173,6 @@
   },
   "required": [
     "title",
-    "chart_type",
-    "data_source"
+    "chart_type"
   ]
 }
