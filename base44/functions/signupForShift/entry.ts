@@ -14,6 +14,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
  * Returns { success: true, record } or { success: false, reason: 'full' }.
  */
 Deno.serve(async (req) => {
+  try {
   const base44 = createClientFromRequest(req);
 
   // This app is used by workers via a shared link without individual login.
@@ -107,4 +108,8 @@ Deno.serve(async (req) => {
   }
 
   return Response.json({ success: true, record: saved });
+  } catch (err) {
+    console.error("signupForShift failed:", err);
+    return Response.json({ success: false, error: String(err?.message || err) }, { status: 200 });
+  }
 });

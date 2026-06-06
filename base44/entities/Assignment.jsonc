@@ -106,24 +106,7 @@
         "role": "admin"
       }
     },
-    "read": {
-      "$or": [
-        {
-          "data.chef_id": "{{user.id}}"
-        },
-        {
-          "data.sous_chef_id": "{{user.id}}"
-        },
-        {
-          "data.additional_chef_id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
+    "read": {},
     "update": {
       "user_condition": {
         "role": "admin"

@@ -80,18 +80,7 @@
         "role": "admin"
       }
     },
-    "read": {
-      "$or": [
-        {
-          "id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
+    "read": {},
     "update": {
       "user_condition": {
         "role": "admin"

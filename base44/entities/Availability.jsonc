@@ -79,6 +79,10 @@
       "type": "object",
       "description": "Worker preferences for additional registration tasks. Keys are task names, values are 'wanted'|'available'|'unavailable'"
     },
+    "desired_shifts": {
+      "type": "number",
+      "description": "How many shifts the worker wants this week"
+    },
     "status": {
       "type": "string",
       "enum": [
@@ -102,53 +106,9 @@
     "shifts"
   ],
   "rls": {
-    "create": {
-      "$or": [
-        {
-          "created_by_id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
-    "read": {
-      "$or": [
-        {
-          "data.worker_id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
-    "update": {
-      "$or": [
-        {
-          "created_by_id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
-    "delete": {
-      "$or": [
-        {
-          "created_by_id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    }
+    "create": {},
+    "read": {},
+    "update": {},
+    "delete": {}
   }
 }
