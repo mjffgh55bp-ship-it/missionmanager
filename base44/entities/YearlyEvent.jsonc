@@ -62,11 +62,7 @@
     "read": {
       "$or": [
         {
-          "data.worker_ids": {
-            "$in": [
-              "{{user.id}}"
-            ]
-          }
+          "data.worker_ids": "{{user.id}}"
         },
         {
           "user_condition": {
@@ -76,20 +72,9 @@
       ]
     },
     "update": {
-      "$or": [
-        {
-          "data.worker_ids": {
-            "$in": [
-              "{{user.id}}"
-            ]
-          }
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
+      "user_condition": {
+        "role": "admin"
+      }
     },
     "delete": {
       "user_condition": {

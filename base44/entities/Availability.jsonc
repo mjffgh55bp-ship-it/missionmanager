@@ -105,7 +105,7 @@
     "create": {
       "$or": [
         {
-          "data.worker_id": "{{user.id}}"
+          "created_by_id": "{{user.id}}"
         },
         {
           "user_condition": {
@@ -129,7 +129,7 @@
     "update": {
       "$or": [
         {
-          "data.worker_id": "{{user.id}}"
+          "created_by_id": "{{user.id}}"
         },
         {
           "user_condition": {
@@ -141,7 +141,7 @@
     "delete": {
       "$or": [
         {
-          "data.worker_id": "{{user.id}}"
+          "created_by_id": "{{user.id}}"
         },
         {
           "user_condition": {
