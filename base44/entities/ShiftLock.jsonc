@@ -24,9 +24,25 @@
     "worker_id"
   ],
   "rls": {
-    "create": {},
-    "read": {},
-    "update": {},
-    "delete": {}
+    "create": {
+      "user_condition": {
+        "role": "non_existent"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "non_existent"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "non_existent"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "non_existent"
+      }
+    }
   }
 }

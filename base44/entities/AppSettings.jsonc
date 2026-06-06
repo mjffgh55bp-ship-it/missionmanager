@@ -14,5 +14,43 @@
   "required": [
     "setting_key",
     "setting_value"
-  ]
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.setting_key": {
+            "$regex": "^tips_acknowledged_"
+          },
+          "created_by_id": "{{user.id}}"
+        }
+      ]
+    },
+    "read": {},
+    "update": {
+      "$or": [
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        },
+        {
+          "data.setting_key": {
+            "$regex": "^tips_acknowledged_"
+          },
+          "created_by_id": "{{user.id}}"
+        }
+      ]
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
 }
