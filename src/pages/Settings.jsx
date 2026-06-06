@@ -126,24 +126,32 @@ export default function Settings() {
     const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, name: trimmed } : c);
     await saveScheduleColumns(updated);
 
-    // 2. Update all Templates that have a column with the old name
-    const allTemplatesData = await base44.entities.Template.list();
-    for (const tmpl of allTemplatesData) {
-      if (!tmpl.columns) continue;
-      const hasCol = tmpl.columns.some(c => c.name === oldName);
-      if (!hasCol) continue;
-      const updatedCols = tmpl.columns.map(c => c.name === oldName ? { ...c, name: trimmed } : c);
-      await base44.entities.Template.update(tmpl.id, { columns: updatedCols });
-    }
+    // 2. Fetch templates and rows in parallel
+    const [allTemplatesData, allRows] = await Promise.all([
+      base44.entities.Template.list(),
+      base44.entities.TemplateRow.list(),
+    ]);
 
-    // 3. Update all TemplateRows that have values under the old column name
-    const allRows = await base44.entities.TemplateRow.list();
-    for (const row of allRows) {
-      if (!row.values || !(oldName in row.values)) continue;
-      const newValues = { ...row.values, [trimmed]: row.values[oldName] };
-      delete newValues[oldName];
-      await base44.entities.TemplateRow.update(row.id, { values: newValues });
-    }
+    // 3. Update all Templates that have a column with the old name — in parallel
+    await Promise.all(
+      allTemplatesData
+        .filter(tmpl => tmpl.columns?.some(c => c.name === oldName))
+        .map(tmpl => {
+          const updatedCols = tmpl.columns.map(c => c.name === oldName ? { ...c, name: trimmed } : c);
+          return base44.entities.Template.update(tmpl.id, { columns: updatedCols });
+        })
+    );
+
+    // 4. Update all TemplateRows that have values under the old column name — in parallel
+    await Promise.all(
+      allRows
+        .filter(row => row.values && oldName in row.values)
+        .map(row => {
+          const newValues = { ...row.values, [trimmed]: row.values[oldName] };
+          delete newValues[oldName];
+          return base44.entities.TemplateRow.update(row.id, { values: newValues });
+        })
+    );
   };
 
   const handleAddScheduleColumn = async () => {
