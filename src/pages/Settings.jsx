@@ -360,9 +360,109 @@ export default function Settings() {
   };
 
   const handleRemoveWorkerRole = async (idx) => {
+    const removedName = normalizeItem(workerRoles[idx]).name;
     const updated = workerRoles.filter((_, i) => i !== idx);
     await saveListSetting("worker_roles", updated);
     setWorkerRoles(updated);
+
+    if (!removedName) return;
+    const matches = (val) => typeof val === "string" && val.trim() === removedName.trim();
+
+    const [allWorkers, allTemplates, allCharts, allAvailabilities, allPresets] = await Promise.all([
+      base44.entities.Worker.list(),
+      base44.entities.Template.list(),
+      base44.entities.ChartWidget.list(),
+      base44.entities.Availability.list(),
+      base44.entities.MokedPreset.list(),
+    ]);
+
+    // 1. Remove the role from every Worker.role array
+    await Promise.all(
+      allWorkers
+        .filter(w => {
+          const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
+          return roles.some(r => matches(r));
+        })
+        .map(w => {
+          const roles = Array.isArray(w.role) ? w.role : [w.role];
+          return base44.entities.Worker.update(w.id, { role: roles.filter(r => !matches(r)) });
+        })
+    );
+
+    // 2. Remove from ChartWidget.filter_roles
+    await Promise.all(
+      allCharts
+        .filter(c => (c.filter_roles || []).some(r => matches(r)))
+        .map(c => base44.entities.ChartWidget.update(c.id, {
+          filter_roles: (c.filter_roles || []).filter(r => !matches(r))
+        }))
+    );
+
+    // 3. Clear role_or_qualification on Availability shifts
+    await Promise.all(
+      allAvailabilities
+        .filter(a => (a.shifts || []).some(s => matches(s.role_or_qualification)))
+        .map(a => base44.entities.Availability.update(a.id, {
+          shifts: (a.shifts || []).map(s =>
+            matches(s.role_or_qualification) ? { ...s, role_or_qualification: "" } : s
+          )
+        }))
+    );
+
+    // 4. Clear role_filter on Template columns (keep column structure intact)
+    await Promise.all(
+      allTemplates
+        .filter(t => (t.columns || []).some(c => matches(c.role_filter)))
+        .map(t => base44.entities.Template.update(t.id, {
+          columns: (t.columns || []).map(c =>
+            matches(c.role_filter) ? { ...c, role_filter: "" } : c
+          )
+        }))
+    );
+
+    // 5. Clear role_filter on MokedPreset columns
+    await Promise.all(
+      (allPresets || [])
+        .filter(p => ((p.template_config || {}).columns || []).some(c => matches(c.role_filter)))
+        .map(p => {
+          const cfg = p.template_config || {};
+          return base44.entities.MokedPreset.update(p.id, {
+            template_config: {
+              ...cfg,
+              columns: (cfg.columns || []).map(c =>
+                matches(c.role_filter) ? { ...c, role_filter: "" } : c
+              ),
+            },
+          });
+        })
+    );
+
+    invalidateStaticCache();
+  };
+
+  const handleCleanupOrphanedRoles = async () => {
+    const validRoleNames = new Set(workerRoles.map(r => normalizeItem(r).name.trim()).filter(Boolean));
+    const allWorkers = await base44.entities.Worker.list();
+
+    const toFix = allWorkers.filter(w => {
+      const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
+      return roles.some(r => typeof r === "string" && r.trim() && !validRoleNames.has(r.trim()));
+    });
+
+    if (toFix.length === 0) {
+      alert("לא נמצאו תפקידים יתומים לניקוי");
+      return;
+    }
+
+    await Promise.all(toFix.map(w => {
+      const roles = Array.isArray(w.role) ? w.role : [w.role];
+      return base44.entities.Worker.update(w.id, {
+        role: roles.filter(r => typeof r === "string" && validRoleNames.has(r.trim()))
+      });
+    }));
+
+    invalidateStaticCache();
+    alert(`נוקו תפקידים יתומים מ-${toFix.length} עובדים`);
   };
 
   const handleSaveWorkerRole = async (idx, updatedItem) => {
@@ -1046,7 +1146,16 @@ export default function Settings() {
         {/* Worker Roles */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Users className="w-5 h-5 text-indigo-600" />תפקידי עובדים</CardTitle>
+            <div className="flex items-center justify-between" dir="rtl">
+              <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5 text-indigo-600" />תפקידי עובדים</CardTitle>
+              <button
+                type="button"
+                onClick={handleCleanupOrphanedRoles}
+                className="text-xs text-gray-500 hover:text-red-600 border border-gray-300 rounded-md px-2 py-1 transition-colors"
+              >
+                נקה תפקידים יתומים
+              </button>
+            </div>
           </CardHeader>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600 mb-3" dir="rtl">הגדר תפקידים שניתן לבחור בהם בעת הוספת/עריכת עובדים. הרחב שורה לעריכת שם מקומי ו-ID.</p>
