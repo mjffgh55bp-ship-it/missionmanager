@@ -46,11 +46,19 @@ export default function Workers() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Reload workers when the tab regains focus (e.g., after editing roles in Settings)
+  // Reload workers when the tab regains focus, or when Worker/Settings data changes (e.g. role rename)
   useEffect(() => {
     const handleFocus = () => { loadWorkers(); };
     window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
+
+    const unsubWorker = base44.entities.Worker.subscribe(() => { loadWorkers(); });
+    const unsubSettings = base44.entities.AppSettings.subscribe(() => { loadWorkers(); });
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      unsubWorker();
+      unsubSettings();
+    };
   }, []);
 
   const loadWorkers = async () => {

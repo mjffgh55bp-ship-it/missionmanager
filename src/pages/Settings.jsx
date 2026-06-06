@@ -375,25 +375,29 @@ export default function Settings() {
     // Propagate rename to Worker records and Template columns
     if (newName && newName !== oldName) {
       // Fetch all independent collections in parallel
-      const [allWorkers, allTemplates, allCharts, allTrackers, allAvailabilities, taskQualSetting] = await Promise.all([
+      const [allWorkers, allTemplates, allCharts, allTrackers, allAvailabilities, taskQualSetting, allPresets] = await Promise.all([
         base44.entities.Worker.list(),
         base44.entities.Template.list(),
         base44.entities.ChartWidget.list(),
         base44.entities.Tracker.list(),
         base44.entities.Availability.list(),
         base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
+        base44.entities.MokedPreset.list(),
       ]);
+
+      // Robust trimmed match helper
+      const matches = (val) => typeof val === "string" && val.trim() === oldName.trim();
 
       // 1. Update ALL Worker records that have the old role (both active and inactive)
       await Promise.all(
         allWorkers
           .filter(w => {
             const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
-            return roles.includes(oldName);
+            return roles.some(r => matches(r));
           })
           .map(w => {
             const roles = Array.isArray(w.role) ? w.role : [w.role];
-            return base44.entities.Worker.update(w.id, { role: roles.map(r => r === oldName ? newName : r) });
+            return base44.entities.Worker.update(w.id, { role: roles.map(r => matches(r) ? newName : r) });
           })
       );
 
@@ -497,6 +501,24 @@ export default function Settings() {
         await base44.entities.AppSettings.update(taskQualSetting[0].id, { setting_value: JSON.stringify(updatedQuals) });
         setTaskQualifications(updatedQuals);
       }
+
+      // ── Step 10: Update MokedPreset.template_config columns ──────────────────
+      const presetsToUpdate = (allPresets || []).filter(p => {
+        const cfg = p.template_config || {};
+        return (cfg.columns || []).some(c => matches(c.name) || matches(c.role_filter));
+      });
+      await Promise.all(presetsToUpdate.map(p => {
+        const cfg = p.template_config || {};
+        const updatedConfig = {
+          ...cfg,
+          columns: (cfg.columns || []).map(c => ({
+            ...c,
+            name: matches(c.name) ? newName : c.name,
+            role_filter: matches(c.role_filter) ? newName : c.role_filter,
+          })),
+        };
+        return base44.entities.MokedPreset.update(p.id, { template_config: updatedConfig });
+      }));
 
       // Invalidate caches so Schedule/Availability pick up fresh data immediately
       invalidateStaticCache();
