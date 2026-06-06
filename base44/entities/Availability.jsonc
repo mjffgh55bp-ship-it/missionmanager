@@ -80,7 +80,10 @@
       "description": "Worker preferences for additional registration tasks. Keys are task names, values are 'wanted'|'available'|'unavailable'"
     },
     "desired_shifts": {
-      "type": "number",
+      "type": [
+        "number",
+        "null"
+      ],
       "description": "How many shifts the worker wants this week"
     },
     "status": {
