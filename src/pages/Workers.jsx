@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,16 @@ export default function Workers() {
   const loadingRef = useRef(false);
   const taskQualSettingIdRef = useRef(null);
 
+  // Only display roles that currently exist in Settings — self-healing filter
+  const validRoleSet = useMemo(
+    () => new Set((workerRoles || []).map(r => (typeof r === "string" ? r : r?.name)).filter(Boolean)),
+    [workerRoles]
+  );
+  const getValidRoles = (worker) => {
+    const roles = Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : []);
+    return roles.filter(r => typeof r === "string" && validRoleSet.has(r));
+  };
+
   useEffect(() => {
     // Small delay to avoid firing simultaneously with other pages on initial mount
     const timer = setTimeout(() => { loadData(); }, 150);
@@ -72,7 +82,7 @@ export default function Workers() {
     const workerRolesSettings = getSetting("worker_roles");
     const tasksSettings = getSetting("tasks_list");
     const taskQualSettings = getSetting("task_qualifications");
-    const rawRoles = workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : ["שף", "סו-שף"];
+    const rawRoles = workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : [];
     setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
     if (tasksSettings) setTasks(JSON.parse(tasksSettings.setting_value) || []);
     if (taskQualSettings) setTaskQualifications(JSON.parse(taskQualSettings.setting_value) || {});
@@ -100,7 +110,7 @@ export default function Workers() {
       if (rolesSettings) setUserRoles(JSON.parse(rolesSettings.setting_value));
       const rawPops = populationsSettings ? (JSON.parse(populationsSettings.setting_value) || []) : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
       setPopulations(rawPops.map(p => (typeof p === "string" ? p : p.name)));
-      const rawRoles = workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : ["שף", "סו-שף"];
+      const rawRoles = workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : [];
       setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
       if (tasksSettings) setTasks(JSON.parse(tasksSettings.setting_value) || []);
       if (taskQualSettings) {
@@ -150,7 +160,7 @@ export default function Workers() {
     setFormData({
       nickname: worker.nickname || "",
       birthday: worker.birthday || "",
-      role: Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : []),
+      role: (Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).filter(r => typeof r === "string" && validRoleSet.has(r)),
       phone: worker.phone || "",
       email: worker.email || "",
       hire_date: worker.hire_date || format(new Date(), "yyyy-MM-dd"),
@@ -229,7 +239,7 @@ export default function Workers() {
                 const query = searchQuery.toLowerCase();
                 return (
                   worker.nickname?.toLowerCase().includes(query) ||
-                  (Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).some(r => r?.toLowerCase().includes(query)) ||
+                  getValidRoles(worker).some(r => r?.toLowerCase().includes(query)) ||
                   worker.population?.toLowerCase().includes(query) ||
                   worker.training?.toLowerCase().includes(query) ||
                   worker.email?.toLowerCase().includes(query)
@@ -247,10 +257,10 @@ export default function Workers() {
                     <div className="flex-1 text-right">
                       <CardTitle className="text-lg">{worker.nickname}</CardTitle>
                       <div className="flex gap-2 mt-1 flex-wrap justify-end">
-                        {(Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).map(r => (
+                        {getValidRoles(worker).map(r => (
                           <Badge key={r} className="bg-blue-100 text-blue-900">{r}</Badge>
                         ))}
-                        {!(Array.isArray(worker.role) ? worker.role.length : worker.role) && <Badge className="bg-blue-100 text-blue-900">לא הוגדר</Badge>}
+                        {getValidRoles(worker).length === 0 && <Badge className="bg-blue-100 text-blue-900">לא הוגדר</Badge>}
                       </div>
                     </div>
                   </div>
@@ -273,7 +283,7 @@ export default function Workers() {
                       <h4 className="text-sm font-semibold text-green-900 mb-2" dir="rtl">כשירות</h4>
                       <div className="space-y-1">
                         {worker.population && <p className="text-sm text-gray-700" dir="rtl">👥 אוכלוסיה: {worker.population}</p>}
-                        <p className="text-sm text-gray-700" dir="rtl">👤 תפקיד: {(Array.isArray(worker.role) ? worker.role : (worker.role ? [worker.role] : [])).join(', ') || 'לא הוגדר'}</p>
+                        <p className="text-sm text-gray-700" dir="rtl">👤 תפקיד: {getValidRoles(worker).join(', ') || 'לא הוגדר'}</p>
                       </div>
                     </div>
 

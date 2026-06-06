@@ -368,26 +368,26 @@ export default function Settings() {
     if (!removedName) return;
     const matches = (val) => typeof val === "string" && val.trim() === removedName.trim();
 
-    const [allWorkers, allTemplates, allCharts, allAvailabilities, allPresets] = await Promise.all([
-      base44.entities.Worker.list(),
-      base44.entities.Template.list(),
-      base44.entities.ChartWidget.list(),
-      base44.entities.Availability.list(),
-      base44.entities.MokedPreset.list(),
-    ]);
-
-    // 1. Remove the role from every Worker.role array
+    // Strip the deleted role from all worker records first
+    const workersForCleanup = await base44.entities.Worker.list();
     await Promise.all(
-      allWorkers
+      workersForCleanup
         .filter(w => {
           const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
-          return roles.some(r => matches(r));
+          return roles.some(matches);
         })
         .map(w => {
           const roles = Array.isArray(w.role) ? w.role : [w.role];
           return base44.entities.Worker.update(w.id, { role: roles.filter(r => !matches(r)) });
         })
     );
+
+    const [allTemplates, allCharts, allAvailabilities, allPresets] = await Promise.all([
+      base44.entities.Template.list(),
+      base44.entities.ChartWidget.list(),
+      base44.entities.Availability.list(),
+      base44.entities.MokedPreset.list(),
+    ]);
 
     // 2. Remove from ChartWidget.filter_roles
     await Promise.all(
