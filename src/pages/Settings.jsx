@@ -570,12 +570,30 @@ export default function Settings() {
 
   const handleRemoveTask = async (task) => {
     const updated = tasks.filter(t => t !== task);
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "tasks_list" });
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, { setting_value: JSON.stringify(updated) });
     const updatedQuals = { ...taskQualifications };
     delete updatedQuals[task];
-    await saveTaskQualifications(updatedQuals);
+
+    // Fetch both settings in parallel
+    const [taskSettings, qualSettings] = await Promise.all([
+      base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
+      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
+    ]);
+
+    const updates = [];
+    if (taskSettings.length > 0) {
+      updates.push(base44.entities.AppSettings.update(taskSettings[0].id, { setting_value: JSON.stringify(updated) }));
+    } else {
+      updates.push(base44.entities.AppSettings.create({ setting_key: "tasks_list", setting_value: JSON.stringify(updated) }));
+    }
+    if (qualSettings.length > 0) {
+      updates.push(base44.entities.AppSettings.update(qualSettings[0].id, { setting_value: JSON.stringify(updatedQuals) }));
+    } else {
+      updates.push(base44.entities.AppSettings.create({ setting_key: "task_qualifications", setting_value: JSON.stringify(updatedQuals) }));
+    }
+
+    await Promise.all(updates);
     setTasks(updated);
+    setTaskQualifications(updatedQuals);
   };
 
   const handleToggleWorkerQualification = async (taskName, role, workerId) => {
