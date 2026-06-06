@@ -16,8 +16,10 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 Deno.serve(async (req) => {
   const base44 = createClientFromRequest(req);
 
-  const user = await base44.auth.me();
-  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  // This app is used by workers via a shared link without individual login.
+  // Integrity is enforced by the ShiftLock atomic lock, not by user auth.
+  let user = null;
+  try { user = await base44.auth.me(); } catch (_) { /* anonymous — allowed */ }
 
   const body = await req.json();
   const { signupKey, weekStartDate, workerId, workerName, availabilityData, requiredCount } = body;
