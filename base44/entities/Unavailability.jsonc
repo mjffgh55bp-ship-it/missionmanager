@@ -44,48 +44,48 @@
     "create": {
       "$or": [
         {
+          "data.worker_id": "{{user.id}}"
+        },
+        {
           "user_condition": {
             "role": "admin"
           }
-        },
-        {
-          "data.worker_id": "{{user.id}}"
         }
       ]
     },
     "read": {
       "$or": [
         {
+          "data.worker_id": "{{user.id}}"
+        },
+        {
           "user_condition": {
             "role": "admin"
           }
-        },
-        {
-          "data.worker_id": "{{user.id}}"
         }
       ]
     },
     "update": {
       "$or": [
         {
+          "data.worker_id": "{{user.id}}"
+        },
+        {
           "user_condition": {
             "role": "admin"
           }
-        },
-        {
-          "data.worker_id": "{{user.id}}"
         }
       ]
     },
     "delete": {
       "$or": [
         {
+          "data.worker_id": "{{user.id}}"
+        },
+        {
           "user_condition": {
             "role": "admin"
           }
-        },
-        {
-          "data.worker_id": "{{user.id}}"
         }
       ]
     }

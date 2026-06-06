@@ -109,11 +109,6 @@
     "read": {
       "$or": [
         {
-          "user_condition": {
-            "role": "admin"
-          }
-        },
-        {
           "data.chef_id": "{{user.id}}"
         },
         {
@@ -121,6 +116,11 @@
         },
         {
           "data.additional_chef_id": "{{user.id}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
         }
       ]
     },
