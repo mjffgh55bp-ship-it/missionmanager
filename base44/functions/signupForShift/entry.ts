@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
     lockRecord = myExistingLock;
   } else {
     // Create our lock entry
-    lockRecord = await base44.asServiceRole.entities.ShiftLock.create({
+    lockRecord = await base44.entities.ShiftLock.create({
       lock_key: lockKey,
       worker_id: workerId,
       worker_name: workerName || '',
@@ -84,27 +84,27 @@ Deno.serve(async (req) => {
   // Wait a tiny bit to let any concurrent inserts land
   await new Promise(r => setTimeout(r, 100));
 
-  const locksAfter = await base44.asServiceRole.entities.ShiftLock.filter({ lock_key: lockKey });
+  const locksAfter = await base44.entities.ShiftLock.filter({ lock_key: lockKey });
   const otherLocksAfter = locksAfter.filter(l => l.worker_id !== workerId);
 
   if (otherLocksAfter.length >= maxSlots) {
     // Someone else also got in — delete our lock and return failure
     // Guard against 404 if lock was already deleted by a concurrent request
     try {
-      await base44.asServiceRole.entities.ShiftLock.delete(lockRecord.id);
+      await base44.entities.ShiftLock.delete(lockRecord.id);
     } catch (_) { /* already gone — that's fine */ }
     return Response.json({ success: false, reason: 'full', currentCount: otherLocksAfter.length, maxSlots });
   }
 
   // Step 4: We won — save the availability record
-  const allAvails = await base44.asServiceRole.entities.Availability.filter({ week_start_date: weekStartDate });
+  const allAvails = await base44.entities.Availability.filter({ week_start_date: weekStartDate });
   const existingList = allAvails.filter(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
 
   let saved;
   if (existingList.length > 0) {
-    saved = await base44.asServiceRole.entities.Availability.update(existingList[0].id, availabilityData);
+    saved = await base44.entities.Availability.update(existingList[0].id, availabilityData);
   } else {
-    saved = await base44.asServiceRole.entities.Availability.create(availabilityData);
+    saved = await base44.entities.Availability.create(availabilityData);
   }
 
   return Response.json({ success: true, record: saved });
