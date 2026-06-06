@@ -35,24 +35,24 @@ Deno.serve(async (req) => {
 
   // Handle un-registration: release lock and save availability
   if (isRemove) {
-    const existingLocks = await base44.asServiceRole.entities.ShiftLock.filter({ lock_key: lockKey });
+    const existingLocks = await base44.entities.ShiftLock.filter({ lock_key: lockKey });
     const myLock = existingLocks.find(l => l.worker_id === workerId);
     if (myLock) {
-      await base44.asServiceRole.entities.ShiftLock.delete(myLock.id);
+      await base44.entities.ShiftLock.delete(myLock.id);
     }
-    const allAvails = await base44.asServiceRole.entities.Availability.filter({ week_start_date: weekStartDate });
+    const allAvails = await base44.entities.Availability.filter({ week_start_date: weekStartDate });
     const existingList = allAvails.filter(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
     let saved;
     if (existingList.length > 0) {
-      saved = await base44.asServiceRole.entities.Availability.update(existingList[0].id, availabilityData);
+      saved = await base44.entities.Availability.update(existingList[0].id, availabilityData);
     } else {
-      saved = await base44.asServiceRole.entities.Availability.create(availabilityData);
+      saved = await base44.entities.Availability.create(availabilityData);
     }
     return Response.json({ success: true, record: saved });
   }
 
   // Step 1: Check existing locks for this slot
-  const existingLocks = await base44.asServiceRole.entities.ShiftLock.filter({ lock_key: lockKey });
+  const existingLocks = await base44.entities.ShiftLock.filter({ lock_key: lockKey });
 
   // Check if this worker already has a lock (re-registration attempt)
   const myExistingLock = existingLocks.find(l => l.worker_id === workerId);
