@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import ShiftDemandPanel from "@/components/availability/ShiftDemandPanel";
 import { buildSignupKey, serializePossibleInstances, buildUnifiedShiftDemand, getSignupsForShift } from "@/lib/shiftDemand";
 import { signupForShift } from "@/functions/signupForShift";
+import { getMyWorker } from "@/functions/getMyWorker";
 
 const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 const HEBREW_DAYS_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
@@ -247,9 +248,9 @@ export default function Availability() {
 
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      // Step 2: fetch static data in parallel (all cached/lightweight)
-      const [workersData, allSettings, eventsData, yearlyEventsData] = await Promise.all([
-        getCachedWorkers(base44.entities),
+      // Step 2: fetch static data in parallel
+      const [myWorkerRes, allSettings, eventsData, yearlyEventsData] = await Promise.all([
+        getMyWorker({}),
         getCachedAllSettings(base44.entities),
         base44.entities.CompanyEvent.list("-date"),
         base44.entities.YearlyEvent.list("-start_date", 500),
@@ -271,19 +272,27 @@ export default function Availability() {
       const acknowledgedRaw = allSettings.find(s => s.setting_key === `tips_acknowledged_${user.email}`);
       const acknowledgedVersion = acknowledgedRaw ? acknowledgedRaw.setting_value : null;
 
-      setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
       setCompanyEvents(eventsData);
       setYearlyEvents(yearlyEventsData);
       setOpenRegistrations(openReg);
 
-      const worker = workersData.find((w) => w.email === user.email);
+      const worker = myWorkerRes?.data?.worker || null;
       cachedWorker.current = worker;
       cachedUnavailabilities.current = null; // reset on fresh load
       setCurrentWorker(worker);
 
       // Manager check
       const role = userRoles[user.email];
-      setIsManager(user.role === 'admin' || role === 'manager');
+      const managerFlag = user.role === 'admin' || role === 'manager';
+      setIsManager(managerFlag);
+
+      // Admins/managers need full worker list for the demand panel; regular workers don't
+      if (managerFlag) {
+        const workersData = await getCachedWorkers(base44.entities);
+        setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
+      } else if (worker) {
+        setWorkers([worker]);
+      }
 
       // Tips
       const tipsData = weekTips || globalTips;

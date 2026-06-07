@@ -2,6 +2,13 @@
   "name": "Worker",
   "type": "object",
   "properties": {
+    "user_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Base44 auth user id this worker belongs to"
+    },
     "nickname": {
       "type": "string",
       "description": "Nickname or preferred name"
@@ -80,7 +87,21 @@
         "role": "admin"
       }
     },
-    "read": {},
+    "read": {
+      "$or": [
+        {
+          "data.user_id": "{{user.id}}"
+        },
+        {
+          "data.email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
     "update": {
       "user_condition": {
         "role": "admin"

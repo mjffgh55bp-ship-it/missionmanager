@@ -109,31 +109,9 @@
     "shifts"
   ],
   "rls": {
-    "create": {
-      "$or": [
-        {
-          "data.worker_id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
+    "create": {},
     "read": {},
-    "update": {
-      "$or": [
-        {
-          "data.worker_id": "{{user.id}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
+    "update": {},
     "delete": {
       "$or": [
         {
