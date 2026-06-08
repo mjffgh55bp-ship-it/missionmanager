@@ -232,16 +232,16 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
   return (
     <>
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setEditingPreset(null); }}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-hidden flex flex-col" dir="rtl">
         <DialogHeader>
-          <DialogTitle dir="rtl" className="text-xl">
+          <DialogTitle className="text-xl">
             {editingPreset ? (editingPreset.id ? "עריכת פריסט" : "פריסט חדש") : "פריסטים"}
           </DialogTitle>
         </DialogHeader>
 
         {editingPreset ? (
           /* ── Edit / Create view ── */
-          <div className="space-y-3 py-2" dir="rtl">
+          <div className="space-y-3 py-2 overflow-y-auto flex-1">
             {/* Moked card - exactly like Schedule page */}
             <div className="rounded-lg overflow-hidden border shadow-sm">
               {/* Header with editable name + color */}
@@ -353,7 +353,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
           </div>
         ) : (
           /* ── List view ── */
-          <div className="py-2" dir="rtl">
+          <div className="py-2 overflow-y-auto flex-1">
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm text-gray-500">{presets.length} פריסטים שמורים</span>
               <Button onClick={handleNewPreset} className="bg-blue-700 hover:bg-blue-800">
