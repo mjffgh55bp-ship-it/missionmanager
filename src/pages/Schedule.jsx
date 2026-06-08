@@ -113,13 +113,20 @@ export default function Schedule() {
   }, [currentDate]);
 
   // Retry helper for rate-limited calls with exponential backoff
-  const fetchWithRetry = async (fn, retries = 4, baseDelay = 800) => {
+  const fetchWithRetry = async (fn, retries = 6, baseDelay = 1000) => {
     for (let i = 0; i < retries; i++) {
       try { return await fn(); }
       catch (e) {
-        if (i < retries - 1 && e?.message?.includes('Rate limit')) {
+        const isRateLimit = e?.message?.includes('Rate limit') || e?.message?.includes('rate limit');
+        if (isRateLimit && i < retries - 1) {
           await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
-        } else throw e;
+        } else if (isRateLimit) {
+          // After all retries, return empty array instead of crashing
+          console.warn('Rate limit exhausted, returning empty for:', fn.toString().slice(0, 80));
+          return [];
+        } else {
+          throw e;
+        }
       }
     }
   };
@@ -140,9 +147,9 @@ export default function Schedule() {
     const allTemplatesData = await getCachedTemplates(base44.entities);
     const allSettings = await getCachedAllSettings(base44.entities);
     const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 300));
     const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 300));
     const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
 
     // Filter settings client-side
@@ -179,7 +186,7 @@ export default function Schedule() {
       getCachedTemplates(base44.entities),
     ]);
     const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 300));
     const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
     const availabilitiesData = weekChanged
       ? (await new Promise(r => setTimeout(r, 200)), await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })))
