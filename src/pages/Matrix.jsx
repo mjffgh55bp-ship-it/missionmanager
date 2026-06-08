@@ -190,6 +190,7 @@ export default function Matrix() {
   const [trackers, setTrackers] = useState([]);
   const [trackerEntries, setTrackerEntries] = useState([]);
   const [signupMode, setSignupMode] = useState("allow_over_sign_up");
+  const [dailyCustomColumns, setDailyCustomColumns] = useState({});
   const [savingSignupMode, setSavingSignupMode] = useState(false);
   const settingsIdCache = useRef({});
   const trackerEntriesCache = useRef(null);
@@ -583,6 +584,30 @@ export default function Matrix() {
         }
       }
 
+      // Load daily custom columns for all relevant dates
+      const relevantDates = viewMode === 'daily'
+        ? [dateStr]
+        : Array.from({ length: 7 }, (_, i) => format(addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), i), "yyyy-MM-dd"));
+      const allSettingsForDailyColumns = await getCachedAllSettings(base44.entities);
+      const newDailyCustomColumns = {};
+      relevantDates.forEach(d => {
+        const setting = allSettingsForDailyColumns.find(s => s.setting_key === `schedule_daily_columns_${d}`);
+        if (setting) {
+          try {
+            const parsed = JSON.parse(setting.setting_value);
+            Object.entries(parsed).forEach(([templateId, cols]) => {
+              if (!newDailyCustomColumns[templateId]) newDailyCustomColumns[templateId] = [];
+              cols.forEach(col => {
+                if (!newDailyCustomColumns[templateId].find(c => c.name === col.name)) {
+                  newDailyCustomColumns[templateId].push(col);
+                }
+              });
+            });
+          } catch {}
+        }
+      });
+      setDailyCustomColumns(newDailyCustomColumns);
+
       setAvailabilities(availabilitiesData);
       setUnavailabilities(unavailabilitiesData);
       setTemplateRows(filteredTemplateRows);
@@ -623,7 +648,9 @@ export default function Matrix() {
   // ── Data helpers ─────────────────────────────────────────────────────────────
   const isWorkerAssignedToRow = (row, workerId, template) => {
     if (!row.values || !workerId) return { assigned: false, workerColumnName: null };
-    const columns = template?.columns || [];
+    const templateCols = template?.columns || [];
+    const extraCols = (template?.id && dailyCustomColumns[template.id]) ? dailyCustomColumns[template.id] : [];
+    const columns = [...templateCols, ...extraCols];
     for (const col of columns) {
       if (col.type !== "worker") continue;
       const val = row.values[col.name];
