@@ -142,9 +142,11 @@ export default function Schedule() {
     lastWeekStart.current = weekStartStr;
 
     try {
-    // Static reference data — use cache first (no network cost if cached)
+    // Static reference data — staggered to avoid rate limits on cache miss
     const workersData = await getCachedWorkers(base44.entities);
+    await new Promise(r => setTimeout(r, 150));
     const allTemplatesData = await getCachedTemplates(base44.entities);
+    await new Promise(r => setTimeout(r, 150));
     const allSettings = await getCachedAllSettings(base44.entities);
     const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
     await new Promise(r => setTimeout(r, 300));

@@ -33,12 +33,29 @@ function invalidateAll() {
 // ── Cached loaders ────────────────────────────────────────────────────────────
 // Each loader checks the cache first; only hits the API on miss or TTL expiry.
 
+async function fetchWithRetry(fn, retries = 6, baseDelay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try { return await fn(); }
+    catch (e) {
+      const isRateLimit = e?.message?.includes('Rate limit') || e?.message?.includes('rate limit');
+      if (isRateLimit && i < retries - 1) {
+        await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
+      } else if (isRateLimit) {
+        console.warn('Cache fetchWithRetry: rate limit exhausted for key, returning []');
+        return [];
+      } else {
+        throw e;
+      }
+    }
+  }
+}
+
 async function cachedFetch(key, fetcher) {
   const cached = get(key);
   if (cached) return cached;
   // If already in-flight, return the same promise
   if (pending[key]) return pending[key];
-  pending[key] = fetcher().then(data => {
+  pending[key] = fetchWithRetry(fetcher).then(data => {
     set(key, data);
     delete pending[key];
     return data;
