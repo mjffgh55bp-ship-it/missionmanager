@@ -244,6 +244,7 @@ export function computeChartSeries(chartRaw, {
   qualifications = [],
   roleObjects = [],        // [{name, mapping_id}]
   populationObjects = [],  // [{name, mapping_id}]
+  scheduleColumnsById = {}, // mapping_id → {name, ...}
 } = {}) {
   const chart = normalizChart(chartRaw);
   const metrics = chart.metrics || [];
@@ -344,11 +345,15 @@ export function computeChartSeries(chartRaw, {
     if (!firstMetric) return { rows: [], metricKeys };
 
     if (firstMetric.source === "schedule_col_value" && firstMetric.schedule_col_name) {
+      // Resolve live column name: if a column_id is stored, use it to look up the current name
+      const resolvedColName = (firstMetric.schedule_col_id && scheduleColumnsById[firstMetric.schedule_col_id]?.name)
+        || firstMetric.schedule_col_name;
       const counts = {};
       templateRows.filter(row => inRange(row.date)).forEach(row => {
-        const val = row.values?.[firstMetric.schedule_col_name];
+        // Try resolved name first, fall back to stored name for backward compat
+        const val = row.values?.[resolvedColName] ?? row.values?.[firstMetric.schedule_col_name];
         if (val) counts[val] = (counts[val] || 0) + 1;
-        const subTypes = row.values?.[`${firstMetric.schedule_col_name}_subTypes`] || [];
+        const subTypes = row.values?.[`${resolvedColName}_subTypes`] || row.values?.[`${firstMetric.schedule_col_name}_subTypes`] || [];
         subTypes.forEach(st => { counts[st] = (counts[st] || 0) + 1; });
       });
       const mKey = firstMetric.id || "m0";

@@ -19,6 +19,7 @@ export default function Reports() {
   const [roleObjects, setRoleObjects] = useState([]);       // [{name, mapping_id}]
   const [populationObjects, setPopulationObjects] = useState([]); // [{name, mapping_id}]
   const [scheduleColumns, setScheduleColumns] = useState([]);
+  const [scheduleColumnsById, setScheduleColumnsById] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("tables");
   // Charts
@@ -157,6 +158,10 @@ export default function Reports() {
     const allCols = [...globalCols, ...cartCols];
     const uniqueCols = allCols.filter((col, idx, arr) => arr.findIndex(c => c.name === col.name) === idx);
     setScheduleColumns(uniqueCols);
+    // Build id→column map for live name resolution in charts
+    const byId = {};
+    globalCols.forEach(c => { if (c.mapping_id) byId[c.mapping_id] = c; });
+    setScheduleColumnsById(byId);
     } catch (error) {
       console.error('Error loading reports data:', error);
     } finally {
@@ -321,6 +326,7 @@ export default function Reports() {
                 qualifications={qualifications}
                 roleObjects={roleObjects}
                 populationObjects={populationObjects}
+                scheduleColumnsById={scheduleColumnsById}
                 onEdit={(chart) => { setEditingChart(chart); setChartBuilderOpen(true); }}
                 onDelete={handleDeleteChart}
               />

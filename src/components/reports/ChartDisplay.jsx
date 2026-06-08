@@ -12,6 +12,7 @@ export default function ChartDisplay({
   trackers, trackerEntries,
   workerQualifications, qualifications,
   roleObjects, populationObjects,
+  scheduleColumnsById = {},
   onEdit, onDelete,
 }) {
   const series = useMemo(() => computeChartSeries(chart, {
@@ -25,7 +26,8 @@ export default function ChartDisplay({
     qualifications: qualifications || [],
     roleObjects: roleObjects || [],
     populationObjects: populationObjects || [],
-  }), [chart, workers, assignments, templateRows, allTemplates, trackers, trackerEntries, workerQualifications, qualifications, roleObjects, populationObjects]);
+    scheduleColumnsById,
+  }), [chart, workers, assignments, templateRows, allTemplates, trackers, trackerEntries, workerQualifications, qualifications, roleObjects, populationObjects, scheduleColumnsById]);
 
   return (
     <Card className="border-none shadow-none h-full flex flex-col" dir="rtl">

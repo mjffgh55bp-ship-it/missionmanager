@@ -14,6 +14,7 @@ export default function ChartCanvas({
   trackers, trackerEntries,
   workerQualifications, qualifications,
   roleObjects, populationObjects,
+  scheduleColumnsById = {},
   onEdit, onDelete,
 }) {
   const STORAGE_KEY = "chart_canvas_positions";
@@ -200,6 +201,7 @@ export default function ChartCanvas({
                 qualifications={qualifications}
                 roleObjects={roleObjects}
                 populationObjects={populationObjects}
+                scheduleColumnsById={scheduleColumnsById}
                 onEdit={() => onEdit(chart)}
                 onDelete={() => onDelete(chart.id)}
               />

@@ -28,7 +28,7 @@ const COLUMN_TYPE_OPTIONS = [
 ];
 
 // Inner component so useColumnDrag hook is called with the live columns array
-function PresetColumnHeaderRow({ columns, onReorder, onRemove, updateColumn }) {
+function PresetColumnHeaderRow({ columns, scheduleColumnsById = {}, onReorder, onRemove, updateColumn }) {
   const { dragState, getDragHandleProps, getHeaderProps } = useColumnDrag(columns, onReorder);
   const { dragging, dropIndex } = dragState;
   return (
@@ -63,7 +63,7 @@ function PresetColumnHeaderRow({ columns, onReorder, onRemove, updateColumn }) {
                   <GripVertical className="w-3 h-3" />
                 </span>
                 <Input
-                  value={col.name}
+                  value={(col.column_id && scheduleColumnsById[col.column_id]?.name) || col.name}
                   onChange={(e) => updateColumn(idx, "name", e.target.value)}
                   placeholder={`עמודה ${idx + 1}`}
                   className="h-6 text-xs text-center px-1 border-dashed flex-1"
@@ -104,6 +104,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
   const [newColumnRole, setNewColumnRole] = useState("");
   const [workerRoles, setWorkerRoles] = useState([]);
   const [columnTypes, setColumnTypes] = useState([]);
+  const [scheduleColumnsById, setScheduleColumnsById] = useState({});
   const [workers, setWorkers] = useState([]);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -131,6 +132,9 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
     if (colTypesSettings.length > 0) {
       const customParams = JSON.parse(colTypesSettings[0].setting_value) || [];
       setColumnTypes(customParams.map(c => c.name));
+      const byId = {};
+      customParams.forEach(c => { if (c.mapping_id) byId[c.mapping_id] = c; });
+      setScheduleColumnsById(byId);
     }
     setWorkers(workersData);
     setSettingsLoaded(true);
@@ -153,7 +157,8 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
     } else if (newColumnName === "task") {
       columnToAdd = { name: "משימה", type: "task", width: 120 };
     } else {
-      columnToAdd = { name: newColumnName, type: "text", width: 120 };
+      const settingsEntry = Object.values(scheduleColumnsById).find(c => c.name === newColumnName);
+      columnToAdd = { name: newColumnName, type: "text", width: 120, ...(settingsEntry?.mapping_id ? { column_id: settingsEntry.mapping_id } : {}) };
     }
     const cols = [...editingPreset.template_config.columns, columnToAdd];
     setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: cols } });
@@ -284,6 +289,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                   <TableHeader>
                     <PresetColumnHeaderRow
                       columns={editingPreset.template_config.columns}
+                      scheduleColumnsById={scheduleColumnsById}
                       onReorder={(newCols) => setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, columns: newCols } })}
                       onRemove={removeColumn}
                       updateColumn={updateColumn}
@@ -386,7 +392,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                         <div className="text-xs text-gray-400 mt-0.5 flex gap-1 flex-wrap">
                           {(preset.template_config?.columns || []).map((c, i) => (
                             <Badge key={i} variant="outline" className="text-[10px] px-1 py-0">
-                              {c.name}
+                              {(c.column_id && scheduleColumnsById[c.column_id]?.name) || c.name}
                             </Badge>
                           ))}
                         </div>

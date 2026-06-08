@@ -72,7 +72,28 @@ export default function Settings() {
     
 
     if (rolesSettings.length > 0) setUserRoles(JSON.parse(rolesSettings[0].setting_value));
-    if (scheduleColsSettings.length > 0) setScheduleColumns(JSON.parse(scheduleColsSettings[0].setting_value) || []);
+    let loadedCols = [];
+    if (scheduleColsSettings.length > 0) {
+      loadedCols = JSON.parse(scheduleColsSettings[0].setting_value) || [];
+      // Part A: backfill missing mapping_ids on load
+      let needsSave = false;
+      const withIds = loadedCols.map(c => {
+        if (!c.mapping_id) {
+          needsSave = true;
+          return { ...c, mapping_id: `col_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` };
+        }
+        return c;
+      });
+      if (needsSave) {
+        const settings2 = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
+        const d = { setting_key: "custom_schedule_params", setting_value: JSON.stringify(withIds) };
+        if (settings2.length > 0) await base44.entities.AppSettings.update(settings2[0].id, d);
+        else await base44.entities.AppSettings.create(d);
+        loadedCols = withIds;
+        invalidateStaticCache();
+      }
+      setScheduleColumns(loadedCols);
+    }
     const rawPops = populationsSettings.length > 0
       ? (JSON.parse(populationsSettings[0].setting_value) || [])
       : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
@@ -115,6 +136,53 @@ export default function Settings() {
     if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
     else await base44.entities.AppSettings.create(data);
     setScheduleColumns(updated);
+  };
+
+  // Part B: backfill column_id on existing Template and MokedPreset columns (one-time maintenance)
+  const [backfilling, setBackfilling] = useState(false);
+  const handleBackfillColumnIds = async () => {
+    setBackfilling(true);
+    // Build name → mapping_id from current scheduleColumns
+    const nameToId = {};
+    scheduleColumns.forEach(c => { if (c.mapping_id) nameToId[c.name.trim()] = c.mapping_id; });
+
+    const [templates, presets] = await Promise.all([
+      base44.entities.Template.list(),
+      base44.entities.MokedPreset.list(),
+    ]);
+
+    // Update Templates
+    await Promise.all(
+      templates
+        .filter(t => (t.columns || []).some(c => !c.column_id && nameToId[c.name?.trim()]))
+        .map(t => base44.entities.Template.update(t.id, {
+          columns: t.columns.map(c =>
+            (!c.column_id && nameToId[c.name?.trim()]) ? { ...c, column_id: nameToId[c.name.trim()] } : c
+          )
+        }))
+    );
+
+    // Update Presets
+    await Promise.all(
+      (presets || [])
+        .filter(p => ((p.template_config?.columns) || []).some(c => !c.column_id && nameToId[c.name?.trim()]))
+        .map(p => {
+          const cfg = p.template_config || {};
+          return base44.entities.MokedPreset.update(p.id, {
+            template_config: {
+              ...cfg,
+              columns: (cfg.columns || []).map(c =>
+                (!c.column_id && nameToId[c.name?.trim()]) ? { ...c, column_id: nameToId[c.name.trim()] } : c
+              )
+            }
+          });
+        })
+    );
+
+    invalidateStaticCache();
+    invalidateTemplatesCache();
+    setBackfilling(false);
+    alert("גיבוי מזהי עמודות הושלם בהצלחה!");
   };
 
   // Rename a schedule column name globally — updates Templates, TemplateRows, and MokedPresets
@@ -802,7 +870,18 @@ export default function Settings() {
         {/* Unified Schedule Columns */}
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b">
-            <CardTitle className="flex items-center gap-2" dir="rtl"><Columns className="w-5 h-5 text-green-600" />עמודות לוח ודוחות</CardTitle>
+            <div className="flex items-center justify-between" dir="rtl">
+              <CardTitle className="flex items-center gap-2"><Columns className="w-5 h-5 text-green-600" />עמודות לוח ודוחות</CardTitle>
+              <button
+                type="button"
+                onClick={handleBackfillColumnIds}
+                disabled={backfilling}
+                className="text-xs text-gray-500 hover:text-blue-700 border border-gray-300 rounded-md px-2 py-1 transition-colors disabled:opacity-50"
+                title="קשר עמודות קיימות בתבניות ופריסטים למזהים מהגדרות (פעולה חד פעמית)"
+              >
+                {backfilling ? "מבצע גיבוי..." : "גבה מזהי עמודות"}
+              </button>
+            </div>
           </CardHeader>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600 mb-4" dir="rtl">
