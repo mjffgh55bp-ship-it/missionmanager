@@ -62,6 +62,8 @@ export default function Schedule() {
   const [columnSubTypes, setColumnSubTypes] = useState({});
   const [columnFreeText, setColumnFreeText] = useState({});
   const [columnQuantitative, setColumnQuantitative] = useState({});
+  // mapping_id → { name, ...column } — used to resolve header names at render time
+  const [scheduleColumnsById, setScheduleColumnsById] = useState({});
   const [templates, setTemplates] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
   const [templateRows, setTemplateRows] = useState([]);
@@ -211,6 +213,13 @@ export default function Schedule() {
     if (colTypesSettings.length > 0) {
       const customParams = JSON.parse(colTypesSettings[0].setting_value) || [];
       setColumnTypes(customParams.map(c => c.name));
+
+      // Build id-keyed lookup for name resolution at render time
+      const byId = {};
+      customParams.forEach(c => { if (c.mapping_id) byId[c.mapping_id] = c; });
+      setScheduleColumnsById(byId);
+
+      // Key behavior maps by BOTH name (legacy) and mapping_id so both lookups work
       const subTypesMap = {};
       const freeTextMap = {};
       customParams.forEach(c => {
@@ -218,11 +227,22 @@ export default function Schedule() {
         if (c.options && c.options.length > 0) allOpts.push(...c.options);
         if (c.sub_options && c.sub_options.length > 0) allOpts.push(...c.sub_options.map(so => so.name));
         if (c.quantitative_items && c.quantitative_items.length > 0) allOpts.push(...c.quantitative_items);
-        if (allOpts.length > 0) subTypesMap[c.name] = allOpts;
-        if (c.free_text) freeTextMap[c.name] = true;
+        if (allOpts.length > 0) {
+          subTypesMap[c.name] = allOpts;
+          if (c.mapping_id) subTypesMap[c.mapping_id] = allOpts;
+        }
+        if (c.free_text) {
+          freeTextMap[c.name] = true;
+          if (c.mapping_id) freeTextMap[c.mapping_id] = true;
+        }
       });
       const quantMap = {};
-      customParams.forEach(c => { if (c.report_type === 'count_quantitative') quantMap[c.name] = true; });
+      customParams.forEach(c => {
+        if (c.report_type === 'count_quantitative') {
+          quantMap[c.name] = true;
+          if (c.mapping_id) quantMap[c.mapping_id] = true;
+        }
+      });
       setColumnQuantitative(quantMap);
       setColumnSubTypes(subTypesMap);
       setColumnFreeText(freeTextMap);
@@ -942,12 +962,13 @@ export default function Schedule() {
                       <Table>
                         <TableHeader>
                           <DraggableColumnHeader
-                            groupKey={group.key}
-                            orderedColumns={orderedColumns}
-                            editMode={editMode}
-                            templateId={template.id}
-                            onReorder={async (newCols) => { await saveColumnOrder(template.id, newCols); }}
-                            onDeleteColumn={async (col) => {
+                           groupKey={group.key}
+                           orderedColumns={orderedColumns}
+                           scheduleColumnsById={scheduleColumnsById}
+                           editMode={editMode}
+                           templateId={template.id}
+                           onReorder={async (newCols) => { await saveColumnOrder(template.id, newCols); }}
+                           onDeleteColumn={async (col) => {
                               if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
                                 const isDailyColumn = (dailyCustomColumns[template.id] || []).some((c) => c.name === col.name);
                                 if (isDailyColumn) {
@@ -1089,23 +1110,32 @@ export default function Schedule() {
                                               {tasksList.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                                             </SelectContent>
                                           </Select>
-                                        ) : ((columnSubTypes[col.name] || []).length > 0 || columnFreeText[col.name]) ? (
+                                        ) : (() => {
+                                          // Resolve behavior by column_id first (rename-proof), fallback to name
+                                          const colKey = col.column_id || col.name;
+                                          const subTypes = columnSubTypes[colKey] || columnSubTypes[col.name] || [];
+                                          const isFreeText = !!(columnFreeText[colKey] || columnFreeText[col.name]);
+                                          const isQuant = !!(columnQuantitative[colKey] || columnQuantitative[col.name]);
+                                          // Resolved display name from Settings (so rename is instant)
+                                          const resolvedName = (col.column_id && scheduleColumnsById[col.column_id]?.name) || col.name;
+                                          return (subTypes.length > 0 || isFreeText) ? (
                                           <ColumnCell
                                             assignmentId={row.id}
-                                            colType={col.name}
+                                            colType={resolvedName}
                                             columnValues={row.values || {}}
-                                            availableSubTypes={columnSubTypes[col.name] || []}
-                                            freeText={!!columnFreeText[col.name]}
+                                            availableSubTypes={subTypes}
+                                            freeText={isFreeText}
                                             isTemplateRow={true}
-                                            isQuantitative={!!columnQuantitative[col.name]}
+                                            isQuantitative={isQuant}
                                             onSaved={(updatedColumnValues) => {
                                             const newValues = { ...row.values, ...updatedColumnValues };
                                             base44.entities.TemplateRow.update(row.id, { values: newValues });
                                              setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                             }} />
                                         ) : (
-                                          <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
-                                        )}
+                                          <div className="px-2 py-1 text-sm text-center">{row.values?.[resolvedName] || row.values?.[col.name] || ''}</div>
+                                        );
+                                        })()}
                                       </TableCell>
                                     );
                                   })}
@@ -1235,7 +1265,10 @@ export default function Schedule() {
                   } else if (newTemplateColumnName === "task") {
                     columnToAdd = { name: "משימה", type: "task", width: 120 };
                   } else {
-                    columnToAdd = { name: newTemplateColumnName, type: "text", width: 120 };
+                    // It's a custom Settings column — look up its mapping_id to store as column_id
+                    const settingsCols = Object.values(scheduleColumnsById);
+                    const settingsCol = settingsCols.find(c => c.name === newTemplateColumnName);
+                    columnToAdd = { name: newTemplateColumnName, type: "text", width: 120, ...(settingsCol?.mapping_id ? { column_id: settingsCol.mapping_id } : {}) };
                   }
                   const updatedDailyColumns = {
                     ...dailyCustomColumns,

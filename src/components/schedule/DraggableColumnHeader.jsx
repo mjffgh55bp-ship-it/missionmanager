@@ -25,6 +25,7 @@ const DropIndicator = ({ side = "right" }) => (
 export default function DraggableColumnHeader({
   groupKey,
   orderedColumns,
+  scheduleColumnsById = {},
   editMode,
   templateId,
   onReorder,
@@ -65,7 +66,9 @@ export default function DraggableColumnHeader({
             {/* Drop indicator: RTL "before col N" = right edge */}
             {showBefore && <DropIndicator side="right" />}
 
-            {editMode ? (
+            {(() => {
+            const resolvedName = (col.column_id && scheduleColumnsById[col.column_id]?.name) || col.name;
+            return editMode ? (
               <div className="flex items-center gap-1 justify-center">
                 <span
                   {...getDragHandleProps(col.name)}
@@ -74,7 +77,7 @@ export default function DraggableColumnHeader({
                 >
                   <GripVertical className="w-3 h-3" />
                 </span>
-                <span>{col.name}</span>
+                <span>{resolvedName}</span>
                 <Button
                   size="icon"
                   variant="ghost"
@@ -85,8 +88,9 @@ export default function DraggableColumnHeader({
                 </Button>
               </div>
             ) : (
-              <span>{col.name}</span>
-            )}
+              <span>{resolvedName}</span>
+            );
+          })()}
 
             {/* Drop indicator: RTL "after last col" = left edge */}
             {showAfter && <DropIndicator side="left" />}

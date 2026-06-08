@@ -46,9 +46,6 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState("schedule");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [allScheduleColumnNames, setAllScheduleColumnNames] = useState([]);
-  const [renamingScheduleColName, setRenamingScheduleColName] = useState(null); // { name, value }
-  const [scheduleColNamesLoading, setScheduleColNamesLoading] = useState(false);
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -94,102 +91,6 @@ export default function Settings() {
     if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
     setWorkers(workersData);
     setLoading(false);
-    // Load discovered column names after static data is ready
-    loadAllScheduleColumnNames();
-  };
-
-  const TIME_KEYS = new Set(["התחלה", "סיום", "שעת התחלה", "שעת סיום", "תדריך"]);
-
-  const loadAllScheduleColumnNames = async () => {
-    setScheduleColNamesLoading(true);
-    const [templates, presets] = await Promise.all([
-      base44.entities.Template.list(),
-      base44.entities.MokedPreset.list(),
-    ]);
-    const names = new Set();
-    templates.forEach(t => (t.columns || []).forEach(c => { if (c.name && !TIME_KEYS.has(c.name)) names.add(c.name); }));
-    presets.forEach(p => ((p.template_config?.columns) || []).forEach(c => { if (c.name && !TIME_KEYS.has(c.name)) names.add(c.name); }));
-    setAllScheduleColumnNames([...names].sort());
-    setScheduleColNamesLoading(false);
-  };
-
-  const renameScheduleColumnEverywhere = async (oldName, newName) => {
-    const trimmed = (newName || "").trim();
-    if (!trimmed || trimmed === oldName) return;
-    const match = (n) => typeof n === "string" && n.trim() === oldName.trim();
-
-    // Fetch everything in parallel
-    const [templates, rows, presets, assignments, allSettings] = await Promise.all([
-      base44.entities.Template.list(),
-      base44.entities.TemplateRow.list(),
-      base44.entities.MokedPreset.list(),
-      base44.entities.Assignment.list(),
-      base44.entities.AppSettings.list(),
-    ]);
-
-    // 1. Template.columns[].name
-    await Promise.all(templates
-      .filter(t => (t.columns || []).some(c => match(c.name)))
-      .map(t => base44.entities.Template.update(t.id, {
-        columns: t.columns.map(c => match(c.name) ? { ...c, name: trimmed } : c)
-      })));
-
-    // 2. TemplateRow.values keys
-    await Promise.all(rows
-      .filter(r => r.values && Object.keys(r.values).some(match))
-      .map(r => {
-        const v = { ...r.values };
-        for (const k of Object.keys(v)) if (match(k)) { v[trimmed] = v[k]; delete v[k]; }
-        return base44.entities.TemplateRow.update(r.id, { values: v });
-      }));
-
-    // 3. MokedPreset: columns AND default_rows
-    await Promise.all(presets
-      .filter(p => {
-        const cfg = p.template_config || {};
-        return (cfg.columns || []).some(c => match(c.name)) ||
-               (cfg.default_rows || []).some(r => r && Object.keys(r).some(match));
-      })
-      .map(p => {
-        const cfg = p.template_config || {};
-        const columns = (cfg.columns || []).map(c => match(c.name) ? { ...c, name: trimmed } : c);
-        const default_rows = (cfg.default_rows || []).map(r => {
-          if (!r) return r;
-          const nr = { ...r };
-          for (const k of Object.keys(nr)) if (match(k)) { nr[trimmed] = nr[k]; delete nr[k]; }
-          return nr;
-        });
-        return base44.entities.MokedPreset.update(p.id, { template_config: { ...cfg, columns, default_rows } });
-      }));
-
-    // 4. Assignment.column_values keys
-    await Promise.all(assignments
-      .filter(a => a.column_values && Object.keys(a.column_values).some(match))
-      .map(a => {
-        const cv = { ...a.column_values };
-        for (const k of Object.keys(cv)) if (match(k)) { cv[trimmed] = cv[k]; delete cv[k]; }
-        return base44.entities.Assignment.update(a.id, { column_values: cv });
-      }));
-
-    // 5. Daily custom columns in AppSettings (keys like schedule_daily_columns_*)
-    const dailySettings = allSettings.filter(s => s.setting_key && s.setting_key.startsWith("schedule_daily_columns"));
-    await Promise.all(dailySettings.map(s => {
-      let parsed; try { parsed = JSON.parse(s.setting_value); } catch { return null; }
-      let changed = false;
-      const updated = {};
-      for (const k of Object.keys(parsed || {})) {
-        updated[k] = (parsed[k] || []).map(c => (c && match(c.name)) ? (changed = true, { ...c, name: trimmed }) : c);
-      }
-      return changed ? base44.entities.AppSettings.update(s.id, { setting_value: JSON.stringify(updated) }) : null;
-    }).filter(Boolean));
-
-    // 6. Keep custom_schedule_params in sync
-    const sc = scheduleColumns.map(c => match(c.name) ? { ...c, name: trimmed } : c);
-    if (JSON.stringify(sc) !== JSON.stringify(scheduleColumns)) await saveScheduleColumns(sc);
-
-    invalidateStaticCache();
-    invalidateTemplatesCache();
-    await loadAllScheduleColumnNames();
   };
 
 
@@ -287,7 +188,7 @@ export default function Settings() {
 
   const handleAddScheduleColumn = async () => {
     if (!newColName.trim()) return;
-    const col = { name: newColName.trim(), report_type: newColReportType, options: [], quantitative_items: [] };
+    const col = { name: newColName.trim(), mapping_id: `col_${Date.now()}`, report_type: newColReportType, options: [], quantitative_items: [] };
     const updated = [...scheduleColumns, col];
     await saveScheduleColumns(updated);
     setNewColName("");
@@ -1166,69 +1067,6 @@ export default function Settings() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Schedule Header Column Names */}
-        <Card className="border-none shadow-lg mb-6">
-          <CardHeader className="border-b">
-            <div className="flex items-center justify-between" dir="rtl">
-              <CardTitle className="flex items-center gap-2"><Columns className="w-5 h-5 text-indigo-600" />שמות עמודות לוח (גלובלי)</CardTitle>
-              <button onClick={loadAllScheduleColumnNames} className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-2 py-1">רענן</button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <p className="text-sm text-gray-600 mb-4" dir="rtl">
-              רשימת כל עמודות הלוח (נהג, משימה, גזרה...) שנמצאות בתבניות ופריסטים. שינוי שם כאן מעדכן את כל מקומות האחסון — כותרת הלוח, עורך הפריסט, שורות ונתונים.
-            </p>
-            {scheduleColNamesLoading ? (
-              <p className="text-sm text-gray-400" dir="rtl">טוען...</p>
-            ) : allScheduleColumnNames.length === 0 ? (
-              <p className="text-sm text-gray-400" dir="rtl">לא נמצאו עמודות</p>
-            ) : (
-              <div className="space-y-1" dir="rtl">
-                {allScheduleColumnNames.map((name) => (
-                  <div key={name} className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-gray-50">
-                    {renamingScheduleColName?.name === name ? (
-                      <>
-                        <Input
-                          autoFocus
-                          value={renamingScheduleColName.value}
-                          onChange={e => setRenamingScheduleColName(prev => ({ ...prev, value: e.target.value }))}
-                          onKeyDown={async e => {
-                            if (e.key === 'Enter') {
-                              await renameScheduleColumnEverywhere(name, renamingScheduleColName.value);
-                              setRenamingScheduleColName(null);
-                            }
-                            if (e.key === 'Escape') setRenamingScheduleColName(null);
-                          }}
-                          className="h-7 text-sm flex-1"
-                          dir="rtl"
-                        />
-                        <button
-                          onClick={async () => {
-                            await renameScheduleColumnEverywhere(name, renamingScheduleColName.value);
-                            setRenamingScheduleColName(null);
-                          }}
-                          className="text-green-600 hover:text-green-700 flex-shrink-0"
-                          title="שמור שם גורפי"
-                        ><Check className="w-4 h-4" /></button>
-                        <button onClick={() => setRenamingScheduleColName(null)} className="text-gray-400 hover:text-gray-600 flex-shrink-0"><X className="w-4 h-4" /></button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-sm font-medium flex-1">{name}</span>
-                        <button
-                          onClick={() => setRenamingScheduleColName({ name, value: name })}
-                          className="text-gray-400 hover:text-blue-600 flex-shrink-0"
-                          title="שנה שם (יעדכן בכל מקום)"
-                        ><Pencil className="w-4 h-4" /></button>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
 
