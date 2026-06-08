@@ -273,7 +273,7 @@ export default function Workers() {
                       <div className="space-y-1">
                         <p className="text-sm text-gray-700" dir="rtl">👤 כינוי: {worker.nickname}</p>
                         {worker.birthday && <p className="text-sm text-gray-700" dir="rtl">🎂 יום הולדת: {format(new Date(worker.birthday), "dd/MM/yyyy")}</p>}
-                        {worker.hire_date && <p className="text-sm text-gray-700" dir="rtl">📅 תאריך גיוס: {format(new Date(worker.hire_date), "dd/MM/yyyy")}</p>}
+                        {worker.hire_date && <p className="text-sm text-gray-700" dir="rtl">📅 תאריך הצטרפות: {format(new Date(worker.hire_date), "dd/MM/yyyy")}</p>}
                         {worker.training && <p className="text-sm text-gray-700" dir="rtl">🎓 קורס: {worker.training}</p>}
                       </div>
                     </div>
@@ -398,7 +398,7 @@ export default function Workers() {
                     <Input type="date" value={formData.birthday} onChange={(e) => setFormData({ ...formData, birthday: e.target.value })} className="flex-1" />
                   </div>
                   <div className="flex items-center gap-2">
-                    <Label className="w-28 text-right shrink-0" dir="rtl">תאריך גיוס</Label>
+                    <Label className="w-28 text-right shrink-0" dir="rtl">תאריך הצטרפות</Label>
                     <Input type="date" value={formData.hire_date} onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })} className="flex-1" />
                   </div>
                   <div className="flex items-center gap-2">
