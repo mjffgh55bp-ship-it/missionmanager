@@ -1002,7 +1002,7 @@ export default function Schedule() {
                             orderedColumns={orderedColumns}
                             editMode={editMode}
                             templateId={template.id}
-                            resolveColName={resolveColName}
+                            scheduleColumnsById={scheduleColumnsById}
                             onReorder={async (newCols) => { await saveColumnOrder(template.id, newCols); }}
                             onDeleteColumn={async (col) => {
                               if (confirm(`האם למחוק את העמודה "${col.name}"?`)) {
