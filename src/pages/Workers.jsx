@@ -24,6 +24,27 @@ export default function Workers() {
   const [tasks, setTasks] = useState([]);
   const [taskQualifications, setTaskQualifications] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortField, setSortField] = useState("nickname");
+  const [sortDir, setSortDir] = useState("asc");
+
+  const handleSort = (field) => {
+    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
+  };
+
+  const SortButton = ({ field, label }) => {
+    const active = sortField === field;
+    return (
+      <button
+        onClick={() => handleSort(field)}
+        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${active ? "bg-blue-900 text-white border-blue-900" : "bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-800"}`}
+        dir="rtl"
+      >
+        {label}
+        <span className="text-xs">{active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}</span>
+      </button>
+    );
+  };
   const [formData, setFormData] = useState({
     nickname: "",
     birthday: "",
@@ -233,6 +254,11 @@ export default function Workers() {
           </TabsList>
 
           <TabsContent value="workers">
+            <div className="flex gap-2 mb-4 flex-wrap" dir="rtl">
+              <SortButton field="nickname" label="א׳ב׳" />
+              <SortButton field="population" label="אוכלוסייה" />
+              <SortButton field="role" label="תפקיד" />
+            </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {workers.filter(worker => {
                 if (!searchQuery.trim()) return true;
@@ -244,6 +270,13 @@ export default function Workers() {
                   worker.training?.toLowerCase().includes(query) ||
                   worker.email?.toLowerCase().includes(query)
                 );
+              }).sort((a, b) => {
+                let valA, valB;
+                if (sortField === "nickname") { valA = a.nickname || ""; valB = b.nickname || ""; }
+                else if (sortField === "population") { valA = a.population || ""; valB = b.population || ""; }
+                else if (sortField === "role") { valA = getValidRoles(a)[0] || ""; valB = getValidRoles(b)[0] || ""; }
+                const cmp = valA.localeCompare(valB, "he");
+                return sortDir === "asc" ? cmp : -cmp;
               }).map((worker) => {
             return (
               <Card key={worker.id} className="border-none shadow-lg hover:shadow-xl transition-all duration-300">
