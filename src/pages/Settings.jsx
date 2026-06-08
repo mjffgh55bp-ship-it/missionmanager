@@ -10,7 +10,7 @@ import MappingSettings from "@/components/settings/MappingSettings";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
 import MappableItemRow, { normalizeItem, suggestMappingId } from "@/components/settings/MappableItemRow";
-import { invalidateStaticCache } from "@/lib/appDataCache";
+import { invalidateStaticCache, invalidateTemplatesCache } from "@/lib/appDataCache";
 
 
 export default function Settings() {
@@ -117,41 +117,73 @@ export default function Settings() {
     setScheduleColumns(updated);
   };
 
-  // Rename a schedule column name globally — updates Templates and all TemplateRows
+  // Rename a schedule column name globally — updates Templates, TemplateRows, and MokedPresets
   const handleRenameColumnName = async (idx, oldName, newName) => {
     if (!newName.trim() || newName.trim() === oldName) return;
     const trimmed = newName.trim();
+    const match = (n) => typeof n === "string" && n.trim() === oldName.trim();
 
     // 1. Update custom_schedule_params setting
     const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, name: trimmed } : c);
     await saveScheduleColumns(updated);
 
-    // 2. Fetch templates and rows in parallel
-    const [allTemplatesData, allRows] = await Promise.all([
+    // 2. Fetch everything in parallel
+    const [allTemplatesData, allRows, allPresets] = await Promise.all([
       base44.entities.Template.list(),
       base44.entities.TemplateRow.list(),
+      base44.entities.MokedPreset.list(),
     ]);
 
-    // 3. Update all Templates that have a column with the old name — in parallel
+    // 3. Update Templates
     await Promise.all(
       allTemplatesData
-        .filter(tmpl => tmpl.columns?.some(c => c.name === oldName))
+        .filter(tmpl => tmpl.columns?.some(c => match(c.name)))
         .map(tmpl => {
-          const updatedCols = tmpl.columns.map(c => c.name === oldName ? { ...c, name: trimmed } : c);
+          const updatedCols = tmpl.columns.map(c => match(c.name) ? { ...c, name: trimmed } : c);
           return base44.entities.Template.update(tmpl.id, { columns: updatedCols });
         })
     );
 
-    // 4. Update all TemplateRows that have values under the old column name — in parallel
+    // 4. Update TemplateRows value keys
     await Promise.all(
       allRows
-        .filter(row => row.values && oldName in row.values)
+        .filter(row => row.values && Object.keys(row.values).some(k => match(k)))
         .map(row => {
-          const newValues = { ...row.values, [trimmed]: row.values[oldName] };
-          delete newValues[oldName];
+          const newValues = { ...row.values };
+          for (const k of Object.keys(newValues)) {
+            if (match(k)) { newValues[trimmed] = newValues[k]; delete newValues[k]; }
+          }
           return base44.entities.TemplateRow.update(row.id, { values: newValues });
         })
     );
+
+    // 5. Update MokedPreset: rename in template_config.columns AND default_rows value keys
+    await Promise.all(
+      (allPresets || [])
+        .filter(p => {
+          const cfg = p.template_config || {};
+          return (cfg.columns || []).some(c => match(c.name)) ||
+            (cfg.default_rows || []).some(r => r && Object.keys(r).some(k => match(k)));
+        })
+        .map(p => {
+          const cfg = p.template_config || {};
+          const updatedCols = (cfg.columns || []).map(c => match(c.name) ? { ...c, name: trimmed } : c);
+          const updatedRows = (cfg.default_rows || []).map(r => {
+            if (!r) return r;
+            const nr = { ...r };
+            for (const k of Object.keys(nr)) {
+              if (match(k)) { nr[trimmed] = nr[k]; delete nr[k]; }
+            }
+            return nr;
+          });
+          return base44.entities.MokedPreset.update(p.id, {
+            template_config: { ...cfg, columns: updatedCols, default_rows: updatedRows },
+          });
+        })
+    );
+
+    invalidateStaticCache();
+    invalidateTemplatesCache();
   };
 
   const handleAddScheduleColumn = async () => {
