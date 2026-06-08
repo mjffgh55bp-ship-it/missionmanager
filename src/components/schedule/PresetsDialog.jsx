@@ -122,11 +122,11 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
   };
 
   const loadSettings = async () => {
-    const [rolesSettings, colTypesSettings, workersData] = await Promise.all([
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
-      base44.entities.Worker.filter({ active: true }),
-    ]);
+    const rolesSettings = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
+    await new Promise(r => setTimeout(r, 200));
+    const colTypesSettings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
+    await new Promise(r => setTimeout(r, 200));
+    const workersData = await base44.entities.Worker.filter({ active: true });
     if (rolesSettings.length > 0) setWorkerRoles(JSON.parse(rolesSettings[0].setting_value) || []);
     if (colTypesSettings.length > 0) {
       const customParams = JSON.parse(colTypesSettings[0].setting_value) || [];
