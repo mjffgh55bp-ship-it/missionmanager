@@ -17,10 +17,11 @@ Deno.serve(async (req) => {
   try {
   const base44 = createClientFromRequest(req);
 
-  // This app is used by workers via a shared link without individual login.
-  // Integrity is enforced by the ShiftLock atomic lock, not by user auth.
-  let user = null;
-  try { user = await base44.auth.me(); } catch (_) { /* anonymous — allowed */ }
+  // Require authentication — all workers have accounts and must be logged in.
+  const user = await base44.auth.me();
+  if (!user) {
+    return Response.json({ success: false, error: "נדרשת התחברות כדי להירשם למשמרת" }, { status: 200 });
+  }
 
   const body = await req.json();
   const { signupKey, weekStartDate, workerId, workerName, availabilityData, requiredCount } = body;
