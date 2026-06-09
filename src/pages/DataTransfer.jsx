@@ -23,14 +23,19 @@ export default function DataTransfer() {
   const loadData = async () => {
     const user = await base44.auth.me();
     setCurrentUser(user);
-    await new Promise(r => setTimeout(r, 200));
-    const logs = await base44.entities.AuditLog.list("-created_date", 50);
-    setAuditLogs(logs);
+    // AuditLog is loaded lazily when the audit tab is opened — don't fetch on mount
   };
 
   const refreshLogs = async () => {
     const logs = await base44.entities.AuditLog.list("-created_date", 50);
     setAuditLogs(logs);
+  };
+
+  const handleTabChange = async (newTab) => {
+    setTab(newTab);
+    if (newTab === "audit" && auditLogs.length === 0) {
+      await refreshLogs();
+    }
   };
 
   return (
@@ -55,7 +60,7 @@ export default function DataTransfer() {
           <strong>חוקי אבטחה:</strong> ייצוא מוציא שדות מאושרים בלבד. ייבוא מתעלם מכל שדה שאינו בסכמה המאושרת. לא ניתן ליצור עובדים חדשים דרך הייבוא.
         </div>
 
-        <Tabs value={tab} onValueChange={setTab}>
+        <Tabs value={tab} onValueChange={handleTabChange}>
           <TabsList className="mb-6 w-full grid grid-cols-5">
             <TabsTrigger value="export" className="flex items-center gap-1 text-xs">
               <Download className="w-4 h-4" />ייצוא לו״ז
