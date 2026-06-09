@@ -208,6 +208,7 @@ export default function Matrix() {
   const vScrollSyncRef = useRef(false);
 
   const midMouseDragRef = useRef(null);
+  const pendingDragRef = useRef(null);
   const pendingScrollRef = useRef(null);
   const wheelAccumRef = useRef(null);
   const ppmRef = useRef(ppm);
@@ -910,7 +911,7 @@ export default function Matrix() {
         : dateString;
     }
 
-    setDragging({
+    const dragData = {
       workerId: worker.id,
       worker,
       shift,
@@ -921,10 +922,30 @@ export default function Matrix() {
       originalStart: shift?.start_time,
       originalEnd: shift?.end_time,
       originalDay: viewMode === 'weekly' ? (shift ? getDayIndexFromDate(shift.date) : dayIndex) : 0,
-    });
+    };
+
+    if (action === 'move') {
+      // Defer: only become a real drag once pointer moves past threshold.
+      // This lets double-click fire cleanly without drag state interfering.
+      pendingDragRef.current = { ...dragData, startClientX: e.clientX, startClientY: e.clientY };
+      return;
+    }
+
+    // resize-start / resize-end / create commit immediately
+    setDragging(dragData);
   };
 
   const handleMouseMove = (e) => {
+    // Promote a pending move-drag to a real drag once pointer moves enough
+    if (!dragging && pendingDragRef.current) {
+      const dx = Math.abs(e.clientX - pendingDragRef.current.startClientX);
+      const dy = Math.abs(e.clientY - pendingDragRef.current.startClientY);
+      if (dx > 4 || dy > 4) {
+        setDragging(pendingDragRef.current);
+        pendingDragRef.current = null;
+      }
+      return; // wait until either promoted or mouseup clears it
+    }
     if (!dragging) return;
     const { worker, shift, action, startAbsMinute, originalStart, originalEnd, originalDay } = dragging;
 
@@ -977,6 +998,7 @@ export default function Matrix() {
   };
 
   const handleMouseUp = async () => {
+    pendingDragRef.current = null; // click/dblclick with no movement — discard pending
     if (!dragging || !dragPreview) { setDragging(null); setDragPreview(null); return; }
     const { workerId, worker, shift, action } = dragging;
     const { start, end, day } = dragPreview;
