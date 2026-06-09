@@ -21,11 +21,10 @@ export default function DataTransfer() {
   }, []);
 
   const loadData = async () => {
-    const [user, logs] = await Promise.all([
-      base44.auth.me(),
-      base44.entities.AuditLog.list("-created_date", 50),
-    ]);
+    const user = await base44.auth.me();
     setCurrentUser(user);
+    await new Promise(r => setTimeout(r, 200));
+    const logs = await base44.entities.AuditLog.list("-created_date", 50);
     setAuditLogs(logs);
   };
 
