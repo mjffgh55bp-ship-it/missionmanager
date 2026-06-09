@@ -56,61 +56,70 @@ export default function Settings() {
   }, []);
 
   const loadSettings = async () => {
-    const allSettings = await getCachedAllSettings(base44.entities);
-    const workersData = await getCachedWorkers(base44.entities);
+    setLoading(true);
+    try {
+      const [allSettings, workersData] = await Promise.all([
+        getCachedAllSettings(base44.entities),
+        getCachedWorkers(base44.entities),
+      ]);
 
-    const getSetting = (key) => allSettings.find(s => s.setting_key === key);
+      const getSetting = (key) => allSettings.find(s => s.setting_key === key);
 
-    const rolesSettings = getSetting("user_roles") ? [getSetting("user_roles")] : [];
-    const scheduleColsSettings = getSetting("custom_schedule_params") ? [getSetting("custom_schedule_params")] : [];
-    const populationsSettings = getSetting("worker_populations") ? [getSetting("worker_populations")] : [];
-    const workerRolesSettings = getSetting("worker_roles") ? [getSetting("worker_roles")] : [];
-    const shiftStatusesSettings = getSetting("shift_statuses") ? [getSetting("shift_statuses")] : [];
-    const tasksSettings = getSetting("tasks_list") ? [getSetting("tasks_list")] : [];
-    const taskQualSettings = getSetting("task_qualifications") ? [getSetting("task_qualifications")] : [];
-    
+      const rolesSettings = getSetting("user_roles") ? [getSetting("user_roles")] : [];
+      const scheduleColsSettings = getSetting("custom_schedule_params") ? [getSetting("custom_schedule_params")] : [];
+      const populationsSettings = getSetting("worker_populations") ? [getSetting("worker_populations")] : [];
+      const workerRolesSettings = getSetting("worker_roles") ? [getSetting("worker_roles")] : [];
+      const shiftStatusesSettings = getSetting("shift_statuses") ? [getSetting("shift_statuses")] : [];
+      const tasksSettings = getSetting("tasks_list") ? [getSetting("tasks_list")] : [];
+      const taskQualSettings = getSetting("task_qualifications") ? [getSetting("task_qualifications")] : [];
 
-    if (rolesSettings.length > 0) setUserRoles(JSON.parse(rolesSettings[0].setting_value));
-    let loadedCols = [];
-    if (scheduleColsSettings.length > 0) {
-      loadedCols = JSON.parse(scheduleColsSettings[0].setting_value) || [];
-      // Part A: backfill missing mapping_ids on load
-      let needsSave = false;
-      const withIds = loadedCols.map(c => {
-        if (!c.mapping_id) {
-          needsSave = true;
-          return { ...c, mapping_id: `col_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` };
+      if (rolesSettings.length > 0) setUserRoles(JSON.parse(rolesSettings[0].setting_value));
+
+      if (scheduleColsSettings.length > 0) {
+        const loadedCols = JSON.parse(scheduleColsSettings[0].setting_value) || [];
+        const needsSave = loadedCols.some(c => !c.mapping_id);
+        const withIds = needsSave
+          ? loadedCols.map(c => c.mapping_id ? c : { ...c, mapping_id: `col_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` })
+          : loadedCols;
+        setScheduleColumns(withIds); // show data immediately
+        if (needsSave) {
+          // persist quietly after render — don't block or risk blanking the page
+          (async () => {
+            try {
+              const s2 = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
+              const d = { setting_key: "custom_schedule_params", setting_value: JSON.stringify(withIds) };
+              if (s2.length > 0) await base44.entities.AppSettings.update(s2[0].id, d);
+              else await base44.entities.AppSettings.create(d);
+              invalidateStaticCache();
+            } catch (e) { console.error("mapping_id backfill save failed:", e); }
+          })();
         }
-        return c;
-      });
-      if (needsSave) {
-        const settings2 = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
-        const d = { setting_key: "custom_schedule_params", setting_value: JSON.stringify(withIds) };
-        if (settings2.length > 0) await base44.entities.AppSettings.update(settings2[0].id, d);
-        else await base44.entities.AppSettings.create(d);
-        loadedCols = withIds;
-        invalidateStaticCache();
       }
-      setScheduleColumns(loadedCols);
+
+      const rawPops = populationsSettings.length > 0
+        ? (JSON.parse(populationsSettings[0].setting_value) || [])
+        : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
+      setPopulations(rawPops.map(normalizeItem));
+
+      const rawRoles = workerRolesSettings.length > 0
+        ? (JSON.parse(workerRolesSettings[0].setting_value) || [])
+        : ["שף", "סו-שף"];
+      setWorkerRoles(rawRoles.map(normalizeItem));
+
+      const rawStatuses = shiftStatusesSettings.length > 0
+        ? (JSON.parse(shiftStatusesSettings[0].setting_value) || [])
+        : ["מתוכנן", "מאושר", "בוצע", "בוטל"];
+      setShiftStatuses(rawStatuses.map(normalizeItem));
+
+      if (tasksSettings.length > 0) setTasks(JSON.parse(tasksSettings[0].setting_value) || []);
+      if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
+      setWorkers(workersData);
+    } catch (err) {
+      console.error("loadSettings failed:", err);
+      // leave any already-set state in place; page stays visible
+    } finally {
+      setLoading(false); // ALWAYS clear loading, even on error
     }
-    const rawPops = populationsSettings.length > 0
-      ? (JSON.parse(populationsSettings[0].setting_value) || [])
-      : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
-    setPopulations(rawPops.map(normalizeItem));
-
-    const rawRoles = workerRolesSettings.length > 0
-      ? (JSON.parse(workerRolesSettings[0].setting_value) || [])
-      : ["שף", "סו-שף"];
-    setWorkerRoles(rawRoles.map(normalizeItem));
-
-    const rawStatuses = shiftStatusesSettings.length > 0
-      ? (JSON.parse(shiftStatusesSettings[0].setting_value) || [])
-      : ["מתוכנן", "מאושר", "בוצע", "בוטל"];
-    setShiftStatuses(rawStatuses.map(normalizeItem));
-    if (tasksSettings.length > 0) setTasks(JSON.parse(tasksSettings[0].setting_value) || []);
-    if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
-    setWorkers(workersData);
-    setLoading(false);
   };
 
 
