@@ -248,10 +248,13 @@ export default function Availability() {
 
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      // Step 2: fetch static data in parallel
-      const [myWorkerRes, allSettings, eventsData, yearlyEventsData] = await Promise.all([
+      // Step 2: fetch static data — staggered to avoid rate-limit burst
+      const [myWorkerRes, allSettings] = await Promise.all([
         getMyWorker({}),
         getCachedAllSettings(base44.entities),
+      ]);
+      await new Promise(r => setTimeout(r, 200));
+      const [eventsData, yearlyEventsData] = await Promise.all([
         base44.entities.CompanyEvent.list("-date"),
         base44.entities.YearlyEvent.list("-start_date", 500),
       ]);
