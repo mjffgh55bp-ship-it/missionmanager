@@ -10,7 +10,7 @@ import MappingSettings from "@/components/settings/MappingSettings";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
 import MappableItemRow, { normalizeItem, suggestMappingId } from "@/components/settings/MappableItemRow";
-import { invalidateStaticCache, invalidateTemplatesCache } from "@/lib/appDataCache";
+import { invalidateStaticCache, invalidateTemplatesCache, getCachedAllSettings, getCachedWorkers } from "@/lib/appDataCache";
 
 
 export default function Settings() {
@@ -56,9 +56,8 @@ export default function Settings() {
   }, []);
 
   const loadSettings = async () => {
-    const allSettings = await base44.entities.AppSettings.list();
-    await new Promise(r => setTimeout(r, 800));
-    const workersData = await base44.entities.Worker.list();
+    const allSettings = await getCachedAllSettings(base44.entities);
+    const workersData = await getCachedWorkers(base44.entities);
 
     const getSetting = (key) => allSettings.find(s => s.setting_key === key);
 
@@ -146,10 +145,9 @@ export default function Settings() {
     const nameToId = {};
     scheduleColumns.forEach(c => { if (c.mapping_id) nameToId[c.name.trim()] = c.mapping_id; });
 
-    const [templates, presets] = await Promise.all([
-      base44.entities.Template.list(),
-      base44.entities.MokedPreset.list(),
-    ]);
+    const templates = await base44.entities.Template.list('created_date', 300);
+    await new Promise(r => setTimeout(r, 150));
+    const presets = await base44.entities.MokedPreset.list('created_date', 100);
 
     // Update Templates
     await Promise.all(
@@ -195,12 +193,12 @@ export default function Settings() {
     const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, name: trimmed } : c);
     await saveScheduleColumns(updated);
 
-    // 2. Fetch everything in parallel
-    const [allTemplatesData, allRows, allPresets] = await Promise.all([
-      base44.entities.Template.list(),
-      base44.entities.TemplateRow.list(),
-      base44.entities.MokedPreset.list(),
-    ]);
+    // 2. Fetch everything (staggered to avoid rate limits)
+    const allTemplatesData = await base44.entities.Template.list('created_date', 300);
+    await new Promise(r => setTimeout(r, 200));
+    const allRows = await base44.entities.TemplateRow.list('-created_date', 500);
+    await new Promise(r => setTimeout(r, 200));
+    const allPresets = await base44.entities.MokedPreset.list('created_date', 100);
 
     // 3. Update Templates
     await Promise.all(
@@ -482,11 +480,12 @@ export default function Settings() {
         })
     );
 
-    const [allTemplates, allCharts, allAvailabilities, allPresets] = await Promise.all([
-      base44.entities.Template.list(),
-      base44.entities.ChartWidget.list(),
-      base44.entities.Availability.list(),
-      base44.entities.MokedPreset.list(),
+    const allTemplates = await base44.entities.Template.list('created_date', 300);
+    await new Promise(r => setTimeout(r, 150));
+    const [allCharts, allAvailabilities, allPresets] = await Promise.all([
+      base44.entities.ChartWidget.list('created_date', 100),
+      base44.entities.Availability.list('-created_date', 500),
+      base44.entities.MokedPreset.list('created_date', 100),
     ]);
 
     // 2. Remove from ChartWidget.filter_roles
@@ -575,14 +574,20 @@ export default function Settings() {
     // Propagate rename to Worker records and Template columns
     if (newName && newName !== oldName) {
       // Fetch all independent collections in parallel
-      const [allWorkers, allTemplates, allCharts, allTrackers, allAvailabilities, taskQualSetting, allPresets] = await Promise.all([
-        base44.entities.Worker.list(),
-        base44.entities.Template.list(),
-        base44.entities.ChartWidget.list(),
-        base44.entities.Tracker.list(),
-        base44.entities.Availability.list(),
+      const allWorkers = await getCachedWorkers(base44.entities);
+      await new Promise(r => setTimeout(r, 150));
+      const allTemplates = await base44.entities.Template.list('created_date', 300);
+      await new Promise(r => setTimeout(r, 150));
+      const [allCharts, allTrackers] = await Promise.all([
+        base44.entities.ChartWidget.list('created_date', 100),
+        base44.entities.Tracker.list('created_date', 100),
+      ]);
+      await new Promise(r => setTimeout(r, 150));
+      const allAvailabilities = await base44.entities.Availability.list('-created_date', 500);
+      await new Promise(r => setTimeout(r, 150));
+      const [taskQualSetting, allPresets] = await Promise.all([
         base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
-        base44.entities.MokedPreset.list(),
+        base44.entities.MokedPreset.list('created_date', 100),
       ]);
 
       // Robust trimmed match helper
