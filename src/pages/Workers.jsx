@@ -93,10 +93,9 @@ export default function Workers() {
   }, []);
 
   const loadWorkers = async () => {
-    const [workersData, allSettings] = await Promise.all([
-      base44.entities.Worker.list("-created_date"),
-      base44.entities.AppSettings.list(),
-    ]);
+    const workersData = await base44.entities.Worker.list("-created_date");
+    await new Promise(r => setTimeout(r, 200));
+    const allSettings = await base44.entities.AppSettings.list();
     setWorkers(workersData);
 
     const getSetting = (key) => allSettings.find(s => s.setting_key === key);
@@ -114,7 +113,7 @@ export default function Workers() {
     loadingRef.current = true;
     try {
       const workersData = await base44.entities.Worker.list("-created_date");
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 300));
       const allSettings = await base44.entities.AppSettings.list();
 
       setWorkers(workersData);
