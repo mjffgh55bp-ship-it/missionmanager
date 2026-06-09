@@ -60,6 +60,7 @@ export default function Workers() {
 
   const loadingRef = useRef(false);
   const taskQualSettingIdRef = useRef(null);
+  const reloadDebounceRef = useRef(null);
 
   // Only display roles that currently exist in Settings — self-healing filter
   const validRoleSet = useMemo(
@@ -93,8 +94,12 @@ export default function Workers() {
   }, []);
 
   const loadWorkers = async () => {
+    // Debounce: skip if a reload is already queued within 300ms
+    if (reloadDebounceRef.current) return;
+    reloadDebounceRef.current = setTimeout(() => { reloadDebounceRef.current = null; }, 300);
+
     const workersData = await base44.entities.Worker.list("-created_date");
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 150));
     const allSettings = await base44.entities.AppSettings.list();
     setWorkers(workersData);
 
@@ -113,7 +118,7 @@ export default function Workers() {
     loadingRef.current = true;
     try {
       const workersData = await base44.entities.Worker.list("-created_date");
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 200));
       const allSettings = await base44.entities.AppSettings.list();
 
       setWorkers(workersData);
