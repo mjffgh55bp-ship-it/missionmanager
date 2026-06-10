@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
+import { getCachedAllWorkers, getCachedAllSettings, invalidateWorkersCache, invalidateSettingsCache } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,9 +99,10 @@ export default function Workers() {
     if (reloadDebounceRef.current) return;
     reloadDebounceRef.current = setTimeout(() => { reloadDebounceRef.current = null; }, 300);
 
-    const workersData = await base44.entities.Worker.list("-created_date");
-    await new Promise(r => setTimeout(r, 150));
-    const allSettings = await base44.entities.AppSettings.list();
+    const [workersData, allSettings] = await Promise.all([
+      getCachedAllWorkers(base44.entities),
+      getCachedAllSettings(base44.entities),
+    ]);
     setWorkers(workersData);
 
     const getSetting = (key) => allSettings.find(s => s.setting_key === key);
@@ -117,9 +119,10 @@ export default function Workers() {
     if (loadingRef.current) return;
     loadingRef.current = true;
     try {
-      const workersData = await base44.entities.Worker.list("-created_date");
-      await new Promise(r => setTimeout(r, 200));
-      const allSettings = await base44.entities.AppSettings.list();
+      const [workersData, allSettings] = await Promise.all([
+        getCachedAllWorkers(base44.entities),
+        getCachedAllSettings(base44.entities),
+      ]);
 
       setWorkers(workersData);
 
@@ -173,6 +176,7 @@ export default function Workers() {
   const handleSubmit = async () => {
     if (editingWorker) await base44.entities.Worker.update(editingWorker.id, formData);
     else await base44.entities.Worker.create(formData);
+    invalidateWorkersCache();
     setShowDialog(false);
     setEditingWorker(null);
     setFormData({ nickname: "", birthday: "", role: [], phone: "", email: "", hire_date: format(new Date(), "yyyy-MM-dd"), active: true, population: "", training: "", photo_url: "" });
@@ -202,6 +206,7 @@ export default function Workers() {
       role: worker.role,
       active: !worker.active 
     });
+    invalidateWorkersCache();
     loadWorkers();
   };
 
@@ -210,6 +215,7 @@ export default function Workers() {
   const handleDeleteWorker = async (workerId) => {
     if (!confirm("האם אתה בטוח שברצונך למחוק עובד זה?")) return;
     await base44.entities.Worker.delete(workerId);
+    invalidateWorkersCache();
     loadWorkers();
   };
 
@@ -226,6 +232,7 @@ export default function Workers() {
     const data = { setting_key: "user_roles", setting_value: JSON.stringify(userRoles) };
     if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
     else await base44.entities.AppSettings.create(data);
+    invalidateSettingsCache();
     setSavingRoles(false);
   };
 

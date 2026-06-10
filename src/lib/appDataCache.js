@@ -70,6 +70,10 @@ export async function getCachedWorkers(entities) {
   return cachedFetch('workers', () => entities.Worker.filter({ active: true }));
 }
 
+export async function getCachedAllWorkers(entities) {
+  return cachedFetch('allWorkers', () => entities.Worker.list("-created_date"));
+}
+
 export async function getCachedTemplates(entities) {
   return cachedFetch('templates', () => entities.Template.filter({ active: true }));
 }
@@ -107,7 +111,7 @@ export function parseListSetting(allSettings, key, defaultValue = []) {
  */
 export function invalidateStaticCache(...keys) {
   if (keys.length === 0) {
-    invalidate('workers', 'templates', 'allSettings');
+    invalidate('workers', 'allWorkers', 'templates', 'allSettings');
   } else {
     invalidate(...keys);
   }
@@ -118,7 +122,7 @@ export function invalidateSettingsCache() {
 }
 
 export function invalidateWorkersCache() {
-  invalidate('workers');
+  invalidate('workers', 'allWorkers');
 }
 
 export function invalidateTemplatesCache() {

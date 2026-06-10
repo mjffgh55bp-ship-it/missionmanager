@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
+import { getCachedWorkers, getCachedAllSettings } from "@/lib/appDataCache";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,12 +106,14 @@ export default function Yearly() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [rowsData, eventsData, workersData, unavailData, allSettings] = await Promise.all([
+      const [rowsData, eventsData, unavailData] = await Promise.all([
         base44.entities.YearlyRow.list("order"),
         base44.entities.YearlyEvent.list(),
-        base44.entities.Worker.filter({ active: true }),
         base44.entities.Unavailability.list(),
-        base44.entities.AppSettings.list(),
+      ]);
+      const [workersData, allSettings] = await Promise.all([
+        getCachedWorkers(base44.entities),
+        getCachedAllSettings(base44.entities),
       ]);
       const getSetting = (key) => allSettings.find(s => s.setting_key === key);
       const rolesS = getSetting("worker_roles");

@@ -1,51 +1,41 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-// Legacy alias → canonical key pairs to normalize
+// [alias, canonical]
 const ALIASES = [
-  { alias: "שעת התחלה", canonical: "התחלה" },
-  { alias: "שעת סיום",  canonical: "סיום"  },
+  ["שעת התחלה", "התחלה"],
+  ["שעת סיום",  "סיום"],
 ];
 
-/**
- * Normalize one values object (TemplateRow.values or Assignment.column_values).
- * Returns { newObj, changed, valuesMoved, aliasesRemoved }.
- */
-function normalizeValues(vals) {
-  const newObj = { ...vals };
-  let changed = false;
-  let valuesMoved = 0;
-  const aliasesRemoved = {};
+const isEmpty = (v) => v === undefined || v === null || v === "";
 
-  for (const { alias, canonical } of ALIASES) {
-    // Main key
-    if (alias in newObj) {
-      const aliasVal = newObj[alias];
-      const canonicalVal = newObj[canonical];
-      // Move only if canonical is missing/empty
-      if (!canonicalVal && aliasVal) {
-        newObj[canonical] = aliasVal;
-        valuesMoved++;
-      }
-      delete newObj[alias];
-      aliasesRemoved[alias] = (aliasesRemoved[alias] || 0) + 1;
+// Normalize one values/column_values object in place on a copy.
+// Returns { out, changed, moved, removed: {aliasName: count} } or null if unchanged.
+function normalizeObj(obj) {
+  if (!obj || typeof obj !== "object") return null;
+  let changed = false, moved = 0;
+  const removed = {};
+  const out = { ...obj };
+
+  for (const [alias, canon] of ALIASES) {
+    // main key
+    if (alias in out) {
+      if (isEmpty(out[canon]) && !isEmpty(out[alias])) { out[canon] = out[alias]; moved++; }
+      delete out[alias];                                  // canonical already set → just drop alias
       changed = true;
+      removed[alias] = (removed[alias] || 0) + 1;
     }
     // _subTypes companion
-    const aliasSubKey = `${alias}_subTypes`;
-    const canonicalSubKey = `${canonical}_subTypes`;
-    if (aliasSubKey in newObj) {
-      const aliasSubVal = newObj[aliasSubKey];
-      const canonicalSubVal = newObj[canonicalSubKey];
-      if (!canonicalSubVal && aliasSubVal) {
-        newObj[canonicalSubKey] = aliasSubVal;
-        valuesMoved++;
-      }
-      delete newObj[aliasSubKey];
+    const aliasSub = `${alias}_subTypes`;
+    const canonSub = `${canon}_subTypes`;
+    if (aliasSub in out) {
+      if (isEmpty(out[canonSub]) && !isEmpty(out[aliasSub])) { out[canonSub] = out[aliasSub]; moved++; }
+      delete out[aliasSub];
       changed = true;
+      removed[aliasSub] = (removed[aliasSub] || 0) + 1;
     }
   }
 
-  return { newObj, changed, valuesMoved, aliasesRemoved };
+  return changed ? { out, moved, removed } : null;
 }
 
 Deno.serve(async (req) => {
@@ -56,80 +46,74 @@ Deno.serve(async (req) => {
   }
 
   const report = {
-    templateRows: {
-      scanned: 0, changed: 0, valuesMoved: 0,
-      aliasesRemoved: { "שעת התחלה": 0, "שעת סיום": 0 },
-    },
-    assignments: {
-      scanned: 0, changed: 0, valuesMoved: 0,
-      aliasesRemoved: { "שעת התחלה": 0, "שעת סיום": 0 },
-    },
-    samplesChanged: [],
+    templateRows: { scanned: 0, changed: 0, valuesMoved: 0, aliasesRemoved: {} },
+    assignments:  { scanned: 0, changed: 0, valuesMoved: 0, aliasesRemoved: {} },
+    samplesChanged: { templateRows: [], assignments: [] },
   };
 
-  const BATCH = 100;
+  const bump = (bucket, removed) => {
+    for (const [k, n] of Object.entries(removed)) {
+      bucket.aliasesRemoved[k] = (bucket.aliasesRemoved[k] || 0) + n;
+    }
+  };
 
-  // ── 1. TemplateRows ──
+  // ── TemplateRow.values ──
   let trOffset = 0;
+  const TR_BATCH = 100;
   while (true) {
-    const rows = await base44.asServiceRole.entities.TemplateRow.list('-created_date', BATCH, trOffset);
+    const rows = await base44.asServiceRole.entities.TemplateRow.list('-created_date', TR_BATCH, trOffset);
     if (!rows || rows.length === 0) break;
     report.templateRows.scanned += rows.length;
 
     for (const row of rows) {
-      const vals = row.values || {};
-      const { newObj, changed, valuesMoved, aliasesRemoved } = normalizeValues(vals);
-      if (changed) {
-        try {
-          await base44.asServiceRole.entities.TemplateRow.update(row.id, { values: newObj });
+      try {
+        const res = normalizeObj(row.values || {});
+        if (res) {
+          if (report.samplesChanged.templateRows.length < 5) {
+            report.samplesChanged.templateRows.push({ id: row.id, before: row.values, after: res.out });
+          }
+          await base44.asServiceRole.entities.TemplateRow.update(row.id, { values: res.out });
           report.templateRows.changed++;
-          report.templateRows.valuesMoved += valuesMoved;
-          for (const [k, v] of Object.entries(aliasesRemoved)) {
-            report.templateRows.aliasesRemoved[k] = (report.templateRows.aliasesRemoved[k] || 0) + v;
-          }
-          if (report.samplesChanged.length < 5) {
-            report.samplesChanged.push({ entity: "TemplateRow", id: row.id, before: vals, after: newObj });
-          }
-        } catch (e) {
-          console.error(`TemplateRow ${row.id} update failed:`, e.message);
+          report.templateRows.valuesMoved += res.moved;
+          bump(report.templateRows, res.removed);
         }
+      } catch (e) {
+        console.error("TemplateRow normalize failed:", row.id, e);
       }
     }
 
-    if (rows.length < BATCH) break;
-    trOffset += BATCH;
+    if (rows.length < TR_BATCH) break;
+    trOffset += TR_BATCH;
     await new Promise(r => setTimeout(r, 100));
   }
 
-  // ── 2. Assignments ──
+  // ── Assignment.column_values ──
   let aOffset = 0;
+  const A_BATCH = 100;
   while (true) {
-    const assignments = await base44.asServiceRole.entities.Assignment.list('-date', BATCH, aOffset);
-    if (!assignments || assignments.length === 0) break;
-    report.assignments.scanned += assignments.length;
+    const asns = await base44.asServiceRole.entities.Assignment.list('-date', A_BATCH, aOffset);
+    if (!asns || asns.length === 0) break;
+    report.assignments.scanned += asns.length;
 
-    for (const asn of assignments) {
-      const cv = asn.column_values || {};
-      const { newObj, changed, valuesMoved, aliasesRemoved } = normalizeValues(cv);
-      if (changed) {
-        try {
-          await base44.asServiceRole.entities.Assignment.update(asn.id, { column_values: newObj });
+    for (const asn of asns) {
+      try {
+        const res = normalizeObj(asn.column_values || {});
+        if (res) {
+          if (report.samplesChanged.assignments.length < 5) {
+            report.samplesChanged.assignments.push({ id: asn.id, before: asn.column_values, after: res.out });
+          }
+          await base44.asServiceRole.entities.Assignment.update(asn.id, { column_values: res.out });
           report.assignments.changed++;
-          report.assignments.valuesMoved += valuesMoved;
-          for (const [k, v] of Object.entries(aliasesRemoved)) {
-            report.assignments.aliasesRemoved[k] = (report.assignments.aliasesRemoved[k] || 0) + v;
-          }
-          if (report.samplesChanged.length < 10) {
-            report.samplesChanged.push({ entity: "Assignment", id: asn.id, before: cv, after: newObj });
-          }
-        } catch (e) {
-          console.error(`Assignment ${asn.id} update failed:`, e.message);
+          report.assignments.valuesMoved += res.moved;
+          bump(report.assignments, res.removed);
         }
+      } catch (e) {
+        console.error("Assignment normalize failed:", asn.id, e);
       }
     }
 
-    if (assignments.length < BATCH) break;
-    aOffset += BATCH;
+    if (asns.length < A_BATCH) break;
+    aOffset += A_BATCH;
     await new Promise(r => setTimeout(r, 100));
   }
 

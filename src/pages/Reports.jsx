@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { getCachedAllSettings, getCachedAllWorkers, parseSetting } from "@/lib/appDataCache";
 import { Button } from "@/components/ui/button";
 import { Plus, BarChart2, Table2 } from "lucide-react";
 import TrackerEditor from "../components/reports/TrackerEditor";
@@ -78,44 +79,37 @@ export default function Reports() {
 
   const loadData = async () => {
     try {
-    // Batch 1: workers + assignments
-    const [workersData, assignmentsData] = await Promise.all([
-      base44.entities.Worker.list(),
+    // Workers + all settings come from the shared cache (dedup + 3-min TTL)
+    const [workersData, allSettings] = await Promise.all([
+      getCachedAllWorkers(base44.entities),
+      getCachedAllSettings(base44.entities),
+    ]);
+
+    // Page-specific data (not cached): two sequential pairs to avoid a burst
+    const [assignmentsData, templateRowsData] = await Promise.all([
       base44.entities.Assignment.list("-date"),
-    ]);
-
-    // Batch 2: template rows + templates
-    const [templateRowsData, templatesData] = await Promise.all([
       base44.entities.TemplateRow.list(),
+    ]);
+    const [templatesData, trackersData] = await Promise.all([
       base44.entities.Template.filter({ active: true }),
-    ]);
-
-    // Batch 3: trackers + charts
-    const [trackersData, chartsData] = await Promise.all([
       base44.entities.Tracker.list("order"),
+    ]);
+    const [chartsData, qualificationsData] = await Promise.all([
       base44.entities.ChartWidget.list("order"),
-    ]);
-
-    // Batch 4: settings part 1
-    const [populationsSettings, workerRolesSettings, globalColSettings] = await Promise.all([
-      base44.entities.AppSettings.filter({ setting_key: "worker_populations" }),
-      base44.entities.AppSettings.filter({ setting_key: "worker_roles" }),
-      base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" }),
-    ]);
-
-    // Batch 5: settings part 2
-    const [cartColSettings, taskQualSettings, tasksListSettings] = await Promise.all([
-      base44.entities.AppSettings.filter({ setting_key: "cart_specific_params" }),
-      base44.entities.AppSettings.filter({ setting_key: "task_qualifications" }),
-      base44.entities.AppSettings.filter({ setting_key: "tasks_list" }),
-    ]);
-
-    // Batch 6: qualifications + tracker entries + worker qualifications
-    const [qualificationsData, entriesData, workerQualsData] = await Promise.all([
       base44.entities.Qualification.filter({ active: true }),
+    ]);
+    const [entriesData, workerQualsData] = await Promise.all([
       base44.entities.TrackerEntry.list(),
       base44.entities.WorkerQualification.list(),
     ]);
+
+    // Pull each setting locally from the one cached list (no per-key queries)
+    const taskQuals = parseSetting(allSettings, "task_qualifications", {}) || {};
+    const tasksList = parseSetting(allSettings, "tasks_list", []) || [];
+    const populationsRaw = parseSetting(allSettings, "worker_populations", []) || [];
+    const workerRolesRaw = parseSetting(allSettings, "worker_roles", []) || [];
+    const globalCols = parseSetting(allSettings, "custom_schedule_params", []) || [];
+    const cartParams = parseSetting(allSettings, "cart_specific_params", {}) || {};
 
     setWorkers(workersData);
     setAssignments(assignmentsData);
@@ -125,11 +119,10 @@ export default function Reports() {
     setCharts(chartsData);
     setTrackerEntries(entriesData);
 
-    // Load task qualifications from AppSettings
-    const taskQuals = taskQualSettings.length > 0 ? JSON.parse(taskQualSettings[0].setting_value) || {} : {};
+    // Task qualifications already parsed from the cached settings
     setTaskQualifications(taskQuals);
     const taskQualNames = Object.keys(taskQuals);
-    const taskListNames = tasksListSettings.length > 0 ? (JSON.parse(tasksListSettings[0].setting_value) || []) : [];
+    const taskListNames = tasksList;
     const qualsFromEntity = qualificationsData.map(q => ({ id: q.id, name: q.name }));
     const allTaskNames = [...new Set([...taskQualNames, ...taskListNames])];
     const entityNameSet = new Set(qualsFromEntity.map(q => q.name));
@@ -139,22 +132,19 @@ export default function Reports() {
     ];
     setQualifications(merged);
     setWorkerQualifications(workerQualsData);
-    if (populationsSettings.length > 0) {
-      const raw = JSON.parse(populationsSettings[0].setting_value) || [];
-      const objs = raw.map(p => typeof p === "string" ? { name: p, mapping_id: p } : p).filter(p => p.name);
+    {
+      const objs = populationsRaw.map(p => typeof p === "string" ? { name: p, mapping_id: p } : p).filter(p => p.name);
       setPopulations(objs.map(p => p.name));
       setPopulationObjects(objs);
     }
-    if (workerRolesSettings.length > 0) {
-      const raw = JSON.parse(workerRolesSettings[0].setting_value) || [];
-      const objs = raw.map(r => typeof r === "string" ? { name: r, mapping_id: r } : r).filter(r => r.name);
+    {
+      const objs = workerRolesRaw.map(r => typeof r === "string" ? { name: r, mapping_id: r } : r).filter(r => r.name);
       setWorkerRoles(objs.map(r => r.name));
       setRoleObjects(objs);
     }
 
     // Collect all unique schedule columns from global + cart params
-    const globalCols = globalColSettings.length > 0 ? (JSON.parse(globalColSettings[0].setting_value) || []) : [];
-    const cartCols = cartColSettings.length > 0 ? Object.values(JSON.parse(cartColSettings[0].setting_value) || {}).flat() : [];
+    const cartCols = Object.values(cartParams).flat();
     const allCols = [...globalCols, ...cartCols];
     const uniqueCols = allCols.filter((col, idx, arr) => arr.findIndex(c => c.name === col.name) === idx);
     setScheduleColumns(uniqueCols);
