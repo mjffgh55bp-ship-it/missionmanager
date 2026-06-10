@@ -1,0 +1,105 @@
+{
+  "name": "ScheduleColumn",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Display name, e.g. \u05d2\u05d6\u05e8 / \u05d4\u05ea\u05d7\u05dc\u05d4 / \u05e0\u05d4\u05d2"
+    },
+    "mapping_id": {
+      "type": "string",
+      "description": "Canonical stable id (col_...). The map scheduleColumnsById is keyed by THIS, not by the Base44 record id. Carried over from custom_schedule_params."
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "time",
+        "worker",
+        "task",
+        "select"
+      ]
+    },
+    "role_filter": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "For worker columns: the matching role name"
+    },
+    "report_type": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "sum_hours | count_by_text | count_quantitative | (default sum)"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sub_options": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "quantitative_items": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "quantitative_preset_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "is_time": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "true for \u05d4\u05ea\u05d7\u05dc\u05d4/\u05e1\u05d9\u05d5\u05dd/\u05ea\u05d3\u05e8\u05d9\u05da"
+    },
+    "is_core": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "structural; not user-deletable"
+    },
+    "sort_order": {
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "name",
+    "type",
+    "mapping_id"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
