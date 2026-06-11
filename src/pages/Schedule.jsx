@@ -144,17 +144,16 @@ export default function Schedule() {
     lastWeekStart.current = weekStartStr;
 
     try {
-    // Static reference data — staggered to avoid rate limits on cache miss
-    const workersData = await getCachedWorkers(base44.entities);
-    await new Promise(r => setTimeout(r, 150));
-    const allTemplatesData = await getCachedTemplates(base44.entities);
-    await new Promise(r => setTimeout(r, 150));
-    const allSettings = await getCachedAllSettings(base44.entities);
-    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
-    await new Promise(r => setTimeout(r, 300));
-    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
-    await new Promise(r => setTimeout(r, 300));
-    const availabilitiesData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
+    const [workersData, allTemplatesData, allSettings] = await Promise.all([
+      getCachedWorkers(base44.entities),
+      getCachedTemplates(base44.entities),
+      getCachedAllSettings(base44.entities),
+    ]);
+    const [templateRowsData, unavailabilitiesData, availabilitiesData] = await Promise.all([
+      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
+      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
+      fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })),
+    ]);
 
     // Filter settings client-side
     const colTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
@@ -189,12 +188,13 @@ export default function Schedule() {
       getCachedAllSettings(base44.entities),
       getCachedTemplates(base44.entities),
     ]);
-    const templateRowsData = await fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString }));
-    await new Promise(r => setTimeout(r, 300));
-    const unavailabilitiesData = await fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString }));
-    const availabilitiesData = weekChanged
-      ? (await new Promise(r => setTimeout(r, 200)), await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })))
-      : null;
+    const [templateRowsData, unavailabilitiesData, availabilitiesData] = await Promise.all([
+      fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: dateString })),
+      fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
+      weekChanged
+        ? fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }))
+        : Promise.resolve(null),
+    ]);
     if (weekChanged) lastWeekStart.current = weekStartStr;
 
     // Update allTemplates state with the fresh list so the render loop finds new templates

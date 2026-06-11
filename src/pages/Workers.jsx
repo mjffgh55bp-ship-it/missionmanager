@@ -74,9 +74,7 @@ export default function Workers() {
   };
 
   useEffect(() => {
-    // Small delay to avoid firing simultaneously with other pages on initial mount
-    const timer = setTimeout(() => { loadData(); }, 150);
-    return () => clearTimeout(timer);
+    loadData();
   }, []);
 
   // Reload workers when the tab regains focus, or when Worker/Settings data changes (e.g. role rename)

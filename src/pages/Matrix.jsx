@@ -501,9 +501,11 @@ export default function Matrix() {
 
   const loadStaticData = async () => {
     try {
-      const workersData = await getCachedWorkers(base44.entities);
-      const allSettings = await getCachedAllSettings(base44.entities);
-      const trackersData = await base44.entities.Tracker.list('-created_date', 200);
+      const [workersData, allSettings, trackersData] = await Promise.all([
+        getCachedWorkers(base44.entities),
+        getCachedAllSettings(base44.entities),
+        base44.entities.Tracker.list('-created_date', 200),
+      ]);
       const parseSetting = (key) => { const s = allSettings.find(x => x.setting_key === key); return s ? JSON.parse(s.setting_value) : null; };
       const rawPops = parseSetting("worker_populations") || ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
       setPopulations(rawPops.map(p => (typeof p === "string" ? p : p.name)));

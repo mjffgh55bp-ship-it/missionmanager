@@ -253,23 +253,17 @@ export default function Availability() {
     if (isLoadingAllRef.current) return;
     isLoadingAllRef.current = true;
     try {
-      // Step 1: identify user FIRST — critical path
-      const user = await base44.auth.me();
-      cachedUser.current = user;
-      setCurrentUser(user);
-
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      // Step 2: fetch static data — staggered to avoid rate-limit burst
-      const [myWorkerRes, allSettings] = await Promise.all([
+      const [user, myWorkerRes, allSettings, eventsData, yearlyEventsData] = await Promise.all([
+        base44.auth.me(),
         getMyWorker({}),
         getCachedAllSettings(base44.entities),
-      ]);
-      await new Promise(r => setTimeout(r, 200));
-      const [eventsData, yearlyEventsData] = await Promise.all([
         fetchWithRetry(() => base44.entities.CompanyEvent.list("-date")),
         fetchWithRetry(() => base44.entities.YearlyEvent.list("-start_date", 500)),
       ]);
+      cachedUser.current = user;
+      setCurrentUser(user);
 
       // Extract settings client-side (no extra API calls)
       const openReg = parseSetting(allSettings, "open_registrations", []);
