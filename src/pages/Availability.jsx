@@ -133,6 +133,18 @@ export default function Availability() {
   const syncDebounceRef = useRef(null);
   const broadcastRef = useRef(null);
 
+  // Shared retry helper for rate-limited requests
+  const fetchWithRetry = async (fn, retries = 3, baseDelay = 600) => {
+    for (let i = 0; i < retries; i++) {
+      try { return await fn(); }
+      catch (e) {
+        if (i < retries - 1 && (e?.message?.includes('Rate limit') || e?.status === 429)) {
+          await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
+        } else throw e;
+      }
+    }
+  };
+
   // Lightweight refetch — only weekAvailabilities (for live count updates)
   const refetchWeekAvailabilities = () => {
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
@@ -255,8 +267,8 @@ export default function Availability() {
       ]);
       await new Promise(r => setTimeout(r, 200));
       const [eventsData, yearlyEventsData] = await Promise.all([
-        base44.entities.CompanyEvent.list("-date"),
-        base44.entities.YearlyEvent.list("-start_date", 500),
+        fetchWithRetry(() => base44.entities.CompanyEvent.list("-date")),
+        fetchWithRetry(() => base44.entities.YearlyEvent.list("-start_date", 500)),
       ]);
 
       // Extract settings client-side (no extra API calls)
@@ -337,18 +349,6 @@ export default function Availability() {
     const weekStartStr = format(ws, "yyyy-MM-dd");
     const weekEndStr = format(addDays(ws, 6), "yyyy-MM-dd");
     const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(ws, i), "yyyy-MM-dd"));
-
-    // Retry helper for rate-limited requests
-    const fetchWithRetry = async (fn, retries = 3, baseDelay = 600) => {
-      for (let i = 0; i < retries; i++) {
-        try { return await fn(); }
-        catch (e) {
-          if (i < retries - 1 && (e?.message?.includes('Rate limit') || e?.status === 429)) {
-            await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
-          } else throw e;
-        }
-      }
-    };
 
     try {
       // ── Phase 1: fire 4 requests in parallel (~300ms total) ─────────────────
