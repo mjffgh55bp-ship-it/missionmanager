@@ -330,12 +330,27 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   };
 
   const loadingRef = useRef(false);
+  const fetchWithRetry = async (fn, retries = 6, baseDelay = 800) => {
+    for (let i = 0; i < retries; i++) {
+      try { return await fn(); }
+      catch (e) {
+        const isRateLimit = e?.message?.includes('Rate limit') || e?.message?.includes('rate limit');
+        if (isRateLimit && i < retries - 1) {
+          await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
+        } else if (isRateLimit) {
+          return [];
+        } else {
+          throw e;
+        }
+      }
+    }
+  };
   const loadEntries = async () => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     try {
-      const data = await base44.entities.TrackerEntry.filter({ tracker_id: tracker.id });
-      setEntries(data);
+      const data = await fetchWithRetry(() => base44.entities.TrackerEntry.filter({ tracker_id: tracker.id }));
+      setEntries(data || []);
     } finally {
       loadingRef.current = false;
     }
