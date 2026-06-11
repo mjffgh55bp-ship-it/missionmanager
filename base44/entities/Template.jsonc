@@ -41,6 +41,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "column_id": {
+            "type": "string",
+            "description": "Stable mapping_id from the ScheduleColumn registry"
           }
         }
       },
