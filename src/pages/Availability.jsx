@@ -181,7 +181,7 @@ export default function Availability() {
 
           const [freshTemplates, ...dayRowArrays] = await Promise.all([
             getCachedTemplates(base44.entities),
-            ...weekDates.map(d => base44.entities.TemplateRow.filter({ date: d })),
+            ...weekDates.map(d => fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: d }))),
           ]);
 
           const freshRows = dayRowArrays.flat();
