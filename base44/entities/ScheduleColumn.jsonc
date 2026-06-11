@@ -49,7 +49,7 @@
     "quantitative_items": {
       "type": "array",
       "items": {
-        "type": "object"
+        "type": "string"
       }
     },
     "quantitative_preset_name": {
