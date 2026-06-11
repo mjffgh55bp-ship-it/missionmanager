@@ -1,4 +1,5 @@
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addDays } from "date-fns";
+import { calcShiftHours } from "./operationalDate";
 
 export const COLORS_PALETTE = [
   "#1e3a5f", "#16a34a", "#dc2626", "#9333ea", "#ea580c",
@@ -46,18 +47,7 @@ export function getDateRange(mode, startDate, endDate) {
 
 export function calcHours(start, end) {
   if (!start || !end) return 0;
-  const endMatch = end.match(/^\+(\d+)\s+(\d{2}):(\d{2})$/);
-  const [sh, sm] = start.split(":").map(Number);
-  if (endMatch) {
-    const days = parseInt(endMatch[1]);
-    const eh = parseInt(endMatch[2]);
-    const em = parseInt(endMatch[3]);
-    return Math.round((days * 24 + eh + em / 60 - sh - sm / 60) * 10) / 10;
-  }
-  const [eh, em] = end.split(":").map(Number);
-  let diff = eh + em / 60 - sh - sm / 60;
-  if (diff < 0) diff += 24;
-  return Math.round(diff * 10) / 10;
+  return Math.round(calcShiftHours(start, end) * 10) / 10;
 }
 
 // ── Migrate legacy chart to new metrics format ──────────────────────────────

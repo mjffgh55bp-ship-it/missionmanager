@@ -10,7 +10,7 @@ import { base44 } from "@/api/base44Client";
 import ColumnConfigDialog from "./ColumnConfigDialog";
 import VisualAnalysisDialog, { getVisualColor } from "./VisualAnalysisDialog";
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from "date-fns";
-import { getOperationalStartDate } from "@/lib/operationalDate";
+import { getOperationalStartDate, calcShiftHours } from "@/lib/operationalDate";
 
 // Pill-style worker filter — same pattern as Yearly participant filter
 // options: array of strings OR array of {value, label} objects
@@ -50,18 +50,7 @@ const COLUMN_TYPES = [
 
 const calcHours = (start, end) => {
   if (!start || !end) return 0;
-  const endMatch = end.match(/^\+(\d+)\s+(\d{2}):(\d{2})$/);
-  const [sh, sm] = start.split(":").map(Number);
-  if (endMatch) {
-    const days = parseInt(endMatch[1]);
-    const eh = parseInt(endMatch[2]);
-    const em = parseInt(endMatch[3]);
-    return Math.round((days * 24 + eh + em / 60 - sh - sm / 60) * 10) / 10;
-  }
-  const [eh, em] = end.split(":").map(Number);
-  let diff = eh + em / 60 - sh - sm / 60;
-  if (diff < 0) diff += 24;
-  return Math.round(diff * 10) / 10;
+  return Math.round(calcShiftHours(start, end) * 10) / 10;
 };
 
 const getDateRange = (mode, startDate, endDate) => {
