@@ -145,6 +145,20 @@ export default function Availability() {
     }
   };
 
+  // Batch helper — prevents rate-limit bursts by staggering parallel calls into small groups
+  const fetchBatch = async (fns, batchSize = 3, delayMs = 200) => {
+    const results = [];
+    for (let i = 0; i < fns.length; i += batchSize) {
+      const batch = fns.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch.map(fn => fetchWithRetry(fn)));
+      results.push(...batchResults);
+      if (i + batchSize < fns.length) {
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+    return results;
+  };
+
   // Lightweight refetch — only weekAvailabilities (for live count updates)
   const refetchWeekAvailabilities = () => {
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
@@ -179,10 +193,10 @@ export default function Availability() {
           const weekEndStr   = format(addDays(ws, 6), "yyyy-MM-dd");
           const weekDates    = Array.from({ length: 7 }, (_, i) => format(addDays(ws, i), "yyyy-MM-dd"));
 
-          const [freshTemplates, ...dayRowArrays] = await Promise.all([
-            getCachedTemplates(base44.entities),
-            ...weekDates.map(d => fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: d }))),
-          ]);
+          const freshTemplates = await getCachedTemplates(base44.entities);
+          const dayRowArrays = await fetchBatch(
+            weekDates.map(d => () => base44.entities.TemplateRow.filter({ date: d })),
+          );
 
           const freshRows = dayRowArrays.flat();
           cachedAllTemplateRows.current = freshRows;
@@ -365,18 +379,14 @@ export default function Availability() {
       }
       const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
 
-      // ── Phase 2: fire 7+1 requests in two batches of 4 ──────────────────────
-      const batch1 = await Promise.all(
-        weekDates.slice(0, 4).map(d => fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: d })))
+      // ── Phase 2: fetch 7 day rows in batches + week availabilities ──────────
+      const dayRowArrays = await fetchBatch(
+        weekDates.map(d => () => base44.entities.TemplateRow.filter({ date: d })),
       );
-      const batch2 = await Promise.all([
-        ...weekDates.slice(4).map(d => fetchWithRetry(() => base44.entities.TemplateRow.filter({ date: d }))),
-        fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })),
-      ]);
+      // Fetch week availabilities separately to avoid mixing result types in the batch
+      const weekAvailsData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
 
-      // Last item of batch2 is weekAvailsData, the rest are template row arrays
-      const weekAvailsData = batch2[batch2.length - 1];
-      const allDayRows = [...batch1, ...batch2.slice(0, -1)].flat();
+      const allDayRows = dayRowArrays.flat();
       cachedAllTemplateRows.current = allDayRows;
       const allWeekRows = allDayRows;
 
