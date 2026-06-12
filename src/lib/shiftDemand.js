@@ -377,10 +377,11 @@ export function serializePossibleInstances(instancesMap) {
 export function filterDemandForWeek(demandMap, weekStart) {
   const results = [];
   const weekDates = new Set();
+  const pad = (n) => String(n).padStart(2, "0");
   for (let i = 0; i < 7; i++) {
     const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
-    weekDates.add(d.toISOString().slice(0, 10));
+    weekDates.add(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
   }
   demandMap.forEach(shift => {
     if (weekDates.has(shift.date)) results.push(shift);

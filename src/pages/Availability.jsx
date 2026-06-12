@@ -212,6 +212,7 @@ export default function Availability() {
           if (format(weekStartRef.current, "yyyy-MM-dd") !== weekStartStr) return;
 
           setOpenRegistrations(freshOpenReg);
+          setSignupMode(parseSetting(freshSettings, "availability_signup_mode", "allow_over_sign_up"));
           setAllTemplates(freshTemplates);
           setTemplateRows(weekRows);
         } catch {

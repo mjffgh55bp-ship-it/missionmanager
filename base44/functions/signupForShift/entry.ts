@@ -19,12 +19,16 @@ async function withRetry(fn, tries = 3) {
  * Atomic signup for a shift slot using a distributed lock (ShiftLock entity).
  *
  * Strategy:
- * 1. Try to INSERT a ShiftLock record for this signupKey+week.
- *    - If the insert succeeds → we own the slot.
- *    - If the insert fails (duplicate lock_key already exists) → slot is taken → return { success: false }.
- * 2. After winning the lock, do a final count check (in case of slots with requiredCount > 1).
- * 3. Save the availability record.
- * 4. Clean up old locks for this key that belong to previous owners (keep only ours).
+ * 1. Fetch all availabilities for the week (needed for validation + saving).
+ * 2. Fetch existing locks for this signupKey+week.
+ * 3. Validate each lock against the holder's actual availability:
+ *    A lock is VALID only if its holder has a "wanted" entry for this signupKey.
+ *    Stale locks (holder removed/switched their signup) are cleaned up.
+ * 4. Count only valid locks from other workers to check capacity.
+ * 5. If capacity available, try to INSERT our lock (or update ours if we already hold one).
+ * 6. After a 100ms race-sleep, re-check and re-validate locks.
+ * 7. If we won, save the availability record.
+ * 8. If we lost, delete our lock.
  *
  * Returns { success: true, record } or { success: false, reason: 'full' }.
  */
@@ -49,14 +53,25 @@ Deno.serve(async (req) => {
   const maxSlots = requiredCount || 1;
   const lockKey = `${signupKey}__${weekStartDate}`;
 
-  // Handle un-registration: release lock and save availability
+  // ── Fetch all availabilities for the week once (used for validation + saving) ──
+  const allAvails = await withRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartDate }));
+
+  // ── Helper: a lock is VALID only if its holder has a "wanted" entry for this signupKey ──
+  const holderHasWanted = (wid) => {
+    const rec = allAvails.find(a => a.worker_id === wid);
+    if (!rec || !Array.isArray(rec.shifts)) return false;
+    return rec.shifts.some(s => s.signupKey === signupKey && s.type === "wanted");
+  };
+
+  // ── Handle un-registration: release ALL locks for this worker+key, save availability ──
   if (isRemove) {
     const existingLocks = await withRetry(() => base44.entities.ShiftLock.filter({ lock_key: lockKey }));
-    const myLock = existingLocks.find(l => l.worker_id === workerId);
-    if (myLock) {
-      await withRetry(() => base44.entities.ShiftLock.delete(myLock.id));
+    const myLocks = existingLocks.filter(l => l.worker_id === workerId);
+    for (const lock of myLocks) {
+      try { await withRetry(() => base44.entities.ShiftLock.delete(lock.id)); } catch (_) {}
     }
-    const allAvails = await withRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartDate }));
+
+    // Reuse the already-fetched allAvails
     const existingList = allAvails.filter(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
     let saved;
     if (existingList.length > 0) {
@@ -67,27 +82,33 @@ Deno.serve(async (req) => {
     return Response.json({ success: true, record: saved });
   }
 
+  // ── Signup branch ──
+
   // Step 1: Check existing locks for this slot
   const existingLocks = await withRetry(() => base44.entities.ShiftLock.filter({ lock_key: lockKey }));
 
-  // Check if this worker already has a lock (re-registration attempt)
-  const myExistingLock = existingLocks.find(l => l.worker_id === workerId);
+  // Validate locks: only count locks whose holder actually has a "wanted" entry
+  const validOtherLocks = [];
+  for (const l of existingLocks) {
+    if (l.worker_id === workerId) continue;
+    if (holderHasWanted(l.worker_id)) {
+      validOtherLocks.push(l);
+    } else {
+      // Stale lock (holder removed/switched their signup via another path) — clean it up
+      try { await withRetry(() => base44.entities.ShiftLock.delete(l.id)); } catch (_) { /* already gone */ }
+    }
+  }
 
-  // Count locks from OTHER workers
-  const otherLocks = existingLocks.filter(l => l.worker_id !== workerId);
-
-  if (otherLocks.length >= maxSlots) {
-    // Slot is fully taken by others
-    return Response.json({ success: false, reason: 'full', currentCount: otherLocks.length, maxSlots });
+  if (validOtherLocks.length >= maxSlots) {
+    return Response.json({ success: false, reason: 'full', currentCount: validOtherLocks.length, maxSlots });
   }
 
   // Step 2: Acquire lock — create if we don't already have one
+  const myExistingLock = existingLocks.find(l => l.worker_id === workerId);
   let lockRecord;
   if (myExistingLock) {
-    // We already hold a lock — just update the timestamp
     lockRecord = myExistingLock;
   } else {
-    // Create our lock entry
     lockRecord = await withRetry(() => base44.entities.ShiftLock.create({
       lock_key: lockKey,
       worker_id: workerId,
@@ -97,23 +118,29 @@ Deno.serve(async (req) => {
   }
 
   // Step 3: Re-check after lock creation (handles the tight race window)
-  // Wait a tiny bit to let any concurrent inserts land
   await new Promise(r => setTimeout(r, 100));
 
   const locksAfter = await withRetry(() => base44.entities.ShiftLock.filter({ lock_key: lockKey }));
-  const otherLocksAfter = locksAfter.filter(l => l.worker_id !== workerId);
+  // Re-validate: only count locks whose holder still has a "wanted" entry
+  const validOtherLocksAfter = [];
+  for (const l of locksAfter) {
+    if (l.worker_id === workerId) continue;
+    if (holderHasWanted(l.worker_id)) {
+      validOtherLocksAfter.push(l);
+    } else {
+      try { await withRetry(() => base44.entities.ShiftLock.delete(l.id)); } catch (_) {}
+    }
+  }
 
-  if (otherLocksAfter.length >= maxSlots) {
+  if (validOtherLocksAfter.length >= maxSlots) {
     // Someone else also got in — delete our lock and return failure
-    // Guard against 404 if lock was already deleted by a concurrent request
     try {
       await withRetry(() => base44.entities.ShiftLock.delete(lockRecord.id));
     } catch (_) { /* already gone — that's fine */ }
-    return Response.json({ success: false, reason: 'full', currentCount: otherLocksAfter.length, maxSlots });
+    return Response.json({ success: false, reason: 'full', currentCount: validOtherLocksAfter.length, maxSlots });
   }
 
-  // Step 4: We won — save the availability record
-  const allAvails = await withRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartDate }));
+  // Step 4: We won — save the availability record (reuse allAvails instead of refetching)
   const existingList = allAvails.filter(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
 
   let saved;

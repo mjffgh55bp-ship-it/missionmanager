@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { usePageState } from "@/hooks/usePageState";
 import { base44 } from "@/api/base44Client";
-import { getCachedAllSettings, getCachedWorkers, getCachedTemplates } from "@/lib/appDataCache";
+import { getCachedAllSettings, getCachedWorkers, getCachedTemplates, invalidateSettingsCache } from "@/lib/appDataCache";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -1113,6 +1113,7 @@ export default function Matrix() {
     const existingId = settingsIdCache.current["availability_signup_mode"];
     if (existingId) await base44.entities.AppSettings.update(existingId, { setting_value: JSON.stringify(newMode) });
     else { const created = await base44.entities.AppSettings.create({ setting_key: "availability_signup_mode", setting_value: JSON.stringify(newMode) }); settingsIdCache.current["availability_signup_mode"] = created.id; }
+    invalidateSettingsCache();
     setSignupMode(newMode); setSavingSignupMode(false);
   };
 
@@ -1120,6 +1121,7 @@ export default function Matrix() {
     const existingId = settingsIdCache.current["matrix_summary_columns"];
     if (existingId) await base44.entities.AppSettings.update(existingId, { setting_value: JSON.stringify(cols) });
     else { const created = await base44.entities.AppSettings.create({ setting_key: 'matrix_summary_columns', setting_value: JSON.stringify(cols) }); settingsIdCache.current["matrix_summary_columns"] = created.id; }
+    invalidateSettingsCache();
     setSummaryColumns(cols);
   };
 
