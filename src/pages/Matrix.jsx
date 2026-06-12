@@ -1110,11 +1110,35 @@ export default function Matrix() {
 
   const saveSignupMode = async (newMode) => {
     setSavingSignupMode(true);
-    const existingId = settingsIdCache.current["availability_signup_mode"];
-    if (existingId) await base44.entities.AppSettings.update(existingId, { setting_value: JSON.stringify(newMode) });
-    else { const created = await base44.entities.AppSettings.create({ setting_key: "availability_signup_mode", setting_value: JSON.stringify(newMode) }); settingsIdCache.current["availability_signup_mode"] = created.id; }
-    invalidateSettingsCache();
-    setSignupMode(newMode); setSavingSignupMode(false);
+    try {
+      // Authoritative: fetch ALL records for this key (bypass any cache/id assumptions)
+      const records = await base44.entities.AppSettings.filter({ setting_key: "availability_signup_mode" });
+
+      if (records.length === 0) {
+        const created = await base44.entities.AppSettings.create({
+          setting_key: "availability_signup_mode",
+          setting_value: JSON.stringify(newMode),
+        });
+        settingsIdCache.current["availability_signup_mode"] = created.id;
+      } else {
+        // Keep the first record, update it, DELETE all duplicates
+        const keep = records[0];
+        await base44.entities.AppSettings.update(keep.id, { setting_value: JSON.stringify(newMode) });
+        settingsIdCache.current["availability_signup_mode"] = keep.id;
+        for (const dup of records.slice(1)) {
+          try { await base44.entities.AppSettings.delete(dup.id); } catch (_) { /* already gone */ }
+        }
+        if (records.length > 1) console.warn(`signup_mode: removed ${records.length - 1} duplicate setting record(s)`);
+      }
+
+      invalidateSettingsCache();
+      setSignupMode(newMode);
+    } catch (e) {
+      console.error("saveSignupMode failed:", e);
+      alert("שמירת מצב ההרשמה נכשלה — נסו שוב");
+    } finally {
+      setSavingSignupMode(false);
+    }
   };
 
   const saveSummaryColumns = async (cols) => {
