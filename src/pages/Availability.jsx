@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
-import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, parseSetting, parseListSetting } from "@/lib/appDataCache";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, parseSetting, parseListSetting, invalidateSettingsCache } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -184,8 +184,13 @@ export default function Availability() {
       });
     });
 
+    const settingsDebounceRef = { current: null };
     const unsubSettings = base44.entities.AppSettings.subscribe(() => {
-      base44.entities.AppSettings.list().then(async freshSettings => {
+      if (settingsDebounceRef.current) clearTimeout(settingsDebounceRef.current);
+      settingsDebounceRef.current = setTimeout(() => {
+        settingsDebounceRef.current = null;
+        invalidateSettingsCache();
+        getCachedAllSettings(base44.entities).then(async freshSettings => {
         const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
         try {
           const ws = weekStartRef.current;
@@ -213,6 +218,7 @@ export default function Availability() {
           // Leave state unchanged on failure
         }
       }).catch(() => {});
+      }, 2000);
     });
 
     const bc = new BroadcastChannel("availability-sync");
@@ -239,6 +245,7 @@ export default function Availability() {
       window.removeEventListener("availabilityUpdated", onUpdated);
       if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
       if (weekNavDebounceRef.current) clearTimeout(weekNavDebounceRef.current);
+      if (settingsDebounceRef.current) clearTimeout(settingsDebounceRef.current);
     };
   }, []); // ← empty deps: never torn down during week navigation
 
@@ -1090,6 +1097,7 @@ END:VEVENT
         } catch {
           setPendingSignupKeys(prev => { const n = new Set(prev); n.delete(signupKey); return n; });
           setSelectedShifts(prev => prev.filter(s => s.signupKey !== signupKey));
+          alert("ההרשמה נכשלה זמנית בגלל עומס — נסו שוב בעוד מספר שניות");
           return;
         }
 
@@ -1157,6 +1165,11 @@ END:VEVENT
 
         // Normal flow (no override):
         if (!result.data?.success) {
+          if (result.data?.reason === 'full') {
+            alert("המשמרת כבר מלאה — מישהו הקדים אתכם");
+          } else {
+            alert("ההרשמה נכשלה זמנית — נסו שוב בעוד מספר שניות");
+          }
           setSelectedShifts(prev => prev.filter(s => s.signupKey !== signupKey));
           const freshAvails = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
           setWeekAvailabilities(freshAvails);
@@ -1188,6 +1201,11 @@ END:VEVENT
           isRemove: true,
         });
         if (!result.data?.success) {
+          if (result.data?.reason === 'full') {
+            alert("המשמרת כבר מלאה — מישהו הקדים אתכם");
+          } else {
+            alert("ההרשמה נכשלה זמנית — נסו שוב בעוד מספר שניות");
+          }
           const freshAvails = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
           setWeekAvailabilities(freshAvails);
           return;

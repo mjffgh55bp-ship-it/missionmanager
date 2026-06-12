@@ -1,5 +1,20 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+async function withRetry(fn, tries = 3) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); }
+    catch (e) {
+      lastErr = e;
+      const msg = String(e?.message || e);
+      if (!/rate limit|429|timeout|network/i.test(msg)) throw e;
+      await sleep(300 * Math.pow(2, i));
+    }
+  }
+  throw lastErr;
+}
+
 /**
  * Atomic signup for a shift slot using a distributed lock (ShiftLock entity).
  *
@@ -36,24 +51,24 @@ Deno.serve(async (req) => {
 
   // Handle un-registration: release lock and save availability
   if (isRemove) {
-    const existingLocks = await base44.entities.ShiftLock.filter({ lock_key: lockKey });
+    const existingLocks = await withRetry(() => base44.entities.ShiftLock.filter({ lock_key: lockKey }));
     const myLock = existingLocks.find(l => l.worker_id === workerId);
     if (myLock) {
-      await base44.entities.ShiftLock.delete(myLock.id);
+      await withRetry(() => base44.entities.ShiftLock.delete(myLock.id));
     }
-    const allAvails = await base44.entities.Availability.filter({ week_start_date: weekStartDate });
+    const allAvails = await withRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartDate }));
     const existingList = allAvails.filter(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
     let saved;
     if (existingList.length > 0) {
-      saved = await base44.entities.Availability.update(existingList[0].id, availabilityData);
+      saved = await withRetry(() => base44.entities.Availability.update(existingList[0].id, availabilityData));
     } else {
-      saved = await base44.entities.Availability.create(availabilityData);
+      saved = await withRetry(() => base44.entities.Availability.create(availabilityData));
     }
     return Response.json({ success: true, record: saved });
   }
 
   // Step 1: Check existing locks for this slot
-  const existingLocks = await base44.entities.ShiftLock.filter({ lock_key: lockKey });
+  const existingLocks = await withRetry(() => base44.entities.ShiftLock.filter({ lock_key: lockKey }));
 
   // Check if this worker already has a lock (re-registration attempt)
   const myExistingLock = existingLocks.find(l => l.worker_id === workerId);
@@ -73,39 +88,39 @@ Deno.serve(async (req) => {
     lockRecord = myExistingLock;
   } else {
     // Create our lock entry
-    lockRecord = await base44.entities.ShiftLock.create({
+    lockRecord = await withRetry(() => base44.entities.ShiftLock.create({
       lock_key: lockKey,
       worker_id: workerId,
       worker_name: workerName || '',
       locked_at: new Date().toISOString(),
-    });
+    }));
   }
 
   // Step 3: Re-check after lock creation (handles the tight race window)
   // Wait a tiny bit to let any concurrent inserts land
   await new Promise(r => setTimeout(r, 100));
 
-  const locksAfter = await base44.entities.ShiftLock.filter({ lock_key: lockKey });
+  const locksAfter = await withRetry(() => base44.entities.ShiftLock.filter({ lock_key: lockKey }));
   const otherLocksAfter = locksAfter.filter(l => l.worker_id !== workerId);
 
   if (otherLocksAfter.length >= maxSlots) {
     // Someone else also got in — delete our lock and return failure
     // Guard against 404 if lock was already deleted by a concurrent request
     try {
-      await base44.entities.ShiftLock.delete(lockRecord.id);
+      await withRetry(() => base44.entities.ShiftLock.delete(lockRecord.id));
     } catch (_) { /* already gone — that's fine */ }
     return Response.json({ success: false, reason: 'full', currentCount: otherLocksAfter.length, maxSlots });
   }
 
   // Step 4: We won — save the availability record
-  const allAvails = await base44.entities.Availability.filter({ week_start_date: weekStartDate });
+  const allAvails = await withRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartDate }));
   const existingList = allAvails.filter(a => a.worker_id === workerId && a.week_start_date === weekStartDate);
 
   let saved;
   if (existingList.length > 0) {
-    saved = await base44.entities.Availability.update(existingList[0].id, availabilityData);
+    saved = await withRetry(() => base44.entities.Availability.update(existingList[0].id, availabilityData));
   } else {
-    saved = await base44.entities.Availability.create(availabilityData);
+    saved = await withRetry(() => base44.entities.Availability.create(availabilityData));
   }
 
   return Response.json({ success: true, record: saved });

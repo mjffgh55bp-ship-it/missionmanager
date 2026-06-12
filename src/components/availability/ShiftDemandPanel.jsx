@@ -407,9 +407,6 @@ export default function ShiftDemandPanel({
 
   const byDate = {};
   filteredWeekDemand.forEach(s => {
-    // Skip Saturday (day 6)
-    const dayOfWeek = new Date(s.date + "T00:00:00").getDay();
-    if (dayOfWeek === 6) return;
     if (!byDate[s.date]) byDate[s.date] = [];
     byDate[s.date].push(s);
   });
