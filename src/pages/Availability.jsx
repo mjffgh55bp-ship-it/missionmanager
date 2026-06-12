@@ -276,12 +276,17 @@ export default function Availability() {
     try {
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      const [user, myWorkerRes, allSettings, eventsData, yearlyEventsData] = await Promise.all([
+      // Phase 1: identity + settings (1 entity call max — avoids rate-limit collision)
+      const [user, myWorkerRes, allSettings] = await Promise.all([
         base44.auth.me(),
         getMyWorker({}),
         getCachedAllSettings(base44.entities),
-        fetchWithRetry(() => base44.entities.CompanyEvent.list("-date")),
-        fetchWithRetry(() => base44.entities.YearlyEvent.list("-start_date", 500)),
+      ]);
+
+      // Phase 2: reference data (staggered entity calls)
+      const [eventsData, yearlyEventsData] = await fetchBatch([
+        () => base44.entities.CompanyEvent.list("-date"),
+        () => base44.entities.YearlyEvent.list("-start_date", 500),
       ]);
       cachedUser.current = user;
       setCurrentUser(user);
