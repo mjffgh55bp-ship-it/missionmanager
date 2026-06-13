@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
-import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, getCachedAllWorkers, parseSetting, parseListSetting, invalidateSettingsCache, fetchWithRetry } from "@/lib/appDataCache";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, getCachedAllWorkers, parseSetting, parseListSetting, invalidateSettingsCache, softInvalidateStaticCache, fetchWithRetry } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -182,7 +182,7 @@ export default function Availability() {
       if (settingsDebounceRef.current) clearTimeout(settingsDebounceRef.current);
       settingsDebounceRef.current = setTimeout(() => {
         settingsDebounceRef.current = null;
-        invalidateSettingsCache();
+        softInvalidateStaticCache();
         getCachedAllSettings(base44.entities).then(async freshSettings => {
         const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
         try {

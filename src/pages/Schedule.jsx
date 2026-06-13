@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, invalidateTemplatesCache, invalidateSettingsCache, invalidateStaticCache } from "@/lib/appDataCache";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, invalidateTemplatesCache, invalidateSettingsCache, invalidateStaticCache, softInvalidateStaticCache } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -360,10 +360,10 @@ export default function Schedule() {
   // Subscribe to external changes (e.g. Settings rename) so the grid refreshes without manual reload
   useEffect(() => {
     const unsubTemplates = base44.entities.Template.subscribe(() => {
-      if (staticDataLoaded.current) { invalidateTemplatesCache(); loadDailyDataRef.current(false); }
+      if (staticDataLoaded.current) { softInvalidateStaticCache(); loadDailyDataRef.current(false); }
     });
     const unsubSettings = base44.entities.AppSettings.subscribe(() => {
-      if (staticDataLoaded.current) { invalidateSettingsCache(); loadDailyDataRef.current(false); }
+      if (staticDataLoaded.current) { softInvalidateStaticCache(); loadDailyDataRef.current(false); }
     });
     return () => { unsubTemplates(); unsubSettings(); };
   }, []);

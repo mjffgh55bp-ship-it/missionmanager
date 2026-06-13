@@ -4,6 +4,8 @@
  */
 
 const CACHE_TTL_MS = 3 * 60 * 1000;
+const SOFT_TTL_MS = 10 * 1000;   // serve instantly; refresh in background past this
+// CACHE_TTL_MS stays the hard limit (3 min): older than this = block & refetch
 
 const cache = {};
 // Tracks in-flight promises to deduplicate concurrent requests for the same key
@@ -74,10 +76,28 @@ export async function fetchWithRetry(fn, retries = 6, baseDelay = 700) {
 }
 
 async function cachedFetch(key, fetcher, ttl = CACHE_TTL_MS) {
-  const cached = get(key, ttl);
-  if (cached) return cached;
-  if (pending[key]) return pending[key];
+  const entry = cache[key];
+  const age = entry ? Date.now() - entry.ts : Infinity;
 
+  // Fresh enough to serve instantly (have a value within the HARD ttl)
+  if (entry && entry.value !== undefined && age < ttl) {
+    // Past the soft window → refresh in the background (don't block navigation)
+    if (age >= SOFT_TTL_MS && !pending[key]) {
+      pending[key] = fetchWithRetry(fetcher).then(data => {
+        set(key, data, ttl);
+        delete pending[key];
+        return data;
+      }).catch(err => {
+        delete pending[key];
+        // background refresh failed → keep serving the existing value, don't throw
+        return entry.value;
+      });
+    }
+    return entry.value;   // instant
+  }
+
+  // No usable value (cold, or past hard ttl) → must fetch; dedupe concurrent callers
+  if (pending[key]) return pending[key];
   pending[key] = fetchWithRetry(fetcher).then(data => {
     set(key, data, ttl);
     delete pending[key];
@@ -85,10 +105,9 @@ async function cachedFetch(key, fetcher, ttl = CACHE_TTL_MS) {
   }).catch(err => {
     delete pending[key];
     const lastKnown = cache[key]?.value;
-    if (lastKnown !== undefined) return lastKnown; // Return stale data on error
-    throw err; // Re-throw if no stale data is available
+    if (lastKnown !== undefined) return lastKnown; // stale beats blank
+    throw err;
   });
-
   return pending[key];
 }
 
@@ -153,4 +172,18 @@ export function invalidateWorkersCache() {
 
 export function invalidateTemplatesCache() {
   invalidate('templates');
+}
+
+// ── Soft invalidation (SWR) ─────────────────────────────────────────────────
+
+// Mark entries stale WITHOUT deleting them: next read serves instantly + refreshes in background.
+function markStale(...keys) {
+  keys.forEach(k => {
+    const entry = cache[k];
+    if (entry) entry.ts = Date.now() - SOFT_TTL_MS - 1; // older than soft window, within hard ttl
+  });
+}
+
+export function softInvalidateStaticCache() {
+  markStale('workers', 'allWorkers', 'templates', 'allSettings');
 }
