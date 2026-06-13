@@ -545,7 +545,12 @@ export default function Availability() {
       setOpenRegistrations(freshOpenReg);
       setUnavailabilities(weekUnavailabilities);
       setTemplateRows(weekRows);
-      setAllTemplateRowsForCalendar(allDayRows);
+      setAllTemplateRowsForCalendar(prev => {
+        const byId = new Map();
+        for (const r of (prev || [])) if (r && r.id) byId.set(r.id, r);
+        for (const r of (allDayRows || [])) if (r && r.id) byId.set(r.id, r); // current week overwrites stale copies
+        return Array.from(byId.values());
+      });
       setAllTemplates(templatesData);
       setWeekAvailabilities(weekAvailsData);
       setAssignments([...assignmentsData, ...sousAssignments, ...additionalAssignments]);
