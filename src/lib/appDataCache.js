@@ -33,21 +33,41 @@ function invalidateAll() {
 // ── Cached loaders ────────────────────────────────────────────────────────────
 // Each loader checks the cache first; only hits the API on miss or TTL expiry.
 
-async function fetchWithRetry(fn, retries = 6, baseDelay = 1000) {
+function isTransient(e) {
+  const msg = String(e?.message || e || '').toLowerCase();
+  const status = e?.status || e?.response?.status || e?.statusCode;
+  return (
+    msg.includes('rate limit') || msg.includes('429') ||
+    msg.includes('timeout') || msg.includes('timed out') ||
+    msg.includes('network') || msg.includes('failed to fetch') ||
+    msg.includes('econn') || msg.includes('fetch failed') ||
+    status === 429 || status === 500 || status === 502 ||
+    status === 503 || status === 504
+  );
+}
+
+export async function fetchWithRetry(fn, retries = 6, baseDelay = 700) {
+  let lastErr;
   for (let i = 0; i < retries; i++) {
-    try { return await fn(); }
-    catch (e) {
-      const isRateLimit = e?.message?.includes('Rate limit') || e?.message?.includes('rate limit');
-      if (isRateLimit && i < retries - 1) {
-        await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
-      } else if (isRateLimit) {
-        console.warn('Cache fetchWithRetry: rate limit exhausted for key, returning []');
-        return [];
-      } else {
-        throw e;
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (i < retries - 1 && isTransient(e)) {
+        // exponential backoff + small jitter so concurrent retries don't sync up
+        const delay = baseDelay * Math.pow(2, i) + Math.random() * 200;
+        await new Promise(r => setTimeout(r, delay));
+        continue;
       }
+      // Non-transient, or out of retries
+      if (isTransient(e)) {
+        console.warn('fetchWithRetry: transient error exhausted, returning []', e?.message);
+        return [];
+      }
+      throw e;
     }
   }
+  throw lastErr;
 }
 
 async function cachedFetch(key, fetcher) {

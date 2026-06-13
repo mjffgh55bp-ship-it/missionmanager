@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
-import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, parseSetting, parseListSetting, invalidateSettingsCache } from "@/lib/appDataCache";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, parseSetting, parseListSetting, invalidateSettingsCache, fetchWithRetry } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -103,6 +103,7 @@ export default function Availability() {
   const [tipsEditValue, setTipsEditValue] = useState("");
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
   const [pendingSignupKeys, setPendingSignupKeys] = useState(new Set());
+  const [workerLoadError, setWorkerLoadError] = useState(false);
 
   const weekStartRef = useRef(weekStart); // always mirrors weekStart state
 
@@ -278,9 +279,17 @@ export default function Availability() {
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
       // Phase 1: identity + settings (1 entity call max — avoids rate-limit collision)
-      const [user, myWorkerRes, allSettings] = await Promise.all([
+      let myWorkerRes;
+      try {
+        myWorkerRes = await fetchWithRetry(() => getMyWorker({}), 5, 600);
+      } catch {
+        setWorkerLoadError(true);
+        isLoadingAllRef.current = false;
+        return; // don't proceed — user can click a retry button
+      }
+
+      const [user, allSettings] = await Promise.all([
         base44.auth.me(),
-        getMyWorker({}),
         getCachedAllSettings(base44.entities),
       ]);
 
@@ -1310,13 +1319,24 @@ END:VEVENT
         </div>
 
         {!currentWorker ? (
-          <Card className="border-none shadow-lg mt-4">
-            <CardContent className="py-16 text-center">
-              <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">לא נמצא פרופיל עובד</h3>
-              <p className="text-gray-600">האימייל שלך לא משויך לחשבון עובד.</p>
-            </CardContent>
-          </Card>
+          workerLoadError ? (
+            <Card className="border-none shadow-lg mt-4">
+              <CardContent className="py-16 text-center">
+                <CalendarIcon className="w-16 h-16 text-amber-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">בעיית חיבור</h3>
+                <p className="text-gray-600 mb-4">לא הצלחנו לטעון את הנתונים שלך.</p>
+                <Button onClick={() => { setWorkerLoadError(false); loadAllData(); }}>נסה שוב</Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-none shadow-lg mt-4">
+              <CardContent className="py-16 text-center">
+                <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">לא נמצא פרופיל עובד</h3>
+                <p className="text-gray-600">האימייל שלך לא משויך לחשבון עובד.</p>
+              </CardContent>
+            </Card>
+          )
         ) : (
           <>
             {/* ── 2. יומן section ── */}
