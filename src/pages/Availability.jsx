@@ -264,6 +264,43 @@ export default function Availability() {
     }, 400);
   }, [weekStart]);
 
+  // Calendar data: load the VIEWED MONTH's rows independently of the signup week.
+  // This makes calendar markers appear for every month the user browses, with no
+  // dependency on which signup week is open.
+  useEffect(() => {
+    if (!currentWorker) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const monthStart = format(startOfMonth(calendarMonth), "yyyy-MM-dd");
+        const monthEnd = format(endOfMonth(calendarMonth), "yyyy-MM-dd");
+        // One windowed query for the whole visible month (with safe fallback if range
+        // filters aren't supported on this Base44 instance).
+        let monthRows;
+        try {
+          monthRows = await fetchWithRetry(() => base44.entities.TemplateRow.filter({
+            date: { $gte: monthStart, $lte: monthEnd },
+          }));
+        } catch {
+          const recent = await fetchWithRetry(() => base44.entities.TemplateRow.list("-date", 1500));
+          monthRows = (recent || []).filter(r => r.date >= monthStart && r.date <= monthEnd);
+        }
+        if (cancelled || !Array.isArray(monthRows)) return;
+        // Merge into the calendar dataset (de-dupe by id; newest data wins)
+        setAllTemplateRowsForCalendar(prev => {
+          const byId = new Map();
+          for (const r of (prev || [])) if (r && r.id) byId.set(r.id, r);
+          for (const r of monthRows) if (r && r.id) byId.set(r.id, r);
+          return Array.from(byId.values());
+        });
+      } catch (e) {
+        console.warn("calendar month load failed:", e);
+        // leave existing calendar markers in place on failure
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [calendarMonth, currentWorker]);
+
   // First load: identify user immediately, then parallelize everything else
   const loadAllData = async () => {
     if (isLoadingAllRef.current) return;
