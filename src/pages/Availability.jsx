@@ -136,16 +136,7 @@ export default function Availability() {
   const broadcastRef = useRef(null);
 
   // Shared retry helper for rate-limited requests
-  const fetchWithRetry = async (fn, retries = 3, baseDelay = 600) => {
-    for (let i = 0; i < retries; i++) {
-      try { return await fn(); }
-      catch (e) {
-        if (i < retries - 1 && (e?.message?.includes('Rate limit') || e?.status === 429)) {
-          await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
-        } else throw e;
-      }
-    }
-  };
+
 
   // Batch helper — prevents rate-limit bursts by staggering parallel calls into small groups
   const fetchBatch = async (fns, batchSize = 3, delayMs = 200) => {
@@ -366,10 +357,11 @@ export default function Availability() {
     } catch (err) {
       console.error("loadAllData failed:", err);
       setWorkerLoadError(true);
+       setIsInitialLoading(false);
     } finally {
       staticLoaded.current = true;
       isLoadingAllRef.current = false;
-      setIsInitialLoading(false);
+     
     }
   };
 

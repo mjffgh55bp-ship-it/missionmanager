@@ -14,12 +14,14 @@ function isFresh(key) {
   return entry && Date.now() - entry.ts < CACHE_TTL_MS;
 }
 
-function set(key, value) {
-  cache[key] = { value, ts: Date.now() };
+function set(key, value, ttl = CACHE_TTL_MS) {
+  cache[key] = { value, ts: Date.now(), ttl };
 }
 
-function get(key) {
-  return isFresh(key) ? cache[key].value : null;
+function get(key, ttl = CACHE_TTL_MS) {
+  const entry = cache[key];
+  if (!entry) return null;
+  return (Date.now() - entry.ts < ttl) ? entry.value : null;
 }
 
 function invalidate(...keys) {
@@ -71,21 +73,22 @@ export async function fetchWithRetry(fn, retries = 6, baseDelay = 700) {
   throw lastErr;
 }
 
-async function cachedFetch(key, fetcher) {
-  const fresh = get(key);              // fresh (within TTL)
-  if (fresh) return fresh;
+async function cachedFetch(key, fetcher, ttl = CACHE_TTL_MS) {
+  const cached = get(key, ttl);
+  if (cached) return cached;
   if (pending[key]) return pending[key];
+
   pending[key] = fetchWithRetry(fetcher).then(data => {
-    set(key, data);                    // cache ONLY on success
+    set(key, data, ttl);
     delete pending[key];
     return data;
   }).catch(err => {
     delete pending[key];
-    // Do NOT cache the failure. Fall back to last known value if we ever had one.
-    const lastKnown = cache[key]?.value;  // ignores TTL on purpose — stale data beats blank
-    if (lastKnown !== undefined) return lastKnown;
-    return [];  // nothing cached yet → empty is safer than crashing
+    const lastKnown = cache[key]?.value;
+    if (lastKnown !== undefined) return lastKnown; // Return stale data on error
+    throw err; // Re-throw if no stale data is available
   });
+
   return pending[key];
 }
 
