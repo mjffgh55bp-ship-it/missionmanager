@@ -105,6 +105,7 @@ export default function Availability() {
   const [pendingSignupKeys, setPendingSignupKeys] = useState(new Set());
   const [workerLoadError, setWorkerLoadError] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [shiftsLoading, setShiftsLoading] = useState(true);
 
   const weekStartRef = useRef(weekStart); // always mirrors weekStart state
 
@@ -373,6 +374,7 @@ export default function Availability() {
       return;
     }
     isLoadingDynamicRef.current = true;
+    setShiftsLoading(true);
     // Use the explicitly passed weekStart — never reads from stale closure
     const ws = forWeekStart || weekStartRef.current;
     const weekKey = ws.toISOString();
@@ -402,14 +404,21 @@ export default function Availability() {
       }
       const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
 
-      // ── Phase 2: fetch 7 day rows in batches + week availabilities ──────────
-      const dayRowArrays = await fetchBatch(
-        weekDates.map(d => () => base44.entities.TemplateRow.filter({ date: d })),
-      );
-      // Fetch week availabilities separately to avoid mixing result types in the batch
-      const weekAvailsData = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
-
-      const allDayRows = dayRowArrays.flat();
+      // ── Phase 2: ONE fetch for the whole week's rows + week availabilities (parallel) ──
+      const weekEndStr2 = format(addDays(ws, 6), "yyyy-MM-dd");
+      const [allDayRowsRaw, weekAvailsData] = await Promise.all([
+        // Single query for the 7-day window instead of 7 separate per-day calls
+        fetchWithRetry(() => base44.entities.TemplateRow.filter({
+          date: { $gte: weekStartStr, $lte: weekEndStr2 },
+        })).catch(async () => {
+          // Fallback if this Base44 instance doesn't support range filters on date:
+          // fetch a broader recent set once and filter client-side.
+          const recent = await fetchWithRetry(() => base44.entities.TemplateRow.list("-date", 1000));
+          return recent.filter(r => r.date >= weekStartStr && r.date <= weekEndStr2);
+        }),
+        fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })),
+      ]);
+      const allDayRows = (allDayRowsRaw || []).filter(r => weekDates.includes(r.date));
       cachedAllTemplateRows.current = allDayRows;
       const allWeekRows = allDayRows;
 
@@ -547,6 +556,7 @@ export default function Availability() {
       console.error("loadDynamicData failed:", err);
     } finally {
       isLoadingDynamicRef.current = false;
+      setShiftsLoading(false);
       if (queuedRefreshRef.current) {
         queuedRefreshRef.current = false;
         loadDynamicData(worker, user, weekStartRef.current);
@@ -1521,6 +1531,9 @@ END:VEVENT
             )}
 
             {/* 3.4 Shift demand panel — only show rows for mokeds with open registration */}
+            {shiftsLoading && (
+              <div className="text-center py-3 text-sm text-gray-400" dir="rtl">טוען משמרות…</div>
+            )}
             <ShiftDemandPanel
               templateRows={openRegistrations.length === 0
                 ? []
