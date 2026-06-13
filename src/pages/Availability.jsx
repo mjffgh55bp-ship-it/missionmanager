@@ -1318,25 +1318,25 @@ END:VEVENT
           </h1>
         </div>
 
-        {!currentWorker ? (
-          workerLoadError ? (
-            <Card className="border-none shadow-lg mt-4">
-              <CardContent className="py-16 text-center">
-                <CalendarIcon className="w-16 h-16 text-amber-300 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">בעיית חיבור</h3>
-                <p className="text-gray-600 mb-4">לא הצלחנו לטעון את הנתונים שלך.</p>
-                <Button onClick={() => { setWorkerLoadError(false); loadAllData(); }}>נסה שוב</Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="border-none shadow-lg mt-4">
-              <CardContent className="py-16 text-center">
-                <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">לא נמצא פרופיל עובד</h3>
-                <p className="text-gray-600">האימייל שלך לא משויך לחשבון עובד.</p>
-              </CardContent>
-            </Card>
-          )
+        {(isLoadingAllRef.current || !staticLoaded.current) ? (
+          <div className="text-center p-8">טוען...</div>
+        ) : workerLoadError ? (
+          <Card className="border-none shadow-lg mt-4">
+            <CardContent className="py-16 text-center">
+              <CalendarIcon className="w-16 h-16 text-amber-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">בעיית חיבור</h3>
+              <p className="text-gray-600 mb-4">לא הצלחנו לטעון את הנתונים שלך.</p>
+              <Button onClick={() => { setWorkerLoadError(false); loadAllData(); }}>נסה שוב</Button>
+            </CardContent>
+          </Card>
+        ) : !currentWorker ? (
+          <Card className="border-none shadow-lg mt-4">
+            <CardContent className="py-16 text-center">
+              <CalendarIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">לא נמצא פרופיל עובד</h3>
+              <p className="text-gray-600">האימייל שלך לא משויך לחשבון עובד.</p>
+            </CardContent>
+          </Card>
         ) : (
           <>
             {/* ── 2. יומן section ── */}
