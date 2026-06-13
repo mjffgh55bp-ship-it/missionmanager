@@ -270,22 +270,24 @@ export default function Availability() {
     try {
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      // Phase 1: identity + settings + worker list, all in parallel.
-      // getMyWorker is best-effort — if it fails we fall back to the worker list.
+      // Critical path only: identity + settings + worker list (cached → usually instant)
       const [user, myWorkerRes, allSettings, allWorkers] = await Promise.all([
         base44.auth.me(),
         fetchWithRetry(() => getMyWorker({}), 5, 600).catch(() => null),
         getCachedAllSettings(base44.entities),
         getCachedAllWorkers(base44.entities).catch(() => null),
       ]);
-
-      // Phase 2: reference data (staggered entity calls)
-      const [eventsData, yearlyEventsData] = await fetchBatch([
-        () => base44.entities.CompanyEvent.list("-date"),
-        () => base44.entities.YearlyEvent.list("-start_date", 500),
-      ]);
       cachedUser.current = user;
       setCurrentUser(user);
+
+      // Company/yearly events are NOT needed for signup — load them in the background.
+      fetchBatch([
+        () => base44.entities.CompanyEvent.list("-date"),
+        () => base44.entities.YearlyEvent.list("-start_date", 500),
+      ]).then(([eventsData, yearlyEventsData]) => {
+        setCompanyEvents(eventsData || []);
+        setYearlyEvents(yearlyEventsData || []);
+      }).catch(err => console.warn("events background load failed:", err));
 
       // Extract settings client-side (no extra API calls)
       const openReg = parseSetting(allSettings, "open_registrations", []);
@@ -303,8 +305,6 @@ export default function Availability() {
       const acknowledgedRaw = allSettings.find(s => s.setting_key === `tips_acknowledged_${user.email}`);
       const acknowledgedVersion = acknowledgedRaw ? acknowledgedRaw.setting_value : null;
 
-      setCompanyEvents(eventsData);
-      setYearlyEvents(yearlyEventsData);
       setOpenRegistrations(openReg);
 
       const norm = (s) => String(s || "").trim().toLowerCase();
@@ -320,6 +320,7 @@ export default function Availability() {
       cachedWorker.current = worker;
       cachedUnavailabilities.current = null; // reset on fresh load
       setCurrentWorker(worker);
+      setIsInitialLoading(false);   // worker known → render the page now; shifts fill in next
 
       // Manager check
       const role = userRoles[user.email];
@@ -357,11 +358,10 @@ export default function Availability() {
     } catch (err) {
       console.error("loadAllData failed:", err);
       setWorkerLoadError(true);
-       setIsInitialLoading(false);
     } finally {
       staticLoaded.current = true;
       isLoadingAllRef.current = false;
-     
+      setIsInitialLoading(false);   // ALWAYS stop the spinner — success or failure
     }
   };
 
