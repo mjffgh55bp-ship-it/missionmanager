@@ -61,8 +61,9 @@ export async function fetchWithRetry(fn, retries = 6, baseDelay = 700) {
       }
       // Non-transient, or out of retries
       if (isTransient(e)) {
-        console.warn('fetchWithRetry: transient error exhausted, returning []', e?.message);
-        return [];
+        const err = new Error('TRANSIENT_EXHAUSTED');
+        err.transientExhausted = true;
+        throw err;
       }
       throw e;
     }
@@ -71,17 +72,19 @@ export async function fetchWithRetry(fn, retries = 6, baseDelay = 700) {
 }
 
 async function cachedFetch(key, fetcher) {
-  const cached = get(key);
-  if (cached) return cached;
-  // If already in-flight, return the same promise
+  const fresh = get(key);              // fresh (within TTL)
+  if (fresh) return fresh;
   if (pending[key]) return pending[key];
   pending[key] = fetchWithRetry(fetcher).then(data => {
-    set(key, data);
+    set(key, data);                    // cache ONLY on success
     delete pending[key];
     return data;
   }).catch(err => {
     delete pending[key];
-    throw err;
+    // Do NOT cache the failure. Fall back to last known value if we ever had one.
+    const lastKnown = cache[key]?.value;  // ignores TTL on purpose — stale data beats blank
+    if (Array.isArray(lastKnown)) return lastKnown;
+    throw err;                          // truly nothing to show → let caller handle
   });
   return pending[key];
 }

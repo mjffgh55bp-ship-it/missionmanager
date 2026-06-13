@@ -158,6 +158,7 @@ export default function Matrix() {
   }, [containerWidth, fixedColumnsWidth, totalMins, zoomPreset, customPpm, pinned]);
 
   const [workers, setWorkers] = useState([]);
+  const [workersLoadFailed, setWorkersLoadFailed] = useState(false);
   const [availabilities, setAvailabilities] = useState([]);
   const [unavailabilities, setUnavailabilities] = useState([]);
   const [initialLoaded, setInitialLoaded] = useState(false);
@@ -519,7 +520,11 @@ export default function Matrix() {
       allSettings.forEach(s => { settingsIdCache.current[s.setting_key] = s.id; });
       setTrackers(trackersData);
       setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
-    } catch (error) { console.error('Error loading static matrix data:', error); }
+      setWorkersLoadFailed(false);
+    } catch (error) {
+      console.error('Error loading static matrix data:', error);
+      setWorkersLoadFailed(true);
+    }
     initialLoadDoneRef.current = true;
     loadDynamicData(false);
   };
@@ -1715,6 +1720,10 @@ export default function Matrix() {
         >
           {loading && !initialLoaded ? (
             <div className="text-center p-8" dir="rtl">טוען...</div>
+          ) : workersLoadFailed ? (
+            <div className="text-center p-8 text-gray-500" dir="rtl">
+              בעיית טעינה — <button className="underline" onClick={() => loadStaticData()}>נסה שוב</button>
+            </div>
           ) : filteredWorkers.length === 0 ? (
             <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
           ) : (
@@ -1821,6 +1830,10 @@ export default function Matrix() {
 
         {loading && !initialLoaded ? (
           <div className="text-center p-8" dir="rtl">טוען...</div>
+        ) : workersLoadFailed ? (
+          <div className="text-center p-8 text-gray-500" dir="rtl">
+            בעיית טעינה — <button className="underline" onClick={() => loadStaticData()}>נסה שוב</button>
+          </div>
         ) : workers.length === 0 ? (
           <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
         ) : (
