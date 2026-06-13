@@ -83,8 +83,8 @@ async function cachedFetch(key, fetcher) {
     delete pending[key];
     // Do NOT cache the failure. Fall back to last known value if we ever had one.
     const lastKnown = cache[key]?.value;  // ignores TTL on purpose — stale data beats blank
-    if (Array.isArray(lastKnown)) return lastKnown;
-    throw err;                          // truly nothing to show → let caller handle
+    if (lastKnown !== undefined) return lastKnown;
+    return [];  // nothing cached yet → empty is safer than crashing
   });
   return pending[key];
 }
