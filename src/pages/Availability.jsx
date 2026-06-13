@@ -166,7 +166,7 @@ export default function Availability() {
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     syncDebounceRef.current = setTimeout(async () => {
       const weekStartStr = format(weekStartRef.current, "yyyy-MM-dd"); // ref, not closure
-      const fresh = await base44.entities.Availability.filter({ week_start_date: weekStartStr });
+      const fresh = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
       setWeekAvailabilities(fresh);
     }, 300);
   };
