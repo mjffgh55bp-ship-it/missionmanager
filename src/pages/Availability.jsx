@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
-import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, parseSetting, parseListSetting, invalidateSettingsCache, fetchWithRetry } from "@/lib/appDataCache";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, getCachedAllWorkers, parseSetting, parseListSetting, invalidateSettingsCache, fetchWithRetry } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -104,6 +104,7 @@ export default function Availability() {
   const [showTipsAsPopup, setShowTipsAsPopup] = useState(false);
   const [pendingSignupKeys, setPendingSignupKeys] = useState(new Set());
   const [workerLoadError, setWorkerLoadError] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const weekStartRef = useRef(weekStart); // always mirrors weekStart state
 
@@ -278,19 +279,13 @@ export default function Availability() {
     try {
       const weekStartStr2 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-      // Phase 1: identity + settings (1 entity call max — avoids rate-limit collision)
-      let myWorkerRes;
-      try {
-        myWorkerRes = await fetchWithRetry(() => getMyWorker({}), 5, 600);
-      } catch {
-        setWorkerLoadError(true);
-        isLoadingAllRef.current = false;
-        return; // don't proceed — user can click a retry button
-      }
-
-      const [user, allSettings] = await Promise.all([
+      // Phase 1: identity + settings + worker list, all in parallel.
+      // getMyWorker is best-effort — if it fails we fall back to the worker list.
+      const [user, myWorkerRes, allSettings, allWorkers] = await Promise.all([
         base44.auth.me(),
+        fetchWithRetry(() => getMyWorker({}), 5, 600).catch(() => null),
         getCachedAllSettings(base44.entities),
+        getCachedAllWorkers(base44.entities).catch(() => null),
       ]);
 
       // Phase 2: reference data (staggered entity calls)
@@ -321,7 +316,16 @@ export default function Availability() {
       setYearlyEvents(yearlyEventsData);
       setOpenRegistrations(openReg);
 
-      const worker = myWorkerRes?.data?.worker || null;
+      const norm = (s) => String(s || "").trim().toLowerCase();
+      let worker = myWorkerRes?.data?.worker || null;
+      if (!worker && user && Array.isArray(allWorkers)) {
+        worker = allWorkers.find(w =>
+          (w.user_id && user.id && w.user_id === user.id) ||
+          (w.email && user.email && norm(w.email) === norm(user.email))
+        ) || null;
+      }
+      // Only a genuine outage (couldn't load the worker list AND no identity at all) is an error
+      setWorkerLoadError(!worker && !Array.isArray(allWorkers));
       cachedWorker.current = worker;
       cachedUnavailabilities.current = null; // reset on fresh load
       setCurrentWorker(worker);
@@ -359,8 +363,13 @@ export default function Availability() {
       if (worker) {
         await loadDynamicData(worker, user, weekStartRef.current);
       }
+    } catch (err) {
+      console.error("loadAllData failed:", err);
+      setWorkerLoadError(true);
     } finally {
+      staticLoaded.current = true;
       isLoadingAllRef.current = false;
+      setIsInitialLoading(false);
     }
   };
 
@@ -1318,7 +1327,7 @@ END:VEVENT
           </h1>
         </div>
 
-        {(isLoadingAllRef.current || !staticLoaded.current) ? (
+        {isInitialLoading ? (
           <div className="text-center p-8">טוען...</div>
         ) : workerLoadError ? (
           <Card className="border-none shadow-lg mt-4">
