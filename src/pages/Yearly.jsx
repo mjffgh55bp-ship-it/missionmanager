@@ -5,9 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Palette, Eye, EyeOff, GripVertical, Clock, User, CalendarDays } from "lucide-react";
+
+import { ChevronLeft, ChevronRight, Plus, Trash2, Palette, GripVertical, Clock, User, CalendarDays, Pencil, X } from "lucide-react";
 import { format, addDays, getDay, differenceInDays, parseISO } from "date-fns";
 import { getHebrewDate } from "../components/utils/HebrewDate";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -427,11 +428,27 @@ export default function Yearly() {
       <div className="fixed top-0 left-0 right-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 pb-2 border-b border-gray-200" style={{ marginRight: 48 }}>
         <div className="max-w-full mx-auto flex items-center justify-between gap-4">
           {/* Left: Edit mode toggle */}
-          <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border flex-shrink-0">
-            {!viewOnly ? <EyeOff className="w-4 h-4 text-green-600" /> : <Eye className="w-4 h-4 text-gray-500" />}
-            <Switch checked={!viewOnly} onCheckedChange={(checked) => setViewOnly(!checked)} />
-            <Label className="text-sm">מצב עריכה</Label>
-          </div>
+          {!viewOnly ? (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button variant="ghost" size="icon" onClick={() => setViewOnly(true)}>
+                <X className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="border-blue-500 text-blue-600 bg-blue-50" onClick={() => setViewOnly(true)}>
+                <Pencil className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => setViewOnly(false)}>
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent dir="rtl">מצב עריכה</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
 
           {/* Right: Navigation */}
           <div className="flex items-center gap-3 flex-wrap justify-end">
