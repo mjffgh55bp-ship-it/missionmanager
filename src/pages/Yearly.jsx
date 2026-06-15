@@ -427,31 +427,8 @@ export default function Yearly() {
       {/* Fixed Header */}
       <div className="fixed top-0 left-0 right-0 z-30 bg-gradient-to-br from-gray-50 to-gray-100 p-4 pb-2 border-b border-gray-200" style={{ marginRight: 48 }}>
         <div className="max-w-full mx-auto flex items-center justify-between gap-4">
-          {/* Left: Edit mode toggle */}
-          {!viewOnly ? (
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button variant="ghost" size="icon" onClick={() => setViewOnly(true)}>
-                <X className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" size="icon" className="border-blue-500 text-blue-600 bg-blue-50" onClick={() => setViewOnly(true)}>
-                <Pencil className="w-4 h-4" />
-              </Button>
-            </div>
-          ) : (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" onClick={() => setViewOnly(false)}>
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent dir="rtl">מצב עריכה</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-
           {/* Right: Navigation */}
-          <div className="flex items-center gap-3 flex-wrap justify-end">
+          <div className="flex items-center gap-3 flex-wrap">
             <Button variant="outline" onClick={() => {
               const todayYear = new Date().getFullYear();
               const todayStr = format(new Date(), "yyyy-MM-dd");
@@ -481,6 +458,29 @@ export default function Yearly() {
             </div>
             <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronLeft className="w-4 h-4" /></Button>
           </div>
+
+          {/* Left: Edit mode toggle */}
+          {!viewOnly ? (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button variant="ghost" size="icon" onClick={() => setViewOnly(true)}>
+                <X className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon" className="border-blue-500 text-blue-600 bg-blue-50" onClick={() => setViewOnly(true)}>
+                <Pencil className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => setViewOnly(false)}>
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent dir="rtl">מצב עריכה</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       </div>
 
