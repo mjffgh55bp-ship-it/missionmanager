@@ -1,5 +1,5 @@
 import React from "react";
-import { Lock, LockOpen, MessageCircle, Send } from "lucide-react";
+import { Lock, LockOpen, MessageCircle, Send, Eye, EyeOff } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 export default function MasterControls({ 
@@ -10,7 +10,10 @@ export default function MasterControls({
   onSendWhatsApp,
   onSendEmail,
   sendingWhatsApp,
-  onUpdate
+  onUpdate,
+  isWeekPublished,
+  onTogglePublish,
+  togglingPublish,
 }) {
   const [isLocking, setIsLocking] = React.useState(false);
   
@@ -108,6 +111,22 @@ export default function MasterControls({
         title="שלח משמרות במייל לכולם"
       >
         <Send className="w-4 h-4" />
+      </button>
+
+      {/* Master Publish (eye) — gates worker visibility of manager-assigned shifts for the current week */}
+      <button
+        onClick={onTogglePublish}
+        disabled={togglingPublish}
+        className={`rounded p-1 transition-colors hover:bg-gray-200 disabled:opacity-50 ${
+          isWeekPublished ? "text-green-600 hover:text-green-700" : "text-gray-400 hover:text-gray-500"
+        }`}
+        title={isWeekPublished
+          ? "העובדים רואים את משמרות השבוע — לחץ כדי להסתיר"
+          : "המשמרות מוסתרות מהעובדים — לחץ כדי לפרסם"}
+      >
+        {togglingPublish
+          ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+          : isWeekPublished ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
       </button>
     </div>
   );

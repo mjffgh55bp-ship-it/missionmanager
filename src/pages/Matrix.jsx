@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { usePageState } from "@/hooks/usePageState";
 import { base44 } from "@/api/base44Client";
-import { getCachedAllSettings, getCachedWorkers, getCachedTemplates, invalidateSettingsCache } from "@/lib/appDataCache";
+import { getCachedAllSettings, getCachedWorkers, getCachedTemplates, invalidateSettingsCache, toggleWeekPublished } from "@/lib/appDataCache";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, operationalMinutesToTime, addDaysString } from "@/lib/operationalDate";
 import { getTimelineRangeStyle, getTimelinePointStyle } from "@/lib/matrixTimeUtils";
-import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut } from "lucide-react";
+import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut, Eye, EyeOff } from "lucide-react";
 import { buildWhatsAppMessage } from "@/lib/whatsappShifts";
 import BriefingBar from "../components/matrix/BriefingBar";
 import MokedSignupBar from "../components/matrix/MokedSignupBar";
@@ -193,6 +193,8 @@ export default function Matrix() {
   const [signupMode, setSignupMode] = useState("allow_over_sign_up");
   const [dailyCustomColumns, setDailyCustomColumns] = useState({});
   const [savingSignupMode, setSavingSignupMode] = useState(false);
+  const [publishedWeeks, setPublishedWeeks] = useState([]);
+  const [togglingPublish, setTogglingPublish] = useState(false);
   const settingsIdCache = useRef({});
   const trackerEntriesCache = useRef(null);
 
@@ -517,6 +519,7 @@ export default function Matrix() {
       setSummaryColumns(parseSetting("matrix_summary_columns") || []);
       setScheduleParams(parseSetting("custom_schedule_params") || []);
       setSignupMode(parseSetting("availability_signup_mode") || "allow_over_sign_up");
+      setPublishedWeeks(parseSetting("published_weeks") || []);
       allSettings.forEach(s => { settingsIdCache.current[s.setting_key] = s.id; });
       setTrackers(trackersData);
       setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
@@ -652,6 +655,28 @@ export default function Matrix() {
 
   const dateString = format(currentDate, "yyyy-MM-dd");
   const weekStartDate = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
+
+  const isCurrentWeekPublished = publishedWeeks.includes(weekStartDate);
+
+  const handleTogglePublish = async () => {
+    const allSettings = await getCachedAllSettings(base44.entities);
+    const userRolesMap = (() => { const s = allSettings.find(x => x.setting_key === "user_roles"); if (!s) return {}; try { return JSON.parse(s.setting_value); } catch { return {}; } })();
+    const currentUser = await base44.auth.me();
+    const role = userRolesMap[currentUser.email];
+    const canPublish = currentUser?.role === 'admin' || role === 'manager';
+    if (!canPublish) { alert("רק מנהל יכול לפרסם משמרות לעובדים"); return; }
+    setTogglingPublish(true);
+    try {
+      const next = !isCurrentWeekPublished;
+      const weeks = await toggleWeekPublished(base44.entities, weekStartDate, next);
+      setPublishedWeeks(weeks);
+    } catch (e) {
+      console.error("toggle publish failed:", e);
+      alert("שגיאה בעדכון פרסום המשמרות. נסה שוב.");
+    } finally {
+      setTogglingPublish(false);
+    }
+  };
 
   // ── Data helpers ─────────────────────────────────────────────────────────────
   const isWorkerAssignedToRow = (row, workerId, template) => {
@@ -1698,6 +1723,9 @@ export default function Matrix() {
                 onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
                 onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
                 sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
+                isWeekPublished={isCurrentWeekPublished}
+                onTogglePublish={handleTogglePublish}
+                togglingPublish={togglingPublish}
               />
             </div>
             {viewMode === 'weekly' && summaryColumns.map(col => (
@@ -1811,6 +1839,9 @@ export default function Matrix() {
               onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
               onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
               sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
+              isWeekPublished={isCurrentWeekPublished}
+              onTogglePublish={handleTogglePublish}
+              togglingPublish={togglingPublish}
             />
           </div>
           {viewMode === 'weekly' && summaryColumns.map(col => (

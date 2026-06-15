@@ -106,6 +106,7 @@ export default function Availability() {
   const [workerLoadError, setWorkerLoadError] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [shiftsLoading, setShiftsLoading] = useState(true);
+  const [publishedWeeks, setPublishedWeeks] = useState([]);
 
   const weekStartRef = useRef(weekStart); // always mirrors weekStart state
 
@@ -207,6 +208,7 @@ export default function Availability() {
 
           setOpenRegistrations(freshOpenReg);
           setSignupMode(parseSetting(freshSettings, "availability_signup_mode", "allow_over_sign_up"));
+          setPublishedWeeks(parseSetting(freshSettings, "published_weeks", []));
           setAllTemplates(freshTemplates);
           setTemplateRows(weekRows);
         } catch {
@@ -976,6 +978,14 @@ END:VEVENT
 
   const getAssignmentForDate = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
+    // Eye-toggle gate: workers see MANAGER-ASSIGNED shifts only for PUBLISHED weeks.
+    // Managers/admins always see everything. This does NOT touch moked signup.
+    if (!isManager) {
+      const wkStart = format(startOfWeek(date, { weekStartsOn: 0 }), "yyyy-MM-dd");
+      if (!publishedWeeks.includes(wkStart)) {
+        return [];
+      }
+    }
     const regularAssignments = assignments.filter((a) => a.date === dateStr);
 
     // Get template shifts for this worker on this date

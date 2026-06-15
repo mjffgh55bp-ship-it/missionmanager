@@ -187,3 +187,22 @@ function markStale(...keys) {
 export function softInvalidateStaticCache() {
   markStale('workers', 'allWorkers', 'templates', 'allSettings');
 }
+
+// Toggle a week's published state. Returns the updated array. De-dupes AppSettings rows.
+export async function toggleWeekPublished(entities, weekStartStr, published) {
+  const rows = await entities.AppSettings.filter({ setting_key: "published_weeks" });
+  let weeks = [];
+  if (rows && rows.length > 0) {
+    try { weeks = JSON.parse(rows[0].setting_value || "[]") || []; } catch { weeks = []; }
+  }
+  weeks = weeks.filter(w => w !== weekStartStr);     // remove if present
+  if (published) weeks.push(weekStartStr);            // add if turning on
+  const value = JSON.stringify(weeks);
+  if (rows && rows.length > 0) {
+    await entities.AppSettings.update(rows[0].id, { setting_value: value });
+    for (let i = 1; i < rows.length; i++) { try { await entities.AppSettings.delete(rows[i].id); } catch {} } // de-dupe
+  } else {
+    await entities.AppSettings.create({ setting_key: "published_weeks", setting_value: value });
+  }
+  return weeks;
+}
