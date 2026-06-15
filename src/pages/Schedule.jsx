@@ -4,7 +4,7 @@ import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, invalidateT
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Pencil, X, Copy, UserCheck, Users } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Copy, UserCheck, Users, GripVertical } from "lucide-react";
 import { format, addDays, subDays, startOfWeek, differenceInDays } from "date-fns";
 import { getHebrewDate } from "../components/utils/HebrewDate";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -46,6 +46,7 @@ import PresetsDialog from "../components/schedule/PresetsDialog";
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 import { getMokedDisplayName } from "@/lib/shiftDemand";
 import { useMemo } from "react";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
 export default function Schedule() {
   const [currentDate, setCurrentDate] = useState(() => {
@@ -62,7 +63,6 @@ export default function Schedule() {
   const [columnSubTypes, setColumnSubTypes] = useState({});
   const [columnFreeText, setColumnFreeText] = useState({});
   const [columnQuantitative, setColumnQuantitative] = useState({});
-  // Map: mapping_id → { name, ... } — used to resolve live display names from Settings
   const [scheduleColumnsById, setScheduleColumnsById] = useState({});
   const [templates, setTemplates] = useState([]);
   const [allTemplates, setAllTemplates] = useState([]);
@@ -92,7 +92,7 @@ export default function Schedule() {
   const openRegSettingIdRef = useRef(null);
   const columnOrderSaveTimer = useRef(null);
   const columnOrderSettingIdRef = useRef(null);
-  const appSettingsIdCache = useRef({}); // key → setting id
+  const appSettingsIdCache = useRef({});
 
   useEffect(() => {
     if (!initialLoadStarted.current) {
@@ -103,10 +103,7 @@ export default function Schedule() {
       loadAllData();
       return;
     }
-    
-    // Guard: don't run daily load until initial load is complete
     if (!staticDataLoaded.current) return;
-
     localStorage.setItem('schedule_last_date', format(currentDate, 'yyyy-MM-dd'));
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
@@ -114,7 +111,6 @@ export default function Schedule() {
     loadDailyData(weekChanged);
   }, [currentDate]);
 
-  // Retry helper for rate-limited calls with exponential backoff
   const fetchWithRetry = async (fn, retries = 6, baseDelay = 1000) => {
     for (let i = 0; i < retries; i++) {
       try { return await fn(); }
@@ -123,7 +119,6 @@ export default function Schedule() {
         if (isRateLimit && i < retries - 1) {
           await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, i)));
         } else if (isRateLimit) {
-          // After all retries, return empty array instead of crashing
           console.warn('Rate limit exhausted, returning empty for:', fn.toString().slice(0, 80));
           return [];
         } else {
@@ -133,7 +128,6 @@ export default function Schedule() {
     }
   };
 
-  // Load everything on first render
   const loadAllData = async () => {
     if (isLoadingAll.current) return;
     isLoadingAll.current = true;
@@ -142,7 +136,6 @@ export default function Schedule() {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
     lastWeekStart.current = weekStartStr;
-
     try {
     const [workersData, allTemplatesData, allSettings] = await Promise.all([
       getCachedWorkers(base44.entities),
@@ -154,8 +147,6 @@ export default function Schedule() {
       fetchWithRetry(() => base44.entities.Unavailability.filter({ date: dateString })),
       fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })),
     ]);
-
-    // Filter settings client-side
     const colTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
     const shiftStatusesSettings = allSettings.filter(s => s.setting_key === "shift_statuses");
     const workerRolesSettings = allSettings.filter(s => s.setting_key === "worker_roles");
@@ -165,7 +156,6 @@ export default function Schedule() {
     const mokedOrderSettings = allSettings.filter(s => s.setting_key === `moked_order_${dateString}`);
     const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
     const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
-
     allSettings.forEach(s => { appSettingsIdCache.current[s.setting_key] = s.id; });
     applyStaticData({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData });
     applyDailyData({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
@@ -176,14 +166,11 @@ export default function Schedule() {
     }
   };
 
-  // Load only day-specific data on date change
   const loadDailyData = async (weekChanged = false) => {
     setDailyLoading(true);
     const dateString = format(currentDate, "yyyy-MM-dd");
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
-
-    // Fetch cached data first (no network cost if cached), then stagger live queries to avoid rate limits
     const [allSettings, freshTemplates] = await Promise.all([
       getCachedAllSettings(base44.entities),
       getCachedTemplates(base44.entities),
@@ -196,11 +183,7 @@ export default function Schedule() {
         : Promise.resolve(null),
     ]);
     if (weekChanged) lastWeekStart.current = weekStartStr;
-
-    // Update allTemplates state with the fresh list so the render loop finds new templates
     setAllTemplates(freshTemplates);
-
-    // Re-apply schedule column name resolution from fresh settings
     const freshColTypesSettings = allSettings.filter(s => s.setting_key === "custom_schedule_params");
     if (freshColTypesSettings.length > 0) {
       const customParams = JSON.parse(freshColTypesSettings[0].setting_value) || [];
@@ -233,11 +216,9 @@ export default function Schedule() {
       setColumnFreeText(freeTextMap);
       setColumnQuantitative(quantMap);
     }
-
     const mokedOrderSettings = allSettings.filter(s => s.setting_key === `moked_order_${dateString}`);
     const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
     const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
-
     allSettings.forEach(s => { appSettingsIdCache.current[s.setting_key] = s.id; });
     applyDailyData({ dateString, templateRowsData, allTemplatesData: freshTemplates, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     setDailyLoading(false);
@@ -247,12 +228,9 @@ export default function Schedule() {
     if (colTypesSettings.length > 0) {
       const customParams = JSON.parse(colTypesSettings[0].setting_value) || [];
       setColumnTypes(customParams.map(c => c.name));
-
-      // Build id→column map for live name resolution in headers
       const byId = {};
       customParams.forEach(c => { if (c.mapping_id) byId[c.mapping_id] = c; });
       setScheduleColumnsById(byId);
-
       const subTypesMap = {};
       const freeTextMap = {};
       customParams.forEach(c => {
@@ -260,7 +238,6 @@ export default function Schedule() {
         if (c.options && c.options.length > 0) allOpts.push(...c.options);
         if (c.sub_options && c.sub_options.length > 0) allOpts.push(...c.sub_options.map(so => so.name));
         if (c.quantitative_items && c.quantitative_items.length > 0) allOpts.push(...c.quantitative_items);
-        // Key by both mapping_id and name so lookups work regardless of which col.name is stored
         const keys = [c.name];
         if (c.mapping_id) keys.push(c.mapping_id);
         keys.forEach(k => {
@@ -310,24 +287,19 @@ export default function Schedule() {
     else setDailyCustomColumns({});
     if (availabilitiesData) setAvailabilities(availabilitiesData);
     setUnavailabilities(unavailabilitiesData);
-
     const processRows = (rows) => {
       setTemplateRows(rows);
       const uniqueTemplateIds = [...new Set(rows.map((row) => row.template_id))];
       setTemplates(allTemplatesData.filter((t) => uniqueTemplateIds.includes(t.id)));
     };
-
     if (templateRowsData.length === 0) {
       const defaultTemplates = allTemplatesData.filter((t) => t.is_default && t.active && isVisibleScheduleTemplate(t));
       if (defaultTemplates.length > 0) {
-        // Create default rows asynchronously without blocking UI
         (async () => {
           for (const template of defaultTemplates) {
             const groupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
             const rowsToCreate = template.default_rows && template.default_rows.length > 0 ? template.default_rows : [{}];
             for (const rowValues of rowsToCreate) {
-              // Do NOT set moked_instance_name here — getMokedDisplayName falls back to template.name,
-              // which is always correct for a freshly created (non-renamed) group.
               const { moked_instance_name, moked_instance_name_locked, ...cleanRowValues } = rowValues;
               await base44.entities.TemplateRow.create({
                 template_id: template.id,
@@ -353,11 +325,9 @@ export default function Schedule() {
     await loadDailyData(false);
   };
 
-  // Keep a ref so subscription callbacks always call the latest version (avoids stale closure)
   const loadDailyDataRef = useRef(loadDailyData);
   useEffect(() => { loadDailyDataRef.current = loadDailyData; });
 
-  // Subscribe to external changes (e.g. Settings rename) so the grid refreshes without manual reload
   useEffect(() => {
     const unsubTemplates = base44.entities.Template.subscribe(() => {
       if (staticDataLoaded.current) { softInvalidateStaticCache(); loadDailyDataRef.current(false); }
@@ -373,8 +343,6 @@ export default function Schedule() {
   const handleAddTemplateRowForTemplate = async (templateId, groupId) => {
     const template = allTemplates.find((t) => t.id === templateId);
     if (!template) return;
-    // Inherit the lock status from existing rows in this group.
-    // If the group was explicitly renamed (locked), carry the locked name to the new row.
     const existingGroupRow = templateRows.find(r => r.template_id === templateId && (r.group_id || "default") === (groupId || "default"));
     const isLocked = existingGroupRow?.values?.moked_instance_name_locked === true;
     const newValues = isLocked
@@ -399,17 +367,11 @@ export default function Schedule() {
       default_rows: config.default_rows || [],
       active: true
     });
-
-    // Invalidate templates cache so the next reload fetches fresh data including the new template
     invalidateTemplatesCache();
-
     const newGroupId = (typeof crypto !== 'undefined' && crypto.randomUUID)
       ? crypto.randomUUID()
       : `group_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-
     const rowsToCreate = config.default_rows && config.default_rows.length > 0 ? config.default_rows : [{}];
-
-    // Create all rows in parallel
     const createdRows = await Promise.all(
       rowsToCreate.map((rowValues, i) => {
         const { moked_instance_name, moked_instance_name_locked, ...cleanRowValues } = rowValues;
@@ -423,38 +385,26 @@ export default function Schedule() {
         });
       })
     );
-
-    // Update local state — no reload needed
     setAllTemplates(prev => [...prev, newTemplate]);
     setTemplates(prev => [...prev, newTemplate]);
     setTemplateRows(prev => [...prev, ...createdRows]);
-
     toast.success(`מוקד "${preset.name}" נוסף ללוח`);
   };
 
   const handleDuplicateMoked = async (group) => {
     const originalGroupId = group.group_id;
-    // Always generate a truly unique new group_id
     const newGroupId = (typeof crypto !== 'undefined' && crypto.randomUUID)
       ? crypto.randomUUID()
       : `group_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-
-    // Sort source rows by their stored _order (same logic as render)
     const sourceRows = [...group.rows].sort((a, b) => {
       const aO = a.values?._order ?? new Date(a.created_date || 0).getTime();
       const bO = b.values?._order ?? new Date(b.created_date || 0).getTime();
       return aO - bO;
     });
-
-    // Create rows sequentially (not in parallel) to preserve order and avoid rate limits
     const createdRows = [];
     for (let index = 0; index < sourceRows.length; index++) {
       const row = sourceRows[index];
-
-      // Deep-clone values — never share object references with original
       const clonedValues = JSON.parse(JSON.stringify(row.values || {}));
-
-      // Remove ALL identity/linkage metadata that connects to the original row
       delete clonedValues._row_id;
       delete clonedValues._source_row_id;
       delete clonedValues._created_from_row_id;
@@ -464,21 +414,10 @@ export default function Schedule() {
       delete clonedValues.continuation_source_row_id;
       delete clonedValues.continuation_from_date;
       delete clonedValues.is_continuation;
-
-      // CRITICAL: Clear the lock flag on the duplicate.
-      // getMokedDisplayName() only trusts moked_instance_name when _locked === true.
-      // A fresh duplicate must NOT carry the source group's locked name — it should
-      // start with template.name as its identity. The user can rename it afterward,
-      // which will set a new locked name for this group only.
       delete clonedValues.moked_instance_name;
       delete clonedValues.moked_instance_name_locked;
-
-      // Assign a fresh, independent _order within the new group
       clonedValues._order = index;
-
-      // Debug marker (harmless, shows which original row this came from)
       clonedValues._duplicated_from_row_id = row.id;
-
       const created = await base44.entities.TemplateRow.create({
         template_id: row.template_id,
         template_name: row.template_name,
@@ -488,17 +427,12 @@ export default function Schedule() {
       });
       createdRows.push(created);
     }
-
-    // Add duplicated rows to state using only the real DB-returned rows
     setTemplateRows(prev => [...prev, ...createdRows]);
-
-    // Ensure template is in the templates list (should already be there)
     setTemplates(prev => {
       const template = allTemplates.find(t => t.id === group.template_id);
       if (template && !prev.find(t => t.id === template.id)) return [...prev, template];
       return prev;
     });
-
     toast.success('מוקד שוכפל בהצלחה');
   };
 
@@ -509,10 +443,7 @@ export default function Schedule() {
     if (!plusMatch) return;
     const daysAhead = parseInt(plusMatch[2]);
     const realEndTime = `${plusMatch[3]}:${plusMatch[4]}`;
-
-    // +1 06:00 is the exact end boundary of the same operational day — not a continuation
     if (daysAhead === 1 && realEndTime <= "06:00") return;
-
     for (let d = 1; d <= daysAhead; d++) {
       const futureDate = format(addDays(currentDate, d), "yyyy-MM-dd");
       const existingRows = await base44.entities.TemplateRow.filter({ date: futureDate });
@@ -522,10 +453,7 @@ export default function Schedule() {
       const isLastDay = d === daysAhead;
       const continuationStart = "06:00";
       const continuationEnd = isLastDay ? realEndTime : "06:00";
-
-      // Never create a zero-duration continuation row (06:00→06:00)
       if (continuationStart === continuationEnd) continue;
-
       const continuationValues = {
         ...newValues,
         "התחלה": continuationStart,
@@ -555,15 +483,6 @@ export default function Schedule() {
     }
   };
 
-  /**
-   * Save a new display name for a SPECIFIC moked group instance.
-   *
-   * CRITICAL: Do NOT update Template.name globally — that would rename ALL groups
-   * using the same template and break instance identity.
-   *
-   * Instead, write moked_instance_name onto every TemplateRow in this group.
-   * getMokedDisplayName() in shiftDemand.js reads this field first.
-   */
   const saveMokedName = async (templateId, groupId, name) => {
     if (!name.trim()) {
       setEditingMokedName(null);
@@ -571,16 +490,12 @@ export default function Schedule() {
       return;
     }
     const trimmed = name.trim();
-    // Update ALL rows in this specific group only.
-    // Set moked_instance_name_locked = true so getMokedDisplayName() knows this was
-    // explicitly renamed by the user (not a stale copied value from duplication).
     const groupRows = templateRows.filter(r => r.template_id === templateId && (r.group_id || "default") === (groupId || "default"));
     await Promise.all(groupRows.map(r =>
       base44.entities.TemplateRow.update(r.id, {
         values: { ...r.values, moked_instance_name: trimmed, moked_instance_name_locked: true }
       })
     ));
-    // Optimistic local update
     setTemplateRows(prev => prev.map(r =>
       r.template_id === templateId && (r.group_id || "default") === (groupId || "default")
         ? { ...r, values: { ...r.values, moked_instance_name: trimmed, moked_instance_name_locked: true } }
@@ -593,7 +508,6 @@ export default function Schedule() {
   const saveColumnOrder = (templateId, newOrderedColumns) => {
     const newCustomOrders = { ...customColumnOrders, [templateId]: newOrderedColumns.map((c) => c.name) };
     setCustomColumnOrders(newCustomOrders);
-    // Debounce: only write to DB once the user stops dragging (500ms idle)
     if (columnOrderSaveTimer.current) clearTimeout(columnOrderSaveTimer.current);
     columnOrderSaveTimer.current = setTimeout(async () => {
       const key = `schedule_column_order_${dateString}`;
@@ -613,6 +527,53 @@ export default function Schedule() {
       }
     }, 500);
   };
+
+  const saveMokedOrder = async (newOrder) => {
+    setMokedOrder(newOrder);
+    const key = `moked_order_${dateString}`;
+    const data = { setting_key: key, setting_value: JSON.stringify(newOrder) };
+    const cachedId = appSettingsIdCache.current[key];
+    if (cachedId) {
+      await base44.entities.AppSettings.update(cachedId, data);
+    } else {
+      const created = await base44.entities.AppSettings.create(data);
+      appSettingsIdCache.current[key] = created.id;
+    }
+    invalidateSettingsCache();
+  };
+
+  const groupedMokeds = useMemo(() => {
+    const groupedRows = {};
+    templateRows.forEach((row) => {
+      const key = `${row.template_id}_${row.group_id || 'default'}`;
+      if (!groupedRows[key]) groupedRows[key] = [];
+      groupedRows[key].push(row);
+    });
+    const groups = Object.entries(groupedRows).map(([key, rows]) => ({
+      key,
+      template_id: rows[0].template_id,
+      group_id: rows[0].group_id,
+      rows: rows.sort((a, b) => {
+        const aO = a.values?._order ?? new Date(a.created_date).getTime();
+        const bO = b.values?._order ?? new Date(b.created_date).getTime();
+        return aO - bO;
+      })
+    }));
+    if (mokedOrder.length > 0) {
+      groups.sort((a, b) => {
+        const ai = mokedOrder.indexOf(a.key);
+        const bi = mokedOrder.indexOf(b.key);
+        if (ai === -1 && bi === -1) return 0;
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
+    }
+    return groups.filter((group) => {
+      const template = allTemplates.find((t) => t.id === group.template_id);
+      return isVisibleScheduleTemplate(template);
+    });
+  }, [templateRows, mokedOrder, allTemplates]);
 
   const workerDayAssignments = useMemo(() => {
     const map = new Map();
@@ -653,7 +614,6 @@ export default function Schedule() {
         <Card className="border-none shadow-lg mb-6">
           <CardHeader className="border-b bg-white pb-0">
             <div className="flex flex-col gap-3">
-              {/* Top row: title + controls */}
               <div className="flex items-center gap-2 flex-wrap" dir="rtl">
                 <div className="flex items-center gap-2">
                   <CardTitle className="text-2xl">לוח</CardTitle>
@@ -664,8 +624,6 @@ export default function Schedule() {
                   })()}
                   {isDailyLoading && <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-700 rounded-full animate-spin" />}
                 </div>
-
-                {/* Date navigation — always on the right (mr-auto pushes it right in RTL) */}
                 <div className="flex items-center gap-1 mr-auto">
                   <Button variant="outline" onClick={() => setCurrentDate(new Date())} size="sm" dir="rtl">היום</Button>
                   <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
@@ -684,8 +642,6 @@ export default function Schedule() {
                   </Popover>
                   <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
                 </div>
-
-                {/* Edit mode toolbar — shown in edit mode */}
                 {editMode && (
                   <>
                     {templateRows.length > 0 && (
@@ -721,8 +677,6 @@ export default function Schedule() {
                     </TooltipProvider>
                   </>
                 )}
-
-                {/* Edit mode toggle — icon-only when not in edit mode */}
                 {!editMode && (
                   <TooltipProvider>
                     <Tooltip>
@@ -736,8 +690,6 @@ export default function Schedule() {
                   </TooltipProvider>
                 )}
               </div>
-
-              {/* Week days navigation bar */}
               {(() => {
                 const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
                 return (
@@ -785,41 +737,17 @@ export default function Schedule() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
-            {(() => {
-              const groupedRows = {};
-              templateRows.forEach((row) => {
-                const key = `${row.template_id}_${row.group_id || 'default'}`;
-                if (!groupedRows[key]) groupedRows[key] = [];
-                groupedRows[key].push(row);
-              });
-
-              const groups = Object.entries(groupedRows).map(([key, rows]) => ({
-                key,
-                template_id: rows[0].template_id,
-                group_id: rows[0].group_id,
-                rows: rows.sort((a, b) => {
-                    const aO = a.values?._order ?? new Date(a.created_date).getTime();
-                    const bO = b.values?._order ?? new Date(b.created_date).getTime();
-                    return aO - bO;
-                  })
-              }));
-
-              if (mokedOrder.length > 0) {
-                groups.sort((a, b) => {
-                  const ai = mokedOrder.indexOf(a.key);
-                  const bi = mokedOrder.indexOf(b.key);
-                  if (ai === -1 && bi === -1) return 0;
-                  if (ai === -1) return 1;
-                  if (bi === -1) return -1;
-                  return ai - bi;
-                });
-              }
-
-              return groups.filter((group) => {
-                const template = allTemplates.find((t) => t.id === group.template_id);
-                return isVisibleScheduleTemplate(template);
-              }).map((group, groupIndex) => {
+          <DragDropContext onDragEnd={(result) => {
+            if (!result.destination || !editMode) return;
+            const newOrder = groupedMokeds.map(g => g.key);
+            const [removed] = newOrder.splice(result.source.index, 1);
+            newOrder.splice(result.destination.index, 0, removed);
+            saveMokedOrder(newOrder);
+          }}>
+            <Droppable droppableId="moked-list">
+              {(provided) => (
+                <div className="space-y-4" ref={provided.innerRef} {...provided.droppableProps}>
+                  {groupedMokeds.map((group, groupIndex) => {
                 const template = allTemplates.find((t) => t.id === group.template_id);
                 if (!template) return null;
                 const templateRowsForTemplate = group.rows;
@@ -834,43 +762,20 @@ export default function Schedule() {
                     ]
                   : allColumns;
 
-                // Resolve a column's live display name from Settings (falls back to stored name)
                 const resolveColName = (col) =>
                   (col.column_id && scheduleColumnsById[col.column_id]?.name) || col.name;
 
                 return (
-                  <Card key={group.key} className="border-none shadow-lg overflow-hidden">
+                  <Draggable key={group.key} draggableId={group.key} index={groupIndex} isDragDisabled={!editMode}>
+                    {(provided, snapshot) => (
+                      <div ref={provided.innerRef} {...provided.draggableProps} className={snapshot.isDragging ? "opacity-70" : ""}>
+                  <Card className="border-none shadow-lg overflow-hidden">
                     <CardHeader className="text-black py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           {editMode && (
-                            <div className="flex flex-col gap-1">
-                              <Button size="icon" variant="ghost" className="h-6 w-6 text-black hover:bg-black/10"
-                                disabled={groupIndex === 0}
-                                onClick={async () => {
-                                  const newOrder = groups.map(g => g.key);
-                                  [newOrder[groupIndex - 1], newOrder[groupIndex]] = [newOrder[groupIndex], newOrder[groupIndex - 1]];
-                                  setMokedOrder(newOrder);
-                                  const key = `moked_order_${dateString}`;
-                                  const data = { setting_key: key, setting_value: JSON.stringify(newOrder) };
-                                  const cachedId = appSettingsIdCache.current[key];
-                                  if (cachedId) { await base44.entities.AppSettings.update(cachedId, data); } else { const created = await base44.entities.AppSettings.create(data); appSettingsIdCache.current[key] = created.id; }
-                                }}>
-                                <ChevronUp className="w-4 h-4" />
-                              </Button>
-                              <Button size="icon" variant="ghost" className="h-6 w-6 text-black hover:bg-black/10"
-                                disabled={groupIndex === groups.length - 1}
-                                onClick={async () => {
-                                  const newOrder = groups.map(g => g.key);
-                                  [newOrder[groupIndex], newOrder[groupIndex + 1]] = [newOrder[groupIndex + 1], newOrder[groupIndex]];
-                                  setMokedOrder(newOrder);
-                                  const key = `moked_order_${dateString}`;
-                                  const data = { setting_key: key, setting_value: JSON.stringify(newOrder) };
-                                  const cachedId = appSettingsIdCache.current[key];
-                                  if (cachedId) { await base44.entities.AppSettings.update(cachedId, data); } else { const created = await base44.entities.AppSettings.create(data); appSettingsIdCache.current[key] = created.id; }
-                                }}>
-                                <ChevronDown className="w-4 h-4" />
-                              </Button>
+                            <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing p-1">
+                              <GripVertical className="w-5 h-5 text-black/60" />
                             </div>
                           )}
                           {group.rows.some((r) => r.values?.is_continuation) && (
@@ -894,7 +799,6 @@ export default function Schedule() {
                             <CardTitle
                             className="text-slate-50 text-lg font-semibold tracking-tight cursor-pointer hover:underline flex items-center gap-2"
                             onClick={() => {
-                              // Pre-populate with the canonical display name (same as what signupKey uses)
                               const canonicalName = getMokedDisplayName(group.rows[0], template);
                               setEditingMokedName(`${group.key}`);
                               setEditingMokedNameValue(canonicalName);
@@ -908,20 +812,17 @@ export default function Schedule() {
                         {editMode && (
                           <div className="flex gap-1">
                             <TooltipProvider>
-                              {/* Delete moked */}
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button size="icon" variant="destructive" className="h-7 w-7"
                                     onClick={async () => {
                                       if (confirm(`האם למחוק את המוקד "${template.name}" מהלוח?`)) {
-                                        // Optimistic update
                                         const rowIdsToDelete = templateRowsForTemplate.map(r => r.id);
                                         setTemplateRows(prev => prev.filter(r => !rowIdsToDelete.includes(r.id)));
                                         const updatedRegs = openRegistrations.filter(r => r && r.key !== group.key);
                                         if (updatedRegs.length !== openRegistrations.length) {
                                           setOpenRegistrations(updatedRegs);
                                         }
-                                        // Persist in background
                                         await Promise.all(templateRowsForTemplate.map(row => base44.entities.TemplateRow.delete(row.id)));
                                         if (updatedRegs.length !== openRegistrations.length) {
                                           const regSettings = await base44.entities.AppSettings.filter({ setting_key: "open_registrations" });
@@ -936,8 +837,6 @@ export default function Schedule() {
                                 </TooltipTrigger>
                                 <TooltipContent dir="rtl">מחק מוקד</TooltipContent>
                               </Tooltip>
-
-                              {/* Allow registration */}
                               {(() => {
                                 const isOpen = openRegistrations.some((r) => r && r.key === group.key);
                                 return (
@@ -978,8 +877,6 @@ export default function Schedule() {
                                   </Tooltip>
                                 );
                               })()}
-
-                              {/* Duplicate moked */}
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => handleDuplicateMoked(group)}>
@@ -1175,7 +1072,6 @@ export default function Schedule() {
                                           await base44.entities.TemplateRow.update(row.id, { values: newValues });
                                           setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                         } catch {
-                                          // Row no longer exists — reload to sync state
                                           await loadData();
                                         }
                                       }}>
@@ -1216,10 +1112,16 @@ export default function Schedule() {
                       )}
                     </CardContent>
                   </Card>
+                      </div>
+                    )}
+                  </Draggable>
                 );
-              });
-            })()}
-          </div>
+              })}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         )}
 
         <PresetsDialog
@@ -1227,7 +1129,6 @@ export default function Schedule() {
           onOpenChange={setShowPresetsDialog}
           onAddPreset={handleAddPresetToSchedule} />
 
-        {/* Add Template Column Dialog */}
         <Dialog open={showAddTemplateColumnDialog} onOpenChange={setShowAddTemplateColumnDialog}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader><DialogTitle dir="rtl">הוסף עמודה ל{selectedTemplate?.name}</DialogTitle></DialogHeader>
@@ -1272,7 +1173,6 @@ export default function Schedule() {
                   )}
                 </>
               )}
-
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => { setShowAddTemplateColumnDialog(false); setNewTemplateColumnName(""); setNewTemplateColumnType("text"); }} dir="rtl">ביטול</Button>
@@ -1292,7 +1192,6 @@ export default function Schedule() {
                   } else if (newTemplateColumnName === "task") {
                     columnToAdd = { name: "משימה", type: "task", width: 120 };
                   } else {
-                    // Look up the mapping_id for this column name from Settings
                     const settingsColEntry = Object.values(scheduleColumnsById).find(c => c.name === newTemplateColumnName);
                     columnToAdd = { name: newTemplateColumnName, type: "text", width: 120, ...(settingsColEntry?.mapping_id ? { column_id: settingsColEntry.mapping_id } : {}) };
                   }
