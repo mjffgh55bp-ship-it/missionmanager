@@ -190,7 +190,14 @@ export function softInvalidateStaticCache() {
 
 // Toggle a week's published state. Returns the updated array. De-dupes AppSettings rows.
 export async function toggleWeekPublished(entities, weekStartStr, published) {
-  const rows = await entities.AppSettings.filter({ setting_key: "published_weeks" });
+  let rows = [];
+  try {
+    rows = await entities.AppSettings.filter({ setting_key: "published_weeks" });
+  } catch (e) {
+    console.error("published_weeks: read failed", e);
+    throw new Error("read_failed");
+  }
+
   let weeks = [];
   if (rows && rows.length > 0) {
     try { weeks = JSON.parse(rows[0].setting_value || "[]") || []; } catch { weeks = []; }
@@ -198,11 +205,23 @@ export async function toggleWeekPublished(entities, weekStartStr, published) {
   weeks = weeks.filter(w => w !== weekStartStr);     // remove if present
   if (published) weeks.push(weekStartStr);            // add if turning on
   const value = JSON.stringify(weeks);
-  if (rows && rows.length > 0) {
-    await entities.AppSettings.update(rows[0].id, { setting_value: value });
-    for (let i = 1; i < rows.length; i++) { try { await entities.AppSettings.delete(rows[i].id); } catch {} } // de-dupe
-  } else {
-    await entities.AppSettings.create({ setting_key: "published_weeks", setting_value: value });
+
+  try {
+    if (rows && rows.length > 0) {
+      await entities.AppSettings.update(rows[0].id, { setting_value: value });
+    } else {
+      await entities.AppSettings.create({ setting_key: "published_weeks", setting_value: value });
+    }
+  } catch (e) {
+    console.error("published_weeks: write failed", e);
+    throw new Error("write_failed");
+  }
+
+  // De-dupe is best-effort ONLY — never let it fail the whole operation
+  if (rows && rows.length > 1) {
+    for (let i = 1; i < rows.length; i++) {
+      try { await entities.AppSettings.delete(rows[i].id); } catch (e) { console.warn("published_weeks: dedupe delete skipped", e); }
+    }
   }
   return weeks;
 }

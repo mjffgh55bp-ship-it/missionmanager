@@ -331,6 +331,7 @@ export default function Availability() {
 
       // Extract settings client-side (no extra API calls)
       const openReg = parseSetting(allSettings, "open_registrations", []);
+      const publishedWeeksInit = parseSetting(allSettings, "published_weeks", []);
       const workerRolesRaw = parseSetting(allSettings, "worker_roles", null);
       const workerRolesList = workerRolesRaw
         ? workerRolesRaw.map(r => (typeof r === "string" ? { name: r, mapping_id: "" } : r))
@@ -346,6 +347,7 @@ export default function Availability() {
       const acknowledgedVersion = acknowledgedRaw ? acknowledgedRaw.setting_value : null;
 
       setOpenRegistrations(openReg);
+      setPublishedWeeks(publishedWeeksInit);
 
       const norm = (s) => String(s || "").trim().toLowerCase();
       let worker = myWorkerRes?.data?.worker || null;
