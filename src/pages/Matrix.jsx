@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, operationalMinutesToTime, addDaysString } from "@/lib/operationalDate";
 import { getTimelineRangeStyle, getTimelinePointStyle } from "@/lib/matrixTimeUtils";
-import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut, Eye, EyeOff } from "lucide-react";
+import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut, Eye, EyeOff, FileSpreadsheet } from "lucide-react";
 import { buildWhatsAppMessage } from "@/lib/whatsappShifts";
 import BriefingBar from "../components/matrix/BriefingBar";
 import MokedSignupBar from "../components/matrix/MokedSignupBar";
@@ -1375,6 +1375,72 @@ export default function Matrix() {
     return <div className="flex gap-0.5 items-center">{days.map((d, i) => <div key={i} className={`text-[9px] font-medium leading-tight ${d.working ? 'text-green-600' : 'text-gray-300'}`} title={`${d.day}: ${d.working ? d.hours.toFixed(1) + 'h' : 'חופש'}`}>{d.day}</div>)}</div>;
   };
 
+  const exportToExcel = () => {
+    const HEBREW_DAYS_FULL = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+    const typeLabel = { wanted: "רצוי", available: "זמין", unavailable: "לא זמין" };
+
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
+
+    // Build rows: one row per worker × per signup shift
+    const rows = [];
+    filteredWorkers.forEach(worker => {
+      const avail = getBestAvail(worker.id);
+      const shifts = avail?.shifts || [];
+
+      // Determine which shifts are relevant to current view
+      const relevantShifts = shifts.filter(s => {
+        const opDate = s.operational_date || s.date;
+        if (viewMode === "daily") return opDate === dateString;
+        return weekDates.includes(opDate);
+      });
+
+      if (relevantShifts.length === 0) {
+        rows.push({
+          "שם עובד": worker.nickname,
+          "תאריך": viewMode === "daily" ? dateString : `${format(weekStart, "d.M")}-${format(addDays(weekStart, 6), "d.M")}`,
+          "יום": "",
+          "שעת התחלה": "",
+          "שעת סיום": "",
+          "סוג הרשמה": "",
+          "שם מוקד": "",
+          "הערות": "לא נרשם",
+        });
+      } else {
+        relevantShifts.forEach(s => {
+          const opDate = s.operational_date || s.date;
+          const d = new Date(opDate + "T12:00:00");
+          rows.push({
+            "שם עובד": worker.nickname,
+            "תאריך": opDate,
+            "יום": HEBREW_DAYS_FULL[d.getDay()],
+            "שעת התחלה": s.start_time || "",
+            "שעת סיום": s.end_time || "",
+            "סוג הרשמה": typeLabel[s.type] || s.type || "",
+            "שם מוקד": s.moked_name || "",
+            "הערות": "",
+          });
+        });
+      }
+    });
+
+    // Convert to CSV (UTF-8 BOM for Hebrew Excel support)
+    const headers = ["שם עובד", "תאריך", "יום", "שעת התחלה", "שעת סיום", "סוג הרשמה", "שם מוקד", "הערות"];
+    const csvLines = [
+      headers.join(","),
+      ...rows.map(row => headers.map(h => `"${String(row[h] || "").replace(/"/g, '""')}"`).join(","))
+    ];
+    const BOM = "\uFEFF";
+    const blob = new Blob([BOM + csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const label = viewMode === "daily" ? dateString : `${format(weekStart, "d.M")}-${format(addDays(weekStart, 6), "d.M")}`;
+    a.download = `מטריצה_${label}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const briefingMarkers = useMemo(() => {
     const markers = [];
     templateRows.forEach(row => {
@@ -1997,6 +2063,14 @@ export default function Matrix() {
           <button onClick={zoomOut} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הקטן רזולוציית זמן">−</button>
           <button onClick={zoomIn} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הגדל רזולוציית זמן">+</button>
           <span className="text-[10px] text-gray-400 mr-auto">Ctrl+גלגל לזום · גרירת גלגל לגלילה</span>
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-1 px-2 py-1 rounded border border-green-300 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-medium transition-colors"
+            title="יצוא מטריצה לאקסל"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Excel
+          </button>
         </div>
 
         <SummaryColumnsDialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog} summaryColumns={summaryColumns} saveSummaryColumns={saveSummaryColumns} shiftStatuses={shiftStatuses} scheduleParams={scheduleParams} trackers={trackers} />
