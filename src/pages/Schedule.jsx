@@ -532,6 +532,7 @@ export default function Schedule() {
     setMokedOrder(newOrder);
     const key = `moked_order_${dateString}`;
     const data = { setting_key: key, setting_value: JSON.stringify(newOrder) };
+    invalidateSettingsCache();
     const cachedId = appSettingsIdCache.current[key];
     if (cachedId) {
       await base44.entities.AppSettings.update(cachedId, data);
@@ -539,7 +540,6 @@ export default function Schedule() {
       const created = await base44.entities.AppSettings.create(data);
       appSettingsIdCache.current[key] = created.id;
     }
-    invalidateSettingsCache();
   };
 
   const groupedMokeds = useMemo(() => {
