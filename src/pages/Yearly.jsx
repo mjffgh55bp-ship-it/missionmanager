@@ -446,7 +446,7 @@ export default function Yearly() {
                 setCurrentYear(todayYear);
               }
             }}>היום</Button>
-            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}><ChevronLeft className="w-4 h-4" /></Button>
+            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronLeft className="w-4 h-4" /></Button>
             <div className="relative">
               <button
                 className="px-4 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[80px] text-center hover:bg-blue-800 transition-colors"
@@ -462,7 +462,7 @@ export default function Yearly() {
                 </div>
               )}
             </div>
-            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear + 1)}><ChevronRight className="w-4 h-4" /></Button>
+            <Button variant="outline" size="icon" onClick={() => setCurrentYear(currentYear - 1)}><ChevronRight className="w-4 h-4" /></Button>
           </div>
         </div>
       </div>
