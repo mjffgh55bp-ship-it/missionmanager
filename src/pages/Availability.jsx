@@ -444,6 +444,7 @@ export default function Availability() {
         setAllUnavailabilities(unavailabilitiesData);
       }
       const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
+      setPublishedWeeks(parseSetting(freshSettings, "published_weeks", []));
 
       // ── Phase 2: ONE fetch for the whole week's rows + week availabilities (parallel) ──
       const weekEndStr2 = format(addDays(ws, 6), "yyyy-MM-dd");
