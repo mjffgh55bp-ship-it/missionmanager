@@ -93,6 +93,7 @@ export default function Schedule() {
   const columnOrderSaveTimer = useRef(null);
   const columnOrderSettingIdRef = useRef(null);
   const appSettingsIdCache = useRef({});
+  const mokedOrderSavingRef = useRef(false);
 
   useEffect(() => {
     if (!initialLoadStarted.current) {
@@ -274,8 +275,10 @@ export default function Schedule() {
   };
 
   const applyDailyData = ({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData }) => {
-    if (mokedOrderSettings.length > 0) setMokedOrder(JSON.parse(mokedOrderSettings[0].setting_value) || []);
-    else setMokedOrder([]);
+    if (!mokedOrderSavingRef.current) {
+      if (mokedOrderSettings.length > 0) setMokedOrder(JSON.parse(mokedOrderSettings[0].setting_value) || []);
+      else setMokedOrder([]);
+    }
     if (columnOrderSettings.length > 0) {
       columnOrderSettingIdRef.current = columnOrderSettings[0].id;
       setCustomColumnOrders(JSON.parse(columnOrderSettings[0].setting_value) || {});
@@ -529,6 +532,7 @@ export default function Schedule() {
   };
 
   const saveMokedOrder = async (newOrder) => {
+    mokedOrderSavingRef.current = true;
     setMokedOrder(newOrder);
     const key = `moked_order_${dateString}`;
     const data = { setting_key: key, setting_value: JSON.stringify(newOrder) };
@@ -540,6 +544,7 @@ export default function Schedule() {
       const created = await base44.entities.AppSettings.create(data);
       appSettingsIdCache.current[key] = created.id;
     }
+    mokedOrderSavingRef.current = false;
   };
 
   const groupedMokeds = useMemo(() => {
