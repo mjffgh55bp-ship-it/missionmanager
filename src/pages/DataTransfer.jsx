@@ -63,10 +63,10 @@ export default function DataTransfer() {
         <Tabs value={tab} onValueChange={handleTabChange}>
           <TabsList className="mb-6 w-full grid grid-cols-5">
             <TabsTrigger value="export" className="flex items-center gap-1 text-xs">
-              <Download className="w-4 h-4" />ייצוא לו״ז
+              <Download className="w-4 h-4" />ייצוא איושים
             </TabsTrigger>
             <TabsTrigger value="import" className="flex items-center gap-1 text-xs">
-              <Upload className="w-4 h-4" />ייבוא לו״ז
+              <Upload className="w-4 h-4" />ייבוא איושים
             </TabsTrigger>
             <TabsTrigger value="avail-export" className="flex items-center gap-1 text-xs">
               <CalendarDays className="w-4 h-4" />ייצוא זמינות
