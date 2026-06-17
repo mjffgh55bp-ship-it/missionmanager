@@ -195,15 +195,18 @@ export default function Availability() {
           const weekDates    = Array.from({ length: 7 }, (_, i) => format(addDays(ws, i), "yyyy-MM-dd"));
 
           const freshTemplates = await getCachedTemplates(base44.entities);
-          const dayRowArrays = await fetchBatch(
-            weekDates.map(d => () => base44.entities.TemplateRow.filter({ date: d })),
-          );
-
-          const freshRows = dayRowArrays.flat();
+          let freshRows;
+          try {
+            freshRows = await fetchWithRetry(() => base44.entities.TemplateRow.filter({
+              date: { $gte: weekStartStr, $lte: weekEndStr },
+            }));
+          } catch {
+            const recent = await fetchWithRetry(() => base44.entities.TemplateRow.list("-date", 1000));
+            freshRows = (recent || []).filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
+          }
+          freshRows = (freshRows || []).filter(r => weekDates.includes(r.date));
           cachedAllTemplateRows.current = freshRows;
-          const weekRows = freshRows.filter(r =>
-            weekDates.includes(r.date) && r.date >= weekStartStr && r.date <= weekEndStr
-          );
+          const weekRows = freshRows;
 
           if (format(weekStartRef.current, "yyyy-MM-dd") !== weekStartStr) return;
 
@@ -273,12 +276,13 @@ export default function Availability() {
   useEffect(() => {
     if (!currentWorker) return;
     let cancelled = false;
-    (async () => {
+    const t = setTimeout(async () => {       // debounce rapid month/worker changes
       try {
         const monthStart = format(startOfMonth(calendarMonth), "yyyy-MM-dd");
         const monthEnd = format(endOfMonth(calendarMonth), "yyyy-MM-dd");
-        // One windowed query for the whole visible month (with safe fallback if range
-        // filters aren't supported on this Base44 instance).
+        // Skip the fetch if we already have rows covering this month (avoid duplicate load)
+        const have = (allTemplateRowsForCalendar || []).some(r => r.date >= monthStart && r.date <= monthEnd);
+        if (have) return;
         let monthRows;
         try {
           monthRows = await fetchWithRetry(() => base44.entities.TemplateRow.filter({
@@ -289,19 +293,15 @@ export default function Availability() {
           monthRows = (recent || []).filter(r => r.date >= monthStart && r.date <= monthEnd);
         }
         if (cancelled || !Array.isArray(monthRows)) return;
-        // Merge into the calendar dataset (de-dupe by id; newest data wins)
         setAllTemplateRowsForCalendar(prev => {
           const byId = new Map();
           for (const r of (prev || [])) if (r && r.id) byId.set(r.id, r);
           for (const r of monthRows) if (r && r.id) byId.set(r.id, r);
           return Array.from(byId.values());
         });
-      } catch (e) {
-        console.warn("calendar month load failed:", e);
-        // leave existing calendar markers in place on failure
-      }
-    })();
-    return () => { cancelled = true; };
+      } catch (e) { console.warn("calendar month load failed:", e); }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
   }, [calendarMonth, currentWorker]);
 
   // First load: identify user immediately, then parallelize everything else
@@ -966,6 +966,8 @@ END:VEVENT
 
   const getAssignmentForDate = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
+    // TEMP DEBUG: confirm publish gate sees correct role + weeks
+    if (typeof window !== "undefined" && !window.__gateLogged) { console.log("GATE:", { isManager, publishedWeeksLoaded, publishedWeeks }); window.__gateLogged = true; }
     // Eye-toggle gate: workers see MANAGER-ASSIGNED shifts only for PUBLISHED weeks.
     // Managers/admins always see everything. This does NOT touch moked signup.
     if (!isManager && publishedWeeksLoaded) {
