@@ -2074,7 +2074,7 @@ export default function Matrix() {
 
   return (
     <div
-      className="h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 p-2 pb-[88px] md:pb-10"
+      className="h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 p-2 pb-[100px] md:pb-14"
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
