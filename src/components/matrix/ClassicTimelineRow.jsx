@@ -42,6 +42,8 @@ function ClassicTimelineRow({
   timesOverlap,
   handleTypeClick,
   handleShiftDoubleClick,
+  canManage,
+  onEditUnavail,
 }) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
 
@@ -163,7 +165,11 @@ function ClassicTimelineRow({
     if (startPx < 0 || startPx > timelineWidth) return null;
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${startPx}px`, width: `${widthPx}px` }}>
+        <div
+          onClick={(e) => { e.stopPropagation(); if (canManage) onEditUnavail && onEditUnavail(unavail); }}
+          className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${canManage ? 'cursor-pointer' : ''} ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`}
+          style={{ right: `${startPx}px`, width: `${widthPx}px` }}
+        >
           <Ban className="w-3 h-3 text-gray-600" />
         </div>
       </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">

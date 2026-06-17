@@ -118,8 +118,6 @@ function ShiftChip({ shift, chipIndex = 0, isUnambiguousSlot = true, signedCount
     } else if (currentType === "wanted") {
       onSignup && onSignup(shift, roleName, "available");
     } else if (currentType === "available") {
-      onSignup && onSignup(shift, roleName, "unavailable");
-    } else if (currentType === "unavailable") {
       onSignup && onSignup(shift, roleName, "remove");
     }
   };
@@ -430,7 +428,7 @@ export default function ShiftDemandPanel({
               <span className="text-gray-300">|</span>
               <span><span className="font-semibold text-cyan-700">זמין</span> – שתי לחיצות</span>
               <span className="text-gray-300">|</span>
-              <span><span className="font-semibold text-red-600">לא זמין</span> – 3 לחיצות</span>
+              <span><span className="text-gray-500">הסרה</span> – שלוש לחיצות</span>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2">
               {dates.map(date => (

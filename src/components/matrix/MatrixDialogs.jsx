@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Send, Star, Check, Ban, Plus } from "lucide-react";
+import { Send, Star, Check, Ban, Plus, Save, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export function NotificationDialog({
   open, onOpenChange, viewMode, currentDate,
@@ -169,6 +170,121 @@ export function ManualShiftDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)} dir="rtl">ביטול</Button>
             <Button onClick={submitManualShift} className="bg-blue-900 hover:bg-blue-800" disabled={!manualShiftData.start_time || !manualShiftData.end_time} dir="rtl">
               {editingShift ? 'עדכן' : <><Plus className="w-4 h-4 mr-2" />הוסף</>}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function UnavailabilityDialog({
+  open, onOpenChange,
+  editingUnavail, setEditingUnavail,
+  onSave,
+}) {
+  const [saving, setSaving] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const isCreate = !editingUnavail?.id;
+
+  const handleSave = async () => {
+    if (saving || deleting) return;
+    if (!editingUnavail?.start_time || !editingUnavail?.end_time || !editingUnavail?.date) return;
+    setSaving(true);
+    try {
+      await onSave(editingUnavail);
+      onOpenChange(false);
+    } catch {
+      alert("שגיאה בעדכון האילוץ. נסה שוב.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (saving || deleting || isCreate) return;
+    setDeleting(true);
+    try {
+      await onSave(editingUnavail, true);
+      onOpenChange(false);
+    } catch {
+      alert("שגיאה במחיקת האילוץ. נסה שוב.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="text-right">
+            {isCreate ? 'הוספת אילוץ' : 'עריכת אילוץ'} — {editingUnavail?.worker_name || ''}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div>
+            <Label className="block mb-1 text-xs text-gray-600">תאריך</Label>
+            <Input
+              type="date"
+              value={editingUnavail?.date || ''}
+              onChange={e => setEditingUnavail(prev => ({ ...prev, date: e.target.value }))}
+              className="text-sm h-9"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="block mb-1 text-xs text-gray-600">שעת התחלה</Label>
+              <Input
+                type="time"
+                value={editingUnavail?.start_time || ''}
+                onChange={e => setEditingUnavail(prev => ({ ...prev, start_time: e.target.value }))}
+                className="text-sm h-9"
+              />
+            </div>
+            <div>
+              <Label className="block mb-1 text-xs text-gray-600">שעת סיום</Label>
+              <Input
+                type="time"
+                value={editingUnavail?.end_time || ''}
+                onChange={e => setEditingUnavail(prev => ({ ...prev, end_time: e.target.value }))}
+                className="text-sm h-9"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="block mb-1 text-xs text-gray-600">סיבה</Label>
+            <Select
+              value={editingUnavail?.reason || 'occupied'}
+              onValueChange={v => setEditingUnavail(prev => ({ ...prev, reason: v }))}
+            >
+              <SelectTrigger dir="rtl" className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent dir="rtl">
+                <SelectItem value="occupied">תפוס</SelectItem>
+                <SelectItem value="overseas">בחו"ל</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter className="flex justify-between" dir="rtl">
+          <div>
+            {!isCreate && (
+              <Button variant="destructive" onClick={handleDelete} disabled={saving || deleting} dir="rtl">
+                <Trash2 className="w-4 h-4 ml-1" />
+                {deleting ? 'מוחק...' : 'מחק'}
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || deleting} dir="rtl">ביטול</Button>
+            <Button
+              onClick={handleSave}
+              className="bg-blue-900 hover:bg-blue-800"
+              disabled={!editingUnavail?.start_time || !editingUnavail?.end_time || !editingUnavail?.date || saving || deleting}
+              dir="rtl"
+            >
+              <Save className="w-4 h-4 ml-1" />
+              {saving ? 'שומר...' : isCreate ? 'צור' : 'שמור'}
             </Button>
           </div>
         </DialogFooter>

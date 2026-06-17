@@ -765,24 +765,7 @@ export default function Availability() {
     cachedUnavailabilities.current = updatedAll;
     setAllUnavailabilities(updatedAll);
 
-    // Auto-mark shifts as unavailable for multi-day constraints
-    if (unavailabilityForm.multiDay) {
-      const newShifts = [...selectedShifts];
-      for (const dateStr of datesToAdd) {
-        (SHIFT_BLOCKS || []).forEach(block => {
-          const overlaps = unavailabilityForm.start_time <= block.end && unavailabilityForm.end_time >= block.start;
-          if (overlaps) {
-            const existingIdx = newShifts.findIndex(s => s.date === dateStr && s.start_time === block.start && s.end_time === block.end);
-            if (existingIdx >= 0) {
-              newShifts[existingIdx] = { ...newShifts[existingIdx], type: "unavailable", priority: 0 };
-            } else {
-              newShifts.push({ date: dateStr, start_time: block.start, end_time: block.end, type: "unavailable", priority: 0 });
-            }
-          }
-        });
-      }
-      setSelectedShifts(newShifts);
-    }
+
 
     // ── Reset and close ───────────────────────────────────────────────────────
     setShowUnavailabilityDialog(false);

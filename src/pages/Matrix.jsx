@@ -16,7 +16,7 @@ import WorkerLockButton from "../components/matrix/WorkerLockButton";
 import MasterControls from "../components/matrix/MasterControls";
 import SummaryColumnsDialog from "../components/matrix/SummaryColumnsDialog";
 import MatrixHeader from "../components/matrix/MatrixHeader";
-import { NotificationDialog, TypeChangeDialog, ManualShiftDialog } from "../components/matrix/MatrixDialogs";
+import { NotificationDialog, TypeChangeDialog, ManualShiftDialog, UnavailabilityDialog } from "../components/matrix/MatrixDialogs";
 import ClassicTimelineRow from "../components/matrix/ClassicTimelineRow";
 
 // ── Timeline constants ──────────────────────────────────────────────────────
@@ -175,6 +175,7 @@ export default function Matrix() {
   const [selectedWorkerForManual, setSelectedWorkerForManual] = useState(null);
   const [manualShiftData, setManualShiftData] = useState({ start_time: '', end_time: '', type: 'available' });
   const [editingShift, setEditingShift] = useState(null);
+  const [editingUnavail, setEditingUnavail] = useState(null); // Unavailability record being edited (null or {worker_id, worker_name, date, ...})
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
   const timelineRefs = useRef({});
@@ -195,6 +196,7 @@ export default function Matrix() {
   const [savingSignupMode, setSavingSignupMode] = useState(false);
   const [publishedWeeks, setPublishedWeeks] = useState([]);
   const [togglingPublish, setTogglingPublish] = useState(false);
+  const [canManage, setCanManage] = useState(false);
   const settingsIdCache = useRef({});
   const trackerEntriesCache = useRef(null);
 
@@ -520,6 +522,15 @@ export default function Matrix() {
       setScheduleParams(parseSetting("custom_schedule_params") || []);
       setSignupMode(parseSetting("availability_signup_mode") || "allow_over_sign_up");
       setPublishedWeeks(parseSetting("published_weeks") || []);
+      // ── canManage check ─────────────────────────────────────────────────────
+      (async () => {
+        try {
+          const user = await base44.auth.me();
+          const userRoles = parseSetting("user_roles") || {};
+          const role = userRoles[user.email];
+          setCanManage(user?.role === 'admin' || role === 'manager');
+        } catch { setCanManage(false); }
+      })();
       allSettings.forEach(s => { settingsIdCache.current[s.setting_key] = s.id; });
       setTrackers(trackersData);
       setWorkers(workersData.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")));
@@ -1138,6 +1149,32 @@ export default function Matrix() {
     debouncedLoadData(true, false, true);
   };
 
+  const handleSaveUnavail = async (unavailData, isDelete = false) => {
+    if (isDelete) {
+      await base44.entities.Unavailability.delete(unavailData.id);
+      setUnavailabilities(prev => prev.filter(u => u.id !== unavailData.id));
+    } else if (unavailData.id) {
+      const updated = await base44.entities.Unavailability.update(unavailData.id, {
+        date: unavailData.date,
+        start_time: unavailData.start_time,
+        end_time: unavailData.end_time,
+        reason: unavailData.reason,
+      });
+      setUnavailabilities(prev => prev.map(u => u.id === updated.id ? updated : u));
+    } else {
+      const created = await base44.entities.Unavailability.create({
+        worker_id: unavailData.worker_id,
+        worker_name: unavailData.worker_name,
+        date: unavailData.date,
+        start_time: unavailData.start_time,
+        end_time: unavailData.end_time,
+        reason: unavailData.reason,
+      });
+      setUnavailabilities(prev => [...prev, created]);
+    }
+    setEditingUnavail(null);
+  };
+
   const saveSignupMode = async (newMode) => {
     setSavingSignupMode(true);
     try {
@@ -1338,7 +1375,11 @@ export default function Matrix() {
     if (startPx < 0 || startPx > timelineWidth) return null;
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <div className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`} style={{ right: `${rightPx}px`, width: `${widthPx}px` }}>
+        <div
+          onClick={(e) => { e.stopPropagation(); if (canManage) setEditingUnavail(unavail); }}
+          className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${canManage ? 'cursor-pointer' : ''} ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`}
+          style={{ right: `${rightPx}px`, width: `${widthPx}px` }}
+        >
           <Ban className="w-3 h-3 text-gray-600" />
         </div>
       </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
@@ -1620,6 +1661,13 @@ export default function Matrix() {
             onClick={e => { e.stopPropagation(); handleManualShiftAdd(worker); }}
             title="הוסף חלון זמינות ידנית"
           ><Plus className="w-3 h-3" /></Button>
+          {canManage && (
+            <Button
+              variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1 text-red-500 hover:text-red-700"
+              onClick={e => { e.stopPropagation(); setEditingUnavail({ worker_id: worker.id, worker_name: worker.nickname, date: viewMode === 'daily' ? dateString : format(currentDate, "yyyy-MM-dd"), start_time: '', end_time: '', reason: 'occupied' }); }}
+              title="הוסף אילוץ"
+            ><Ban className="w-3 h-3" /></Button>
+          )}
         </div>
       </>
     );
@@ -1991,6 +2039,8 @@ export default function Matrix() {
                   timesOverlap={timesOverlap}
                   handleTypeClick={handleTypeClick}
                   handleShiftDoubleClick={handleShiftDoubleClick}
+                  canManage={canManage}
+                  onEditUnavail={setEditingUnavail}
                 />
               </div>
             );
@@ -2077,6 +2127,13 @@ export default function Matrix() {
         <NotificationDialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog} viewMode={viewMode} currentDate={currentDate} selectedWorkerForNotification={selectedWorkerForNotification} notificationNotes={notificationNotes} setNotificationNotes={setNotificationNotes} getWorkerTemplateShifts={getWorkerTemplateShifts} getWorkerExtraTaskShifts={getWorkerExtraTaskShifts} sendNotification={sendNotification} />
         <TypeChangeDialog open={showTypeDialog} onOpenChange={setShowTypeDialog} handleChangeType={handleChangeType} />
         <ManualShiftDialog open={showManualDialog} onOpenChange={(v) => { setShowManualDialog(v); if (!v) { setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null); } }} editingShift={editingShift} selectedWorkerForManual={selectedWorkerForManual} manualShiftData={manualShiftData} setManualShiftData={setManualShiftData} submitManualShift={submitManualShift} deleteShift={deleteManualShift} />
+        <UnavailabilityDialog
+          open={!!editingUnavail}
+          onOpenChange={(v) => { if (!v) setEditingUnavail(null); }}
+          editingUnavail={editingUnavail || {}}
+          setEditingUnavail={setEditingUnavail}
+          onSave={handleSaveUnavail}
+        />
       </div>
     </div>
   );
