@@ -1333,7 +1333,7 @@ END:VEVENT
     let next;
     if (current === null || current === undefined) next = "wanted";
     else if (current === "wanted") next = "available";
-    else if (current === "available") next = "unavailable";
+    else if (current === "available") next = null;
     else next = null;
     const updated = { ...extraTaskStates };
     if (next === null) delete updated[taskName];

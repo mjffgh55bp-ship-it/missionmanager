@@ -111,9 +111,7 @@ export function TypeChangeDialog({ open, onOpenChange, handleChangeType }) {
           <Button variant="outline" className="w-full justify-start" onClick={() => handleChangeType('available')}>
             <Check className="w-4 h-4 ml-2 text-blue-600" />זמין
           </Button>
-          <Button variant="outline" className="w-full justify-start" onClick={() => handleChangeType('unavailable')}>
-            <Ban className="w-4 h-4 ml-2 text-red-600" />לא זמין
-          </Button>
+
         </div>
       </DialogContent>
     </Dialog>
@@ -154,11 +152,21 @@ export function ManualShiftDialog({
               <Button variant={manualShiftData.type === "available" ? "default" : "outline"} className={manualShiftData.type === "available" ? "bg-blue-500 hover:bg-blue-600" : ""} onClick={() => setManualShiftData({ ...manualShiftData, type: "available" })} dir="rtl">
                 <Check className="w-4 h-4 ml-1" />זמין
               </Button>
-              <Button variant={manualShiftData.type === "unavailable" ? "default" : "outline"} className={manualShiftData.type === "unavailable" ? "bg-red-500 hover:bg-red-600" : ""} onClick={() => setManualShiftData({ ...manualShiftData, type: "unavailable" })} dir="rtl">
-                <Ban className="w-4 h-4 ml-1" />לא זמין
+              <Button variant={manualShiftData.type === "constraint" ? "default" : "outline"} className={manualShiftData.type === "constraint" ? "bg-gray-500 hover:bg-gray-600 text-white" : ""} onClick={() => setManualShiftData({ ...manualShiftData, type: "constraint" })} dir="rtl">
+                <Ban className="w-4 h-4 ml-1" />אילוץ
               </Button>
             </div>
           </div>
+          {manualShiftData.type === "constraint" && (
+            <div>
+              <Label className="text-center block mb-2" dir="rtl">סיבת האילוץ</Label>
+              <div className="flex gap-2 justify-center" dir="rtl">
+                <Button variant={manualShiftData.reason === "occupied" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "occupied" })} dir="rtl">עיסוק</Button>
+                <Button variant={manualShiftData.reason === "overseas" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "overseas" })} dir="rtl">חו״ל</Button>
+                <Button variant={manualShiftData.reason === "other" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "other" })} dir="rtl">אחר</Button>
+              </div>
+            </div>
+          )}
         </div>
         <DialogFooter className="flex justify-between" dir="rtl">
           <div>

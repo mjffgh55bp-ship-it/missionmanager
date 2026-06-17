@@ -1072,7 +1072,7 @@ export default function Matrix() {
     e.stopPropagation(); e.preventDefault();
     const workerAvail = getBestAvail(worker.id);
     if (!workerAvail) return;
-    const typeMap = { available: 'wanted', wanted: 'unavailable', unavailable: 'available' };
+    const typeMap = { available: 'wanted', wanted: 'available' };
     const updatedShifts = workerAvail.shifts.map(s => s.date === shift.date && s.start_time === shift.start_time && s.end_time === shift.end_time ? { ...s, type: typeMap[shift.type || 'available'] } : s);
     const previousAvailabilities = availabilities;
     applyOptimisticAvailability(worker.id, updatedShifts);
@@ -1099,7 +1099,7 @@ export default function Matrix() {
 
   const handleManualShiftAdd = (worker) => {
     setSelectedWorkerForManual(worker);
-    setManualShiftData({ start_time: '', end_time: '', type: 'available' });
+    setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' });
     setEditingShift(null);
     setShowManualDialog(true);
   };
@@ -1117,6 +1117,35 @@ export default function Matrix() {
 
   const submitManualShift = async () => {
     if (!selectedWorkerForManual || !manualShiftData.start_time || !manualShiftData.end_time) return;
+    if (manualShiftData.type === "constraint") {
+      try {
+        await base44.entities.Unavailability.create({
+          worker_id: selectedWorkerForManual.id,
+          worker_name: selectedWorkerForManual.nickname,
+          date: manualShiftData.date || dateString,
+          start_time: manualShiftData.start_time,
+          end_time: manualShiftData.end_time,
+          reason: manualShiftData.reason || "occupied",
+        });
+      } catch (e) {
+        console.error("create constraint failed:", e);
+        alert("שגיאה בשמירת האילוץ. נסה שוב.");
+        return;
+      }
+      setUnavailabilities(prev => [...prev, {
+        id: 'temp_' + Date.now(), // optimistic placeholder — real data loads next refresh
+        worker_id: selectedWorkerForManual.id,
+        worker_name: selectedWorkerForManual.nickname,
+        date: manualShiftData.date || dateString,
+        start_time: manualShiftData.start_time,
+        end_time: manualShiftData.end_time,
+        reason: manualShiftData.reason || "occupied",
+      }]);
+      setShowManualDialog(false); setSelectedWorkerForManual(null);
+      setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null);
+      debouncedLoadData(true, false, true);
+      return;
+    }
     const workerAvail = getBestAvail(selectedWorkerForManual.id);
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     const targetDate = format(currentDate, "yyyy-MM-dd");
@@ -1128,7 +1157,7 @@ export default function Matrix() {
     const availData = { worker_id: selectedWorkerForManual.id, worker_name: selectedWorkerForManual.nickname, week_start_date: weekStartDate, shifts: updatedShifts, status: workerAvail?.status || "approved" };
     const previousAvailabilities = availabilities;
     applyOptimisticAvailability(selectedWorkerForManual.id, updatedShifts, availData);
-    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null);
+    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null);
     try {
       if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
       else await base44.entities.Availability.create(availData);
@@ -1143,7 +1172,7 @@ export default function Matrix() {
     const updatedShifts = workerAvail.shifts.filter(s => !(s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type));
     const prevAvails2 = availabilities;
     applyOptimisticAvailability(selectedWorkerForManual.id, updatedShifts);
-    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null);
+    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null);
     try { await base44.entities.Availability.update(workerAvail.id, { shifts: updatedShifts }); }
     catch { setAvailabilities(prevAvails2); }
     debouncedLoadData(true, false, true);
@@ -1659,15 +1688,8 @@ export default function Matrix() {
           <Button
             variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1"
             onClick={e => { e.stopPropagation(); handleManualShiftAdd(worker); }}
-            title="הוסף חלון זמינות ידנית"
+            title="הוסף חלון זמינות"
           ><Plus className="w-3 h-3" /></Button>
-          {canManage && (
-            <Button
-              variant="ghost" size="icon" className="h-5 w-5 shrink-0 p-0 mr-1 text-red-500 hover:text-red-700"
-              onClick={e => { e.stopPropagation(); setEditingUnavail({ worker_id: worker.id, worker_name: worker.nickname, date: viewMode === 'daily' ? dateString : format(currentDate, "yyyy-MM-dd"), start_time: '', end_time: '', reason: 'occupied' }); }}
-              title="הוסף אילוץ"
-            ><Ban className="w-3 h-3" /></Button>
-          )}
         </div>
       </>
     );
@@ -2126,7 +2148,7 @@ export default function Matrix() {
         <SummaryColumnsDialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog} summaryColumns={summaryColumns} saveSummaryColumns={saveSummaryColumns} shiftStatuses={shiftStatuses} scheduleParams={scheduleParams} trackers={trackers} />
         <NotificationDialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog} viewMode={viewMode} currentDate={currentDate} selectedWorkerForNotification={selectedWorkerForNotification} notificationNotes={notificationNotes} setNotificationNotes={setNotificationNotes} getWorkerTemplateShifts={getWorkerTemplateShifts} getWorkerExtraTaskShifts={getWorkerExtraTaskShifts} sendNotification={sendNotification} />
         <TypeChangeDialog open={showTypeDialog} onOpenChange={setShowTypeDialog} handleChangeType={handleChangeType} />
-        <ManualShiftDialog open={showManualDialog} onOpenChange={(v) => { setShowManualDialog(v); if (!v) { setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available' }); setEditingShift(null); } }} editingShift={editingShift} selectedWorkerForManual={selectedWorkerForManual} manualShiftData={manualShiftData} setManualShiftData={setManualShiftData} submitManualShift={submitManualShift} deleteShift={deleteManualShift} />
+        <ManualShiftDialog open={showManualDialog} onOpenChange={(v) => { setShowManualDialog(v); if (!v) { setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null); } }} editingShift={editingShift} selectedWorkerForManual={selectedWorkerForManual} manualShiftData={manualShiftData} setManualShiftData={setManualShiftData} submitManualShift={submitManualShift} deleteShift={deleteManualShift} />
         <UnavailabilityDialog
           open={!!editingUnavail}
           onOpenChange={(v) => { if (!v) setEditingUnavail(null); }}

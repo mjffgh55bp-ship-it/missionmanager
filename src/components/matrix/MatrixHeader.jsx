@@ -106,9 +106,7 @@ export default function MatrixHeader({
         <Badge className="bg-cyan-100 text-cyan-800 text-[10px] px-1.5 py-0">
           <Check className="w-2.5 h-2.5 ml-0.5" />זמין
         </Badge>
-        <Badge className="bg-red-100 text-red-800 text-[10px] px-1.5 py-0">
-          <Ban className="w-2.5 h-2.5 ml-0.5" />לא זמין
-        </Badge>
+
         <Badge className="bg-purple-400 text-white text-[10px] px-1.5 py-0">שיבוץ (לוח)</Badge>
       </div>
 
