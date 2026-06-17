@@ -1382,7 +1382,7 @@ export default function Matrix() {
       return st && et && timesOverlap(shift.start_time, shift.end_time, st, et);
     }).map(r => ({ start_time: r.values?.["התחלה"] || r.values?.["שעת התחלה"], end_time: r.values?.["סיום"] || r.values?.["שעת סיום"], status: r.values?.status || null }));
     const handleBarDblClick = (e) => { e.stopPropagation(); handleShiftDoubleClick(e, worker, shift); };
-    const handleBarMD = (action) => (e) => { if (e.detail >= 2) return; e.stopPropagation(); handleMouseDown(e, worker, shift, action, dayIndex); };
+    const handleBarMD = (action) => (e) => { e.stopPropagation(); handleMouseDown(e, worker, shift, action, dayIndex); };
     return (
       <div
         data-matrix-existing-bar="true"

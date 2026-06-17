@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, invalidateTemplatesCache, invalidateSettingsCache, invalidateStaticCache, softInvalidateStaticCache } from "@/lib/appDataCache";
+import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, invalidateTemplatesCache, invalidateSettingsCache, invalidateStaticCache, softInvalidateStaticCache, toggleWeekPublished, parseSetting } from "@/lib/appDataCache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Pencil, X, Copy, UserCheck, Users, GripVertical } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Copy, UserCheck, Users, GripVertical, Eye, EyeOff } from "lucide-react";
 import { format, addDays, subDays, startOfWeek, differenceInDays } from "date-fns";
 import { getHebrewDate } from "../components/utils/HebrewDate";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -85,6 +85,8 @@ export default function Schedule() {
   const [openRegistrations, setOpenRegistrations] = useState([]);
   const [tasksList, setTasksList] = useState([]);
   const [taskQualifications, setTaskQualifications] = useState({});
+  const [publishedWeeks, setPublishedWeeks] = useState([]);
+  const [togglingPublish, setTogglingPublish] = useState(false);
   const staticDataLoaded = useRef(false);
   const lastWeekStart = useRef(null);
   const initialLoadStarted = useRef(false);
@@ -158,6 +160,7 @@ export default function Schedule() {
     const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
     const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
     allSettings.forEach(s => { appSettingsIdCache.current[s.setting_key] = s.id; });
+    setPublishedWeeks(parseSetting(allSettings, "published_weeks", []));
     applyStaticData({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData });
     applyDailyData({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     staticDataLoaded.current = true;
@@ -221,6 +224,7 @@ export default function Schedule() {
     const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
     const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
     allSettings.forEach(s => { appSettingsIdCache.current[s.setting_key] = s.id; });
+    setPublishedWeeks(parseSetting(allSettings, "published_weeks", []));
     applyDailyData({ dateString, templateRowsData, allTemplatesData: freshTemplates, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     setDailyLoading(false);
   };
@@ -547,6 +551,23 @@ export default function Schedule() {
     mokedOrderSavingRef.current = false;
   };
 
+  const weekStartStrForPublish = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
+  const isCurrentWeekPublished = publishedWeeks.includes(weekStartStrForPublish);
+
+  const handleTogglePublish = async () => {
+    setTogglingPublish(true);
+    try {
+      const next = !isCurrentWeekPublished;
+      const weeks = await toggleWeekPublished(base44.entities, weekStartStrForPublish, next);
+      setPublishedWeeks(weeks);
+    } catch (e) {
+      console.error("toggle publish failed:", e);
+      alert("שגיאה בעדכון פרסום המשמרות. נסה שוב.");
+    } finally {
+      setTogglingPublish(false);
+    }
+  };
+
   const groupedMokeds = useMemo(() => {
     const groupedRows = {};
     templateRows.forEach((row) => {
@@ -631,6 +652,19 @@ export default function Schedule() {
                 </div>
                 <div className="flex items-center gap-1 mr-auto">
                   <Button variant="outline" onClick={() => setCurrentDate(new Date())} size="sm" dir="rtl">היום</Button>
+                  <Button
+                    variant="outline" size="icon"
+                    onClick={handleTogglePublish}
+                    disabled={togglingPublish}
+                    title={isCurrentWeekPublished
+                      ? "העובדים רואים את משמרות השבוע — לחץ כדי להסתיר"
+                      : "המשמרות מוסתרות מהעובדים — לחץ כדי לפרסם"}
+                    className={isCurrentWeekPublished ? "text-green-600" : "text-gray-400"}
+                  >
+                    {togglingPublish
+                      ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                      : isCurrentWeekPublished ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </Button>
                   <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
                   <Popover>
                     <PopoverTrigger asChild>
