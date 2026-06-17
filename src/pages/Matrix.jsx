@@ -214,6 +214,7 @@ export default function Matrix() {
 
   const midMouseDragRef = useRef(null);
   const pendingDragRef = useRef(null);
+  const lastBarMouseDownRef = useRef({ t: 0, key: null });
   const pendingScrollRef = useRef(null);
   const wheelAccumRef = useRef(null);
   const ppmRef = useRef(ppm);
@@ -934,6 +935,21 @@ export default function Matrix() {
   const handleMouseDown = (e, worker, shift, action, dayIndex = 0) => {
     if (action === 'create') e.preventDefault();
     e.stopPropagation();
+
+    // Manual double-click detection on a shift bar → open the editor.
+    if (action === 'move' && shift) {
+      const now = Date.now();
+      const key = `${worker.id}|${shift.date}|${shift.start_time}|${shift.end_time}|${shift.type}`;
+      const prev = lastBarMouseDownRef.current;
+      if (prev.key === key && (now - prev.t) < 350) {
+        lastBarMouseDownRef.current = { t: 0, key: null };
+        pendingDragRef.current = null;
+        handleShiftDoubleClick(e, worker, shift);
+        return;
+      }
+      lastBarMouseDownRef.current = { t: now, key };
+    }
+
     if (action === 'move' && e.detail === 2) return;
 
     const slot = getSlotFromPointer(e);
@@ -1107,12 +1123,12 @@ export default function Matrix() {
   const handleShiftDoubleClick = (e, worker, shift) => {
     e.stopPropagation();
     e.preventDefault();
-    setTimeout(() => {
-      setSelectedWorkerForManual(worker);
-      setManualShiftData({ start_time: shift.start_time, end_time: shift.end_time, type: shift.type });
-      setEditingShift(shift);
-      setShowManualDialog(true);
-    }, 0);
+    pendingDragRef.current = null;
+    setDragging(null);
+    setSelectedWorkerForManual(worker);
+    setManualShiftData({ start_time: shift.start_time, end_time: shift.end_time, type: shift.type });
+    setEditingShift(shift);
+    setShowManualDialog(true);
   };
 
   const submitManualShift = async () => {
