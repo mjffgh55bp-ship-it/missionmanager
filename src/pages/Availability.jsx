@@ -107,6 +107,7 @@ export default function Availability() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [shiftsLoading, setShiftsLoading] = useState(true);
   const [publishedWeeks, setPublishedWeeks] = useState([]);
+  const [publishedWeeksLoaded, setPublishedWeeksLoaded] = useState(false);
 
   const weekStartRef = useRef(weekStart); // always mirrors weekStart state
 
@@ -348,6 +349,7 @@ export default function Availability() {
 
       setOpenRegistrations(openReg);
       setPublishedWeeks(publishedWeeksInit);
+      setPublishedWeeksLoaded(true);
 
       const norm = (s) => String(s || "").trim().toLowerCase();
       let worker = myWorkerRes?.data?.worker || null;
@@ -966,7 +968,7 @@ END:VEVENT
     const dateStr = format(date, "yyyy-MM-dd");
     // Eye-toggle gate: workers see MANAGER-ASSIGNED shifts only for PUBLISHED weeks.
     // Managers/admins always see everything. This does NOT touch moked signup.
-    if (!isManager) {
+    if (!isManager && publishedWeeksLoaded) {
       const wkStart = format(startOfWeek(date, { weekStartsOn: 0 }), "yyyy-MM-dd");
       if (!publishedWeeks.includes(wkStart)) {
         return [];

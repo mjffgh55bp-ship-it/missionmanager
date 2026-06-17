@@ -223,5 +223,6 @@ export async function toggleWeekPublished(entities, weekStartStr, published) {
       try { await entities.AppSettings.delete(rows[i].id); } catch (e) { console.warn("published_weeks: dedupe delete skipped", e); }
     }
   }
+  invalidateSettingsCache(); // workers must see the updated list immediately
   return weeks;
 }
