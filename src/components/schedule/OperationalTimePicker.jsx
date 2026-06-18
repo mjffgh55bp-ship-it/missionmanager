@@ -99,8 +99,20 @@ export default function OperationalTimePicker({
   compact = false,
 }) {
   const [open, setOpen] = useState(false);
+  const [hourInput, setHourInput] = useState("");
   const hourRef = useRef(null);
   const minRef = useRef(null);
+
+  const parsed = parseTimeCellLocal(value);
+  // localHourValue tracks the currently highlighted hour inside the popover
+  // (may differ from stored value until a minute is chosen or Enter is pressed)
+  const [localHourValue, setLocalHourValue] = useState(parsed.hourValue);
+
+  // Reset local selection when popover opens to match stored value
+  useEffect(() => {
+    setLocalHourValue(parsed.hourValue);
+    setHourInput("");
+  }, [open, parsed.hourValue]);
 
   // Scroll selected item into view when popover opens
   useEffect(() => {
@@ -117,10 +129,6 @@ export default function OperationalTimePicker({
     }, 50);
   }, [open]);
 
-  const parsed = parseTimeCellLocal(value);
-  const selectedHourValue = parsed.hourValue;
-  const selectedMin = parsed.min;
-
   const handleSelect = (hourValue, min) => {
     const newVal = buildStoredValue(hourValue, min);
     if (!newVal) return;
@@ -128,14 +136,33 @@ export default function OperationalTimePicker({
     onChange(newVal);
   };
 
+  // Hour click only highlights — does NOT close or save
   const handleHourClick = (hourValue) => {
-    const min = selectedMin || "00";
-    handleSelect(hourValue, min);
+    setLocalHourValue(hourValue);
   };
 
+  // Minute click finalizes: close + save with selected hour
   const handleMinClick = (m) => {
-    const hv = selectedHourValue || "06";
+    const hv = localHourValue || parsed.hourValue || "06";
     handleSelect(hv, m);
+  };
+
+  // Enter key: resolve typed/selected hour + any selected minute, close & save
+  const handleKeyDown = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    let resolvedHour = localHourValue || parsed.hourValue;
+    if (hourInput.trim()) {
+      const padded = hourInput.trim().padStart(2, "0");
+      const matched = HOUR_ENTRIES.find(
+        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === padded
+      );
+      if (matched) resolvedHour = matched.value;
+      setHourInput("");
+    }
+    if (resolvedHour) {
+      handleSelect(resolvedHour, parsed.min || "00");
+    }
   };
 
   const handleClear = () => {
@@ -158,10 +185,20 @@ export default function OperationalTimePicker({
       </PopoverTrigger>
 
       <PopoverContent className="w-52 p-2 z-50" align="center">
-        <div className="flex gap-1 h-56" dir="ltr">
+        <div className="flex gap-1 h-56" dir="ltr" onKeyDown={handleKeyDown}>
           {/* Hours roller */}
-          <div ref={hourRef} className="flex-1 overflow-y-auto scroll-smooth">
-            <div className="text-center text-[10px] text-gray-400 mb-1 sticky top-0 bg-white z-10">שעה</div>
+          <div ref={hourRef} className="flex-1 overflow-y-auto scroll-smooth flex flex-col">
+            <div className="text-center text-[10px] text-gray-400 mb-0.5 sticky top-0 bg-white z-10">שעה</div>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={hourInput}
+              onChange={(e) => setHourInput(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              onKeyDown={handleKeyDown}
+              placeholder="הקלד שעה…"
+              className="w-full text-center text-xs py-0.5 border border-gray-200 rounded mb-1 bg-gray-50 focus:bg-white focus:border-blue-400 outline-none"
+              dir="ltr"
+            />
             {HOUR_ENTRIES.map((entry, idx) => {
               if (entry.type === "boundary") {
                 return (
@@ -173,7 +210,7 @@ export default function OperationalTimePicker({
                 );
               }
 
-              const isSelected = entry.value === selectedHourValue;
+              const isSelected = entry.value === localHourValue;
               const isPrev = entry.zone === "prev";
               const isNext = entry.zone === "next1" || entry.zone === "next2";
 
@@ -211,10 +248,10 @@ export default function OperationalTimePicker({
             {MINUTES.map(m => (
               <button
                 key={m}
-                data-selected={m === selectedMin}
+                data-selected={m === parsed.min}
                 onClick={() => handleMinClick(m)}
                 className={`w-full text-center py-0.5 rounded text-sm font-mono transition-colors ${
-                  m === selectedMin
+                  m === parsed.min
                     ? "bg-blue-600 text-white font-bold"
                     : "hover:bg-gray-100 text-gray-800"
                 }`}
