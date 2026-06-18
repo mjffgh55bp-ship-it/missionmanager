@@ -100,21 +100,25 @@ export default function OperationalTimePicker({
 }) {
   const [open, setOpen] = useState(false);
   const [hourInput, setHourInput] = useState("");
+  const [hasStartedTyping, setHasStartedTyping] = useState(false);
   const inputRef = useRef(null);
   const hourRef = useRef(null);
   const minRef = useRef(null);
   const autoClosedRef = useRef(false); // prevents double-fire on auto-close
 
   const parsed = parseTimeCellLocal(value);
-  // localHourValue tracks the currently highlighted hour inside the popover
+  // localHourValue: currently highlighted hour in the popover
   const [localHourValue, setLocalHourValue] = useState(parsed.hourValue);
+  // liveMin: live-highlighted minute as user types
+  const [liveMin, setLiveMin] = useState(null);
 
-  // On popover open: reset, pre-fill existing hour digits for plain cur-zone values
+  // On popover open: reset, pre-fill existing hour digits for plain values
   useEffect(() => {
     if (!open) return;
     autoClosedRef.current = false;
+    setHasStartedTyping(false);
+    setLiveMin(null);
     setLocalHourValue(parsed.hourValue);
-    // Pre-fill hour digits if it's a plain (non-prefixed) value
     if (parsed.hourValue && !parsed.hourValue.startsWith("-1") && !parsed.hourValue.startsWith("+")) {
       setHourInput(parsed.hourValue);
     } else {
@@ -166,6 +170,7 @@ export default function OperationalTimePicker({
     if (autoClosedRef.current) return;
     const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
     setHourInput(raw);
+    setHasStartedTyping(true);
 
     const hhRaw = raw.slice(0, 2);
     const mmRaw = raw.slice(2, 4);
@@ -177,6 +182,14 @@ export default function OperationalTimePicker({
         entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh
       );
       if (matched) setLocalHourValue(matched.value);
+    }
+
+    // Live minute highlighting as 3rd/4th digits arrive
+    if (mmRaw.length >= 1) {
+      const padded = mmRaw.padStart(2, "0");
+      setLiveMin(MINUTES.includes(padded) ? padded : null);
+    } else {
+      setLiveMin(null);
     }
 
     // Auto-close when 4 digits entered and both are valid
@@ -230,15 +243,16 @@ export default function OperationalTimePicker({
     ? "w-full h-full text-xs text-center py-1 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none"
     : "w-full h-full text-sm text-center py-2 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none";
 
-  // Input shows formatted value when closed, raw typed digits when open
-  const inputDisplayValue = open ? hourInput : (value || "");
+  // Input display: formatted value when closed, formatted value when open but hasn't started typing, raw digits once typing begins
+  const inputDisplayValue = open
+    ? (hasStartedTyping ? hourInput : (value || ""))
+    : (value || "");
 
-  // Format display placeholder-like text for empty state
-  const inputStyle = open
+  const inputStyle = (open && !hasStartedTyping) || (!open && value)
     ? {}
-    : value
-      ? {}
-      : { color: "#9ca3af" };
+    : !open && !value
+      ? { color: "#9ca3af" }
+      : {};
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -308,20 +322,23 @@ export default function OperationalTimePicker({
           {/* Minutes roller */}
           <div ref={minRef} className="flex-1 overflow-y-auto scroll-smooth">
             <div className="text-center text-[10px] text-gray-400 mb-1 sticky top-0 bg-white z-10">דקות</div>
-            {MINUTES.map(m => (
-              <button
-                key={m}
-                data-selected={m === parsed.min}
-                onClick={() => handleMinClick(m)}
-                className={`w-full text-center py-0.5 rounded text-sm font-mono transition-colors ${
-                  m === parsed.min
-                    ? "bg-blue-600 text-white font-bold"
-                    : "hover:bg-gray-100 text-gray-800"
-                }`}
-              >
-                {m}
-              </button>
-            ))}
+            {MINUTES.map(m => {
+              const isSelected = hasStartedTyping ? m === liveMin : m === parsed.min;
+              return (
+                <button
+                  key={m}
+                  data-selected={isSelected}
+                  onClick={() => handleMinClick(m)}
+                  className={`w-full text-center py-0.5 rounded text-sm font-mono transition-colors ${
+                    isSelected
+                      ? "bg-blue-600 text-white font-bold"
+                      : "hover:bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {m}
+                </button>
+              );
+            })}
           </div>
         </div>
 
