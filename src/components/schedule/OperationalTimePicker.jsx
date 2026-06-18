@@ -100,22 +100,27 @@ export default function OperationalTimePicker({
 }) {
   const [open, setOpen] = useState(false);
   const [hourInput, setHourInput] = useState("");
-  const [mode, setMode] = useState("hour"); // "hour" | "minute" – two-phase typing
   const inputRef = useRef(null);
   const hourRef = useRef(null);
   const minRef = useRef(null);
+  const autoClosedRef = useRef(false); // prevents double-fire on auto-close
 
   const parsed = parseTimeCellLocal(value);
   // localHourValue tracks the currently highlighted hour inside the popover
-  // (may differ from stored value until a minute is chosen or Enter is pressed)
   const [localHourValue, setLocalHourValue] = useState(parsed.hourValue);
 
-  // Reset local selection & mode when popover opens, auto-focus input
+  // On popover open: reset, pre-fill existing hour digits for plain cur-zone values
   useEffect(() => {
+    if (!open) return;
+    autoClosedRef.current = false;
     setLocalHourValue(parsed.hourValue);
-    setHourInput("");
-    setMode("hour");
-  }, [open, parsed.hourValue]);
+    // Pre-fill hour digits if it's a plain (non-prefixed) value
+    if (parsed.hourValue && !parsed.hourValue.startsWith("-1") && !parsed.hourValue.startsWith("+")) {
+      setHourInput(parsed.hourValue);
+    } else {
+      setHourInput("");
+    }
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -156,55 +161,63 @@ export default function OperationalTimePicker({
     handleSelect(hv, m);
   };
 
-  // Live hour matching as user types digits
+  // Continuous HHMM typing — live highlight + auto-close on 4 valid digits
   const handleInputChange = (e) => {
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+    if (autoClosedRef.current) return;
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
     setHourInput(raw);
-    if (raw.length >= 1) {
-      const padded = raw.padStart(2, "0");
-      const isMinuteMode = mode === "minute";
-      if (isMinuteMode) {
-        // In minute mode, only accept valid minute values
-        if (padded.length === 2 && MINUTES.includes(padded)) {
-          setHourInput(padded);
-        }
-        return;
-      }
-      // Hour mode: live highlight matching hour (current operational day only)
+
+    const hhRaw = raw.slice(0, 2);
+    const mmRaw = raw.slice(2, 4);
+    const hh = hhRaw.padStart(2, "0");
+
+    // Live hour matching (cur zone only)
+    if (hhRaw.length >= 1) {
       const matched = HOUR_ENTRIES.find(
-        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === padded
+        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh
       );
       if (matched) setLocalHourValue(matched.value);
     }
+
+    // Auto-close when 4 digits entered and both are valid
+    if (raw.length === 4 && mmRaw.length === 2) {
+      const hourMatched = HOUR_ENTRIES.find(
+        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh
+      );
+      if (hourMatched && MINUTES.includes(mmRaw)) {
+        autoClosedRef.current = true;
+        handleSelect(hourMatched.value, mmRaw);
+      }
+    }
   };
 
-  // Enter key: two-phase flow — hour first, then minute
+  // Enter key: resolve whatever is typed/selected, save
   const handleKeyDown = (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
+    if (autoClosedRef.current) return;
 
-    if (mode === "hour") {
-      let resolvedHour = localHourValue || parsed.hourValue;
-      if (hourInput.trim()) {
-        const padded = hourInput.trim().padStart(2, "0");
-        const matched = HOUR_ENTRIES.find(
-          entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === padded
-        );
-        if (matched) resolvedHour = matched.value;
-      }
-      if (!resolvedHour) return;
-      setLocalHourValue(resolvedHour);
-      setHourInput("");
-      setMode("minute");
-      setTimeout(() => inputRef.current?.focus(), 50);
-    } else {
-      // Minute mode — finalize
-      if (hourInput.trim()) {
-        const m = hourInput.trim().padStart(2, "0");
-        if (MINUTES.includes(m)) {
-          handleSelect(localHourValue || parsed.hourValue || "06", m);
-        }
-      }
+    let resolvedHour = localHourValue || parsed.hourValue;
+    let resolvedMin = parsed.min || "00";
+
+    const raw = hourInput.replace(/\D/g, "");
+    const hh = raw.slice(0, 2).padStart(2, "0");
+    const mm = raw.slice(2, 4);
+
+    // Try matching typed hour
+    if (raw.length >= 1) {
+      const matched = HOUR_ENTRIES.find(
+        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh
+      );
+      if (matched) resolvedHour = matched.value;
+    }
+    // Try using typed minute if 2 digits and valid
+    if (mm.length === 2 && MINUTES.includes(mm)) {
+      resolvedMin = mm;
+    }
+
+    if (resolvedHour) {
+      handleSelect(resolvedHour, resolvedMin);
     }
   };
 
@@ -217,7 +230,15 @@ export default function OperationalTimePicker({
     ? "w-full h-full text-xs text-center py-1 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none"
     : "w-full h-full text-sm text-center py-2 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none";
 
+  // Input shows formatted value when closed, raw typed digits when open
   const inputDisplayValue = open ? hourInput : (value || "");
+
+  // Format display placeholder-like text for empty state
+  const inputStyle = open
+    ? {}
+    : value
+      ? {}
+      : { color: "#9ca3af" };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -232,7 +253,7 @@ export default function OperationalTimePicker({
           placeholder={placeholder}
           className={triggerClass + (open ? " bg-blue-50 ring-1 ring-blue-400" : "")}
           dir="ltr"
-          style={open ? {} : (value ? {} : { color: "#9ca3af" })}
+          style={inputStyle}
         />
       </PopoverTrigger>
 
