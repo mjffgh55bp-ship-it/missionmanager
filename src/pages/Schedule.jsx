@@ -665,7 +665,7 @@ export default function Schedule() {
                       ? <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
                       : isCurrentWeekPublished ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                   </Button>
-                  <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 1))}><ChevronRight className="w-4 h-4" /></Button>
+                  <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 7))}><ChevronRight className="w-4 h-4" /></Button>
                   <Popover>
                     <PopoverTrigger asChild>
                       <div className="px-3 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[150px] text-center cursor-pointer hover:bg-blue-800 transition-colors text-sm" dir="rtl">{formatDateHebrew(currentDate)}</div>
@@ -679,7 +679,7 @@ export default function Schedule() {
                       />
                     </PopoverContent>
                   </Popover>
-                  <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 1))}><ChevronLeft className="w-4 h-4" /></Button>
+                  <Button variant="outline" size="icon" onClick={() => setCurrentDate(addDays(currentDate, 7))}><ChevronLeft className="w-4 h-4" /></Button>
                 </div>
                 {editMode && (
                   <>
