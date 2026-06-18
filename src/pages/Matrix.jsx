@@ -1196,8 +1196,19 @@ export default function Matrix() {
 
   const handleSaveUnavail = async (unavailData, isDelete = false) => {
     if (isDelete) {
-      await base44.entities.Unavailability.delete(unavailData.id);
-      setUnavailabilities(prev => prev.filter(u => u.id !== unavailData.id));
+      // Optimistic temp-id entries: just remove from local state (no DB record)
+      if (String(unavailData.id).startsWith('temp_')) {
+        setUnavailabilities(prev => prev.filter(u => u.id !== unavailData.id));
+        setEditingUnavail(null);
+        return;
+      }
+      try {
+        await base44.entities.Unavailability.delete(unavailData.id);
+        setUnavailabilities(prev => prev.filter(u => u.id !== unavailData.id));
+      } catch (e) {
+        console.error('delete unavailability failed:', e);
+        throw new Error('delete_failed');
+      }
     } else if (unavailData.id) {
       const updated = await base44.entities.Unavailability.update(unavailData.id, {
         date: unavailData.date,
