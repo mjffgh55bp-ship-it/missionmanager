@@ -663,10 +663,10 @@ export default function Schedule() {
                   <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 7))}><ChevronRight className="w-4 h-4" /></Button>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <div className="px-3 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[200px] text-center cursor-pointer hover:bg-blue-800 transition-colors text-sm" dir="rtl">
+                      <div className="px-3 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[150px] text-center cursor-pointer hover:bg-blue-800 transition-colors text-sm" dir="rtl">
                         {(() => {
                           const ws = startOfWeek(currentDate, { weekStartsOn: 0 });
-                          return `${formatDateHebrew(ws)} – ${formatDateHebrew(addDays(ws, 6))}`;
+                          return `שבוע ${getCustomWeekNumber(ws)}`;
                         })()}
                       </div>
                     </PopoverTrigger>
