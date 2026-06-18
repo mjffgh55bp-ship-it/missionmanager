@@ -214,35 +214,33 @@ export default function OperationalTimePicker({
   };
 
   const triggerClass = compact
-    ? "w-full h-full text-xs text-center py-1 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap"
-    : "w-full h-full text-sm text-center py-2 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap";
+    ? "w-full h-full text-xs text-center py-1 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none"
+    : "w-full h-full text-sm text-center py-2 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none";
+
+  const inputDisplayValue = open ? hourInput : (value || "");
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button className={triggerClass}>
-          {value ? formatTimeTrigger(value) : (
-            <span className="text-gray-400">{placeholder}</span>
-          )}
-        </button>
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          value={inputDisplayValue}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className={triggerClass + (open ? " bg-blue-50 ring-1 ring-blue-400" : "")}
+          dir="ltr"
+          style={open ? {} : (value ? {} : { color: "#9ca3af" })}
+        />
       </PopoverTrigger>
 
-      <PopoverContent className="w-52 p-2 z-50" align="center">
+      <PopoverContent className="w-52 p-2 z-[60]" align="center" onOpenAutoFocus={(e) => e.preventDefault()}>
         <div className="flex gap-1 h-56" dir="ltr" onKeyDown={handleKeyDown}>
           {/* Hours roller */}
           <div ref={hourRef} className="flex-1 overflow-y-auto scroll-smooth flex flex-col">
             <div className="text-center text-[10px] text-gray-400 mb-0.5 sticky top-0 bg-white z-10">שעה</div>
-            <input
-              ref={inputRef}
-              type="text"
-              inputMode="numeric"
-              value={hourInput}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={mode === "hour" ? "הקלד שעה…" : "הקלד דקות…"}
-              className="w-full text-center text-xs py-0.5 border border-gray-200 rounded mb-1 bg-gray-50 focus:bg-white focus:border-blue-400 outline-none"
-              dir="ltr"
-            />
             {HOUR_ENTRIES.map((entry, idx) => {
               if (entry.type === "boundary") {
                 return (
