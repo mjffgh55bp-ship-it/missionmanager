@@ -643,11 +643,6 @@ export default function Schedule() {
               <div className="flex items-center gap-2 flex-wrap" dir="rtl">
                 <div className="flex items-center gap-2">
                   <CardTitle className="text-2xl">לוח</CardTitle>
-                  {(() => {
-                    const ws = startOfWeek(currentDate, { weekStartsOn: 0 });
-                    const wn = getCustomWeekNumber(ws);
-                    return <span className="text-sm font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">שב׳ {wn}</span>;
-                  })()}
                   {isDailyLoading && <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-700 rounded-full animate-spin" />}
                 </div>
                 <div className="flex items-center gap-1 mr-auto">
@@ -668,7 +663,12 @@ export default function Schedule() {
                   <Button variant="outline" size="icon" onClick={() => setCurrentDate(subDays(currentDate, 7))}><ChevronRight className="w-4 h-4" /></Button>
                   <Popover>
                     <PopoverTrigger asChild>
-                      <div className="px-3 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[150px] text-center cursor-pointer hover:bg-blue-800 transition-colors text-sm" dir="rtl">{formatDateHebrew(currentDate)}</div>
+                      <div className="px-3 py-2 bg-blue-900 text-white rounded-lg font-semibold min-w-[200px] text-center cursor-pointer hover:bg-blue-800 transition-colors text-sm" dir="rtl">
+                        {(() => {
+                          const ws = startOfWeek(currentDate, { weekStartsOn: 0 });
+                          return `${formatDateHebrew(ws)} – ${formatDateHebrew(addDays(ws, 6))}`;
+                        })()}
+                      </div>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
