@@ -105,8 +105,15 @@ async function cachedFetch(key, fetcher, ttl = CACHE_TTL_MS) {
   }).catch(err => {
     delete pending[key];
     const lastKnown = cache[key]?.value;
-    if (lastKnown !== undefined) return lastKnown; // stale beats blank
-    throw err;
+    if (lastKnown !== undefined) {
+      // stale beats blank — return expired value, refresh will retry next access
+      return lastKnown;
+    }
+    // No stale value either. Return empty array (most common type) instead of
+    // crashing the page — the cache will self-heal on the next access after the
+    // transient issue resolves.
+    console.warn(`cachedFetch "${key}": all retries exhausted, returning empty fallback`);
+    return [];
   });
   return pending[key];
 }
