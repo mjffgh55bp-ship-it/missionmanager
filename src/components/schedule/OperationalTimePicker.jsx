@@ -100,6 +100,8 @@ export default function OperationalTimePicker({
 }) {
   const [open, setOpen] = useState(false);
   const [hourInput, setHourInput] = useState("");
+  const [mode, setMode] = useState("hour"); // "hour" | "minute" – two-phase typing
+  const inputRef = useRef(null);
   const hourRef = useRef(null);
   const minRef = useRef(null);
 
@@ -108,11 +110,18 @@ export default function OperationalTimePicker({
   // (may differ from stored value until a minute is chosen or Enter is pressed)
   const [localHourValue, setLocalHourValue] = useState(parsed.hourValue);
 
-  // Reset local selection when popover opens to match stored value
+  // Reset local selection & mode when popover opens, auto-focus input
   useEffect(() => {
     setLocalHourValue(parsed.hourValue);
     setHourInput("");
+    setMode("hour");
   }, [open, parsed.hourValue]);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [open]);
 
   // Scroll selected item into view when popover opens
   useEffect(() => {
@@ -147,21 +156,55 @@ export default function OperationalTimePicker({
     handleSelect(hv, m);
   };
 
-  // Enter key: resolve typed/selected hour + any selected minute, close & save
-  const handleKeyDown = (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    let resolvedHour = localHourValue || parsed.hourValue;
-    if (hourInput.trim()) {
-      const padded = hourInput.trim().padStart(2, "0");
+  // Live hour matching as user types digits
+  const handleInputChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 2);
+    setHourInput(raw);
+    if (raw.length >= 1) {
+      const padded = raw.padStart(2, "0");
+      const isMinuteMode = mode === "minute";
+      if (isMinuteMode) {
+        // In minute mode, only accept valid minute values
+        if (padded.length === 2 && MINUTES.includes(padded)) {
+          setHourInput(padded);
+        }
+        return;
+      }
+      // Hour mode: live highlight matching hour (current operational day only)
       const matched = HOUR_ENTRIES.find(
         entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === padded
       );
-      if (matched) resolvedHour = matched.value;
-      setHourInput("");
+      if (matched) setLocalHourValue(matched.value);
     }
-    if (resolvedHour) {
-      handleSelect(resolvedHour, parsed.min || "00");
+  };
+
+  // Enter key: two-phase flow — hour first, then minute
+  const handleKeyDown = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+
+    if (mode === "hour") {
+      let resolvedHour = localHourValue || parsed.hourValue;
+      if (hourInput.trim()) {
+        const padded = hourInput.trim().padStart(2, "0");
+        const matched = HOUR_ENTRIES.find(
+          entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === padded
+        );
+        if (matched) resolvedHour = matched.value;
+      }
+      if (!resolvedHour) return;
+      setLocalHourValue(resolvedHour);
+      setHourInput("");
+      setMode("minute");
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } else {
+      // Minute mode — finalize
+      if (hourInput.trim()) {
+        const m = hourInput.trim().padStart(2, "0");
+        if (MINUTES.includes(m)) {
+          handleSelect(localHourValue || parsed.hourValue || "06", m);
+        }
+      }
     }
   };
 
@@ -190,12 +233,13 @@ export default function OperationalTimePicker({
           <div ref={hourRef} className="flex-1 overflow-y-auto scroll-smooth flex flex-col">
             <div className="text-center text-[10px] text-gray-400 mb-0.5 sticky top-0 bg-white z-10">שעה</div>
             <input
+              ref={inputRef}
               type="text"
               inputMode="numeric"
               value={hourInput}
-              onChange={(e) => setHourInput(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="הקלד שעה…"
+              placeholder={mode === "hour" ? "הקלד שעה…" : "הקלד דקות…"}
               className="w-full text-center text-xs py-0.5 border border-gray-200 rounded mb-1 bg-gray-50 focus:bg-white focus:border-blue-400 outline-none"
               dir="ltr"
             />
