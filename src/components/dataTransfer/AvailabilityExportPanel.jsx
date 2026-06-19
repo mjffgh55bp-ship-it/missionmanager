@@ -61,16 +61,21 @@ export default function AvailabilityExportPanel({ currentUser, onAuditLog }) {
 
     // Load data — staggered to avoid rate limits with large datasets
     const workers = await fetchWithRetry(() => base44.entities.Worker.list());
+    const liveWorkerIds = new Set(workers.map(w => w.id));
     await new Promise(r => setTimeout(r, 200));
     const availabilities = await fetchWithRetry(() => base44.entities.Availability.list());
     await new Promise(r => setTimeout(r, 200));
     const unavailabilities = await fetchWithRetry(() => base44.entities.Unavailability.list());
 
-    // Filter availability by selected week_start_dates
-    const filteredAvail = availabilities.filter(a => weekStarts.includes(a.week_start_date));
+    // Filter availability by selected week_start_dates, only for live workers
+    const filteredAvail = availabilities.filter(a =>
+      weekStarts.includes(a.week_start_date) && liveWorkerIds.has(a.worker_id)
+    );
 
-    // Filter unavailability by date range
-    const filteredUnavail = unavailabilities.filter(u => u.date >= dateStart && u.date <= dateEnd);
+    // Filter unavailability by date range, only for live workers
+    const filteredUnavail = unavailabilities.filter(u =>
+      u.date >= dateStart && u.date <= dateEnd && liveWorkerIds.has(u.worker_id)
+    );
 
     const exportedAt = format(new Date(), "yyyy-MM-dd HH:mm");
     const wb = XLSX.utils.book_new();

@@ -243,10 +243,29 @@ export default function Workers() {
 
 
   const handleDeleteWorker = async (workerId) => {
-    if (!confirm("האם אתה בטוח שברצונך למחוק עובד זה?")) return;
-    await base44.entities.Worker.delete(workerId);
-    invalidateWorkersCache();
-    loadWorkers();
+    if (!workerId) return;
+    if (!confirm("מחיקת העובד תמחק גם את כל נתוני הזמינות והאילוצים שלו. להמשיך?")) return;
+    try {
+      // Clean up related records first (avoid orphans that would leak into exports)
+      const [avails, unavails] = await Promise.all([
+        base44.entities.Availability.filter({ worker_id: workerId }),
+        base44.entities.Unavailability.filter({ worker_id: workerId }),
+      ]);
+      for (const a of (avails || [])) {
+        try { await base44.entities.Availability.delete(a.id); } catch (e) { console.error("del avail", a.id, e); }
+      }
+      for (const u of (unavails || [])) {
+        try { await base44.entities.Unavailability.delete(u.id); } catch (e) { console.error("del unavail", u.id, e); }
+      }
+      await base44.entities.Worker.delete(workerId);
+      setShowDialog(false);
+      setEditingWorker(null);
+      invalidateWorkersCache();
+      loadWorkers();
+    } catch (e) {
+      console.error("delete worker failed:", e);
+      alert("מחיקת העובד נכשלה. נסה שוב.");
+    }
   };
 
 
