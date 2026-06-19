@@ -2157,7 +2157,7 @@ export default function Matrix() {
         </Card>
 
         {/* ── Fixed bottom zoom bar ── */}
-        <div className="fixed bottom-12 md:bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-md flex items-center gap-2 px-3 py-1.5" dir="rtl" style={{ zIndex: 90 }}>
+        <div className="fixed bottom-12 md:bottom-0 left-0 right-0 md:right-12 bg-white border-t border-gray-200 shadow-md flex items-center gap-2 px-3 py-1.5" dir="rtl" style={{ zIndex: 90 }}>
           <span className="text-xs text-gray-500 font-medium">רזולוציה:</span>
           <button onClick={zoomOut} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הקטן רזולוציית זמן">−</button>
           <button onClick={zoomIn} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הגדל רזולוציית זמן">+</button>
