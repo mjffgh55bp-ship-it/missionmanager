@@ -278,7 +278,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
         if (!isEmpty(rawVal)) {
           if (isWorker) {
             const w = workerById[rawVal];
-            exportValue = w ? sanitizeText(w.mapping_id || w.id) : sanitizeText(String(rawVal));
+            exportValue = w ? sanitizeText(w.worker_mapping_id || w.id) : sanitizeText(String(rawVal));
             if (!w) console.warn(`[Export] Worker ID not found: ${rawVal} in col ${col.name}`);
           } else {
             exportValue = serializeForExport(rawVal);
@@ -327,7 +327,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     const workerHeader = ["worker_id", "worker_mapping_id", "nickname", "roles", "active"];
     const workerRows = workers.map(w => [
       w.id,
-      sanitizeText(w.mapping_id || ""),
+      sanitizeText(w.worker_mapping_id || ""),
       sanitizeText(w.nickname || ""),
       Array.isArray(w.role) ? w.role.join(", ") : (w.role || ""),
       w.active !== false ? "true" : "false",

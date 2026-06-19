@@ -255,16 +255,21 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
     // mapping_id → local worker_id (primary resolution method for new exports)
     const workerByMappingId = {};
-    workers.forEach(w => { if (w.mapping_id) workerByMappingId[w.mapping_id] = w.id; });
+    workers.forEach(w => { if (w.worker_mapping_id) workerByMappingId[w.worker_mapping_id] = w.id; });
 
     // Also use imported WorkersMap for nickname→id fallback (legacy)
     const { rows: importedWorkers } = rawSheets.workersMap;
+    // Map the SOURCE network's worker_id → its worker_mapping_id (from the imported WorkersMap)
+    const importedIdToMappingId = {};
     importedWorkers.forEach(iw => {
       const nick = iw.nickname?.trim();
       const id   = iw.worker_id?.trim();
       if (nick && id && !workerByNickname[nick]) {
         if (workerIdSet.has(id)) workerByNickname[nick] = id;
       }
+      const sid = iw.worker_id?.trim();
+      const mid = iw.worker_mapping_id?.trim();
+      if (sid && mid) importedIdToMappingId[sid] = mid;
     });
 
     // Template matching
@@ -557,13 +562,17 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         const isTask   = liveCol.type === "task";
 
         if (isWorker) {
+          // First translate a source worker_id → mapping_id → local worker id
+          const mappedMid = importedIdToMappingId[stripped];
+          const viaMappingId = mappedMid ? workerByMappingId[mappedMid] : null;
           // Resolution priority: mapping_id → local worker_id → nickname → raw id fallback
           const resolvedId =
-            workerByMappingId[stripped] ||          // new: resolve by worker mapping_id
+            viaMappingId ||                          // cross-network: source id → mapping_id → local id
+            workerByMappingId[stripped] ||           // new: resolve by worker mapping_id
             (workerIdSet.has(stripped) ? stripped : null) || // same-env: direct id
-            workerByNickname[stripped] ||           // legacy: nickname fallback
+            workerByNickname[stripped] ||            // legacy: nickname fallback
             null;
-          const resolveMethod = workerByMappingId[stripped] ? "mapping_id" : workerIdSet.has(stripped) ? "id" : workerByNickname[stripped] ? "nickname_fallback" : null;
+          const resolveMethod = viaMappingId ? "mapping_id_via_source_id" : workerByMappingId[stripped] ? "mapping_id" : workerIdSet.has(stripped) ? "id" : workerByNickname[stripped] ? "nickname_fallback" : null;
           if (resolvedId) {
             parsedValues[internalKey] = resolvedId;
             workerDiag.push({ col: colName, rawValue: stripped, resolvedId, resolveMethod, status: "resolved" });
