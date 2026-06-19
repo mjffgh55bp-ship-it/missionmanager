@@ -140,9 +140,17 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
     setSettingsLoaded(true);
   };
 
-  const updateRowCell = (rowIdx, colName, value) => {
+  // Stable storage key for a column's cell data: prefer the id-key, fall back to name for legacy rows.
+  const cellKey = (col) => col.column_id || col.name;
+  // Read a cell value tolerant of either keying (id-key first, then legacy name-key).
+  const readCell = (row, col) => {
+    if (col.column_id && row[col.column_id] !== undefined) return row[col.column_id];
+    return row[col.name];
+  };
+
+  const updateRowCell = (rowIdx, colKey, value) => {
     const rows = [...(editingPreset.template_config.default_rows || [])];
-    rows[rowIdx] = { ...rows[rowIdx], [colName]: value };
+    rows[rowIdx] = { ...rows[rowIdx], [colKey]: value };
     setEditingPreset({ ...editingPreset, template_config: { ...editingPreset.template_config, default_rows: rows } });
   };
 
@@ -303,15 +311,15 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                             {col.type === "time" ? (
                               <div className="w-full border rounded overflow-hidden" style={{ minWidth: 80 }}>
                                 <OperationalTimePicker
-                                  value={row[col.name] || ""}
-                                  onChange={(newVal) => updateRowCell(rowIdx, col.name, newVal)}
+                                  value={readCell(row, col) || ""}
+                                  onChange={(newVal) => updateRowCell(rowIdx, cellKey(col), newVal)}
                                   compact={true}
                                 />
                               </div>
                             ) : col.type === "worker" ? (
                               <select
-                                value={row[col.name] || ""}
-                                onChange={(e) => updateRowCell(rowIdx, col.name, e.target.value)}
+                                value={readCell(row, col) || ""}
+                                onChange={(e) => updateRowCell(rowIdx, cellKey(col), e.target.value)}
                                 className="w-full text-xs border rounded px-1 py-0.5"
                                 dir="rtl"
                               >
@@ -322,8 +330,8 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                               </select>
                             ) : (
                               <Input
-                                value={row[col.name] || ""}
-                                onChange={(e) => updateRowCell(rowIdx, col.name, e.target.value)}
+                                value={readCell(row, col) || ""}
+                                onChange={(e) => updateRowCell(rowIdx, cellKey(col), e.target.value)}
                                 className="h-6 text-xs px-1"
                                 dir="rtl"
                                 placeholder="—"
