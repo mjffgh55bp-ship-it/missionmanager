@@ -182,9 +182,19 @@ export default function Availability() {
   const refetchWeekAvailabilities = () => {
     if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
     syncDebounceRef.current = setTimeout(async () => {
+      // Don't disturb the list while the user is actively editing their own availability
+      if (showEditMode || showSummary) return;
       const weekStartStr = format(weekStartRef.current, "yyyy-MM-dd"); // ref, not closure
       const fresh = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr }));
-      setWeekAvailabilities(fresh);
+      setWeekAvailabilities(prev => {
+        // Preserve OUR own record from local state — it's authoritative for our edits;
+        // take everyone else's from the fresh server data.
+        const mineLocal = prev.find(a => a.worker_id === cachedWorker.current?.id);
+        const othersFresh = (fresh || []).filter(a => a.worker_id !== cachedWorker.current?.id);
+        const mineFresh = (fresh || []).find(a => a.worker_id === cachedWorker.current?.id);
+        // Use local "mine" if present (mid-session edits); else fall back to server's.
+        return mineLocal ? [...othersFresh, mineLocal] : (mineFresh ? [...othersFresh, mineFresh] : othersFresh);
+      });
     }, 300);
   };
 
@@ -667,11 +677,12 @@ export default function Availability() {
     setShowSummary(false);
     setShowEditMode(false);
 
-    // Broadcast to other tabs/workers
+    // Broadcast to OTHER tabs/workers only — do NOT self-dispatch (would refetch our own
+    // just-saved data and clobber local state mid-edit).
     const syncPayload = JSON.stringify({ ts: Date.now() });
     try { broadcastRef.current?.postMessage("update"); } catch {}
     try { localStorage.setItem("availability-sync-event", syncPayload); } catch {}
-    window.dispatchEvent(new CustomEvent("availabilityUpdated"));
+    // (removed window.dispatchEvent("availabilityUpdated") — same-tab self-refetch caused windows to vanish)
   };
 
   const handleSubmitChangeRequest = async () => {
@@ -689,9 +700,10 @@ export default function Availability() {
     setShowEditMode(false);
     setChangeNote("");
 
+    // Broadcast to OTHER tabs/workers only — do NOT self-dispatch (same race as handleSubmit)
     try { broadcastRef.current?.postMessage("update"); } catch {}
     try { localStorage.setItem("availability-sync-event", JSON.stringify({ ts: Date.now() })); } catch {}
-    window.dispatchEvent(new CustomEvent("availabilityUpdated"));
+    // (removed window.dispatchEvent("availabilityUpdated") — same-tab self-refetch caused windows to vanish)
   };
 
   const getChanges = () => {
