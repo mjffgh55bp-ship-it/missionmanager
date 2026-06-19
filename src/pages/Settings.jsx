@@ -185,6 +185,18 @@ export default function Settings() {
     setUserRoles({ ...userRoles, [email]: role });
   };
 
+  const handleSaveWorkerMappingId = async (worker, value) => {
+    const v = (value || "").trim();
+    if (v === (worker.worker_mapping_id || "")) return;
+    try {
+      await base44.entities.Worker.update(worker.id, { worker_mapping_id: v });
+      setWorkers(prev => prev.map(w => w.id === worker.id ? { ...w, worker_mapping_id: v } : w));
+    } catch (e) {
+      console.error("save worker_mapping_id failed:", e);
+      alert("שגיאה בשמירת מזהה הסנכרון. נסה שוב.");
+    }
+  };
+
   const saveScheduleColumns = async (updated) => {
     const settings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
     const data = { setting_key: "custom_schedule_params", setting_value: JSON.stringify(updated) };
@@ -1410,6 +1422,7 @@ export default function Settings() {
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <p className="text-sm text-gray-700" dir="rtl"><strong>מנהל:</strong> גישה מלאה<br /><strong>משתמש:</strong> זמינות בלבד</p>
+                <p className="text-sm text-gray-700 mt-2" dir="rtl"><strong>מזהה סנכרון:</strong> הזן את אותו מזהה לאותו עובד בכל רשת סגורה. נתונים מועברים לפי המזהה הזה, לא לפי השם.</p>
               </div>
               <div className="space-y-3">
                 {workers.filter(w => w.email).map((worker) => (
@@ -1417,6 +1430,16 @@ export default function Settings() {
                     <div className="flex-1">
                       <p className="font-medium text-gray-900">{worker.nickname}</p>
                       <p className="text-sm text-gray-600">{worker.email}</p>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <label className="text-xs text-gray-500 mb-1" dir="rtl">מזהה סנכרון</label>
+                      <Input
+                        defaultValue={worker.worker_mapping_id || ""}
+                        onBlur={(e) => handleSaveWorkerMappingId(worker, e.target.value)}
+                        placeholder="זהה בכל הרשתות"
+                        dir="ltr"
+                        className="w-40"
+                      />
                     </div>
                     <Select value={userRoles[worker.email] || "user"} onValueChange={(value) => handleRoleChange(worker.email, value)}>
                       <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
