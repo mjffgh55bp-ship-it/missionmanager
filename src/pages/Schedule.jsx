@@ -266,7 +266,8 @@ export default function Schedule() {
     const parsedTaskQual = taskQualSettings.length > 0 ? (JSON.parse(taskQualSettings[0].setting_value) || {}) : {};
     if (taskQualSettings.length > 0) setTaskQualifications(parsedTaskQual);
     if (tasksSettings.length > 0) {
-      setTasksList(JSON.parse(tasksSettings[0].setting_value) || []);
+      const rawTasksList = JSON.parse(tasksSettings[0].setting_value) || [];
+      setTasksList(rawTasksList.map(t => typeof t === 'string' ? t : t.name));
     } else {
       setTasksList(Object.keys(parsedTaskQual));
     }
@@ -1079,7 +1080,7 @@ export default function Schedule() {
                                             </SelectTrigger>
                                             <SelectContent>
                                               <SelectItem value={null}>ללא</SelectItem>
-                                              {tasksList.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                              {tasksList.map((t) => { const name = typeof t === 'string' ? t : t.name; return <SelectItem key={name} value={name}>{name}</SelectItem>; })}
                                             </SelectContent>
                                           </Select>
                                         ) : ((columnSubTypes[resolveColName(col)] || columnSubTypes[col.name] || []).length > 0 || columnFreeText[resolveColName(col)] || columnFreeText[col.name]) ? (

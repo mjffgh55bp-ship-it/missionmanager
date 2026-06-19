@@ -122,7 +122,7 @@ export default function Reports() {
     // Task qualifications already parsed from the cached settings
     setTaskQualifications(taskQuals);
     const taskQualNames = Object.keys(taskQuals);
-    const taskListNames = tasksList;
+    const taskListNames = tasksList.map(t => typeof t === 'string' ? t : t.name);
     const qualsFromEntity = qualificationsData.map(q => ({ id: q.id, name: q.name }));
     const allTaskNames = [...new Set([...taskQualNames, ...taskListNames])];
     const entityNameSet = new Set(qualsFromEntity.map(q => q.name));

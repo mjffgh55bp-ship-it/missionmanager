@@ -209,7 +209,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     };
     const shiftStatuses    = getSetting("shift_statuses")        || [];
     const customParams     = getSetting("custom_schedule_params") || [];
-    const tasksList        = getSetting("tasks_list")             || [];
+    const tasksList        = (getSetting("tasks_list") || []).map(t => typeof t === 'string' ? t : (t.name || t));
 
     // ── Build per-date daily columns + column orders (mirrors ExportPanel / Schedule.jsx) ──
     const dailyColumnsPerDate = {};   // dateStr → { [templateId]: col[] }

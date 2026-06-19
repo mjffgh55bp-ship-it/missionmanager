@@ -109,7 +109,10 @@ export default function Workers() {
     const taskQualSettings = getSetting("task_qualifications");
     const rawRoles = workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : [];
     setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
-    if (tasksSettings) setTasks(JSON.parse(tasksSettings.setting_value) || []);
+    if (tasksSettings) {
+      const rawTasks = JSON.parse(tasksSettings.setting_value) || [];
+      setTasks(rawTasks.map(t => typeof t === 'string' ? t : t.name));
+    }
     if (taskQualSettings) setTaskQualifications(JSON.parse(taskQualSettings.setting_value) || {});
   };
 
@@ -137,7 +140,10 @@ export default function Workers() {
       setPopulations(rawPops.map(p => (typeof p === "string" ? p : p.name)));
       const rawRoles = workerRolesSettings ? (JSON.parse(workerRolesSettings.setting_value) || []) : [];
       setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
-      if (tasksSettings) setTasks(JSON.parse(tasksSettings.setting_value) || []);
+      if (tasksSettings) {
+      const rawTasks = JSON.parse(tasksSettings.setting_value) || [];
+      setTasks(rawTasks.map(t => typeof t === 'string' ? t : t.name));
+    }
       if (taskQualSettings) {
         taskQualSettingIdRef.current = taskQualSettings.id;
         setTaskQualifications(JSON.parse(taskQualSettings.setting_value) || {});
