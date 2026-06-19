@@ -123,17 +123,23 @@ export default function AvailabilityImportPanel({ currentUser, onAuditLog }) {
 
     // Worker lookups
     const workerById      = {};
+    const workerByMappingId = {};
     const workerByNick    = {};
     const workerByName    = {};
     workers.forEach(w => {
       workerById[w.id] = w;
+      if (w.worker_mapping_id) workerByMappingId[w.worker_mapping_id] = w;
       if (w.nickname) workerByNick[normalizeForMatch(w.nickname)] = w;
       if (w.full_name) workerByName[normalizeForMatch(w.full_name)] = w;
     });
 
-    // Also supplement from imported WorkersMap
+    // Build incoming id→mapping_id from the imported workers map sheet
+    const importedIdToMappingId = {};
     rawSheets.workersMap.rows.forEach(iw => {
       const id = iw.worker_id?.trim();
+      const mid = iw.worker_mapping_id?.trim();
+      if (id && mid) importedIdToMappingId[id] = mid;
+      // Also supplement nick fallback
       if (id && workerById[id]) {
         const nick = normalizeForMatch(iw.nickname || "");
         if (nick && !workerByNick[nick]) workerByNick[nick] = workerById[id];
@@ -142,7 +148,12 @@ export default function AvailabilityImportPanel({ currentUser, onAuditLog }) {
 
     // Resolve worker from imported submission
     const resolveWorker = (workerId, workerName) => {
+      // 1. Stable cross-network id (survives renames) — highest priority
+      const mid = workerId ? importedIdToMappingId[workerId] : null;
+      if (mid && workerByMappingId[mid]) return workerByMappingId[mid];
+      // 2. Same-network DB id (works only if same network)
       if (workerId && workerById[workerId]) return workerById[workerId];
+      // 3. Legacy fallbacks by name (last resort)
       const byNick = workerByNick[normalizeForMatch(workerName || "")];
       if (byNick) return byNick;
       const byName = workerByName[normalizeForMatch(workerName || "")];

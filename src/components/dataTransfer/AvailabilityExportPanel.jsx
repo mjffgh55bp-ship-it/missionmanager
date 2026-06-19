@@ -90,8 +90,9 @@ export default function AvailabilityExportPanel({ currentUser, onAuditLog }) {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(manifestData), SHEET_MANIFEST);
 
     // ── WorkersMap ────────────────────────────────────────────────────────────
-    const workerHeader = ["worker_id", "nickname", "full_name", "roles", "active"];
+    const workerHeader = ["worker_mapping_id", "worker_id", "nickname", "full_name", "roles", "active"];
     const workerRows = workers.map(w => [
+      w.worker_mapping_id || "",
       w.id,
       sanitizeText(w.nickname || ""),
       sanitizeText(w.full_name || ""),

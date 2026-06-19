@@ -75,6 +75,10 @@
     "photo_url": {
       "type": "string",
       "description": "URL of the worker's profile photo"
+    },
+    "worker_mapping_id": {
+      "type": "string",
+      "description": "Stable cross-network identifier. Same value for the same worker on every network; survives renames. Used to match records during import/export between closed networks."
     }
   },
   "required": [

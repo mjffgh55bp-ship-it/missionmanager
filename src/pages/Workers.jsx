@@ -94,15 +94,26 @@ export default function Workers() {
   }, []);
 
   const loadWorkers = async () => {
-    // Debounce: skip if a reload is already queued within 300ms
-    if (reloadDebounceRef.current) return;
-    reloadDebounceRef.current = setTimeout(() => { reloadDebounceRef.current = null; }, 300);
+  // Debounce: skip if a reload is already queued within 300ms
+  if (reloadDebounceRef.current) return;
+  reloadDebounceRef.current = setTimeout(() => { reloadDebounceRef.current = null; }, 300);
 
-    const [workersData, allSettings] = await Promise.all([
-      getCachedAllWorkers(base44.entities),
-      getCachedAllSettings(base44.entities),
-    ]);
-    setWorkers(workersData);
+  const [workersData, allSettings] = await Promise.all([
+    getCachedAllWorkers(base44.entities),
+    getCachedAllSettings(base44.entities),
+  ]);
+
+  // Backfill stable cross-network ids (runs once per worker)
+  const needBackfill = workersData.filter(w => !w.worker_mapping_id);
+  if (needBackfill.length > 0) {
+    for (const w of needBackfill) {
+      const mid = `wrk_${w.id}`;
+      try { await base44.entities.Worker.update(w.id, { worker_mapping_id: mid }); w.worker_mapping_id = mid; }
+      catch (e) { console.error("worker_mapping_id backfill failed for", w.id, e); }
+    }
+  }
+
+  setWorkers(workersData);
 
     const getSetting = (key) => allSettings.find(s => s.setting_key === key);
     const workerRolesSettings = getSetting("worker_roles");
@@ -125,6 +136,16 @@ export default function Workers() {
         getCachedAllWorkers(base44.entities),
         getCachedAllSettings(base44.entities),
       ]);
+
+      // Backfill stable cross-network ids (runs once per worker)
+      const needBackfill = workersData.filter(w => !w.worker_mapping_id);
+      if (needBackfill.length > 0) {
+        for (const w of needBackfill) {
+          const mid = `wrk_${w.id}`;
+          try { await base44.entities.Worker.update(w.id, { worker_mapping_id: mid }); w.worker_mapping_id = mid; }
+          catch (e) { console.error("worker_mapping_id backfill failed for", w.id, e); }
+        }
+      }
 
       setWorkers(workersData);
 
