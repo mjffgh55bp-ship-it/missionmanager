@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { getCachedAllSettings, getCachedAllWorkers, parseSetting } from "@/lib/appDataCache";
+import { getTaskQuals } from "@/lib/taskQuals";
 import { Button } from "@/components/ui/button";
 import { Plus, BarChart2, Table2 } from "lucide-react";
 import TrackerEditor from "../components/reports/TrackerEditor";
@@ -121,7 +122,9 @@ export default function Reports() {
 
     // Task qualifications already parsed from the cached settings
     setTaskQualifications(taskQuals);
-    const taskQualNames = Object.keys(taskQuals);
+    const taskIdToName = {};
+    (tasksList || []).forEach(t => { if (typeof t === "object" && t.mapping_id) taskIdToName[t.mapping_id] = t.name; });
+    const taskQualNames = Object.keys(taskQuals).map(k => taskIdToName[k] || k);
     const taskListNames = tasksList.map(t => typeof t === 'string' ? t : t.name);
     const qualsFromEntity = qualificationsData.map(q => ({ id: q.id, name: q.name }));
     const allTaskNames = [...new Set([...taskQualNames, ...taskListNames])];

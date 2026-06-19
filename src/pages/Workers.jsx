@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { getCachedAllWorkers, getCachedAllSettings, invalidateWorkersCache, invalidateSettingsCache } from "@/lib/appDataCache";
+import { getTaskQuals } from "@/lib/taskQuals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,7 +112,7 @@ export default function Workers() {
     setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
     if (tasksSettings) {
       const rawTasks = JSON.parse(tasksSettings.setting_value) || [];
-      setTasks(rawTasks.map(t => typeof t === 'string' ? t : t.name));
+      setTasks(rawTasks.map(t => typeof t === 'string' ? { name: t, mapping_id: "", export_name: "", is_importable: true, is_exportable: true } : t));
     }
     if (taskQualSettings) setTaskQualifications(JSON.parse(taskQualSettings.setting_value) || {});
   };
@@ -142,7 +143,7 @@ export default function Workers() {
       setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
       if (tasksSettings) {
       const rawTasks = JSON.parse(tasksSettings.setting_value) || [];
-      setTasks(rawTasks.map(t => typeof t === 'string' ? t : t.name));
+      setTasks(rawTasks.map(t => typeof t === 'string' ? { name: t, mapping_id: "", export_name: "", is_importable: true, is_exportable: true } : t));
     }
       if (taskQualSettings) {
         taskQualSettingIdRef.current = taskQualSettings.id;
@@ -153,13 +154,17 @@ export default function Workers() {
     }
   };
 
-  const handleToggleTaskQualification = async (taskName, role, workerId) => {
-    const taskRoles = taskQualifications[taskName] || {};
+  const handleToggleTaskQualification = async (task, role, workerId) => {
+    const key = task.mapping_id || task.name;
+    const taskRoles = getTaskQuals(taskQualifications, task);
     const current = taskRoles[role] || [];
     const updatedRole = current.includes(workerId)
       ? current.filter(id => id !== workerId)
       : [...current, workerId];
-    const updated = { ...taskQualifications, [taskName]: { ...taskRoles, [role]: updatedRole } };
+    const updated = { ...taskQualifications, [key]: { ...taskRoles, [role]: updatedRole } };
+    if (task.mapping_id && task.name && taskQualifications[task.name] && key !== task.name) {
+      delete updated[task.name];
+    }
     setTaskQualifications(updated);
     const data = { setting_key: "task_qualifications", setting_value: JSON.stringify(updated) };
     if (taskQualSettingIdRef.current) {
@@ -543,28 +548,28 @@ export default function Workers() {
                             </PopoverTrigger>
                             <PopoverContent className="w-48 p-1" align="start">
                               {tasks.map(task => {
-                                const qualified = ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id);
-                                return (
-                                  <button
-                                    key={task}
-                                    type="button"
-                                    onClick={() => handleToggleTaskQualification(task, role, editingWorker.id)}
+                               const qualified = ((getTaskQuals(taskQualifications, task))[role] || []).includes(editingWorker.id);
+                               return (
+                                 <button
+                                   key={task.mapping_id || task.name}
+                                   type="button"
+                                   onClick={() => handleToggleTaskQualification(task, role, editingWorker.id)}
                                     className="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded hover:bg-gray-100 text-right"
                                     dir="rtl"
                                   >
                                     <Check className={`w-4 h-4 shrink-0 ${qualified ? 'text-violet-600' : 'text-transparent'}`} />
-                                    {task}
+                                    {task.name || task}
                                   </button>
                                 );
                               })}
                             </PopoverContent>
                           </Popover>
                           {(() => {
-                            const qualTasks = tasks.filter(task => ((taskQualifications[task] || {})[role] || []).includes(editingWorker.id));
+                            const qualTasks = tasks.filter(task => ((getTaskQuals(taskQualifications, task))[role] || []).includes(editingWorker.id));
                             return qualTasks.length > 0 ? (
                               <div className="flex flex-wrap gap-1 mt-2" dir="rtl">
                                 {qualTasks.map(t => (
-                                  <Badge key={t} className="bg-violet-100 text-violet-800 text-xs">{t}</Badge>
+                                  <Badge key={t.mapping_id || t.name} className="bg-violet-100 text-violet-800 text-xs">{t.name || t}</Badge>
                                 ))}
                               </div>
                             ) : null;

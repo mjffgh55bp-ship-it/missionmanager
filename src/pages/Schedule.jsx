@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { getCachedWorkers, getCachedTemplates, getCachedAllSettings, invalidateTemplatesCache, invalidateSettingsCache, invalidateStaticCache, softInvalidateStaticCache, toggleWeekPublished, parseSetting } from "@/lib/appDataCache";
+import { getTaskQuals } from "@/lib/taskQuals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -267,9 +268,9 @@ export default function Schedule() {
     if (taskQualSettings.length > 0) setTaskQualifications(parsedTaskQual);
     if (tasksSettings.length > 0) {
       const rawTasksList = JSON.parse(tasksSettings[0].setting_value) || [];
-      setTasksList(rawTasksList.map(t => typeof t === 'string' ? t : t.name));
+      setTasksList(rawTasksList.map(t => typeof t === 'string' ? { name: t, mapping_id: "", export_name: "", is_importable: true, is_exportable: true } : t));
     } else {
-      setTasksList(Object.keys(parsedTaskQual));
+      setTasksList(Object.keys(parsedTaskQual).map(k => ({ name: k, mapping_id: "", export_name: "", is_importable: true, is_exportable: true })));
     }
     if (openRegSettings.length > 0) {
       openRegSettingIdRef.current = openRegSettings[0].id;
@@ -1050,7 +1051,7 @@ export default function Schedule() {
                                             dateString={dateString}
                                             rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
                                             rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
-                                            taskQualifiedWorkerIds={col.task_name ? Object.values(taskQualifications[col.task_name] || {}).flat() : (row.values?.task ? Object.values(taskQualifications[row.values.task] || {}).flat() : undefined)}
+                                            taskQualifiedWorkerIds={(() => { const key = col.task_name || (row.values?.task); if (!key) return undefined; const tObj = typeof key === 'string' ? tasksList.find(tt => (typeof tt === 'object' ? tt.name : tt) === key) || key : key; const q = getTaskQuals(taskQualifications, tObj); return Object.values(q).flat(); })()}
                                             workerDayAssignments={workerDayAssignments}
                                             onSaved={(workerId) => {
                                             const newValues = { ...row.values, [col.name]: workerId };

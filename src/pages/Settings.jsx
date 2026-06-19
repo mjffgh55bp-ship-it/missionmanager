@@ -11,6 +11,7 @@ import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
 import MappableItemRow, { normalizeItem, suggestMappingId } from "@/components/settings/MappableItemRow";
 import { invalidateStaticCache, invalidateTemplatesCache, getCachedAllSettings, getCachedWorkers } from "@/lib/appDataCache";
+import { getTaskQuals } from "@/lib/taskQuals";
 
 
 export default function Settings() {
@@ -129,8 +130,36 @@ export default function Settings() {
             } catch (e) { console.error("task mapping_id backfill failed:", e); }
           })();
         }
+        // Re-key task_qualifications from name → mapping_id (backward-compatible; runs once)
+        if (taskQualSettings.length > 0) {
+          const rawQuals = JSON.parse(taskQualSettings[0].setting_value) || {};
+          const nameToId = {};
+          normTasks.forEach(t => { if (t.mapping_id && t.name) nameToId[t.name] = t.mapping_id; });
+          let changed = false;
+          const rekeyed = {};
+          for (const [k, v] of Object.entries(rawQuals)) {
+            const id = nameToId[k];
+            if (id && id !== k) { rekeyed[id] = v; changed = true; }
+            else { rekeyed[k] = v; }
+          }
+          setTaskQualifications(rekeyed);
+          if (changed) {
+            (async () => {
+              try {
+                const s2 = await base44.entities.AppSettings.filter({ setting_key: "task_qualifications" });
+                const d = { setting_key: "task_qualifications", setting_value: JSON.stringify(rekeyed) };
+                if (s2.length > 0) await base44.entities.AppSettings.update(s2[0].id, d);
+                else await base44.entities.AppSettings.create(d);
+              } catch (e) { console.error("task_qualifications re-key failed:", e); }
+            })();
+          }
+        }
+      } else {
+        // No tasks_list, but task_qualifications may exist — load as-is
+        if (taskQualSettings.length > 0) {
+          setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
+        }
       }
-      if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
       setWorkers(workersData);
     } catch (err) {
       console.error("loadSettings failed:", err);
@@ -834,6 +863,7 @@ export default function Settings() {
     const updated = tasks.filter(t => t.mapping_id !== task.mapping_id);
     const updatedQuals = { ...taskQualifications };
     delete updatedQuals[task.name];
+    if (task.mapping_id) delete updatedQuals[task.mapping_id];
 
     // Fetch both settings in parallel
     const [taskSettings, qualSettings] = await Promise.all([
@@ -858,13 +888,18 @@ export default function Settings() {
     setTaskQualifications(updatedQuals);
   };
 
-  const handleToggleWorkerQualification = async (taskName, role, workerId) => {
-    const taskRoles = taskQualifications[taskName] || {};
+  const handleToggleWorkerQualification = async (task, role, workerId) => {
+    const key = task.mapping_id || task.name;
+    const taskRoles = getTaskQuals(taskQualifications, task);
     const current = taskRoles[role] || [];
     const updatedRole = current.includes(workerId)
       ? current.filter(id => id !== workerId)
       : [...current, workerId];
-    const updated = { ...taskQualifications, [taskName]: { ...taskRoles, [role]: updatedRole } };
+    const updated = { ...taskQualifications, [key]: { ...taskRoles, [role]: updatedRole } };
+    // If a legacy name-key existed for this task, remove it so we don't keep two copies
+    if (task.mapping_id && task.name && taskQualifications[task.name] && key !== task.name) {
+      delete updated[task.name];
+    }
     await saveTaskQualifications(updated);
   };
 
@@ -1249,7 +1284,7 @@ export default function Settings() {
                   />
                   <div className="flex items-center justify-between px-3" dir="rtl">
                     <Badge variant="outline" className="text-xs border-violet-300 text-violet-700">
-                      {Object.values(taskQualifications[task.name] || {}).flat().length} כשירים
+                      {Object.values(getTaskQuals(taskQualifications, task)).flat().length} כשירים
                     </Badge>
                     <button onClick={() => setExpandedTask(expandedTask === task.mapping_id ? null : task.mapping_id)} className="text-gray-400 hover:text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-100">
                       {expandedTask === task.mapping_id ? "סגור כשירויות" : "נהל כשירויות"}
@@ -1262,7 +1297,7 @@ export default function Settings() {
                         const role = normalizeItem(roleObj).name;
                         const roleWorkers = workers.filter(w => w.active !== false && (Array.isArray(w.role) ? w.role.includes(role) : w.role === role));
                         if (roleWorkers.length === 0) return null;
-                        const taskRoleQuals = (taskQualifications[task.name] || {})[role] || [];
+                        const taskRoleQuals = (getTaskQuals(taskQualifications, task))[role] || [];
                         return (
                           <div key={role}>
                             <p className="text-xs font-semibold text-gray-700 mb-1">{role}</p>
@@ -1272,7 +1307,7 @@ export default function Settings() {
                                 return (
                                   <button
                                     key={worker.id}
-                                    onClick={() => handleToggleWorkerQualification(task.name, role, worker.id)}
+                                    onClick={() => handleToggleWorkerQualification(task, role, worker.id)}
                                     className={`px-2 py-1 rounded text-xs border transition-colors ${
                                       qualified
                                         ? 'bg-violet-100 border-violet-400 text-violet-800 font-semibold'

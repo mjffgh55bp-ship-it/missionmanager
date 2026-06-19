@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { getCachedWorkers, getCachedAllSettings } from "@/lib/appDataCache";
 import { Card, CardContent } from "@/components/ui/card";
+import { getTaskQuals } from "@/lib/taskQuals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -130,7 +131,8 @@ export default function Yearly() {
       setUnavailabilities(unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd));
       setWorkerRoles(rolesS ? JSON.parse(rolesS.setting_value) : ["שף", "סו-שף"]);
       setWorkerPopulations(popsS ? JSON.parse(popsS.setting_value) : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
-      setTasks(tasksS ? JSON.parse(tasksS.setting_value) : []);
+      const rawTasksY = tasksS ? JSON.parse(tasksS.setting_value) : [];
+    setTasks(rawTasksY.map(t => typeof t === 'string' ? { name: t, mapping_id: "", export_name: "", is_importable: true, is_exportable: true } : t));
       setTaskQualifications(taskQualS ? JSON.parse(taskQualS.setting_value) : {});
     } catch (error) {
       console.error('Error loading yearly data:', error);
@@ -379,7 +381,7 @@ export default function Yearly() {
     }
     if (filterTasks.length > 0) {
       const passesAll = filterTasks.every(task => {
-        const quals = taskQualifications[task] || {};
+        const quals = getTaskQuals(taskQualifications, task) || {};
         const qualifiedIds = Object.values(quals).flat();
         return qualifiedIds.includes(w.id);
       });
@@ -832,10 +834,10 @@ export default function Yearly() {
                     <p className="text-xs font-semibold text-gray-500 mb-1">כשירות למשימה</p>
                     <div className="flex flex-wrap gap-1">
                       {tasks.map(task => (
-                        <button key={task} type="button"
-                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filterTasks.includes(task) ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400'}`}
-                          onClick={() => setFilterTasks(prev => prev.includes(task) ? prev.filter(t => t !== task) : [...prev, task])}>
-                          {task}
+                        <button key={task.name || task} type="button"
+                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filterTasks.includes(task.name || task) ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400'}`}
+                          onClick={() => setFilterTasks(prev => prev.includes(task.name || task) ? prev.filter(t => t !== (task.name || task)) : [...prev, (task.name || task)])}>
+                          {task.name || task}
                         </button>
                       ))}
                     </div>
