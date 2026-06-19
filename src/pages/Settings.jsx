@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check, Calendar, UserCog, Link, Wand2, AlertTriangle } from "lucide-react";
+import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check, Calendar, UserCog, Link, Wand2, AlertTriangle, Search } from "lucide-react";
 import MappingSettings from "@/components/settings/MappingSettings";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +47,7 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState("schedule");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
   const loadedRef = useRef(false);
 
   useEffect(() => {
@@ -1424,8 +1425,27 @@ export default function Settings() {
                 <p className="text-sm text-gray-700" dir="rtl"><strong>מנהל:</strong> גישה מלאה<br /><strong>משתמש:</strong> זמינות בלבד</p>
                 <p className="text-sm text-gray-700 mt-2" dir="rtl"><strong>מזהה סנכרון:</strong> הזן את אותו מזהה לאותו עובד בכל רשת סגורה. נתונים מועברים לפי המזהה הזה, לא לפי השם.</p>
               </div>
+              <div className="relative max-w-md mb-4">
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  placeholder="חפש לפי שם, אימייל או מזהה סנכרון..."
+                  className="pr-10"
+                  dir="rtl"
+                />
+              </div>
               <div className="space-y-3">
-                {workers.filter(w => w.email).map((worker) => (
+                {workers.filter(w => {
+                  if (!w.email) return false;
+                  if (!userSearchQuery.trim()) return true;
+                  const q = userSearchQuery.toLowerCase();
+                  return (
+                    (w.nickname || "").toLowerCase().includes(q) ||
+                    (w.email || "").toLowerCase().includes(q) ||
+                    (w.worker_mapping_id || "").toLowerCase().includes(q)
+                  );
+                }).map((worker) => (
                   <div key={worker.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1">
                       <p className="font-medium text-gray-900">{worker.nickname}</p>
