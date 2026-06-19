@@ -1126,7 +1126,13 @@ export default function Matrix() {
     pendingDragRef.current = null;
     setDragging(null);
     setSelectedWorkerForManual(worker);
-    setManualShiftData({ start_time: shift.start_time, end_time: shift.end_time, type: shift.type });
+    setManualShiftData({
+      start_time: shift.start_time,
+      end_time: shift.end_time,
+      type: shift.type,
+      date: shift.date || format(currentDate, "yyyy-MM-dd"),
+      reason: shift.reason || "occupied",
+    });
     setEditingShift(shift);
     setShowManualDialog(true);
   };
@@ -1134,11 +1140,12 @@ export default function Matrix() {
   const submitManualShift = async () => {
     if (!selectedWorkerForManual || !manualShiftData.start_time || !manualShiftData.end_time) return;
     if (manualShiftData.type === "constraint") {
+      const constraintDate = (editingShift?.date) || manualShiftData.date || dateString;
       try {
         await base44.entities.Unavailability.create({
           worker_id: selectedWorkerForManual.id,
           worker_name: selectedWorkerForManual.nickname,
-          date: manualShiftData.date || dateString,
+          date: constraintDate,
           start_time: manualShiftData.start_time,
           end_time: manualShiftData.end_time,
           reason: manualShiftData.reason || "occupied",
@@ -1148,11 +1155,41 @@ export default function Matrix() {
         alert("שגיאה בשמירת האילוץ. נסה שוב.");
         return;
       }
+
+      // If we converted an EXISTING availability window, remove that source shift now.
+      if (editingShift) {
+        try {
+          const workerAvail = getBestAvail(selectedWorkerForManual.id);
+          if (workerAvail?.shifts) {
+            const remaining = workerAvail.shifts.filter(s => !(
+              s.date === editingShift.date &&
+              s.start_time === editingShift.start_time &&
+              s.end_time === editingShift.end_time &&
+              s.type === editingShift.type
+            ));
+            if (remaining.length !== workerAvail.shifts.length) {
+              const availData = {
+                worker_id: selectedWorkerForManual.id,
+                worker_name: selectedWorkerForManual.nickname,
+                week_start_date: weekStartDate,
+                shifts: remaining,
+                status: workerAvail.status || "approved",
+              };
+              applyOptimisticAvailability(selectedWorkerForManual.id, remaining, availData);
+              await base44.entities.Availability.update(workerAvail.id, { shifts: remaining });
+            }
+          }
+        } catch (e) {
+          console.error("remove source availability shift failed:", e);
+          alert("האילוץ נוצר, אך לא הצלחנו להסיר את חלון הזמינות המקורי. רענן ונסה למחוק ידנית אם נשאר.");
+        }
+      }
+
       setUnavailabilities(prev => [...prev, {
-        id: 'temp_' + Date.now(), // optimistic placeholder — real data loads next refresh
+        id: 'temp_' + Date.now(),
         worker_id: selectedWorkerForManual.id,
         worker_name: selectedWorkerForManual.nickname,
-        date: manualShiftData.date || dateString,
+        date: constraintDate,
         start_time: manualShiftData.start_time,
         end_time: manualShiftData.end_time,
         reason: manualShiftData.reason || "occupied",
