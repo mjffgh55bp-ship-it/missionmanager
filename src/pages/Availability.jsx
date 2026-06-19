@@ -138,6 +138,29 @@ export default function Availability() {
   const syncDebounceRef = useRef(null);
   const broadcastRef = useRef(null);
 
+  // Short-lived cache for the week-rows fetch — dedupes overlapping same-week fetches
+  const weekRowsCacheRef = useRef({}); // { [weekStartStr]: { ts, rows } }
+  const WEEK_ROWS_TTL = 8000; // ms — within this window, reuse instead of refetching
+
+  const fetchWeekRows = async (wsStr, weStr, weekDatesArr) => {
+    const cached = weekRowsCacheRef.current[wsStr];
+    if (cached && (Date.now() - cached.ts) < WEEK_ROWS_TTL) {
+      return cached.rows; // reuse the just-fetched data — no second network call
+    }
+    let rows;
+    try {
+      rows = await fetchWithRetry(() => base44.entities.TemplateRow.filter({
+        date: { $gte: wsStr, $lte: weStr },
+      }));
+    } catch {
+      const recent = await fetchWithRetry(() => base44.entities.TemplateRow.list("-date", 1000));
+      rows = (recent || []).filter(r => r.date >= wsStr && r.date <= weStr);
+    }
+    rows = (rows || []).filter(r => weekDatesArr.includes(r.date));
+    weekRowsCacheRef.current[wsStr] = { ts: Date.now(), rows };
+    return rows;
+  };
+
   // Shared retry helper for rate-limited requests
 
 
@@ -195,16 +218,7 @@ export default function Availability() {
           const weekDates    = Array.from({ length: 7 }, (_, i) => format(addDays(ws, i), "yyyy-MM-dd"));
 
           const freshTemplates = await getCachedTemplates(base44.entities);
-          let freshRows;
-          try {
-            freshRows = await fetchWithRetry(() => base44.entities.TemplateRow.filter({
-              date: { $gte: weekStartStr, $lte: weekEndStr },
-            }));
-          } catch {
-            const recent = await fetchWithRetry(() => base44.entities.TemplateRow.list("-date", 1000));
-            freshRows = (recent || []).filter(r => r.date >= weekStartStr && r.date <= weekEndStr);
-          }
-          freshRows = (freshRows || []).filter(r => weekDates.includes(r.date));
+          const freshRows = await fetchWeekRows(weekStartStr, weekEndStr, weekDates);
           cachedAllTemplateRows.current = freshRows;
           const weekRows = freshRows;
 
@@ -450,19 +464,10 @@ export default function Availability() {
 
       // ── Phase 2: ONE fetch for the whole week's rows + week availabilities (parallel) ──
       const weekEndStr2 = format(addDays(ws, 6), "yyyy-MM-dd");
-      const [allDayRowsRaw, weekAvailsData] = await Promise.all([
-        // Single query for the 7-day window instead of 7 separate per-day calls
-        fetchWithRetry(() => base44.entities.TemplateRow.filter({
-          date: { $gte: weekStartStr, $lte: weekEndStr2 },
-        })).catch(async () => {
-          // Fallback if this Base44 instance doesn't support range filters on date:
-          // fetch a broader recent set once and filter client-side.
-          const recent = await fetchWithRetry(() => base44.entities.TemplateRow.list("-date", 1000));
-          return recent.filter(r => r.date >= weekStartStr && r.date <= weekEndStr2);
-        }),
+      const [allDayRows, weekAvailsData] = await Promise.all([
+        fetchWeekRows(weekStartStr, weekEndStr2, weekDates),
         fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: weekStartStr })),
       ]);
-      const allDayRows = (allDayRowsRaw || []).filter(r => weekDates.includes(r.date));
       cachedAllTemplateRows.current = allDayRows;
       const allWeekRows = allDayRows;
 
@@ -1311,6 +1316,9 @@ END:VEVENT
     }
 
     setExistingAvailability(savedRecord);
+
+    // Invalidate the week-rows cache for this week so subsequent loads refetch fresh data
+    weekRowsCacheRef.current[weekStartStr] = undefined;
 
     // Broadcast to other tabs
     try { broadcastRef.current?.postMessage("update"); } catch {}
