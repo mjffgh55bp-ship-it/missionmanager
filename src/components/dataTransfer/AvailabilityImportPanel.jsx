@@ -314,6 +314,19 @@ export default function AvailabilityImportPanel({ currentUser, onAuditLog }) {
     setApplying(true);
 
     let availCreated = 0, availUpdated = 0, unavailCreated = 0, skipped = 0, errors = 0;
+    const failures = [];
+
+    const applyWithRetry = async (fn, tries = 4) => {
+      let lastErr;
+      for (let i = 0; i < tries; i++) {
+        try { return await fn(); }
+        catch (e) {
+          lastErr = e;
+          await new Promise(r => setTimeout(r, 400 * (i + 1)));
+        }
+      }
+      throw lastErr;
+    };
 
     // Process availability
     for (const plan of preview.availPlan) {
@@ -321,27 +334,32 @@ export default function AvailabilityImportPanel({ currentUser, onAuditLog }) {
 
       const newShifts = [...(plan.existingRecord?.shifts || []), ...plan.shiftsToAdd];
 
-      if (plan.action === "create") {
-        const data = {
-          worker_id: plan.worker.id,
-          worker_name: plan.worker.nickname || plan.worker.full_name || "",
-          week_start_date: plan.sub.week_start_date,
-          shifts: newShifts,
-          status: plan.sub.status || "draft",
-        };
-        if (!isEmpty(plan.sub.desired_shifts)) data.desired_shifts = Number(plan.sub.desired_shifts);
-        if (plan.extraTasks) data.extra_tasks = plan.extraTasks;
-        if (!isEmpty(plan.sub.change_request)) data.change_request = plan.sub.change_request;
-        await base44.entities.Availability.create(data);
-        availCreated++;
-      } else if (plan.action === "update" && plan.existingRecord) {
-        const updates = { shifts: newShifts };
-        if (!isEmpty(plan.sub.status)) updates.status = plan.sub.status;
-        if (!isEmpty(plan.sub.desired_shifts)) updates.desired_shifts = Number(plan.sub.desired_shifts);
-        if (plan.extraTasks) updates.extra_tasks = plan.extraTasks;
-        if (!isEmpty(plan.sub.change_request)) updates.change_request = plan.sub.change_request;
-        await base44.entities.Availability.update(plan.existingRecord.id, updates);
-        availUpdated++;
+      try {
+        if (plan.action === "create") {
+          const data = {
+            worker_id: plan.worker.id,
+            worker_name: plan.worker.nickname || plan.worker.full_name || "",
+            week_start_date: plan.sub.week_start_date,
+            shifts: newShifts,
+            status: plan.sub.status || "draft",
+          };
+          if (!isEmpty(plan.sub.desired_shifts)) data.desired_shifts = Number(plan.sub.desired_shifts);
+          if (plan.extraTasks) data.extra_tasks = plan.extraTasks;
+          if (!isEmpty(plan.sub.change_request)) data.change_request = plan.sub.change_request;
+          await applyWithRetry(() => base44.entities.Availability.create(data));
+          availCreated++;
+        } else if (plan.action === "update" && plan.existingRecord) {
+          const updates = { shifts: newShifts };
+          if (!isEmpty(plan.sub.status)) updates.status = plan.sub.status;
+          if (!isEmpty(plan.sub.desired_shifts)) updates.desired_shifts = Number(plan.sub.desired_shifts);
+          if (plan.extraTasks) updates.extra_tasks = plan.extraTasks;
+          if (!isEmpty(plan.sub.change_request)) updates.change_request = plan.sub.change_request;
+          await applyWithRetry(() => base44.entities.Availability.update(plan.existingRecord.id, updates));
+          availUpdated++;
+        }
+      } catch (e) {
+        console.error("import write failed for", plan.worker?.nickname, e);
+        failures.push(plan.worker?.nickname || plan.sub?.worker_name || "?");
       }
     }
 
@@ -349,15 +367,20 @@ export default function AvailabilityImportPanel({ currentUser, onAuditLog }) {
     for (const plan of preview.unavailPlan) {
       if (plan.action === "skip") { errors++; continue; }
       if (plan.action === "skip_dup") { skipped++; continue; }
-      await base44.entities.Unavailability.create({
-        worker_id: plan.worker.id,
-        worker_name: plan.worker.nickname || plan.worker.full_name || "",
-        date: plan.u.date,
-        start_time: plan.u.start_time,
-        end_time: plan.u.end_time,
-        reason: plan.reason,
-      });
-      unavailCreated++;
+      try {
+        await applyWithRetry(() => base44.entities.Unavailability.create({
+          worker_id: plan.worker.id,
+          worker_name: plan.worker.nickname || plan.worker.full_name || "",
+          date: plan.u.date,
+          start_time: plan.u.start_time,
+          end_time: plan.u.end_time,
+          reason: plan.reason,
+        }));
+        unavailCreated++;
+      } catch (e) {
+        console.error("unavail write failed for", plan.worker?.nickname, e);
+        failures.push(plan.worker?.nickname || plan.u?.worker_name || "?");
+      }
     }
 
     await base44.entities.AuditLog.create({
@@ -374,9 +397,15 @@ export default function AvailabilityImportPanel({ currentUser, onAuditLog }) {
     });
     if (onAuditLog) onAuditLog();
 
-    setResult({ availCreated, availUpdated, unavailCreated, skipped, errors });
+    setResult({ availCreated, availUpdated, unavailCreated, skipped, errors, failures });
     setApplying(false);
     setPreview(null);
+    if (failures.length > 0) {
+      alert(`הייבוא הסתיים עם ${failures.length} כשלים (כנראה עקב חיבור רשת). העובדים שלא נקלטו: ${[...new Set(failures)].join(", ")}.
+נסה לייבא שוב — פעולה זו בטוחה וניתנת לחזרה (הנתונים מתווספים, לא נמחקים).`);
+    } else {
+      alert(`הייבוא הושלם: ${availCreated} נוצרו, ${availUpdated} עודכנו, ${unavailCreated} אילוצים. ${errors > 0 ? errors + " דולגו." : ""}`);
+    }
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
