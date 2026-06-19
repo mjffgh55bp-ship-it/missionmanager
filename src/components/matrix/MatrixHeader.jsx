@@ -48,11 +48,6 @@ export default function MatrixHeader({
         <span className="font-bold text-base whitespace-nowrap">
           מטריצה {viewMode === "weekly" ? "שבועית" : "יומית"}
         </span>
-        {viewMode === "weekly" && (
-          <span className="text-sm font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full whitespace-nowrap">
-            שב׳ {weekNum}
-          </span>
-        )}
       </div>
 
       {/* Date navigation */}
@@ -76,7 +71,7 @@ export default function MatrixHeader({
           <PopoverTrigger asChild>
             <div className="px-3 py-1 bg-blue-900 text-white rounded font-semibold text-xs min-w-[120px] text-center cursor-pointer hover:bg-blue-800 transition-colors h-7 flex items-center justify-center">
               {viewMode === "weekly"
-                ? `${format(weekStart, "d.M")} – ${format(weekEnd, "d.M")}`
+                ? `שבוע ${weekNum}`
                 : format(currentDate, "d.M.yyyy")}
             </div>
           </PopoverTrigger>
