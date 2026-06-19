@@ -141,10 +141,10 @@ export default function Layout({ children }) {
         {/* Sidebar: bottom bar on mobile, right column on desktop */}
         <nav
           className="fixed z-[100] flex items-center gap-1
-                     bottom-0 left-0 right-0 h-12 flex-row justify-center overflow-hidden
+                     bottom-0 left-0 right-0 h-12 flex-row justify-center overflow-hidden overscroll-none
                      border-t border-gray-200
                      md:top-0 md:bottom-0 md:left-auto md:right-0 md:h-full md:w-12
-                     md:flex-col md:justify-start md:overflow-hidden
+                     md:flex-col md:justify-start md:overflow-hidden md:overscroll-none
                      md:border-t-0 md:border-l md:border-gray-200"
           style={{ background: '#ffffff', boxShadow: '-2px 0 6px rgba(0,0,0,0.08)' }}
         >
@@ -182,7 +182,7 @@ export default function Layout({ children }) {
         </nav>
 
         {/* Main content — right margin on desktop, bottom padding on mobile */}
-        <main className="min-h-screen flex flex-col pb-12 md:pb-0 md:mr-12">
+        <main className="min-h-screen flex flex-col pb-12 md:pb-0 md:mr-12 overflow-x-hidden">
           <div className="flex-1 overflow-auto">
             {children}
           </div>
