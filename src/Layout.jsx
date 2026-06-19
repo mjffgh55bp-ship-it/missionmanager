@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
-import { LayoutDashboard, Calendar, Users, Truck, BarChart3, Grid, Clock, Award, Settings, ExternalLink, CalendarDays, Calculator, Briefcase, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Calendar, Users, Truck, BarChart3, Grid, Clock, Award, Settings, ExternalLink, CalendarDays, Calculator, ShieldCheck } from "lucide-react";
 
 
 const managerNavigationItems = [
@@ -148,10 +148,6 @@ export default function Layout({ children }) {
                      md:border-t-0 md:border-l md:border-gray-200"
           style={{ background: '#ffffff', boxShadow: '-2px 0 6px rgba(0,0,0,0.08)' }}
         >
-          {/* Logo icon — desktop only */}
-          <div className="hidden md:flex w-8 h-8 bg-gradient-to-br from-green-500 to-green-400 rounded-xl items-center justify-center shadow mb-3 mt-2 flex-shrink-0">
-            <Briefcase className="w-4 h-4 text-white" />
-          </div>
 
           {navigationItems.map((item) => {
             const isActive = location.pathname === item.url;
