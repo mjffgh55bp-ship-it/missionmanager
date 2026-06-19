@@ -13,6 +13,7 @@ import {
   SHEET_MANIFEST, SHEET_WORKERS_MAP,
   SHEET_AVAIL_SUBMISSIONS, SHEET_AVAIL_WINDOWS, SHEET_UNAVAIL_WINDOWS,
 } from "@/lib/dataTransferSchema";
+import { fetchWithRetry } from "@/lib/appDataCache";
 
 const HEBREW_MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
 
@@ -58,12 +59,12 @@ export default function AvailabilityExportPanel({ currentUser, onAuditLog }) {
     const dateStart = weekStarts[0];
     const dateEnd   = format(endOfWeek(new Date(weekStarts[weekStarts.length - 1]), { weekStartsOn: 0 }), "yyyy-MM-dd");
 
-    // Load data
-    const [workers, availabilities, unavailabilities] = await Promise.all([
-      base44.entities.Worker.list(),
-      base44.entities.Availability.list(),
-      base44.entities.Unavailability.list(),
-    ]);
+    // Load data — staggered to avoid rate limits with large datasets
+    const workers = await fetchWithRetry(() => base44.entities.Worker.list());
+    await new Promise(r => setTimeout(r, 200));
+    const availabilities = await fetchWithRetry(() => base44.entities.Availability.list());
+    await new Promise(r => setTimeout(r, 200));
+    const unavailabilities = await fetchWithRetry(() => base44.entities.Unavailability.list());
 
     // Filter availability by selected week_start_dates
     const filteredAvail = availabilities.filter(a => weekStarts.includes(a.week_start_date));
