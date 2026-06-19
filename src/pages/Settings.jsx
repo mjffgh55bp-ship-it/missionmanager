@@ -111,7 +111,25 @@ export default function Settings() {
         : ["מתוכנן", "מאושר", "בוצע", "בוטל"];
       setShiftStatuses(rawStatuses.map(normalizeItem));
 
-      if (tasksSettings.length > 0) setTasks(JSON.parse(tasksSettings[0].setting_value) || []);
+      if (tasksSettings.length > 0) {
+        const rawTasks = JSON.parse(tasksSettings[0].setting_value) || [];
+        const normTasks = rawTasks.map(normalizeItem).map(t =>
+          t.mapping_id ? t : { ...t, mapping_id: suggestMappingId(t.name, "task") }
+        );
+        setTasks(normTasks);
+        // Persist backfilled ids quietly (don't block render), like the schedule-column backfill
+        const needsSave = rawTasks.some((t, i) => normTasks[i].mapping_id && (typeof t === "string" || !t.mapping_id));
+        if (needsSave) {
+          (async () => {
+            try {
+              const s2 = await base44.entities.AppSettings.filter({ setting_key: "tasks_list" });
+              const d = { setting_key: "tasks_list", setting_value: JSON.stringify(normTasks) };
+              if (s2.length > 0) await base44.entities.AppSettings.update(s2[0].id, d);
+              else await base44.entities.AppSettings.create(d);
+            } catch (e) { console.error("task mapping_id backfill failed:", e); }
+          })();
+        }
+      }
       if (taskQualSettings.length > 0) setTaskQualifications(JSON.parse(taskQualSettings[0].setting_value) || {});
       setWorkers(workersData);
     } catch (err) {
@@ -794,8 +812,10 @@ export default function Settings() {
   };
 
   const handleAddTask = async () => {
-    if (!newTaskName.trim() || tasks.includes(newTaskName.trim())) return;
-    const updated = [...tasks, newTaskName.trim()];
+    const nm = newTaskName.trim();
+    if (!nm || tasks.some(t => t.name === nm)) return;
+    const newTask = { name: nm, mapping_id: suggestMappingId(nm, "task"), export_name: "", is_importable: true, is_exportable: true };
+    const updated = [...tasks, newTask];
     const settings = await base44.entities.AppSettings.filter({ setting_key: "tasks_list" });
     const data = { setting_key: "tasks_list", setting_value: JSON.stringify(updated) };
     if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
@@ -804,10 +824,16 @@ export default function Settings() {
     setNewTaskName("");
   };
 
+  const handleSaveTask = async (idx, updatedItem) => {
+    const updated = tasks.map((t, i) => i === idx ? updatedItem : t);
+    await saveListSetting("tasks_list", updated);
+    setTasks(updated);
+  };
+
   const handleRemoveTask = async (task) => {
-    const updated = tasks.filter(t => t !== task);
+    const updated = tasks.filter(t => t.mapping_id !== task.mapping_id);
     const updatedQuals = { ...taskQualifications };
-    delete updatedQuals[task];
+    delete updatedQuals[task.name];
 
     // Fetch both settings in parallel
     const [taskSettings, qualSettings] = await Promise.all([
@@ -1211,30 +1237,32 @@ export default function Settings() {
             </div>
             <div className="space-y-2">
               {tasks.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו משימות</p>}
-              {tasks.map(task => (
-                <div key={task} className="border rounded-lg overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 bg-gray-50" dir="rtl">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{task}</span>
-                      <Badge variant="outline" className="text-xs border-violet-300 text-violet-700">
-                        {Object.values(taskQualifications[task] || {}).flat().length} כשירים
-                      </Badge>
-                    </div>
-                    <div className="flex gap-1">
-                      <button onClick={() => setExpandedTask(expandedTask === task ? null : task)} className="text-gray-400 hover:text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-200">
-                        {expandedTask === task ? "סגור" : "נהל כשירויות"}
-                      </button>
-                      <ConfirmDeleteButton onConfirm={() => handleRemoveTask(task)} />
-                    </div>
+              {tasks.map((task, idx) => (
+                <div key={task.mapping_id || idx} className="space-y-1">
+                  <MappableItemRow
+                    item={normalizeItem(task)}
+                    allItems={tasks}
+                    prefix="task"
+                    color="violet"
+                    onSave={(updated) => handleSaveTask(idx, updated)}
+                    onDelete={() => handleRemoveTask(task)}
+                  />
+                  <div className="flex items-center justify-between px-3" dir="rtl">
+                    <Badge variant="outline" className="text-xs border-violet-300 text-violet-700">
+                      {Object.values(taskQualifications[task.name] || {}).flat().length} כשירים
+                    </Badge>
+                    <button onClick={() => setExpandedTask(expandedTask === task.mapping_id ? null : task.mapping_id)} className="text-gray-400 hover:text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-100">
+                      {expandedTask === task.mapping_id ? "סגור כשירויות" : "נהל כשירויות"}
+                    </button>
                   </div>
-                  {expandedTask === task && (
-                    <div className="p-3 border-t space-y-3" dir="rtl">
+                  {expandedTask === task.mapping_id && (
+                    <div className="p-3 border rounded-lg space-y-3" dir="rtl">
                       <p className="text-xs text-gray-500">סמן עובדים כשירים למשימה לפי תפקיד:</p>
                       {workerRoles.map(roleObj => {
                         const role = normalizeItem(roleObj).name;
                         const roleWorkers = workers.filter(w => w.active !== false && (Array.isArray(w.role) ? w.role.includes(role) : w.role === role));
                         if (roleWorkers.length === 0) return null;
-                        const taskRoleQuals = (taskQualifications[task] || {})[role] || [];
+                        const taskRoleQuals = (taskQualifications[task.name] || {})[role] || [];
                         return (
                           <div key={role}>
                             <p className="text-xs font-semibold text-gray-700 mb-1">{role}</p>
@@ -1244,7 +1272,7 @@ export default function Settings() {
                                 return (
                                   <button
                                     key={worker.id}
-                                    onClick={() => handleToggleWorkerQualification(task, role, worker.id)}
+                                    onClick={() => handleToggleWorkerQualification(task.name, role, worker.id)}
                                     className={`px-2 py-1 rounded text-xs border transition-colors ${
                                       qualified
                                         ? 'bg-violet-100 border-violet-400 text-violet-800 font-semibold'
