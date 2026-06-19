@@ -182,10 +182,8 @@ export default function Layout({ children }) {
         </nav>
 
         {/* Main content — right margin on desktop, bottom padding on mobile */}
-        <main className="min-h-screen flex flex-col pb-12 md:pb-0 md:mr-12 overflow-x-hidden">
-          <div className="flex-1 overflow-auto">
-            {children}
-          </div>
+        <main className="min-h-screen pb-12 md:pb-0 md:mr-12 overflow-y-auto overflow-x-hidden">
+          {children}
         </main>
       </div>
     </>
