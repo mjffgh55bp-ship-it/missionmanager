@@ -9,6 +9,7 @@ import {
   sanitizeText, isEmpty, normalizeForMatch,
   SHEET_AVAIL_SUBMISSIONS, SHEET_AVAIL_WINDOWS, SHEET_UNAVAIL_WINDOWS, SHEET_WORKERS_MAP,
 } from "@/lib/dataTransferSchema";
+import { fetchWithRetry } from "@/lib/appDataCache";
 
 // ── Sheet parser ──────────────────────────────────────────────────────────────
 function parseSheet(ws) {
@@ -119,7 +120,8 @@ export default function AvailabilityImportPanel({ currentUser, onAuditLog }) {
     if (!rawSheets) return;
     setLoadingPreview(true);
 
-    const workers = await base44.entities.Worker.list();
+    const workers = await fetchWithRetry(() => base44.entities.Worker.list());
+    await new Promise(r => setTimeout(r, 200));
 
     // Worker lookups
     const workerById      = {};
@@ -173,10 +175,12 @@ export default function AvailabilityImportPanel({ currentUser, onAuditLog }) {
     const allWeekStarts = [...new Set(rawSheets.submissions.rows.map(r => r.week_start_date).filter(Boolean))];
     let existingAvailList = [];
     if (allWeekStarts.length > 0) {
-      const allExisting = await Promise.all(
-        allWeekStarts.map(ws => base44.entities.Availability.filter({ week_start_date: ws }))
-      );
-      existingAvailList = allExisting.flat();
+      // Staggered to avoid rate limits
+      for (const ws of allWeekStarts) {
+        const batch = await fetchWithRetry(() => base44.entities.Availability.filter({ week_start_date: ws }));
+        existingAvailList.push(...batch);
+        await new Promise(r => setTimeout(r, 200));
+      }
     }
     // Index existing by (worker_id, week_start_date)
     const existingByKey = {};
@@ -190,7 +194,8 @@ export default function AvailabilityImportPanel({ currentUser, onAuditLog }) {
     const maxDate = allDates[allDates.length - 1] || "";
     let existingUnavail = [];
     if (minDate && maxDate) {
-      const allUnavail = await base44.entities.Unavailability.list();
+      await new Promise(r => setTimeout(r, 200));
+      const allUnavail = await fetchWithRetry(() => base44.entities.Unavailability.list());
       existingUnavail = allUnavail.filter(u => u.date >= minDate && u.date <= maxDate);
     }
 
