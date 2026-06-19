@@ -1232,12 +1232,41 @@ export default function Matrix() {
   };
 
   const handleSaveUnavail = async (unavailData, isDelete = false) => {
+    // Resolve a temp_ optimistic entry to its real DB record (created moments ago, may not be in
+    // local state yet). Match by worker + date + times.
+    const resolveRealUnavail = async (data) => {
+      if (!data?.id || !String(data.id).startsWith('temp_')) return data;
+      // Try local state first
+      const localMatch = unavailabilities.find(u =>
+        !String(u.id).startsWith('temp_') &&
+        u.worker_id === data.worker_id &&
+        u.date === data.date &&
+        u.start_time === data.start_time &&
+        u.end_time === data.end_time
+      );
+      if (localMatch) return localMatch;
+      // Fall back to the server (the create may have landed but not yet reloaded)
+      try {
+        const fresh = await base44.entities.Unavailability.filter({ worker_id: data.worker_id, date: data.date });
+        const serverMatch = (fresh || []).find(u =>
+          u.start_time === data.start_time && u.end_time === data.end_time
+        );
+        if (serverMatch) return serverMatch;
+      } catch (e) { console.error("resolveRealUnavail lookup failed:", e); }
+      return data; // still temp — caller handles
+    };
+
     if (isDelete) {
-      // Optimistic temp-id entries: just remove from local state (no DB record)
+      // Optimistic temp entry with no real record yet
       if (String(unavailData.id).startsWith('temp_')) {
-        setUnavailabilities(prev => prev.filter(u => u.id !== unavailData.id));
-        setEditingUnavail(null);
-        return;
+        const real = await resolveRealUnavail(unavailData);
+        if (String(real.id).startsWith('temp_')) {
+          // No real record found yet — just drop the optimistic one locally
+          setUnavailabilities(prev => prev.filter(u => u.id !== unavailData.id));
+          setEditingUnavail(null);
+          return;
+        }
+        unavailData = real; // delete the real one below
       }
       try {
         await base44.entities.Unavailability.delete(unavailData.id);
@@ -1246,15 +1275,32 @@ export default function Matrix() {
         console.error('delete unavailability failed:', e);
         throw new Error('delete_failed');
       }
-    } else if (unavailData.id) {
-      const updated = await base44.entities.Unavailability.update(unavailData.id, {
+      setEditingUnavail(null);
+      return;
+    }
+
+    // UPDATE or CREATE
+    let target = unavailData;
+    if (unavailData.id && String(unavailData.id).startsWith('temp_')) {
+      target = await resolveRealUnavail(unavailData);
+    }
+
+    if (target.id && !String(target.id).startsWith('temp_')) {
+      // Real record → UPDATE (never create a duplicate)
+      const updated = await base44.entities.Unavailability.update(target.id, {
         date: unavailData.date,
         start_time: unavailData.start_time,
         end_time: unavailData.end_time,
         reason: unavailData.reason,
       });
       setUnavailabilities(prev => prev.map(u => u.id === updated.id ? updated : u));
+    } else if (target.id && String(target.id).startsWith('temp_')) {
+      // Still couldn't resolve the just-created record — don't create a duplicate.
+      alert("האילוץ נשמר זה עתה ועדיין נטען. המתן רגע ונסה לערוך שוב.");
+      setEditingUnavail(null);
+      return;
     } else {
+      // Genuinely new → CREATE
       const created = await base44.entities.Unavailability.create({
         worker_id: unavailData.worker_id,
         worker_name: unavailData.worker_name,
