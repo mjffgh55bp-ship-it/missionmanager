@@ -141,10 +141,10 @@ export default function Layout({ children }) {
         {/* Sidebar: bottom bar on mobile, right column on desktop */}
         <nav
           className="fixed z-[100] flex items-center gap-1
-                     bottom-0 left-0 right-0 h-12 flex-row justify-center overflow-x-auto
+                     bottom-0 left-0 right-0 h-12 flex-row justify-center overflow-hidden
                      border-t border-gray-200
                      md:top-0 md:bottom-0 md:left-auto md:right-0 md:h-full md:w-12
-                     md:flex-col md:justify-start md:overflow-x-visible md:overflow-y-auto
+                     md:flex-col md:justify-start md:overflow-hidden
                      md:border-t-0 md:border-l md:border-gray-200"
           style={{ background: '#ffffff', boxShadow: '-2px 0 6px rgba(0,0,0,0.08)' }}
         >
