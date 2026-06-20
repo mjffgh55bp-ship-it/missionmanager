@@ -1561,16 +1561,20 @@ END:VEVENT
                             <Switch checked={showTipsAsPopup} onCheckedChange={setShowTipsAsPopup} />
                           </div>
                           <div className="flex gap-2 justify-end">
-                            <Button size="sm" variant="outline" onClick={() => setEditingTips(false)} dir="rtl">ביטול</Button>
-                            <Button size="sm" className="bg-blue-900 hover:bg-blue-800" dir="rtl" onClick={async () => {
-                              const weekStartStr3 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
-                              const key = `availability_tips_${weekStartStr3}`;
-                              const existing = await base44.entities.AppSettings.filter({ setting_key: key });
-                              const data = { setting_key: key, setting_value: JSON.stringify({ message: tipsEditValue, showAsPopup: showTipsAsPopup }) };
-                              if (existing.length > 0) await base44.entities.AppSettings.update(existing[0].id, data);
-                              else await base44.entities.AppSettings.create(data);
-                              setTipsMessage(tipsEditValue);
-                              setEditingTips(false);
+                            <Button type="button" size="sm" variant="outline" onClick={() => setEditingTips(false)} dir="rtl">ביטול</Button>
+                            <Button type="button" size="sm" className="bg-blue-900 hover:bg-blue-800" dir="rtl" onClick={async () => {
+                              try {
+                                const weekStartStr3 = format(startOfWeek(weekStart, { weekStartsOn: 0 }), "yyyy-MM-dd");
+                                const key = `availability_tips_${weekStartStr3}`;
+                                const existing = await base44.entities.AppSettings.filter({ setting_key: key });
+                                const data = { setting_key: key, setting_value: JSON.stringify({ message: tipsEditValue, showAsPopup: showTipsAsPopup }) };
+                                if (existing.length > 0) await base44.entities.AppSettings.update(existing[0].id, data);
+                                else await base44.entities.AppSettings.create(data);
+                                setTipsMessage(tipsEditValue);
+                                setEditingTips(false);
+                              } catch {
+                                alert("השמירה נכשלה. אנא נסה שוב.");
+                              }
                             }}>שמור</Button>
                           </div>
                         </div>
