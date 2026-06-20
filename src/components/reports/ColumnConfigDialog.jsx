@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 
 const TASK_COL_NAME = "__משימה__";
 const TIME_RANGE_COL_NAME = "__טווח_שעות__";
+const WORKER_ROLE_COL_NAME = "__תפקיד__";
 
 function TimeRangeSelector({ criterion, onUpdate }) {
   // Parse stored "HH:MM-HH:MM" strings into {start, end} objects
@@ -78,11 +79,12 @@ function TimeRangeSelector({ criterion, onUpdate }) {
   );
 }
 
-function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, onRemove }) {
+function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles, onUpdate, onRemove }) {
   const [showColPicker, setShowColPicker] = useState(!criterion.col_name);
 
   const isTaskCriterion = criterion.col_name === TASK_COL_NAME;
   const isTimeRangeCriterion = criterion.col_name === TIME_RANGE_COL_NAME;
+  const isRoleCriterion = criterion.col_name === WORKER_ROLE_COL_NAME;
   const sc = scheduleColumns.find(c => c.name === criterion.col_name);
 
   // For task criterion: store id as value but display name
@@ -90,6 +92,8 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
     ? qualifications.map(q => ({ value: q.id, label: q.name }))
     : isTimeRangeCriterion
     ? []
+    : isRoleCriterion
+    ? (workerRoles || []).map(r => typeof r === "string" ? { value: r, label: r } : { value: r.name, label: r.name })
     : sc
       ? [
           ...(sc.options || []),
@@ -123,7 +127,7 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
     setShowColPicker(false);
   };
 
-  const displayName = isTaskCriterion ? "משימה" : isTimeRangeCriterion ? "טווח שעות" : (criterion.col_name || "בחר עמודה");
+  const displayName = isTaskCriterion ? "משימה" : isTimeRangeCriterion ? "טווח שעות" : isRoleCriterion ? "תפקיד" : (criterion.col_name || "בחר עמודה");
 
   return (
     <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden mb-2">
@@ -270,6 +274,18 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
     setShowCriteriaPicker(false);
   };
 
+  const addWorkerRoleCriterion = () => {
+    const newC = {
+      id: Date.now().toString(),
+      col_name: WORKER_ROLE_COL_NAME,
+      col_type: "worker_role",
+      include: [],
+      logic: "or",
+    };
+    update("criteria", [...(draft.criteria || []), newC]);
+    setShowCriteriaPicker(false);
+  };
+
   const updateCriterion = (id, updated) => {
     update("criteria", (draft.criteria || []).map(c => c.id === id ? updated : c));
   };
@@ -372,6 +388,10 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
                     משימה
                   </button>
                 )}
+                <button type="button" onClick={addWorkerRoleCriterion}
+                  className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors font-medium border-b border-gray-200">
+                  תפקיד
+                </button>
                 {scheduleColumns.map(sc => (
                   <button key={sc.name} type="button" onClick={() => addCriterion(sc)}
                     className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors">
