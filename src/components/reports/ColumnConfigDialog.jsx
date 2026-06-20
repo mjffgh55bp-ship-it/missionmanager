@@ -93,7 +93,11 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles,
     : isTimeRangeCriterion
     ? []
     : isRoleCriterion
-    ? (workerRoles || []).map(r => typeof r === "string" ? { value: r, label: r } : { value: r.name, label: r.name })
+    ? (workerRoles || []).map(r =>
+        typeof r === "string"
+          ? { value: r, label: r }
+          : { value: r.mapping_id || r.name, label: r.name, _altName: r.name }
+      )
     : sc
       ? [
           ...(sc.options || []),
@@ -110,9 +114,9 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles,
     ? (criterion.include || [])  // Keep all time ranges as-is
     : (criterion.include || []);
 
-  const toggleInclude = (opt) => {
+  const toggleInclude = (opt, altName) => {
     const next = cleanInclude.includes(opt)
-      ? cleanInclude.filter(v => v !== opt)
+      ? cleanInclude.filter(v => v !== opt && v !== altName)
       : [...cleanInclude, opt];
     onUpdate({ ...criterion, include: next });
   };
@@ -176,9 +180,10 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles,
                 {availableOptions.map(opt => {
                   const optValue = typeof opt === "object" ? opt.value : opt;
                   const optLabel = typeof opt === "object" ? opt.label : opt;
-                  const isSelected = cleanInclude.includes(optValue);
+                  const _altName = typeof opt === "object" ? opt._altName : undefined;
+                  const isSelected = cleanInclude.includes(optValue) || (_altName && cleanInclude.includes(_altName));
                   return (
-                    <button key={optValue} type="button" onClick={() => toggleInclude(optValue)}
+                    <button key={optValue} type="button" onClick={() => toggleInclude(optValue, _altName)}
                       className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
                         isSelected
                           ? "bg-gray-800 text-white border-gray-800"
