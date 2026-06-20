@@ -92,7 +92,10 @@ const PinIcon = ({ size = 16 }) => (
 
 export default function Matrix() {
   const [_savedDate, _setSavedDate] = usePageState("matrix", "currentDate", null);
-  const currentDate = _savedDate ? new Date(_savedDate) : new Date();
+  const currentDate = useMemo(
+    () => (_savedDate ? new Date(_savedDate) : new Date()),
+    [_savedDate]
+  );
   const setCurrentDate = (d) => _setSavedDate(d instanceof Date ? d.toISOString() : d);
 
   const [viewMode, setViewMode] = usePageState("matrix", "viewMode", "daily");
