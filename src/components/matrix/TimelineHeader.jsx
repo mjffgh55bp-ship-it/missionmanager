@@ -13,13 +13,13 @@ export default function TimelineHeader({ viewMode, timelineWidth, ppm, dailySlot
     return (
       <div dir="rtl">
         {/* Top row: day name + date */}
-        <div className="text-center font-bold text-gray-800 text-sm py-1 border-b border-gray-300" style={{ width: `${timelineWidth}px` }}>
+        <div className="text-center font-semibold text-gray-800 text-xs py-0.5 border-b border-gray-300" style={{ width: `${timelineWidth}px` }}>
           {dateStr} {dayName}
         </div>
         {/* Bottom row: hours */}
         <div className="relative flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
           {dailySlots.map((hour) => (
-            <div key={hour} className="shrink-0 text-xs text-gray-600 py-1 border-l text-center font-medium overflow-hidden" style={{ width: `${60 * ppm}px` }}>
+            <div key={hour} className="shrink-0 text-[10px] text-gray-600 py-0.5 border-l text-center font-medium overflow-hidden" style={{ width: `${60 * ppm}px` }}>
               {String(hour).padStart(2, '0')}:00
             </div>
           ))}
@@ -39,7 +39,7 @@ export default function TimelineHeader({ viewMode, timelineWidth, ppm, dailySlot
           return (
             <div
               key={day}
-              className="shrink-0 text-center font-bold text-gray-800 text-sm py-1 border-l border-gray-200"
+              className="shrink-0 text-center font-semibold text-gray-800 text-xs py-0.5 border-l border-gray-200"
               style={{ width: `${DAY_WIDTH}px` }}
             >
               {dayName} {dayDate}
@@ -51,7 +51,7 @@ export default function TimelineHeader({ viewMode, timelineWidth, ppm, dailySlot
       {/* Bottom row: individual hours */}
       <div className="relative flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
         {weeklySlots.map((slot, idx) => (
-          <div key={idx} className="shrink-0 text-xs text-gray-600 py-1 text-center font-medium overflow-hidden border-l border-l-gray-200" style={{ width: `${60 * ppm}px` }}>
+          <div key={idx} className="shrink-0 text-[10px] text-gray-600 py-0.5 text-center font-medium overflow-hidden border-l border-l-gray-200" style={{ width: `${60 * ppm}px` }}>
             <div className={slot.opIndex === 0 ? 'text-gray-800 font-semibold' : 'text-gray-400'} style={{ fontSize: '9px' }}>
               {String(slot.hour).padStart(2, '0')}
             </div>
