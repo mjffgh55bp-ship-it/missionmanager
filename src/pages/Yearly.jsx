@@ -646,56 +646,75 @@ export default function Yearly() {
                   </DragDropContext>
 
                   {/* Unavailability Row */}
-                  {unavailabilities.length > 0 && (
-                    <div className="flex border-b bg-red-50" style={{ height: ROW_HEIGHT }}>
-                      <div className="relative flex" style={{ width: `${yearDays.length * CELL_WIDTH}px` }}>
-                        {yearDays.map((day, idx) => {
-                          const dayOfWeek = getDay(day);
-                          const isShabbat = dayOfWeek === 6;
-                          const isFriday = dayOfWeek === 5;
-                          const isToday = format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
-                          return <div key={idx} className={`h-full border-l ${isToday ? 'border-r-2 border-r-blue-500' : ''} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }} />;
-                        })}
-                        {(() => {
-                          const groupedByWorker = {};
-                          unavailabilities.forEach(unavail => {
-                            if (!groupedByWorker[unavail.worker_id]) groupedByWorker[unavail.worker_id] = [];
-                            groupedByWorker[unavail.worker_id].push(unavail);
-                          });
-                          const mergedBars = [];
-                          Object.entries(groupedByWorker).forEach(([workerId, workerUnavails]) => {
-                            workerUnavails.sort((a, b) => a.date.localeCompare(b.date));
-                            let currentGroup = null;
-                            workerUnavails.forEach(unavail => {
-                              const dateIdx = yearDaysMap[unavail.date];
-                              if (dateIdx === undefined) return;
-                              if (!currentGroup) {
-                                currentGroup = { worker_id: workerId, startIdx: dateIdx, endIdx: dateIdx, unavails: [unavail] };
-                              } else if (dateIdx === currentGroup.endIdx + 1) {
-                                currentGroup.endIdx = dateIdx;
-                                currentGroup.unavails.push(unavail);
-                              } else {
-                                mergedBars.push(currentGroup);
-                                currentGroup = { worker_id: workerId, startIdx: dateIdx, endIdx: dateIdx, unavails: [unavail] };
-                              }
-                            });
-                            if (currentGroup) mergedBars.push(currentGroup);
-                          });
-                          return mergedBars.map((group, idx) => {
+                  {unavailabilities.length > 0 && (() => {
+                    const groupedByWorker = {};
+                    unavailabilities.forEach(unavail => {
+                      if (!groupedByWorker[unavail.worker_id]) groupedByWorker[unavail.worker_id] = [];
+                      groupedByWorker[unavail.worker_id].push(unavail);
+                    });
+                    const mergedBars = [];
+                    Object.entries(groupedByWorker).forEach(([workerId, workerUnavails]) => {
+                      workerUnavails.sort((a, b) => a.date.localeCompare(b.date));
+                      let currentGroup = null;
+                      workerUnavails.forEach(unavail => {
+                        const dateIdx = yearDaysMap[unavail.date];
+                        if (dateIdx === undefined) return;
+                        if (!currentGroup) {
+                          currentGroup = { worker_id: workerId, startIdx: dateIdx, endIdx: dateIdx, unavails: [unavail] };
+                        } else if (dateIdx === currentGroup.endIdx + 1) {
+                          currentGroup.endIdx = dateIdx;
+                          currentGroup.unavails.push(unavail);
+                        } else {
+                          mergedBars.push(currentGroup);
+                          currentGroup = { worker_id: workerId, startIdx: dateIdx, endIdx: dateIdx, unavails: [unavail] };
+                        }
+                      });
+                      if (currentGroup) mergedBars.push(currentGroup);
+                    });
+
+                    // Lay out bars in non-overlapping tracks (stacked vertically)
+                    const sorted = [...mergedBars].sort((a, b) => a.startIdx - b.startIdx);
+                    const tracks = [];
+                    for (const bar of sorted) {
+                      let placed = false;
+                      for (let i = 0; i < tracks.length; i++) {
+                        const lastInTrack = tracks[i][tracks[i].length - 1];
+                        if (bar.startIdx > lastInTrack.endIdx) {
+                          tracks[i].push(bar);
+                          placed = true;
+                          break;
+                        }
+                      }
+                      if (!placed) tracks.push([bar]);
+                    }
+                    const unavailRowHeight = Math.max(ROW_HEIGHT, tracks.length * (EVENT_HEIGHT + 2) + 4);
+
+                    return (
+                      <div className="flex border-b bg-red-50" style={{ height: unavailRowHeight }}>
+                        <div className="relative flex" style={{ width: `${yearDays.length * CELL_WIDTH}px` }}>
+                          {yearDays.map((day, idx) => {
+                            const dayOfWeek = getDay(day);
+                            const isShabbat = dayOfWeek === 6;
+                            const isFriday = dayOfWeek === 5;
+                            const isToday = format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                            return <div key={idx} className={`h-full border-l ${isToday ? 'border-r-2 border-r-blue-500' : ''} ${isShabbat ? 'bg-amber-50' : isFriday ? 'bg-amber-50/50' : ''}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }} />;
+                          })}
+                          {tracks.map((track, trackIdx) => track.map((group, idx) => {
                             const worker = workers.find(w => w.id === group.worker_id);
                             const width = (group.endIdx - group.startIdx + 1) * CELL_WIDTH - 2;
+                            const topOffset = 2 + trackIdx * (EVENT_HEIGHT + 2);
                             return (
-                              <div key={`${group.worker_id}-${idx}`} className="absolute top-1 rounded bg-red-500 flex items-center justify-center text-white text-[8px] font-medium px-1 z-10"
-                                style={{ right: `${group.startIdx * CELL_WIDTH}px`, width: `${width}px`, height: EVENT_HEIGHT }}
+                              <div key={`${group.worker_id}-${idx}`} className="absolute rounded bg-red-500 flex items-center justify-center text-white text-[8px] font-medium px-1 z-10"
+                                style={{ right: `${group.startIdx * CELL_WIDTH}px`, width: `${width}px`, height: EVENT_HEIGHT, top: `${topOffset}px` }}
                                 title={`${worker?.nickname || 'Unknown'}: ${format(parseISO(group.unavails[0].date), 'dd/MM')}-${format(parseISO(group.unavails[group.unavails.length - 1].date), 'dd/MM')}`}>
                                 <span className="truncate">{worker?.nickname?.split(' ')[0] || '?'}</span>
                               </div>
                             );
-                          });
-                        })()}
+                          }))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
             </div>
