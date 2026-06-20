@@ -11,9 +11,9 @@ export function AvailabilityStatsHeader() {
     >
       <span className="text-[10px] font-semibold text-gray-700 leading-tight">זמינות</span>
       <div className="flex w-full mt-0.5">
-        <div className="flex-1 text-center text-[8px] text-gray-400 font-medium">A</div>
+        <div className="flex-1 text-center text-[8px] text-gray-400 font-medium">TW</div>
         <div className="flex-1 text-center text-[8px] text-gray-400 font-medium border-r border-gray-300">W</div>
-        <div className="flex-1 text-center text-[8px] text-gray-400 font-medium border-r border-gray-300">TW</div>
+        <div className="flex-1 text-center text-[8px] text-gray-400 font-medium border-r border-gray-300">A</div>
       </div>
     </div>
   );
@@ -35,13 +35,13 @@ export function AvailabilityStatsCell({ workerId, availabilities, weekStartDate 
       style={{ width: `${COL_WIDTH}px`, minWidth: `${COL_WIDTH}px` }}
     >
       <div className="flex-1 text-center">
-        <span className="text-xs font-bold text-gray-800">{availableCount}</span>
+        <span className="text-xs font-bold text-gray-800">{totalDesired}</span>
       </div>
       <div className="flex-1 text-center border-r border-gray-200">
         <span className="text-xs font-bold text-gray-800">{wantedCount}</span>
       </div>
       <div className="flex-1 text-center border-r border-gray-200">
-        <span className="text-xs font-bold text-gray-800">{totalDesired}</span>
+        <span className="text-xs font-bold text-gray-800">{availableCount}</span>
       </div>
     </div>
   );
