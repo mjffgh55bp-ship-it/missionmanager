@@ -242,6 +242,8 @@ export function getOperationalEndMinutes(startValue, endValue) {
  */
 export function calcShiftHours(startValue, endValue) {
   if (!startValue || !endValue) return 0;
+  // When start == end, there's no shift (avoid wrapping to 24h)
+  if (startValue === endValue) return 0;
   const startMins = getOperationalMinutes(startValue);
   const endMins = getOperationalEndMinutes(startValue, endValue);
   return Math.max(0, (endMins - startMins) / 60);
