@@ -127,14 +127,14 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
                           {tags.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {tags.map((t, i) => (
-                                <span key={i} className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{t}</span>
+                                <span key={i} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">{t}</span>
                               ))}
                             </div>
                           )}
                         </div>
                         <button
                           onClick={() => setConfiguringColId(col.id)}
-                          className="text-gray-400 hover:text-blue-600 transition-colors mt-0.5 text-xs border border-gray-200 rounded px-2 py-0.5"
+                          className="text-gray-400 hover:text-gray-700 transition-colors mt-0.5 text-xs border border-gray-200 rounded px-2 py-0.5"
                           title="הגדר קריטריונים"
                         >ערוך</button>
                         <button
@@ -156,7 +156,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
                 <button
                   type="button"
                   onClick={() => setShowAddColumn(true)}
-                  className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-blue-700 transition-colors py-1"
+                  className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors py-1"
                 >
                   <Plus className="w-4 h-4" />הוסף עמודה
                 </button>
@@ -171,7 +171,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
                     onKeyDown={e => { if (e.key === "Enter") addNewColumn(); if (e.key === "Escape") setShowAddColumn(false); }}
                   />
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={addNewColumn} className="bg-blue-700 hover:bg-blue-800 flex-1">
+                    <Button size="sm" onClick={addNewColumn} className="bg-green-600 hover:bg-green-700 flex-1">
                       הוסף והגדר
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => { setShowAddColumn(false); setNewColName(""); }}>
@@ -185,7 +185,7 @@ export default function TrackerEditor({ open, onOpenChange, tracker, onSaved, sc
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} dir="rtl">ביטול</Button>
-            <Button onClick={handleSave} disabled={saving || !name.trim()} className="bg-blue-900 hover:bg-blue-800" dir="rtl">
+            <Button onClick={handleSave} disabled={saving || !name.trim()} className="bg-green-600 hover:bg-green-700" dir="rtl">
               {saving ? "שומר..." : "שמור"}
             </Button>
           </DialogFooter>

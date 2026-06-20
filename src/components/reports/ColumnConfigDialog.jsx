@@ -63,14 +63,14 @@ function TimeRangeSelector({ criterion, onUpdate }) {
             </div>
           </div>
           {range.start > range.end && (
-            <p className="text-xs text-blue-600 text-right pr-6">⟳ טווח חוצה חצות ({range.start}–00:00–{range.end})</p>
+            <p className="text-xs text-gray-600 text-right pr-6">⟳ טווח חוצה חצות ({range.start}–00:00–{range.end})</p>
           )}
         </div>
       ))}
       <button
         type="button"
         onClick={addTimeRange}
-        className="text-xs text-blue-700 hover:text-blue-900 font-medium mt-2"
+        className="text-xs text-gray-700 hover:text-gray-900 font-medium mt-2"
       >
         + הוסף טווח שעות
       </button>
@@ -126,32 +126,32 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
   const displayName = isTaskCriterion ? "משימה" : isTimeRangeCriterion ? "טווח שעות" : (criterion.col_name || "בחר עמודה");
 
   return (
-    <div className="border border-blue-200 rounded-lg bg-blue-50 overflow-hidden mb-2">
+    <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden mb-2">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-blue-700 text-white">
+      <div className="flex items-center gap-2 px-3 py-2 bg-gray-200 text-gray-800">
         <span className="font-semibold text-sm flex-1 text-right">{displayName}</span>
         {criterion.col_name && (
           <button type="button" onClick={() => setShowColPicker(!showColPicker)}
-            className="text-blue-200 hover:text-white text-xs underline">שנה</button>
+            className="text-gray-500 hover:text-gray-700 text-xs underline">שנה</button>
         )}
-        <button type="button" onClick={onRemove} className="text-blue-200 hover:text-white">
+        <button type="button" onClick={onRemove} className="text-gray-500 hover:text-gray-700">
           <X className="w-4 h-4" />
         </button>
       </div>
 
       {/* Column picker */}
       {showColPicker && (
-        <div className="bg-blue-100 border-b border-blue-200 max-h-40 overflow-y-auto">
+        <div className="bg-gray-100 border-b border-gray-200 max-h-40 overflow-y-auto">
           {/* Task option */}
           {qualifications.length > 0 && (
             <button type="button" onClick={selectTaskCol}
-              className="w-full text-right px-4 py-1.5 text-sm text-blue-900 hover:bg-blue-200 transition-colors font-medium border-b border-blue-200">
+              className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors font-medium border-b border-gray-200">
               משימה
             </button>
           )}
           {scheduleColumns.map(col => (
             <button key={col.name} type="button" onClick={() => selectCol(col)}
-              className="w-full text-right px-4 py-1.5 text-sm text-blue-900 hover:bg-blue-200 transition-colors">
+              className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors">
               {col.name}
             </button>
           ))}
@@ -177,8 +177,8 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
                     <button key={optValue} type="button" onClick={() => toggleInclude(optValue)}
                       className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
                         isSelected
-                          ? "bg-blue-700 text-white border-blue-700"
-                          : "bg-white text-blue-800 border-blue-300 hover:border-blue-500"
+                          ? "bg-gray-800 text-white border-gray-800"
+                          : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
                       }`}>
                       {optLabel}
                       {isSelected && <X className="inline w-3 h-3 mr-1" />}
@@ -188,14 +188,14 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
               </div>
               {cleanInclude.length > 1 && (
                 <div className="flex items-center gap-1 mt-1">
-                  <span className="text-xs text-blue-700 ml-2">שיטת ספירה:</span>
+                  <span className="text-xs text-gray-700 ml-2">שיטת ספירה:</span>
                   <button type="button" onClick={() => onUpdate({ ...criterion, logic: "and" })}
                     className={`px-2.5 py-0.5 rounded text-xs border transition-colors ${
-                      criterion.logic === "and" ? "bg-blue-700 text-white border-blue-700" : "bg-white text-blue-700 border-blue-300 hover:border-blue-500"
+                      criterion.logic === "and" ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
                     }`}>גם</button>
                   <button type="button" onClick={() => onUpdate({ ...criterion, logic: "or" })}
                     className={`px-2.5 py-0.5 rounded text-xs border transition-colors ${
-                      criterion.logic === "or" ? "bg-blue-700 text-white border-blue-700" : "bg-white text-blue-700 border-blue-300 hover:border-blue-500"
+                      criterion.logic === "or" ? "bg-gray-800 text-white border-gray-800" : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
                     }`}>או</button>
                 </div>
               )}
@@ -281,31 +281,31 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
   return (
     <Dialog open onOpenChange={onClose} key={col.id}>
       <DialogContent className="sm:max-w-md max-h-[88vh] overflow-y-auto p-0" dir="rtl">
-        <div className="bg-blue-600 px-4 py-3">
+        <div className="bg-gray-100 px-4 py-3 border-b">
           <input value={draft.name} onChange={e => update("name", e.target.value)}
             placeholder="שם העמודה"
-            className="w-full bg-transparent text-white placeholder-blue-200 text-center font-semibold text-base outline-none border-none"
+            className="w-full bg-transparent text-gray-800 placeholder-gray-400 text-center font-semibold text-base outline-none border-none"
             dir="rtl" />
         </div>
 
         <div className="px-4 py-3 space-y-3">
-          <div className="bg-blue-500 rounded">
+          <div className="bg-gray-50 border rounded">
             <input value={draft.description || ""} onChange={e => update("description", e.target.value)}
               placeholder="תיאור"
-              className="w-full bg-transparent text-white placeholder-blue-200 text-center text-sm outline-none border-none px-3 py-2"
+              className="w-full bg-transparent text-gray-600 placeholder-gray-400 text-center text-sm outline-none border-none px-3 py-2"
               dir="rtl" />
           </div>
 
           {/* Count mode toggle — compact */}
-          <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-            <span className="text-xs text-blue-700 font-medium whitespace-nowrap ml-auto">אופן ספירה:</span>
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+            <span className="text-xs text-gray-700 font-medium whitespace-nowrap ml-auto">אופן ספירה:</span>
             <button
               type="button"
               onClick={() => update("count_mode", "per_worker")}
               className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
                 (!draft.count_mode || draft.count_mode === "per_worker")
-                  ? "bg-blue-700 text-white border-blue-700"
-                  : "bg-white text-blue-700 border-blue-300 hover:border-blue-500"
+                  ? "bg-gray-800 text-white border-gray-800"
+                  : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
               }`}
             >
               לאיש צוות
@@ -315,8 +315,8 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
               onClick={() => update("count_mode", "per_shift")}
               className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
                 draft.count_mode === "per_shift"
-                  ? "bg-blue-700 text-white border-blue-700"
-                  : "bg-white text-blue-700 border-blue-300 hover:border-blue-500"
+                  ? "bg-gray-800 text-white border-gray-800"
+                  : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
               }`}
             >
               לקריטריון
@@ -336,8 +336,8 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
                     onClick={() => update("criteria_logic", "and")}
                     className={`px-3 py-0.5 rounded text-xs border transition-colors ${
                       (draft.criteria_logic || "or") === "and"
-                        ? "bg-blue-700 text-white border-blue-700"
-                        : "bg-white text-blue-700 border-blue-300 hover:border-blue-500"
+                        ? "bg-gray-800 text-white border-gray-800"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
                     }`}>
                     וגם
                   </button>
@@ -345,8 +345,8 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
                     onClick={() => update("criteria_logic", "or")}
                     className={`px-3 py-0.5 rounded text-xs border transition-colors ${
                       (draft.criteria_logic || "or") === "or"
-                        ? "bg-blue-700 text-white border-blue-700"
-                        : "bg-white text-blue-700 border-blue-300 hover:border-blue-500"
+                        ? "bg-gray-800 text-white border-gray-800"
+                        : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
                     }`}>
                     או
                   </button>
@@ -355,26 +355,26 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
             </div>
           ))}
 
-          <div className="border border-blue-200 rounded-lg bg-blue-50 overflow-hidden">
+          <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden">
             <button type="button" onClick={() => setShowCriteriaPicker(!showCriteriaPicker)}
-              className="w-full text-center px-4 py-2.5 text-sm text-blue-700 hover:bg-blue-100 transition-colors">
+              className="w-full text-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors">
               בחירת קריטריון לספירה ∨
             </button>
             {showCriteriaPicker && (
-              <div className="border-t border-blue-200 bg-blue-100 max-h-40 overflow-y-auto">
+              <div className="border-t border-gray-200 bg-gray-100 max-h-40 overflow-y-auto">
                 <button type="button" onClick={addTimeRangeCriterion}
-                  className="w-full text-right px-4 py-1.5 text-sm text-blue-900 hover:bg-blue-200 transition-colors font-medium border-b border-blue-200">
+                  className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors font-medium border-b border-gray-200">
                   טווח שעות
                 </button>
                 {qualifications.length > 0 && (
                   <button type="button" onClick={addTaskCriterion}
-                    className="w-full text-right px-4 py-1.5 text-sm text-blue-900 hover:bg-blue-200 transition-colors font-medium border-b border-blue-200">
+                    className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors font-medium border-b border-gray-200">
                     משימה
                   </button>
                 )}
                 {scheduleColumns.map(sc => (
                   <button key={sc.name} type="button" onClick={() => addCriterion(sc)}
-                    className="w-full text-right px-4 py-1.5 text-sm text-blue-900 hover:bg-blue-200 transition-colors">
+                    className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors">
                     {sc.name}
                   </button>
                 ))}
@@ -401,7 +401,7 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
               };
               onSave(cleaned);
             }}
-            className="bg-blue-700 hover:bg-blue-800 flex-1" dir="rtl">אישור</Button>
+            className="bg-green-600 hover:bg-green-700 flex-1" dir="rtl">אישור</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
