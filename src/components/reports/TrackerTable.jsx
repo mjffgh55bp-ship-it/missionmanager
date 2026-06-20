@@ -663,6 +663,29 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           );
           if (!hasWorker) return;
           
+          if (expectedRoles && expectedRoles.includes("מנהל")) {
+            const workerObj = workers.find(w => w.id === workerId);
+            if (workerObj && workerObj.nickname === "נחמן") {
+              const workerCols = (tmpl?.columns || []).filter(c => c.type === "worker");
+              console.log("[ROLE DIAG] נחמן row", row.id, "date", row.date, "effectiveDate", effectiveDate,
+                "dateRange", dateRange,
+                "hasWorker", hasWorker,
+                "workerId", workerId,
+                "workerCols", workerCols.map(tc => ({
+                  name: tc.name,
+                  role_filter: tc.role_filter,
+                  column_id: tc.column_id,
+                  valByName: row.values?.[tc.name],
+                  valById: tc.column_id ? row.values?.[tc.column_id] : undefined,
+                  matchesThisWorker: row.values?.[tc.name] === workerId || (tc.column_id && row.values?.[tc.column_id] === workerId)
+                })),
+                "expectedRoles", expectedRoles,
+                "passesMatchesCriteria", matchesCriteria(row.values, { qualification_id: row.values?.task || "" }),
+                "passesRoleMatch", workerMatchesRoleInShift(row, true, tmpl)
+              );
+            }
+          }
+          
           // Check if criteria match this row (as if it's an assignment)
           const rowAsAssignment = { qualification_id: row.values?.task || "" };
           if (!matchesCriteria(row.values, rowAsAssignment)) return;
