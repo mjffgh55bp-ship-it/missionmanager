@@ -2265,6 +2265,7 @@ export default function Matrix() {
       onMouseUp={handlePointerUp}
     >
       <div style={{ display: 'flex', flexDirection: 'row' }}>
+        {viewMode === 'weekly' && <SaturdayReferenceStrip currentDate={currentDate} filteredWorkers={filteredWorkers} satAssigned={satAssigned} satAvail={satAvail} satUnavail={satUnavail} allTemplates={allTemplates} ROW_H={ROW_H} ppm={ppm} timelineWidth={timelineWidth} isStandbyStatus={isStandbyStatus} />}
         <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
         <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
           <div className="p-2 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2 relative" dir="rtl" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
@@ -2378,7 +2379,6 @@ export default function Matrix() {
           })
         )}
       </div>
-      {viewMode === 'weekly' && <SaturdayReferenceStrip currentDate={currentDate} filteredWorkers={filteredWorkers} satAssigned={satAssigned} satAvail={satAvail} satUnavail={satUnavail} allTemplates={allTemplates} ROW_H={ROW_H} ppm={ppm} timelineWidth={timelineWidth} isStandbyStatus={isStandbyStatus} />}
       </div>
     </div>
   );
