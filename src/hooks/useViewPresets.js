@@ -35,7 +35,7 @@ export default function useViewPresets() {
   }, [presets, save]);
 
   const updatePreset = useCallback((id, { name, workerIds }) => {
-    const next = presets.map(p => p.id === id ? { ...p, name, workerIds } : p);
+    const next = presets.map(p => p.id === id ? { ...p, ...(name !== undefined ? { name } : {}), ...(workerIds !== undefined ? { workerIds } : {}) } : p);
     save(next);
   }, [presets, save]);
 

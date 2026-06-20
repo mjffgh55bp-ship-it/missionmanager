@@ -101,9 +101,6 @@ export default function Matrix() {
   const setCurrentDate = (d) => _setSavedDate(d instanceof Date ? d.toISOString() : d);
 
   const [viewMode, setViewMode] = usePageState("matrix", "viewMode", "daily");
-  const [populationFilter, setPopulationFilter] = usePageState("matrix", "populationFilter", "__all__");
-  const [roleFilter, setRoleFilter] = usePageState("matrix", "roleFilter", "__all__");
-  const [statusFilter, setStatusFilter] = usePageState("matrix", "statusFilter", "__all__");
 
   // ── Pin state ────────────────────────────────────────────────────────────────
   const [pinned, setPinned] = useState(() => {
@@ -444,6 +441,10 @@ export default function Matrix() {
   const handleOpenEditPreset = (preset) => {
     setEditingPreset(preset);
     setShowPresetDialog(true);
+  };
+
+  const handleRenamePreset = (id, name) => {
+    updatePreset(id, { name });
   };
 
   const handleRemovePreset = (id) => {
@@ -1853,10 +1854,8 @@ export default function Matrix() {
   // ── Filtered workers ──────────────────────────────────────────────────────────
   const filteredWorkers = useMemo(() => workers.filter(w => {
     if (activePreset && !activePreset.workerIds.includes(w.id)) return false;
-    if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
-    if (roleFilter !== "__all__") { const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []); if (!roles.includes(roleFilter)) return false; }
     return true;
-  }), [workers, populationFilter, roleFilter, activePreset]);
+  }), [workers, activePreset]);
   filteredWorkersRef.current = filteredWorkers;
 
   const handleRowClick = useCallback((e, worker, index) => {
@@ -2136,7 +2135,7 @@ export default function Matrix() {
                 </Tooltip>
               </TooltipProvider>
               <MasterControls
-                workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
+                workers={workers}
                 getWorkerSendStatus={getWorkerSendStatus}
                 onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
                 onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
@@ -2252,7 +2251,7 @@ export default function Matrix() {
               </Tooltip>
             </TooltipProvider>
             <MasterControls
-              workers={workers} populationFilter={populationFilter} roleFilter={roleFilter}
+              workers={workers}
               getWorkerSendStatus={getWorkerSendStatus}
               onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
               onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
@@ -2397,10 +2396,6 @@ export default function Matrix() {
           <MatrixHeader
             currentDate={currentDate} setCurrentDate={setCurrentDate}
             viewMode={viewMode} setViewMode={setViewMode}
-            populationFilter={populationFilter} setPopulationFilter={setPopulationFilter}
-            roleFilter={roleFilter} setRoleFilter={setRoleFilter}
-            statusFilter={statusFilter} setStatusFilter={setStatusFilter}
-            populations={populations} workerRoles={workerRoles} shiftStatuses={shiftStatuses}
             signupMode={signupMode} saveSignupMode={saveSignupMode} savingSignupMode={savingSignupMode}
             onToday={goToToday}
             presets={presets}
@@ -2408,7 +2403,7 @@ export default function Matrix() {
             activePreset={activePreset}
             onTogglePreset={togglePreset}
             onAddPreset={handleOpenCreatePreset}
-            onEditPreset={handleOpenEditPreset}
+            onRenamePreset={handleRenamePreset}
             onRemovePreset={handleRemovePreset}
           />
         </Card>

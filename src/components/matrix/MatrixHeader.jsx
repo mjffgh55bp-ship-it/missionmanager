@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
-import { ChevronLeft, ChevronRight, Star, Check, Ban, Calendar, CalendarDays, Plus, Pencil, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star, Check, Calendar, CalendarDays, Plus, Pencil, X, Trash2 } from "lucide-react";
 import { format, startOfWeek, endOfWeek, addDays, subDays, differenceInDays } from "date-fns";
 
 const getCustomWeekNumber = (date) => {
@@ -23,15 +23,6 @@ export default function MatrixHeader({
   setCurrentDate,
   viewMode,
   setViewMode,
-  populationFilter,
-  setPopulationFilter,
-  roleFilter,
-  setRoleFilter,
-  statusFilter,
-  setStatusFilter,
-  populations,
-  workerRoles,
-  shiftStatuses,
   signupMode,
   saveSignupMode,
   savingSignupMode,
@@ -41,17 +32,42 @@ export default function MatrixHeader({
   activePreset,
   onTogglePreset,
   onAddPreset,
-  onEditPreset,
+  onRenamePreset,
   onRemovePreset,
 }) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
   const weekNum = getCustomWeekNumber(weekStart);
+  const [editMode, setEditMode] = useState(false);
+  const [editNames, setEditNames] = useState({});
+
+  const enterEditMode = () => {
+    const names = {};
+    presets.forEach(p => { names[p.id] = p.name; });
+    setEditNames(names);
+    setEditMode(true);
+  };
+
+  const exitEditMode = () => {
+    setEditMode(false);
+    setEditNames({});
+  };
+
+  const handleSaveName = (presetId) => {
+    if (editNames[presetId]?.trim()) {
+      onRenamePreset(presetId, editNames[presetId].trim());
+    }
+  };
+
+  const handleDeletePreset = (presetId) => {
+    if (window.confirm("למחוק תצוגה זו?")) {
+      onRemovePreset(presetId);
+    }
+  };
 
   return (
     <div className="flex items-center gap-2 flex-wrap py-2 px-4 border-b bg-white" dir="rtl">
 
-      {/* ===== RIGHT SIDE: Title + week num + date nav + היום ===== */}
+      {/* ===== RIGHT SIDE: Title + date nav + היום ===== */}
       <div className="flex items-center gap-1.5 shrink-0">
         <span className="font-bold text-base whitespace-nowrap">
           מטריצה {viewMode === "weekly" ? "שבועית" : "יומית"}
@@ -109,63 +125,91 @@ export default function MatrixHeader({
         <Badge className="bg-cyan-100 text-cyan-800 text-[10px] px-1.5 py-0">
           <Check className="w-2.5 h-2.5 ml-0.5" />זמין
         </Badge>
-
         <Badge className="bg-purple-400 text-white text-[10px] px-1.5 py-0">שיבוץ (לוח)</Badge>
       </div>
 
-      {/* View preset pills */}
-      <div className="flex items-center gap-1 flex-wrap shrink-0">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-6 text-[10px] px-2 gap-0.5"
-          onClick={onAddPreset}
-        >
-          <Plus className="w-2.5 h-2.5" />הגדרת תצוגה חדשה
-        </Button>
-        {presets.map((p) => {
-          const isActive = p.id === activePresetId;
-          return (
-            <div
-              key={p.id}
-              className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] cursor-pointer border transition-colors ${
-                isActive
-                  ? "bg-blue-900 text-white border-blue-900"
-                  : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
-              }`}
-            >
-              <span onClick={() => onTogglePreset(p.id)} className="whitespace-nowrap">{p.name}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); onEditPreset(p); }}
-                className="hover:text-blue-300"
-                title="ערוך"
+      {/* ===== View presets: pills (normal mode) or edit list (edit mode) ===== */}
+      {!editMode ? (
+        <div className="flex items-center gap-1 flex-wrap shrink-0">
+          {presets.map((p) => {
+            const isActive = p.id === activePresetId;
+            return (
+              <div
+                key={p.id}
+                onClick={() => onTogglePreset(p.id)}
+                className={`px-2 py-0.5 rounded-full text-[10px] cursor-pointer border transition-colors whitespace-nowrap ${
+                  isActive
+                    ? "bg-blue-900 text-white border-blue-900"
+                    : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+                }`}
               >
-                <Pencil className="w-2.5 h-2.5" />
+                {p.name}
+              </div>
+            );
+          })}
+          <button
+            onClick={enterEditMode}
+            className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors shrink-0"
+            title="עריכת תצוגות"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          {activePreset && (
+            <button
+              onClick={() => onTogglePreset(activePresetId)}
+              className="text-[10px] text-blue-600 underline whitespace-nowrap shrink-0"
+            >
+              כל העובדים
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1.5 bg-gray-50 rounded-lg border p-2 shrink-0 min-w-[200px]">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-gray-700">עריכת תצוגות</span>
+            <button onClick={exitEditMode} className="text-gray-400 hover:text-gray-600">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {presets.map((p) => (
+            <div key={p.id} className="flex items-center gap-1">
+              <Input
+                value={editNames[p.id] || ""}
+                onChange={(e) => setEditNames(prev => ({ ...prev, [p.id]: e.target.value }))}
+                className="h-7 text-xs"
+                dir="rtl"
+              />
+              <button
+                onClick={() => handleSaveName(p.id)}
+                disabled={!editNames[p.id]?.trim()}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 shrink-0"
+              >
+                שמור
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); if (window.confirm("למחוק תצוגה זו?")) onRemovePreset(p.id); }}
-                className="hover:text-red-500"
+                onClick={() => handleDeletePreset(p.id)}
+                className="text-red-400 hover:text-red-600 p-0.5 shrink-0"
                 title="מחק"
               >
-                <X className="w-2.5 h-2.5" />
+                <Trash2 className="w-3 h-3" />
               </button>
             </div>
-          );
-        })}
-        {activePreset && (
-          <button
-            onClick={() => onTogglePreset(activePresetId)}
-            className="text-[10px] text-blue-600 underline whitespace-nowrap shrink-0"
+          ))}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-[10px] gap-0.5"
+            onClick={() => { onAddPreset(); exitEditMode(); }}
           >
-            כל העובדים
-          </button>
-        )}
-      </div>
+            <Plus className="w-2.5 h-2.5" />תצוגה חדשה
+          </Button>
+        </div>
+      )}
 
-      {/* Spacer pushes filters to the left */}
+      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* ===== LEFT SIDE: Filters + view toggle + signup mode ===== */}
+      {/* ===== LEFT SIDE: View toggle + signup mode ===== */}
 
       {/* View toggle */}
       <div className="flex items-center gap-1 border rounded px-2 py-1 bg-white h-7 shrink-0">
@@ -179,45 +223,6 @@ export default function MatrixHeader({
         <CalendarDays className="w-3 h-3 text-gray-500" />
         <span className="text-xs text-gray-600">שבועי</span>
       </div>
-
-      {/* Population filter */}
-      <Select value={populationFilter} onValueChange={setPopulationFilter} disabled={!!activePreset}>
-        <SelectTrigger className={`h-7 text-xs w-[130px] ${activePreset ? "opacity-50" : ""}`}>
-          <SelectValue placeholder="אוכלוסייה" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">כל האוכלוסיות</SelectItem>
-          {populations.map((pop) => (
-            <SelectItem key={pop} value={pop}>{pop}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Role filter */}
-      <Select value={roleFilter} onValueChange={setRoleFilter} disabled={!!activePreset}>
-        <SelectTrigger className={`h-7 text-xs w-[110px] ${activePreset ? "opacity-50" : ""}`}>
-          <SelectValue placeholder="תפקיד" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">כל התפקידים</SelectItem>
-          {workerRoles.map((role) => (
-            <SelectItem key={role} value={role}>{role}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      {/* Status filter */}
-      <Select value={statusFilter} onValueChange={setStatusFilter}>
-        <SelectTrigger className="h-7 text-xs w-[110px]">
-          <SelectValue placeholder="סטטוס" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__all__">כל הסטטוסים</SelectItem>
-          {shiftStatuses.map((status) => (
-            <SelectItem key={status} value={status}>{status}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
 
       {/* Signup mode toggle */}
       <button

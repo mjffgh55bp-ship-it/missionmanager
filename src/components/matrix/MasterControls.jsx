@@ -4,8 +4,6 @@ import { base44 } from "@/api/base44Client";
 
 export default function MasterControls({ 
   workers, 
-  populationFilter, 
-  roleFilter, 
   getWorkerSendStatus, 
   onSendWhatsApp,
   onSendEmail,
@@ -17,14 +15,7 @@ export default function MasterControls({
 }) {
   const [isLocking, setIsLocking] = React.useState(false);
   
-  const visibleWorkers = workers.filter(w => {
-    if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
-    if (roleFilter !== "__all__") {
-      const roles = Array.isArray(w.role) ? w.role : [w.role];
-      if (!roles.includes(roleFilter)) return false;
-    }
-    return true;
-  });
+  const visibleWorkers = workers;
 
   const allLocked = visibleWorkers.length > 0 && visibleWorkers.every(w => w.availability_locked);
 
