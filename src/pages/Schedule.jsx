@@ -542,7 +542,6 @@ export default function Schedule() {
     setMokedOrder(newOrder);
     const key = `moked_order_${dateString}`;
     const data = { setting_key: key, setting_value: JSON.stringify(newOrder) };
-    invalidateSettingsCache();
     const cachedId = appSettingsIdCache.current[key];
     if (cachedId) {
       await base44.entities.AppSettings.update(cachedId, data);
@@ -550,7 +549,10 @@ export default function Schedule() {
       const created = await base44.entities.AppSettings.create(data);
       appSettingsIdCache.current[key] = created.id;
     }
-    mokedOrderSavingRef.current = false;
+    // Keep guard active for a few seconds so the subscription-triggered
+    // loadDailyData (which fires asynchronously on every AppSettings change)
+    // does NOT overwrite the moked order we just set.
+    setTimeout(() => { mokedOrderSavingRef.current = false; }, 3000);
   };
 
   const weekStartStrForPublish = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
