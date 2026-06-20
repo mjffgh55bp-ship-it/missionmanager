@@ -411,12 +411,20 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       // Expand each candidate into both its id-form and name-form so a column carrying only
       // a role_filter name still matches a criterion that stored the mapping_id (and vice versa).
       const colRoleMatches = (col) => {
-        const rawCandidates = [col.role_mapping_id, col.role_filter, col.name].filter(Boolean);
+        // Gather role identifiers from the column itself...
+        const raw = [col.role_mapping_id, col.role_filter, col.name];
+        // ...and from the linked ScheduleColumn (template columns carry role via column_id)
+        if (col.column_id) {
+          const sc = (scheduleColumns || []).find(s => s.mapping_id === col.column_id);
+          if (sc) { raw.push(sc.role_filter, sc.name, sc.mapping_id); }
+        }
+        const rawCandidates = raw.filter(Boolean);
+        // Expand each candidate into both its id-form and name-form via the roles list
         const expanded = new Set();
         rawCandidates.forEach(c => {
           expanded.add(c);
-          if (_roleIdByName[c]) expanded.add(_roleIdByName[c]);   // c is a name → add its id
-          if (_roleNameById[c]) expanded.add(_roleNameById[c]);   // c is an id → add its name
+          if (_roleIdByName[c]) expanded.add(_roleIdByName[c]);
+          if (_roleNameById[c]) expanded.add(_roleNameById[c]);
         });
         return [...expanded].some(c => expectedRoles.includes(c));
       };
