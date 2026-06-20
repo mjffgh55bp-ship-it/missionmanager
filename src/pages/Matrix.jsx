@@ -2222,7 +2222,7 @@ export default function Matrix() {
         <div
           ref={timelineHeaderRef}
           className="flex-shrink-0 bg-gray-100 border-b"
-          style={{ height: '36px', overflowX: 'hidden', scrollbarWidth: 'none' }}
+          style={{ height: '40px', overflowX: 'hidden', scrollbarWidth: 'none' }}
           dir="ltr"
         >
           <div style={{ display: 'flex', flexDirection: 'row' }}>
