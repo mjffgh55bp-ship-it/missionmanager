@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, operationalMinutesToTime, addDaysString } from "@/lib/operationalDate";
 import { getTimelineRangeStyle, getTimelinePointStyle } from "@/lib/matrixTimeUtils";
+import { getWorkerColumnCount } from "@/lib/matrixColumnCount";
 import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut, Eye, EyeOff, FileSpreadsheet, Pencil, X } from "lucide-react";
 import { buildWhatsAppMessage } from "@/lib/whatsappShifts";
 import BriefingBar from "../components/matrix/BriefingBar";
@@ -1575,62 +1576,9 @@ export default function Matrix() {
     setSummaryColumns(cols);
   };
 
-  const getWorkerColumnCount = (workerId, column) => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekStartStr = format(weekStart, 'yyyy-MM-dd');
-    const weekEndStr = format(endOfWeek(currentDate, { weekStartsOn: 0 }), 'yyyy-MM-dd');
-    const weeklyShifts = [];
-    templateRows.forEach(row => {
-      if (!row.values) return;
-      const tmpl = allTemplates.find(t => t.id === row.template_id);
-      if (!tmpl) return;
-      const { assigned } = isWorkerAssignedToRow(row, workerId, tmpl);
-      if (!assigned) return;
-      const st = row.values?.['התחלה'] || row.values?.['שעת התחלה'];
-      const et = row.values?.['סיום'] || row.values?.['שעת סיום'];
-      if (st && et) {
-        if (row.date < weekStartStr || row.date > weekEndStr) return;
-        weeklyShifts.push({ date: row.date, start_time: st, end_time: et, status: row.values?.status || null, food_cart_name: allTemplates.find(t => t.id === row.template_id)?.name || row.template_name || '' });
-      }
-    });
-    if (column.criteria_type === 'total_shifts') return weeklyShifts.length;
-    if (column.criteria_type === 'status') return weeklyShifts.filter(s => s.status === column.criteria_value).length;
-    if (column.criteria_type === 'food_cart') return weeklyShifts.filter(s => s.food_cart_name === column.criteria_value).length;
-    if (column.criteria_type === 'time_range') {
-      const [from, to] = (column.criteria_value || '').split('-');
-      if (!from || !to) return 0;
-      const fromOp = getOperationalMinutes(from);
-      const toOp = getOperationalMinutes(to) || 1440;
-      return weeklyShifts.filter(s => {
-        const sStart = getOperationalMinutes(s.start_time);
-        const sEnd = getOperationalEndMinutes(s.start_time, s.end_time);
-        return sStart < toOp && sEnd > fromOp;
-      }).length;
-    }
-    if (column.criteria_type === 'schedule_col') {
-      const [colName, criterion] = (column.criteria_value || '').split('|||');
-      if (!colName) return 0;
-      let count = 0;
-      templateRows.forEach(row => {
-        if (!row.values || row.date < weekStartStr || row.date > weekEndStr) return;
-        const tmpl = allTemplates.find(t => t.id === row.template_id);
-        if (!tmpl) return;
-        const { assigned } = isWorkerAssignedToRow(row, workerId, tmpl);
-        if (!assigned) return;
-        const cellVal = row.values[colName];
-        if (!criterion) { if (cellVal) count++; }
-        else { const valStr = Array.isArray(cellVal) ? cellVal.join(',') : (cellVal || ''); if (valStr.includes(criterion)) count++; }
-      });
-      return count;
-    }
-    if (column.criteria_type === 'tracker_col') {
-      const [trackerId, columnId] = (column.criteria_value || '').split('|||');
-      if (!trackerId || !columnId) return 0;
-      const entry = trackerEntries.find(e => e.tracker_id === trackerId && e.worker_id === workerId && e.column_id === columnId);
-      return entry ? (parseFloat(entry.value) || entry.value || 0) : 0;
-    }
-    return 0;
-  };
+  const columnCount = (workerId, column) => getWorkerColumnCount(column, workerId, {
+    templateRows, allTemplates, workerQualifications, currentDate, trackerEntries
+  });
 
   const AssignmentBar = ({ assignment }) => {
     const positionDate = assignment.operational_date || assignment.schedule_date || assignment.date;
@@ -2002,7 +1950,7 @@ export default function Matrix() {
 
   const renderSummaryCell = (worker, col, index, isSelected) => (
     <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ height: `${ROW_H}px` }}>
-      <span className="text-xs font-bold text-gray-700">{getWorkerColumnCount(worker.id, col)}</span>
+      <span className="text-xs font-bold text-gray-700">{columnCount(worker.id, col)}</span>
     </div>
   );
 
@@ -2450,7 +2398,7 @@ export default function Matrix() {
           </button>
         </div>
 
-        <SummaryColumnsDialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog} summaryColumns={summaryColumns} saveSummaryColumns={saveSummaryColumns} shiftStatuses={shiftStatuses} scheduleParams={scheduleParams} trackers={trackers} />
+        <SummaryColumnsDialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog} summaryColumns={summaryColumns} saveSummaryColumns={saveSummaryColumns} shiftStatuses={shiftStatuses} scheduleParams={scheduleParams} trackers={trackers} qualifications={qualifications} allTemplates={allTemplates} templateRows={templateRows} />
         <ViewPresetDialog
           open={showPresetDialog}
           onClose={() => { setShowPresetDialog(false); setEditingPreset(null); }}
