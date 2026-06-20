@@ -357,20 +357,30 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const computeAutoValue = (col, workerId) => {
   const dateRange = getDateRange(dateFilterMode, startDate, endDate);
 
-  // ── Worker role criteria — filter at worker level ──────────────────────
+  // ── Role criteria — filter at SHIFT level ──────────────────────────
+  // Instead of checking whether the worker HAS a role in their profile,
+  // we check whether the worker was ASSIGNED to that specific role in
+  // each individual shift. A worker might fill different roles in different shifts.
   const roleCriteria = (col.criteria || []).filter(c => c.col_name === WORKER_ROLE_COL_NAME && c.include?.length > 0);
-  if (roleCriteria.length > 0) {
-    const w = workers.find(wk => wk.id === workerId);
-    const wRoles = w ? (Array.isArray(w.role) ? w.role : (w.role ? [w.role] : [])) : [];
-    const roleLogic = col.criteria_logic || "or";
-    const matchesOne = (c) => c.include.some(r => wRoles.includes(r));
-    const passes = roleLogic === "and" ? roleCriteria.every(c => matchesOne(c)) : roleCriteria.some(c => matchesOne(c));
-    if (!passes) {
-      if (col.type === "count_quantitative") return {};
-      if (col.type === "count_by_task") return col.task_list?.length > 0 ? Object.fromEntries(col.task_list.map(t => [t, 0])) : 0;
-      return 0;
+  const expectedRoles = roleCriteria.length > 0 ? roleCriteria.flatMap(c => c.include) : null;
+  
+  // Helper: check if the worker was assigned to a matching role in a given shift
+  const workerMatchesRoleInShift = (shiftData, isTemplateRow = false, template = null) => {
+    if (!expectedRoles) return true;
+    if (isTemplateRow && template) {
+      const workerCols = (template.columns || []).filter(c => c.type === "worker" && c.column_id);
+      return workerCols.some(tc => {
+        if (shiftData.values?.[tc.name] !== workerId) return false;
+        const sc = scheduleColumns.find(s => s.mapping_id === tc.column_id);
+        return sc && expectedRoles.includes(sc.role_filter);
+      });
     }
-  }
+    const vals = shiftData.column_values || {};
+    return scheduleColumns.some(sc => {
+      if (sc.type !== "worker" || !expectedRoles.includes(sc.role_filter)) return false;
+      return vals[sc.name] === workerId;
+    });
+  };
 
   // Get the actual cell values for a schedule column (supports old string + new JSON)
     const getCellVals = (vals, colName) => {
@@ -557,7 +567,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     });
 
     if (col.type === "shifts_count") {
-      return filtered.filter(a => matchesCriteria(a.column_values, a)).length;
+      return filtered.filter(a => matchesCriteria(a.column_values, a) && workerMatchesRoleInShift(a)).length;
     }
 
     if (col.type === "schedule_col") {
@@ -593,6 +603,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const includeItems = quantCriteria.flatMap(c => c.include);
         filtered.forEach(a => {
           if (!checkTimeRange(a.start_time, a.end_time)) return;
+          if (!workerMatchesRoleInShift(a)) return;
           const raw = a.column_values?.[colName];
           if (!raw) return;
           const parsed = parseQuantJson(raw);
@@ -608,6 +619,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           if (dateRange && (effectiveDate < dateRange.start || effectiveDate > dateRange.end)) return;
           if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
           if (!checkTimeRange(rowStartTime, rowEndTime)) return;
+          if (!workerMatchesRoleInShift(row, true, tmpl)) return;
           const raw = row.values?.[colName];
           if (!raw) return;
           const parsed = parseQuantJson(raw);
@@ -616,6 +628,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       } else {
         filtered.forEach(a => {
           if (!matchesCriteria(a.column_values, a)) return;
+          if (!workerMatchesRoleInShift(a)) return;
           // If criteria include time range, only count hours within that range
           const timeRangeCriteria = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
           if (timeRangeCriteria && timeRangeCriteria.include?.length > 0) {
@@ -641,6 +654,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           // Check if criteria match this row (as if it's an assignment)
           const rowAsAssignment = { qualification_id: row.values?.task || "" };
           if (!matchesCriteria(row.values, rowAsAssignment)) return;
+          if (!workerMatchesRoleInShift(row, true, tmpl)) return;
           
           // If criteria include time range, only count hours within that range
           const timeRangeCriteria = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
@@ -661,6 +675,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       let count = 0;
       filtered.forEach(a => {
         if (!matchesColValueFilter(a.column_values, col.schedule_col_name, a)) return;
+        if (!workerMatchesRoleInShift(a)) return;
         count++;
       });
       templateRows.forEach(row => {
@@ -671,7 +686,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         if (!tmpl) return;
         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
         const rowAsAssignment = { qualification_id: row.values?.task || "" };
-        if (matchesColValueFilter(row.values, col.schedule_col_name, rowAsAssignment)) count++;
+        if (!matchesColValueFilter(row.values, col.schedule_col_name, rowAsAssignment)) return;
+        if (!workerMatchesRoleInShift(row, true, tmpl)) return;
+        count++;
       });
       return count;
     }
@@ -683,6 +700,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
        taskList.forEach(taskId => { result[taskId] = 0; });
        filtered.forEach(a => {
          if (a.qualification_id && taskList.includes(a.qualification_id)) {
+           if (!workerMatchesRoleInShift(a)) return;
            result[a.qualification_id] += a.hours || 0;
          }
        });
@@ -741,6 +759,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
        filtered.forEach(a => {
          if (!checkQuantCriteria(a.column_values)) return;
          if (!checkTimeRangeCriteria(a.start_time, a.end_time)) return;
+         if (!workerMatchesRoleInShift(a)) return;
 
          const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
          const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
@@ -762,11 +781,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
          if (!checkQuantCriteria(row.values)) return;
          if (!checkTimeRangeCriteria(startTime, endTime)) return;
+         if (!workerMatchesRoleInShift(row, true, tmpl)) return;
 
          const raw = row.values?.[col.schedule_col_name];
          const parsed = parseQuantJson(typeof raw === "string" ? raw : null);
          opts.forEach(o => { counts[o] += parsed[o] || 0; });
-       });
+         });
 
       return counts;
     }
