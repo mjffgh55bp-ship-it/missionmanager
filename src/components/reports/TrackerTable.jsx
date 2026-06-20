@@ -406,27 +406,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const workerMatchesRoleInShift = (shiftData, isTemplateRow = false, template = null) => {
       if (!expectedRoles) return true;
 
-      // A column matches if ANY of its role identifiers (stable id, role_filter name, or column name)
-      // appears in expectedRoles. expectedRoles may contain ids and/or names (mixed during migration).
-      // Expand each candidate into both its id-form and name-form so a column carrying only
-      // a role_filter name still matches a criterion that stored the mapping_id (and vice versa).
       const colRoleMatches = (col) => {
-        // Gather role identifiers from the column itself...
-        const raw = [col.role_mapping_id, col.role_filter, col.name];
-        // ...and from the linked ScheduleColumn (template columns carry role via column_id)
-        if (col.column_id) {
-          const sc = (scheduleColumns || []).find(s => s.mapping_id === col.column_id);
-          if (sc) { raw.push(sc.role_filter, sc.name, sc.mapping_id); }
-        }
-        const rawCandidates = raw.filter(Boolean);
-        // Expand each candidate into both its id-form and name-form via the roles list
-        const expanded = new Set();
-        rawCandidates.forEach(c => {
-          expanded.add(c);
-          if (_roleIdByName[c]) expanded.add(_roleIdByName[c]);
-          if (_roleNameById[c]) expanded.add(_roleNameById[c]);
-        });
-        return [...expanded].some(c => expectedRoles.includes(c));
+        // Role identity = the role's stable id carried on the column (role_mapping_id). Names are display only.
+        const colRoleId = col.role_mapping_id
+          || (col.role_filter && _roleIdByName[col.role_filter.trim()])
+          || (col.name && _roleIdByName[col.name.trim()])
+          || null;
+        if (!colRoleId) return false;
+        // expectedRoles holds selected role ids (and possibly legacy names). Match by id; allow a name match only as legacy fallback.
+        if (expectedRoles.includes(colRoleId)) return true;
+        const colRoleName = _roleNameById[colRoleId];
+        return colRoleName ? expectedRoles.includes(colRoleName) : false;
       };
 
       if (isTemplateRow && template) {

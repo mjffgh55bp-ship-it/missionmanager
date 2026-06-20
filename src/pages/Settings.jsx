@@ -273,6 +273,54 @@ export default function Settings() {
         })();
       }
 
+      // ── One-time backfill: stamp role_mapping_id on MokedPreset + Template worker columns ──
+      const presetRoleMidDone = localStorage.getItem('preset_role_mid_v1');
+      if (!presetRoleMidDone) {
+        (async () => {
+          try {
+            const workerRolesSetting = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
+            const roleList = workerRolesSetting.length > 0 ? (JSON.parse(workerRolesSetting[0].setting_value) || []) : [];
+            const roleIdByName = {};
+            roleList.forEach(r => { if (!r.mapping_id) return; const n = typeof r === "string" ? r : r.name; if (n) roleIdByName[n.trim()] = r.mapping_id; });
+
+            // MokedPresets
+            const allPresets = await base44.entities.MokedPreset.list('created_date', 500);
+            const presetsToUpdate = [];
+            for (const p of allPresets) {
+              const cfg = p.template_config || {};
+              let changed = false;
+              const updatedCols = (cfg.columns || []).map(col => {
+                if (col.type !== "worker" || col.role_mapping_id) return col;
+                const roleName = (col.role_filter || col.name || "").trim();
+                const mid = roleIdByName[roleName];
+                if (mid) { changed = true; return { ...col, role_mapping_id: mid }; }
+                return col;
+              });
+              if (changed) presetsToUpdate.push({ id: p.id, template_config: { ...cfg, columns: updatedCols } });
+            }
+            await Promise.all(presetsToUpdate.map(p => base44.entities.MokedPreset.update(p.id, { template_config: p.template_config })));
+
+            // Templates (high limit — there are 303+)
+            const allTemplatesData = await base44.entities.Template.list('created_date', 1000);
+            const tmplsToUpdate = [];
+            for (const t of allTemplatesData) {
+              let changed = false;
+              const updatedCols = (t.columns || []).map(col => {
+                if (col.type !== "worker" || col.role_mapping_id) return col;
+                const roleName = (col.role_filter || col.name || "").trim();
+                const mid = roleIdByName[roleName];
+                if (mid) { changed = true; return { ...col, role_mapping_id: mid }; }
+                return col;
+              });
+              if (changed) tmplsToUpdate.push({ id: t.id, columns: updatedCols });
+            }
+            await Promise.all(tmplsToUpdate.map(t => base44.entities.Template.update(t.id, { columns: t.columns })));
+
+            localStorage.setItem('preset_role_mid_v1', '1');
+          } catch (e) { console.error("preset role_mapping_id backfill failed:", e); }
+        })();
+      }
+
       setWorkers(workersData);
     } catch (err) {
       console.error("loadSettings failed:", err);
