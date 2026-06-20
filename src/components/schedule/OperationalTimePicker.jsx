@@ -135,6 +135,7 @@ export default function OperationalTimePicker({
   const hourRef = useRef(null);
   const minRef = useRef(null);
   const autoClosedRef = useRef(false);
+  const clickSlotRef = useRef(0);
 
   const parsed = parseTimeCellLocal(value);
   const [localHourValue, setLocalHourValue] = useState(parsed.hourValue);
@@ -150,10 +151,10 @@ export default function OperationalTimePicker({
     // Pre-fill slots if the stored value is a plain "HH:MM"
     if (parsed.hourValue && !parsed.hourValue.startsWith("-1") && !parsed.hourValue.startsWith("+") && parsed.min) {
       setSlots([parsed.hourValue[0] || " ", parsed.hourValue[1] || " ", parsed.min[0] || " ", parsed.min[1] || " "]);
-      setCursor(0);
+      setCursor(clickSlotRef.current);
     } else {
       setSlots([" ", " ", " ", " "]);
-      setCursor(0);
+      setCursor(clickSlotRef.current);
     }
   }, [open]);
 
@@ -319,7 +320,19 @@ export default function OperationalTimePicker({
           tabIndex={0}
           dir="ltr"
           onKeyDown={handleKeyDown}
-          onClick={() => inputRef.current?.focus()}
+          onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const relX = (e.clientX - rect.left) / rect.width;
+            // 4 slots + colon: 0-22% slot0, 22-45% slot1, 45-58% colon→slot1, 58-80% slot2, 80-100% slot3
+            let s;
+            if (relX < 0.22) s = 0;
+            else if (relX < 0.45) s = 1;
+            else if (relX < 0.58) s = 1;
+            else if (relX < 0.80) s = 2;
+            else s = 3;
+            clickSlotRef.current = s;
+            inputRef.current?.focus();
+          }}
           className={triggerClass + " flex items-center justify-center gap-0 font-mono cursor-text outline-none" + (open ? " bg-blue-50 ring-1 ring-blue-400" : "")}
         >
           {open ? (
