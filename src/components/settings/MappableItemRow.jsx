@@ -44,6 +44,7 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
   const [expanded, setExpanded] = useState(false);
   const [draft, setDraft] = useState(item);
   const [saving, setSaving] = useState(false);
+  const savingRef = React.useRef(false);
 
   // Sync draft when item prop changes (after parent saves)
   useEffect(() => { setDraft(item); }, [item.name, item.mapping_id, item.export_name]);
@@ -57,18 +58,23 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
 
   const hasMappingId = !!item.mapping_id;
 
-  const handleSave = async () => {
+  const doSave = async (data) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
-      await onSave({ ...draft, mapping_id: (draft.mapping_id || "").trim().toLowerCase() });
+      await onSave({ ...data, mapping_id: (data.mapping_id || "").trim().toLowerCase() });
       setExpanded(false);
     } catch (e) {
       console.error("MappableItemRow save failed:", e);
       alert("שגיאה בשמירה. נסה שוב.");
     } finally {
       setSaving(false);
+      savingRef.current = false;
     }
   };
+
+  const handleSave = () => doSave(draft);
 
   const handleCancel = () => {
     setDraft(item);
@@ -125,12 +131,10 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
               <Input
                 value={draft.name}
                 onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
-                onBlur={async e => {
+                onBlur={e => {
                   const newName = e.target.value.trim();
                   if (newName && newName !== item.name) {
-                    setSaving(true);
-                    await onSave({ ...draft, name: newName });
-                    setSaving(false);
+                    doSave({ ...draft, name: newName });
                   }
                 }}
                 onKeyDown={async e => {
