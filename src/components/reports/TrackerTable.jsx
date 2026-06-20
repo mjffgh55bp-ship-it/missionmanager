@@ -368,6 +368,13 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const workerMatchesRoleInShift = (shiftData, isTemplateRow = false, template = null) => {
       if (!expectedRoles) return true;
 
+      // A column matches if ANY of its role identifiers (stable id, role_filter name, or column name)
+      // appears in expectedRoles. expectedRoles may contain ids and/or names (mixed during migration).
+      const colRoleMatches = (col) => {
+        const candidates = [col.role_mapping_id, col.role_filter, col.name].filter(Boolean);
+        return candidates.some(c => expectedRoles.includes(c));
+      };
+
       if (isTemplateRow && template) {
         const allWorkerCols = (template.columns || []).filter(c => c.type === "worker");
         return allWorkerCols.some(tc => {
@@ -375,9 +382,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           const valByName = shiftData.values?.[tc.name];
           const valById = tc.column_id ? shiftData.values?.[tc.column_id] : undefined;
           if (valByName !== workerId && valById !== workerId) return false;
-          // The column's role is its OWN role_filter; fall back to the column name for legacy/default columns.
-          const colRole = tc.role_filter || tc.name;
-          return expectedRoles.includes(colRole);
+          return colRoleMatches(tc);
         });
       }
 
@@ -385,8 +390,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       const vals = shiftData.column_values || {};
       return scheduleColumns.some(sc => {
         if (sc.type !== "worker") return false;
-        const colRole = sc.role_filter || sc.name;
-        if (!expectedRoles.includes(colRole)) return false;
+        if (!colRoleMatches(sc)) return false;
         return vals[sc.name] === workerId || (sc.mapping_id && vals[sc.mapping_id] === workerId);
       });
     };
