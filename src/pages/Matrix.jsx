@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { format, addDays, startOfWeek, endOfWeek } from "date-fns";
 import { getOperationalStartDate, getOperationalMinutes, getOperationalEndMinutes, parseTimeCellValue, operationalMinutesToTime, addDaysString } from "@/lib/operationalDate";
 import { getTimelineRangeStyle, getTimelinePointStyle } from "@/lib/matrixTimeUtils";
-import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut, Eye, EyeOff, FileSpreadsheet } from "lucide-react";
+import { Send, Star, Check, Ban, Plus, MessageCircle, ZoomIn, ZoomOut, Eye, EyeOff, FileSpreadsheet, Pencil, X } from "lucide-react";
 import { buildWhatsAppMessage } from "@/lib/whatsappShifts";
 import BriefingBar from "../components/matrix/BriefingBar";
 import MokedSignupBar from "../components/matrix/MokedSignupBar";
@@ -18,6 +18,8 @@ import SummaryColumnsDialog from "../components/matrix/SummaryColumnsDialog";
 import MatrixHeader from "../components/matrix/MatrixHeader";
 import { NotificationDialog, TypeChangeDialog, ManualShiftDialog, UnavailabilityDialog } from "../components/matrix/MatrixDialogs";
 import ClassicTimelineRow from "../components/matrix/ClassicTimelineRow";
+import useViewPresets from "../hooks/useViewPresets";
+import ViewPresetDialog from "../components/matrix/ViewPresetDialog";
 
 // ── Timeline constants ──────────────────────────────────────────────────────
 const DAILY_TOTAL_MINUTES = 24 * 60;        // 1440
@@ -196,11 +198,16 @@ export default function Matrix() {
   const [trackers, setTrackers] = useState([]);
   const [trackerEntries, setTrackerEntries] = useState([]);
   const [signupMode, setSignupMode] = useState("allow_over_sign_up");
+  const [activePresetId, setActivePresetId] = usePageState("matrix", "activePresetId", null);
   const [dailyCustomColumns, setDailyCustomColumns] = useState({});
   const [savingSignupMode, setSavingSignupMode] = useState(false);
   const [publishedWeeks, setPublishedWeeks] = useState([]);
   const [togglingPublish, setTogglingPublish] = useState(false);
   const [canManage, setCanManage] = useState(false);
+  const [showPresetDialog, setShowPresetDialog] = useState(false);
+  const [editingPreset, setEditingPreset] = useState(null);
+  const { presets, addPreset, updatePreset, removePreset } = useViewPresets();
+  const activePreset = useMemo(() => presets.find(p => p.id === activePresetId) || null, [presets, activePresetId]);
   const settingsIdCache = useRef({});
   const trackerEntriesCache = useRef(null);
 
@@ -417,6 +424,34 @@ export default function Matrix() {
 
   const zoomIn  = () => applyZoom(ppmRef.current * 1.25);
   const zoomOut = () => applyZoom(ppmRef.current * 0.8);
+
+  const handleSavePreset = (name, workerIds) => {
+    if (editingPreset) {
+      updatePreset(editingPreset.id, { name, workerIds });
+    } else {
+      addPreset(name, workerIds);
+    }
+    setEditingPreset(null);
+  };
+
+  const handleOpenCreatePreset = () => {
+    setEditingPreset(null);
+    setShowPresetDialog(true);
+  };
+
+  const handleOpenEditPreset = (preset) => {
+    setEditingPreset(preset);
+    setShowPresetDialog(true);
+  };
+
+  const handleRemovePreset = (id) => {
+    if (activePresetId === id) setActivePresetId(null);
+    removePreset(id);
+  };
+
+  const togglePreset = (id) => {
+    setActivePresetId(prev => prev === id ? null : id);
+  };
 
   const applyPreset = (preset) => {
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
@@ -1811,10 +1846,11 @@ export default function Matrix() {
 
   // ── Filtered workers ──────────────────────────────────────────────────────────
   const filteredWorkers = useMemo(() => workers.filter(w => {
+    if (activePreset && !activePreset.workerIds.includes(w.id)) return false;
     if (populationFilter !== "__all__" && w.population !== populationFilter) return false;
     if (roleFilter !== "__all__") { const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []); if (!roles.includes(roleFilter)) return false; }
     return true;
-  }), [workers, populationFilter, roleFilter]);
+  }), [workers, populationFilter, roleFilter, activePreset]);
   filteredWorkersRef.current = filteredWorkers;
 
   const handleRowClick = useCallback((e, worker, index) => {
@@ -2361,6 +2397,13 @@ export default function Matrix() {
             populations={populations} workerRoles={workerRoles} shiftStatuses={shiftStatuses}
             signupMode={signupMode} saveSignupMode={saveSignupMode} savingSignupMode={savingSignupMode}
             onToday={goToToday}
+            presets={presets}
+            activePresetId={activePresetId}
+            activePreset={activePreset}
+            onTogglePreset={togglePreset}
+            onAddPreset={handleOpenCreatePreset}
+            onEditPreset={handleOpenEditPreset}
+            onRemovePreset={handleRemovePreset}
           />
         </Card>
 
@@ -2387,6 +2430,15 @@ export default function Matrix() {
         </div>
 
         <SummaryColumnsDialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog} summaryColumns={summaryColumns} saveSummaryColumns={saveSummaryColumns} shiftStatuses={shiftStatuses} scheduleParams={scheduleParams} trackers={trackers} />
+        <ViewPresetDialog
+          open={showPresetDialog}
+          onClose={() => { setShowPresetDialog(false); setEditingPreset(null); }}
+          workers={workers}
+          populationOptions={populations}
+          roleOptions={workerRoles}
+          editingPreset={editingPreset}
+          onSave={handleSavePreset}
+        />
         <NotificationDialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog} viewMode={viewMode} currentDate={currentDate} selectedWorkerForNotification={selectedWorkerForNotification} notificationNotes={notificationNotes} setNotificationNotes={setNotificationNotes} getWorkerTemplateShifts={getWorkerTemplateShifts} getWorkerExtraTaskShifts={getWorkerExtraTaskShifts} sendNotification={sendNotification} />
         <TypeChangeDialog open={showTypeDialog} onOpenChange={setShowTypeDialog} handleChangeType={handleChangeType} />
         <ManualShiftDialog open={showManualDialog} onOpenChange={(v) => { setShowManualDialog(v); if (!v) { setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null); setEditingUnavailSource(null); } }} editingShift={editingShift || editingUnavailSource} selectedWorkerForManual={selectedWorkerForManual} manualShiftData={manualShiftData} setManualShiftData={setManualShiftData} submitManualShift={submitManualShift} deleteShift={deleteManualShift} />

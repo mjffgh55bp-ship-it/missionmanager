@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
-import { ChevronLeft, ChevronRight, Star, Check, Ban, Calendar, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star, Check, Ban, Calendar, CalendarDays, Plus, Pencil, X } from "lucide-react";
 import { format, startOfWeek, endOfWeek, addDays, subDays, differenceInDays } from "date-fns";
 
 const getCustomWeekNumber = (date) => {
@@ -36,6 +36,13 @@ export default function MatrixHeader({
   saveSignupMode,
   savingSignupMode,
   onToday,
+  presets,
+  activePresetId,
+  activePreset,
+  onTogglePreset,
+  onAddPreset,
+  onEditPreset,
+  onRemovePreset,
 }) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
@@ -106,6 +113,55 @@ export default function MatrixHeader({
         <Badge className="bg-purple-400 text-white text-[10px] px-1.5 py-0">שיבוץ (לוח)</Badge>
       </div>
 
+      {/* View preset pills */}
+      <div className="flex items-center gap-1 flex-wrap shrink-0">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 text-[10px] px-2 gap-0.5"
+          onClick={onAddPreset}
+        >
+          <Plus className="w-2.5 h-2.5" />הגדרת תצוגה חדשה
+        </Button>
+        {presets.map((p) => {
+          const isActive = p.id === activePresetId;
+          return (
+            <div
+              key={p.id}
+              className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] cursor-pointer border transition-colors ${
+                isActive
+                  ? "bg-blue-900 text-white border-blue-900"
+                  : "bg-white text-gray-700 border-gray-300 hover:border-blue-400"
+              }`}
+            >
+              <span onClick={() => onTogglePreset(p.id)} className="whitespace-nowrap">{p.name}</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); onEditPreset(p); }}
+                className="hover:text-blue-300"
+                title="ערוך"
+              >
+                <Pencil className="w-2.5 h-2.5" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); if (window.confirm("למחוק תצוגה זו?")) onRemovePreset(p.id); }}
+                className="hover:text-red-500"
+                title="מחק"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </div>
+          );
+        })}
+        {activePreset && (
+          <button
+            onClick={() => onTogglePreset(activePresetId)}
+            className="text-[10px] text-blue-600 underline whitespace-nowrap shrink-0"
+          >
+            כל העובדים
+          </button>
+        )}
+      </div>
+
       {/* Spacer pushes filters to the left */}
       <div className="flex-1" />
 
@@ -125,8 +181,8 @@ export default function MatrixHeader({
       </div>
 
       {/* Population filter */}
-      <Select value={populationFilter} onValueChange={setPopulationFilter}>
-        <SelectTrigger className="h-7 text-xs w-[130px]">
+      <Select value={populationFilter} onValueChange={setPopulationFilter} disabled={!!activePreset}>
+        <SelectTrigger className={`h-7 text-xs w-[130px] ${activePreset ? "opacity-50" : ""}`}>
           <SelectValue placeholder="אוכלוסייה" />
         </SelectTrigger>
         <SelectContent>
@@ -138,8 +194,8 @@ export default function MatrixHeader({
       </Select>
 
       {/* Role filter */}
-      <Select value={roleFilter} onValueChange={setRoleFilter}>
-        <SelectTrigger className="h-7 text-xs w-[110px]">
+      <Select value={roleFilter} onValueChange={setRoleFilter} disabled={!!activePreset}>
+        <SelectTrigger className={`h-7 text-xs w-[110px] ${activePreset ? "opacity-50" : ""}`}>
           <SelectValue placeholder="תפקיד" />
         </SelectTrigger>
         <SelectContent>
