@@ -313,11 +313,13 @@ export default function Matrix() {
   const applyZoom = useCallback((newPpmRaw, focalClientX = null) => {
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     const oldPpm = ppmRef.current;
-    if (!containerWidth || !sc) return;
+    if (!sc) return;
+    const cw = sc.clientWidth;
+    if (!cw) return;
 
     const fixedW = pinned ? 0 : (WORKER_COL_WIDTH +
       (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH + SUMMARY_ADD_COL_WIDTH : 0));
-    const available = Math.max(300, containerWidth - fixedW);
+    const available = Math.max(300, cw - fixedW);
     const ppmFit = available / totalMins;
     const newPpm = Math.max(ppmFit, newPpmRaw);
 
@@ -345,7 +347,7 @@ export default function Matrix() {
 
     setZoomPreset('custom');
     setCustomPpm(newPpm);
-  }, [containerWidth, totalMins, viewMode, summaryColumns, pinned]);
+  }, [totalMins, viewMode, summaryColumns, pinned]);
 
   useLayoutEffect(() => {
     const pending = pendingScrollRef.current;
