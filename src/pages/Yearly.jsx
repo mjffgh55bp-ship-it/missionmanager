@@ -243,20 +243,17 @@ export default function Yearly() {
     const todayDate = new Date();
     if (todayDate.getFullYear() !== currentYear) return;
     const todayStr = format(todayDate, "yyyy-MM-dd");
-    const todayIndex = yearDaysMap[todayStr];
-    if (todayIndex !== undefined) {
-      // Align today to the right edge (first visible column in RTL)
-      const scrollPosition = todayIndex * CELL_WIDTH;
-      scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
+    const el = scrollContainerRef.current.querySelector(`[data-date="${todayStr}"]`);
+    if (el) {
+      el.scrollIntoView({ block: "nearest", inline: "start" });
     }
   };
 
   const scrollToDate = (dateStr) => {
     if (!scrollContainerRef.current || !dateStr) return;
-    const idx = yearDaysMap[dateStr];
-    if (idx !== undefined) {
-      const scrollPosition = idx * CELL_WIDTH - (scrollContainerRef.current.clientWidth / 2) + (CELL_WIDTH / 2);
-      scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
+    const el = scrollContainerRef.current.querySelector(`[data-date="${dateStr}"]`);
+    if (el) {
+      el.scrollIntoView({ block: "nearest", inline: "center" });
     }
   };
 
@@ -590,9 +587,10 @@ export default function Yearly() {
                       const isShabbat = dayOfWeek === 6;
                       const isFriday = dayOfWeek === 5;
                       const hebDate = getHebrewDate(day);
-                      const isToday = format(day, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                      const dateStr = format(day, "yyyy-MM-dd");
+                      const isToday = dateStr === format(new Date(), "yyyy-MM-dd");
                       return (
-                        <div key={idx} className={`text-center text-[8px] py-1 border-l leading-tight flex flex-col justify-center ${isToday ? 'border-r-2 border-r-blue-500' : ''} ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}>
+                        <div key={idx} data-date={dateStr} className={`text-center text-[8px] py-1 border-l leading-tight flex flex-col justify-center ${isToday ? 'border-r-2 border-r-blue-500' : ''} ${isShabbat ? 'bg-amber-100' : isFriday ? 'bg-amber-50' : 'bg-gray-100'}`} style={{ width: CELL_WIDTH, minWidth: CELL_WIDTH }}>
                           <div className="font-semibold">{HEBREW_DAYS[dayOfWeek]}</div>
                           <div>{day.getDate()}</div>
                           <div className="text-gray-500">{hebDate.dayHeb}</div>
