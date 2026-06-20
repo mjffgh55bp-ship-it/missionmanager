@@ -20,6 +20,7 @@ import { NotificationDialog, TypeChangeDialog, ManualShiftDialog, Unavailability
 import ClassicTimelineRow from "../components/matrix/ClassicTimelineRow";
 import SaturdayReferenceStrip from "../components/matrix/SaturdayReferenceStrip";
 import SaturdayTimelineHeader from "../components/matrix/SaturdayTimelineHeader";
+import { AvailabilityStatsHeader, AvailabilityStatsCell, AVAILABILITY_STATS_COL_WIDTH } from "../components/matrix/AvailabilityStatsColumn";
 import TimelineHeaderComponent from "../components/matrix/TimelineHeader";
 import useViewPresets from "../hooks/useViewPresets";
 import ViewPresetDialog from "../components/matrix/ViewPresetDialog";
@@ -142,6 +143,7 @@ export default function Matrix() {
 
   const fixedColumnsWidth = useMemo(() => {
     return WORKER_COL_WIDTH +
+      (viewMode === 'weekly' ? AVAILABILITY_STATS_COL_WIDTH : 0) +
       (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH : 0) +
       (viewMode === 'weekly' ? SUMMARY_ADD_COL_WIDTH : 0);
   }, [viewMode, summaryColumns]);
@@ -319,6 +321,7 @@ export default function Matrix() {
     if (!cw) return;
 
     const fixedW = pinned ? 0 : (WORKER_COL_WIDTH +
+      (viewMode === 'weekly' ? AVAILABILITY_STATS_COL_WIDTH : 0) +
       (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH + SUMMARY_ADD_COL_WIDTH : 0));
     const available = Math.max(300, cw - fixedW);
     const ppmFit = available / totalMins;
@@ -2166,6 +2169,7 @@ export default function Matrix() {
                 togglingPublish={togglingPublish}
               />
             </div>
+            {viewMode === 'weekly' && <AvailabilityStatsHeader />}
             {viewMode === 'weekly' && summaryColumns.map(col => (
               <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1 h-full" title={col.name}>
                 <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
@@ -2209,6 +2213,7 @@ export default function Matrix() {
                   >
                     {renderWorkerCellContent(worker, index)}
                   </div>
+                  {viewMode === 'weekly' && <AvailabilityStatsCell workerId={worker.id} availabilities={availabilities} weekStartDate={weekStartDate} />}
                   {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index, isSelected))}
                   {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${rowBg}`} />}
                 </div>
@@ -2317,6 +2322,7 @@ export default function Matrix() {
                   togglingPublish={togglingPublish}
                 />
               </div>
+              {viewMode === 'weekly' && <AvailabilityStatsHeader />}
               {viewMode === 'weekly' && summaryColumns.map(col => (
                 <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1 h-full" title={col.name}>
                   <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
@@ -2355,6 +2361,7 @@ export default function Matrix() {
                   >
                     {renderWorkerCellContent(worker, index)}
                   </div>
+                  {viewMode === 'weekly' && <AvailabilityStatsCell workerId={worker.id} availabilities={availabilities} weekStartDate={weekStartDate} />}
                   {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index, isSelected))}
                   {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${rowBg}`} />}
                 </div>
