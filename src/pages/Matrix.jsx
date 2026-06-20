@@ -581,6 +581,8 @@ export default function Matrix() {
       setShiftStatuses(rawStatuses.map(s => (typeof s === "string" ? s : s.name)));
       setSummaryColumns(parseSetting("matrix_summary_columns") || []);
       setScheduleParams(parseSetting("custom_schedule_params") || []);
+      console.log('[Matrix] loaded summaryColumns:', parseSetting("matrix_summary_columns"));
+      console.log('[Matrix] loaded scheduleParams:', parseSetting("custom_schedule_params"));
       setSignupMode(parseSetting("availability_signup_mode") || "allow_over_sign_up");
       setPublishedWeeks(parseSetting("published_weeks") || []);
       // ── canManage check ─────────────────────────────────────────────────────

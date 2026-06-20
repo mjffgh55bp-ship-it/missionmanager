@@ -77,12 +77,14 @@ export function countWithCriteria(column, workerId, templateRows, allTemplates, 
   }
 
   let count = 0;
+  let assignedCount = 0;
   templateRows.forEach(row => {
     if (!row.values || row.date < weekStartStr || row.date > weekEndStr) return;
     const tmpl = allTemplates.find(t => t.id === row.template_id);
     if (!tmpl) return;
     const assigned = isWorkerInRow(row, workerId, tmpl);
     if (!assigned) return;
+    assignedCount++;
     const st = row.values?.['התחלה'] || row.values?.['שעת התחלה'];
     const et = row.values?.['סיום'] || row.values?.['שעת סיום'];
     if (!st || !et) return;
@@ -91,6 +93,7 @@ export function countWithCriteria(column, workerId, templateRows, allTemplates, 
     const match = column.criteria_logic === 'and' ? results.every(Boolean) : results.some(Boolean);
     if (match) count++;
   });
+  console.log('[matrixColumnCount] workerId:', workerId, 'column:', column.name, 'criteria:', JSON.stringify(column.criteria), 'assignedRows:', assignedCount, 'matchCount:', count);
   return count;
 }
 
@@ -183,7 +186,11 @@ export function countLegacy(column, workerId, templateRows, allTemplates, curren
  * Supports both old (criteria_type/criteria_value) and new (criteria array) formats.
  */
 export function getWorkerColumnCount(column, workerId, { templateRows, allTemplates, workerQualifications, currentDate, trackerEntries }) {
-  if (column.criteria && Array.isArray(column.criteria)) {
+  if (column.criteria && Array.isArray(column.criteria) && column.criteria.length > 0) {
+    return countWithCriteria(column, workerId, templateRows, allTemplates, workerQualifications, currentDate);
+  }
+  if (column.criteria && Array.isArray(column.criteria) && column.criteria.length === 0) {
+    // Empty criteria = count all shifts (same as no-criteria, but through criteria path)
     return countWithCriteria(column, workerId, templateRows, allTemplates, workerQualifications, currentDate);
   }
   return countLegacy(column, workerId, templateRows, allTemplates, currentDate, trackerEntries);
