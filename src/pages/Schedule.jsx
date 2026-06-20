@@ -172,7 +172,10 @@ export default function Schedule() {
   };
 
   const loadDailyData = async (weekChanged = false) => {
+    if (isLoadingDaily.current) return;
+    isLoadingDaily.current = true;
     setDailyLoading(true);
+    try {
     const dateString = format(currentDate, "yyyy-MM-dd");
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, "yyyy-MM-dd");
@@ -227,7 +230,10 @@ export default function Schedule() {
     allSettings.forEach(s => { appSettingsIdCache.current[s.setting_key] = s.id; });
     setPublishedWeeks(parseSetting(allSettings, "published_weeks", []));
     applyDailyData({ dateString, templateRowsData, allTemplatesData: freshTemplates, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
+    } finally {
     setDailyLoading(false);
+    isLoadingDaily.current = false;
+    }
   };
 
   const applyStaticData = ({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData }) => {
@@ -556,6 +562,8 @@ export default function Schedule() {
       }
     }, 500);
   };
+
+  const isLoadingDaily = useRef(false);
 
   const saveMokedOrder = async (newOrder) => {
     mokedOrderSavingRef.current = true;
