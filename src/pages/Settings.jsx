@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check, Calendar, UserCog, Link, Wand2, AlertTriangle, Search } from "lucide-react";
+import { Save, Users, X, Plus, Columns, Settings as SettingsIcon, ClipboardList, Pencil, Check, Calendar, UserCog, Link, Wand2, AlertTriangle, Search, FileSearch } from "lucide-react";
 import MappingSettings from "@/components/settings/MappingSettings";
 import ConfirmDeleteButton from "@/components/ui/ConfirmDeleteButton";
 import { Badge } from "@/components/ui/badge";
@@ -988,9 +988,15 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">הגדרות</h1>
-          <p className="text-gray-600" dir="rtl">הגדר הגדרות כלל מערכת</p>
+        <div className="mb-6 flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2" dir="rtl">הגדרות</h1>
+            <p className="text-gray-600" dir="rtl">הגדר הגדרות כלל מערכת</p>
+          </div>
+          <a href="/RoleRepairPreview" className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <FileSearch className="w-4 h-4" />
+            תצוגה מקדימה לתיקון תפקידים
+          </a>
         </div>
 
         {/* Tab Toggle */}

@@ -57,6 +57,7 @@ import ShiftMaster from './pages/ShiftMaster';
 import Workers from './pages/Workers';
 import Yearly from './pages/Yearly.jsx';
 import DataTransfer from './pages/DataTransfer.jsx';
+import RoleRepairPreview from './pages/RoleRepairPreview.jsx';
 import __Layout from './Layout.jsx';
 
 
@@ -71,6 +72,7 @@ export const PAGES = {
     "Workers": Workers,
     "Yearly": Yearly,
     "DataTransfer": DataTransfer,
+    "RoleRepairPreview": RoleRepairPreview,
 }
 
 export const pagesConfig = {
