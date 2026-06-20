@@ -323,9 +323,9 @@ export default function OperationalTimePicker({
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const relX = (e.clientX - rect.left) / rect.width;
-            // Far left → slot0; hour zone → slot1; colon zone → slot2; minute zone → slot3
+            // Slot 0 occupies left third; slot 1 the rest of the hour half; then colon → slot2; minutes → slot3
             let s;
-            if (relX < 0.22) s = 0;
+            if (relX < 0.33) s = 0;
             else if (relX < 0.50) s = 1;
             else if (relX < 0.58) s = 2;
             else s = 3;
