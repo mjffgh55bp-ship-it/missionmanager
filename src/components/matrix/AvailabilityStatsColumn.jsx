@@ -41,10 +41,10 @@ export function AvailabilityStatsCell({ workerId, availabilities, weekStartDate 
         )}
       </div>
       <div className="flex-1 text-center border-r border-gray-200">
-        <span className="text-xs font-bold text-gray-800">{wantedCount}</span>
+        {wantedCount > 0 && <span className="text-xs font-bold text-gray-800">{wantedCount}</span>}
       </div>
       <div className="flex-1 text-center border-r border-gray-200">
-        <span className="text-xs font-bold text-gray-800">{availableCount}</span>
+        {availableCount > 0 && <span className="text-xs font-bold text-gray-800">{availableCount}</span>}
       </div>
     </div>
   );
