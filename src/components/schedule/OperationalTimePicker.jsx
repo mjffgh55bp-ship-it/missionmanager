@@ -169,7 +169,10 @@ export default function OperationalTimePicker({
 
   useEffect(() => {
     if (open) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+      setTimeout(() => {
+        inputRef.current?.focus();
+        restoreCaret(0);
+      }, 50);
     }
   }, [open]);
 
@@ -227,7 +230,6 @@ export default function OperationalTimePicker({
 
   // Hour click: fill hour slots from the roller selection
   const handleHourClick = (hourValue) => {
-    // Parse the hourValue to get display digits (handle "-1 05", "+2 18", "06" etc.)
     const parts = hourValue.split(" ");
     const numStr = parts.length > 1 ? parts[1] : parts[0];
     const next = [...slots];
@@ -238,6 +240,8 @@ export default function OperationalTimePicker({
     setLocalHourValue(hourValue);
     syncHighlightFromSlots(next);
     restoreCaret(2);
+    // Refocus the slot input so user can keep typing minutes
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   // Minute click finalizes: close + save with selected hour
@@ -246,12 +250,12 @@ export default function OperationalTimePicker({
     handleSelect(hv, m);
   };
 
-  const handleInputChange = () => {
-    // onChange is only used as fallback for paste etc. — digits are handled in onKeyDown.
-    // For paste: extract digits and fill slots left-to-right.
-    if (autoClosedRef.current) return;
-    // Minimal fallback — the input is controlled, so this only fires on paste/IME.
-    // We'll just sync slots from whatever ended up in the input.
+  // Click on the slot input → map caret index to slot, set cursor, restore visual caret
+  const handleInputClick = (e) => {
+    const idx = e.target.selectionStart ?? 0;
+    const c = caretToSlot(idx);
+    setCursor(c);
+    restoreCaret(c);
   };
 
   const handleKeyDown = (e) => {
@@ -325,42 +329,34 @@ export default function OperationalTimePicker({
     ? "w-full h-full text-xs text-center py-1 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none"
     : "w-full h-full text-sm text-center py-2 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none";
 
-  // Display: when open, show slots as "--:--" style with dashes for blanks
+  // Display helper: convert blank slot to dash for "--:--" style
   const slotChar = (ch) => ch === " " ? "-" : ch;
-  const inputDisplayValue = open
-    ? `${slotChar(slots[0])}${slotChar(slots[1])}:${slotChar(slots[2])}${slotChar(slots[3])}`
-    : (value || "");
-
-  const inputStyle = open
-    ? {}
-    : !value
-      ? { color: "#9ca3af" }
-      : {};
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
+        <div
+          className={triggerClass + " cursor-pointer select-none flex items-center justify-center" + (open ? " bg-blue-50 ring-1 ring-blue-400" : "")}
+          dir="ltr"
+        >
+          {value ? formatTimeTrigger(value) : <span style={{ color: "#9ca3af" }}>{placeholder}</span>}
+        </div>
+      </PopoverTrigger>
+
+      <PopoverContent className="w-52 p-2 z-[60]" align="center" onOpenAutoFocus={(e) => e.preventDefault()}>
+        {/* Editable slot input */}
         <input
           ref={inputRef}
           type="text"
           inputMode="numeric"
-          value={inputDisplayValue}
-          onChange={handleInputChange}
-          onSelect={(e) => setCursor(caretToSlot(e.target.selectionStart))}
-          onClick={(e) => {
-            const c = caretToSlot(e.target.selectionStart);
-            setCursor(c);
-            restoreCaret(c);
-          }}
+          readOnly
+          value={`${slotChar(slots[0])}${slotChar(slots[1])}:${slotChar(slots[2])}${slotChar(slots[3])}`}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          className={triggerClass + (open ? " bg-blue-50 ring-1 ring-blue-400" : "")}
+          onClick={handleInputClick}
           dir="ltr"
-          style={inputStyle}
+          className="w-full text-center text-lg font-mono tracking-widest mb-2 py-1 rounded ring-1 ring-blue-400 bg-blue-50 outline-none cursor-text"
         />
-      </PopoverTrigger>
 
-      <PopoverContent className="w-52 p-2 z-[60]" align="center" onOpenAutoFocus={(e) => e.preventDefault()}>
         <div className="flex gap-1 h-56" dir="ltr" onKeyDown={handleKeyDown}>
           {/* Hours roller */}
           <div ref={hourRef} className="flex-1 overflow-y-auto scroll-smooth flex flex-col">
