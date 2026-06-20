@@ -323,12 +323,11 @@ export default function OperationalTimePicker({
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const relX = (e.clientX - rect.left) / rect.width;
-            // 4 slots + colon: 0-22% slot0, 22-45% slot1, 45-58% colon→slot1, 58-80% slot2, 80-100% slot3
+            // Digit to the RIGHT of click position: 0-22%→slot1, 22-45%→slot2, 45-58%→slot2, 58-80%→slot3, 80-100%→slot3
             let s;
-            if (relX < 0.22) s = 0;
-            else if (relX < 0.45) s = 1;
-            else if (relX < 0.58) s = 1;
-            else if (relX < 0.80) s = 2;
+            if (relX < 0.22) s = 1;
+            else if (relX < 0.45) s = 2;
+            else if (relX < 0.58) s = 2;
             else s = 3;
             clickSlotRef.current = s;
             inputRef.current?.focus();
