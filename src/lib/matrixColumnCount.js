@@ -85,9 +85,6 @@ export function countWithCriteria(column, workerId, templateRows, allTemplates, 
     const assigned = isWorkerInRow(row, workerId, tmpl);
     if (!assigned) return;
     assignedCount++;
-    const st = row.values?.['התחלה'] || row.values?.['שעת התחלה'];
-    const et = row.values?.['סיום'] || row.values?.['שעת סיום'];
-    if (!st || !et) return;
 
     const results = column.criteria.map(c => evaluateCriterionForShift(c, row, workerId, workerQualifications));
     const match = column.criteria_logic === 'and' ? results.every(Boolean) : results.some(Boolean);
@@ -127,16 +124,14 @@ export function countLegacy(column, workerId, templateRows, allTemplates, curren
     const tmpl = allTemplates.find(t => t.id === row.template_id);
     if (!tmpl) return;
     if (!isWorkerInRow(row, workerId, tmpl)) return;
+    if (row.date < weekStartStr || row.date > weekEndStr) return;
     const st = row.values?.['התחלה'] || row.values?.['שעת התחלה'];
     const et = row.values?.['סיום'] || row.values?.['שעת סיום'];
-    if (st && et) {
-      if (row.date < weekStartStr || row.date > weekEndStr) return;
-      weeklyShifts.push({
-        date: row.date, start_time: st, end_time: et,
-        status: row.values?.status || null,
-        food_cart_name: tmpl.name || row.template_name || ''
-      });
-    }
+    weeklyShifts.push({
+      date: row.date, start_time: st || null, end_time: et || null,
+      status: row.values?.status || null,
+      food_cart_name: tmpl.name || row.template_name || ''
+    });
   });
 
   if (column.criteria_type === 'total_shifts') return weeklyShifts.length;
