@@ -2265,120 +2265,103 @@ export default function Matrix() {
       onMouseUp={handlePointerUp}
     >
       <div style={{ display: 'flex', flexDirection: 'row' }}>
-        <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
-        <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
-          <div className="p-2 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2 relative" dir="rtl" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button onClick={togglePin} className="absolute top-1 left-1 flex-shrink-0 text-gray-400 hover:text-green-600 transition-colors p-0.5 rounded hover:bg-green-50 z-10">
-                    <PinIcon size={13} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent dir="rtl">הקפא עמודת עובדים</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <MasterControls
-              workers={workers}
-              getWorkerSendStatus={getWorkerSendStatus}
-              onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
-              onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
-              sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
-              isWeekPublished={isCurrentWeekPublished}
-              onTogglePublish={handleTogglePublish}
-              togglingPublish={togglingPublish}
-            />
+        {/* ── Timeline (left) ── */}
+        <div dir="rtl" className="flex-shrink-0" style={{ width: `${timelineWidth}px` }}>
+          <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${timelineWidth}px` }}>
+            <div className="flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
+              {renderTimelineHeader()}
+            </div>
           </div>
-          {viewMode === 'weekly' && summaryColumns.map(col => (
-            <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1" title={col.name}>
-              <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
-            </div>
-          ))}
-          {viewMode === 'weekly' && (
-            <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center">
-              <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
-            </div>
+
+          {loading && !initialLoaded ? null : (
+            filteredWorkers.map((worker, index) => {
+              const isSelected = selectedWorkerIds.has(worker.id);
+              return renderTimelineRow(worker, index, isSelected);
+            })
           )}
-          <div className="flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
-            {renderTimelineHeader()}
-          </div>
         </div>
 
-        {loading && !initialLoaded ? (
-          <div className="text-center p-8" dir="rtl">טוען...</div>
-        ) : workersLoadFailed ? (
-          <div className="text-center p-8 text-gray-500" dir="rtl">
-            בעיית טעינה — <button className="underline" onClick={() => loadStaticData()}>נסה שוב</button>
+        {/* ── Saturday (between timeline and workers) ── */}
+        {viewMode === 'weekly' && (
+          <div className="flex-shrink-0">
+            <div className="sticky top-0 z-30 bg-gray-100 border-b" style={{ height: '40px' }}>
+              <SaturdayTimelineHeader currentDate={currentDate} ppm={ppm} />
+            </div>
+            <SaturdayReferenceStrip currentDate={currentDate} filteredWorkers={filteredWorkers} satAssigned={satAssigned} satAvail={satAvail} satUnavail={satUnavail} allTemplates={allTemplates} ROW_H={ROW_H} ppm={ppm} timelineWidth={timelineWidth} isStandbyStatus={isStandbyStatus} showHeader={false} />
           </div>
-        ) : workers.length === 0 ? (
-          <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
-        ) : (
-          filteredWorkers.map((worker, index) => {
-            const isSelected = selectedWorkerIds.has(worker.id);
-            const rowBg = isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
-            const availabilityShifts = getWorkerAvailabilityForDate(worker.id);
-            const workerTemplateShifts = (() => {
-              if (viewMode !== 'weekly') return getWorkerTemplateShifts(worker.id, dateString);
-              const wS = startOfWeek(currentDate, { weekStartsOn: 0 });
-              const all = [];
-              for (let _i = 0; _i < 7; _i++) all.push(...getWorkerTemplateShifts(worker.id, format(addDays(wS, _i), "yyyy-MM-dd")));
-              return all;
-            })();
-            const workerExtraTaskShifts = getWorkerExtraTaskShifts(worker.id);
-            const workerUnavailabilities = getWorkerUnavailabilityForDate(worker.id);
-            const workerBriefingMarkers = getWorkerBriefingMarkers(worker.id);
-            const workerMokedSignups = getWorkerMokedSignups(worker.id);
+        )}
 
-            return (
-              <div
-                key={worker.id}
-                className={`flex border-b shrink-0 cursor-pointer select-none ${rowBg}`}
-                style={{ width: `${totalMatrixWidth}px`, height: `${ROW_H}px` }}
-                onClick={e => handleRowClick(e, worker, index)}
-              >
-                <div
-                  className={`px-1 font-medium text-gray-800 border-r flex items-center gap-1 sticky left-0 z-20 h-full ${rowBg}`}
-                  style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}
-                >
-                  {renderWorkerCellContent(worker, index)}
-                </div>
-                {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index, isSelected))}
-                {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${rowBg}`} />}
-                <ClassicTimelineRow
-                  worker={worker} index={index} isSelected={isSelected} rowBg={rowBg}
-                  timelineWidth={timelineWidth} ppm={ppm} viewMode={viewMode}
-                  dateString={dateString} currentDate={currentDate}
-                  dailySlots={dailySlots} weeklySlots={weeklySlots}
-                  availabilityShifts={availabilityShifts}
-                  workerUnavailabilities={workerUnavailabilities}
-                  workerTemplateShifts={workerTemplateShifts}
-                  workerExtraTaskShifts={workerExtraTaskShifts}
-                  workerMokedSignups={workerMokedSignups}
-                  workerBriefingMarkers={workerBriefingMarkers}
-                  dragPreview={dragPreview}
-                  handleMouseDown={handleMouseDown}
-                  getDayIndexFromDate={getDayIndexFromDate}
-                  timeToPixels={timeToPixels}
-                  endTimeToPixels={endTimeToPixels}
-                  getTimelineRangeStyle={getTimelineRangeStyle}
-                  getOperationalMinutes={getOperationalMinutes}
-                  getOperationalEndMinutes={getOperationalEndMinutes}
-                  isStandbyStatus={isStandbyStatus}
-                  isWorkerAssignedToRow={isWorkerAssignedToRow}
-                  allTemplates={allTemplates}
-                  templateRows={templateRows}
-                  timesOverlap={timesOverlap}
-                  handleTypeClick={handleTypeClick}
-                  handleShiftDoubleClick={handleShiftDoubleClick}
-                  canManage={canManage}
-                  onEditUnavail={openUnavailInUnifiedDialog}
+        {/* ── Worker panel (right) ── */}
+        <div className="flex-shrink-0 bg-white" dir="rtl" style={{ width: `${fixedColumnsWidth}px`, minWidth: `${fixedColumnsWidth}px`, boxShadow: '-4px 0 8px rgba(0,0,0,0.06)' }}>
+          <div className="bg-gray-100 border-b z-10 sticky top-0" style={{ height: '40px' }}>
+            <div className="flex items-center h-full">
+              <div className="px-2 flex items-center gap-1 h-full border-r relative" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button onClick={togglePin} className="absolute top-1 left-1 flex-shrink-0 text-gray-400 hover:text-green-600 transition-colors p-0.5 rounded hover:bg-green-50 z-10">
+                        <PinIcon size={13} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent dir="rtl">הקפא עמודת עובדים</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <MasterControls
+                  workers={workers}
+                  getWorkerSendStatus={getWorkerSendStatus}
+                  onSendWhatsApp={async (visibleWorkers) => { for (const w of visibleWorkers) { await sendWhatsAppNotification(w); await new Promise(r => setTimeout(r, 500)); } }}
+                  onSendEmail={async (visibleWorkers) => { for (const w of visibleWorkers) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
+                  sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
+                  isWeekPublished={isCurrentWeekPublished}
+                  onTogglePublish={handleTogglePublish}
+                  togglingPublish={togglingPublish}
                 />
               </div>
-            );
-          })
-        )}
-      </div>
-      {viewMode === 'weekly' && <SaturdayReferenceStrip currentDate={currentDate} filteredWorkers={filteredWorkers} satAssigned={satAssigned} satAvail={satAvail} satUnavail={satUnavail} allTemplates={allTemplates} ROW_H={ROW_H} ppm={ppm} timelineWidth={timelineWidth} isStandbyStatus={isStandbyStatus} />}
+              {viewMode === 'weekly' && summaryColumns.map(col => (
+                <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1 h-full" title={col.name}>
+                  <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
+                </div>
+              ))}
+              {viewMode === 'weekly' && (
+                <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center h-full">
+                  <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {loading && !initialLoaded ? (
+            <div className="text-center p-8" dir="rtl">טוען...</div>
+          ) : workersLoadFailed ? (
+            <div className="text-center p-8 text-gray-500" dir="rtl">
+              בעיית טעינה — <button className="underline" onClick={() => loadStaticData()}>נסה שוב</button>
+            </div>
+          ) : filteredWorkers.length === 0 ? (
+            <div className="text-center p-8 text-gray-500" dir="rtl">לא נמצאו עובדים פעילים.</div>
+          ) : (
+            filteredWorkers.map((worker, index) => {
+              const isSelected = selectedWorkerIds.has(worker.id);
+              const rowBg = isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
+              return (
+                <div
+                  key={worker.id}
+                  className={`flex border-b cursor-pointer select-none ${rowBg}`}
+                  style={{ height: `${ROW_H}px` }}
+                  onClick={e => handleRowClick(e, worker, index)}
+                >
+                  <div
+                    className={`px-1 font-medium text-gray-800 border-r flex items-center gap-1 h-full ${rowBg}`}
+                    style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}
+                  >
+                    {renderWorkerCellContent(worker, index)}
+                  </div>
+                  {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index, isSelected))}
+                  {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${rowBg}`} />}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
