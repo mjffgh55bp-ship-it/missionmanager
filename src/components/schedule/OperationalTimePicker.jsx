@@ -81,16 +81,6 @@ export function formatTimeTrigger(storedValue) {
   return storedValue;
 }
 
-// ─── Slot helpers ─────────────────────────────────────────────────────────────
-// Display: "HH:MM" → string indices [0,1, 2(:), 3,4]
-const caretToSlot = (caretIdx) => {
-  if (caretIdx <= 0) return 0;
-  if (caretIdx === 1) return 1;
-  if (caretIdx >= 2 && caretIdx <= 3) return 2;
-  return 3;
-};
-const slotToCaret = (slot) => (slot <= 1 ? slot : slot + 1); // skip colon at index 2
-
 // Round a 2-digit minute string to nearest valid MINUTE
 const roundMinute = (mm) => {
   const val = parseInt(mm, 10);
@@ -171,7 +161,6 @@ export default function OperationalTimePicker({
     if (open) {
       setTimeout(() => {
         inputRef.current?.focus();
-        restoreCaret(0);
       }, 50);
     }
   }, [open]);
@@ -211,16 +200,6 @@ export default function OperationalTimePicker({
     }
   };
 
-  // ── Restore caret to slot position ──────────────────────────────────────────
-  const restoreCaret = (c) => {
-    requestAnimationFrame(() => {
-      if (inputRef.current) {
-        const target = slotToCaret(c);
-        inputRef.current.setSelectionRange(target, target);
-      }
-    });
-  };
-
   const handleSelect = (hourValue, min) => {
     const newVal = buildStoredValue(hourValue, min);
     if (!newVal) return;
@@ -239,7 +218,6 @@ export default function OperationalTimePicker({
     setCursor(2); // advance to minutes
     setLocalHourValue(hourValue);
     syncHighlightFromSlots(next);
-    restoreCaret(2);
     // Refocus the slot input so user can keep typing minutes
     setTimeout(() => inputRef.current?.focus(), 50);
   };
@@ -248,14 +226,6 @@ export default function OperationalTimePicker({
   const handleMinClick = (m) => {
     const hv = localHourValue || parsed.hourValue || "06";
     handleSelect(hv, m);
-  };
-
-  // Click on the slot input → map caret index to slot, set cursor, restore visual caret
-  const handleInputClick = (e) => {
-    const idx = e.target.selectionStart ?? 0;
-    const c = caretToSlot(idx);
-    setCursor(c);
-    restoreCaret(c);
   };
 
   const handleKeyDown = (e) => {
@@ -286,7 +256,6 @@ export default function OperationalTimePicker({
 
       const newCursor = cursor + 1;
       setCursor(newCursor);
-      restoreCaret(newCursor);
       return;
     }
 
@@ -299,7 +268,6 @@ export default function OperationalTimePicker({
       setSlots(next);
       setCursor(target);
       syncHighlightFromSlots(next);
-      restoreCaret(target);
       return;
     }
 
@@ -308,14 +276,12 @@ export default function OperationalTimePicker({
       e.preventDefault();
       const newCursor = Math.max(cursor - 1, 0);
       setCursor(newCursor);
-      restoreCaret(newCursor);
       return;
     }
     if (e.key === "ArrowRight") {
       e.preventDefault();
       const newCursor = Math.min(cursor + 1, 3);
       setCursor(newCursor);
-      restoreCaret(newCursor);
       return;
     }
   };
@@ -329,35 +295,47 @@ export default function OperationalTimePicker({
     ? "w-full h-full text-xs text-center py-1 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none"
     : "w-full h-full text-sm text-center py-2 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none";
 
-  // Display helper: convert blank slot to dash for "--:--" style
-  const slotChar = (ch) => ch === " " ? "-" : ch;
+  const SlotSpan = ({ idx }) => {
+    const ch = slots[idx] === " " ? "-" : slots[idx];
+    const isActive = open && cursor === idx;
+    return (
+      <span
+        onClick={(e) => { e.stopPropagation(); setCursor(idx); }}
+        className={
+          "inline-flex items-center justify-center w-[1ch] text-center transition-colors " +
+          (isActive ? "bg-blue-600 text-white rounded-sm" : "text-gray-900")
+        }
+      >
+        {ch}
+      </span>
+    );
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <div
-          className={triggerClass + " cursor-pointer select-none flex items-center justify-center" + (open ? " bg-blue-50 ring-1 ring-blue-400" : "")}
+          ref={inputRef}
+          tabIndex={0}
           dir="ltr"
+          onKeyDown={handleKeyDown}
+          onClick={() => inputRef.current?.focus()}
+          className={triggerClass + " flex items-center justify-center gap-0 font-mono cursor-text outline-none" + (open ? " bg-blue-50 ring-1 ring-blue-400" : "")}
         >
-          {value ? formatTimeTrigger(value) : <span style={{ color: "#9ca3af" }}>{placeholder}</span>}
+          {open ? (
+            <>
+              <SlotSpan idx={0} /><SlotSpan idx={1} />
+              <span className="mx-0.5">:</span>
+              <SlotSpan idx={2} /><SlotSpan idx={3} />
+            </>
+          ) : (
+            value ? formatTimeTrigger(value) : <span style={{ color: "#9ca3af" }}>{placeholder}</span>
+          )}
         </div>
       </PopoverTrigger>
 
       <PopoverContent className="w-52 p-2 z-[60]" align="center" onOpenAutoFocus={(e) => e.preventDefault()}>
-        {/* Editable slot input */}
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="numeric"
-          readOnly
-          value={`${slotChar(slots[0])}${slotChar(slots[1])}:${slotChar(slots[2])}${slotChar(slots[3])}`}
-          onKeyDown={handleKeyDown}
-          onClick={handleInputClick}
-          dir="ltr"
-          className="w-full text-center text-lg font-mono tracking-widest mb-2 py-1 rounded ring-1 ring-blue-400 bg-blue-50 outline-none cursor-text"
-        />
-
-        <div className="flex gap-1 h-56" dir="ltr" onKeyDown={handleKeyDown}>
+        <div className="flex gap-1 h-56" dir="ltr">
           {/* Hours roller */}
           <div ref={hourRef} className="flex-1 overflow-y-auto scroll-smooth flex flex-col">
             <div className="text-center text-[10px] text-gray-400 mb-0.5 sticky top-0 bg-white z-10">שעה</div>
