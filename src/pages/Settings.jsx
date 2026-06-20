@@ -223,6 +223,56 @@ export default function Settings() {
         })();
       }
 
+      // ── One-time backfill: ensure ScheduleColumn exists for every role ──
+      const roleSchedColDone = localStorage.getItem('role_schedcol_sync_v1');
+      if (!roleSchedColDone) {
+        (async () => {
+          try {
+            // Reload fresh ScheduleColumns in case they were modified by the mapping_id backfill above
+            const s2 = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
+            const currentCols = s2.length > 0 ? (JSON.parse(s2[0].setting_value) || []) : [];
+            const normRoles = workerRoles.map(r => typeof r === "string" ? { name: r } : r);
+            let changed = false;
+
+            for (const role of normRoles) {
+              const roleName = (role.name || "").trim();
+              if (!roleName) continue;
+
+              const exists = currentCols.some(c =>
+                c.type === "worker" && ((c.role_filter || "").trim() === roleName || (c.name || "").trim() === roleName)
+              );
+              if (exists) continue;
+
+              const colMappingId = role.mapping_id
+                ? `col_role_${role.mapping_id}`
+                : `col_role_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+              const maxOrder = Math.max(0, ...currentCols.map(c => c.sort_order || 0), 0);
+
+              currentCols.push({
+                mapping_id: colMappingId,
+                name: roleName,
+                role_filter: roleName,
+                type: "worker",
+                is_core: false,
+                sort_order: maxOrder + 1,
+              });
+              changed = true;
+            }
+
+            if (changed) {
+              const d = { setting_key: "custom_schedule_params", setting_value: JSON.stringify(currentCols) };
+              if (s2.length > 0) await base44.entities.AppSettings.update(s2[0].id, d);
+              else await base44.entities.AppSettings.create(d);
+              invalidateStaticCache();
+              setScheduleColumns(currentCols);
+            }
+
+            localStorage.setItem('role_schedcol_sync_v1', '1');
+          } catch (e) { console.error("role schedcol backfill failed:", e); }
+        })();
+      }
+
       setWorkers(workersData);
     } catch (err) {
       console.error("loadSettings failed:", err);
@@ -581,11 +631,31 @@ export default function Settings() {
 
   const handleAddWorkerRole = async () => {
     if (!newWorkerRole.trim()) return;
-    const newItem = { name: newWorkerRole.trim(), mapping_id: "", export_name: "", is_importable: true, is_exportable: true };
+    const roleMappingId = suggestMappingId(newWorkerRole.trim(), "role");
+    const newItem = { name: newWorkerRole.trim(), mapping_id: roleMappingId, export_name: "", is_importable: true, is_exportable: true };
     const updated = [...workerRoles, newItem];
     await saveListSetting("worker_roles", updated);
     setWorkerRoles(updated);
     setNewWorkerRole("");
+
+    // Auto-create ScheduleColumn for this role so it's immediately usable
+    const exists = scheduleColumns.some(c =>
+      c.type === "worker" && ((c.role_filter || "").trim() === newItem.name || (c.name || "").trim() === newItem.name)
+    );
+    if (!exists) {
+      const colMappingId = `col_role_${roleMappingId}`;
+      const maxOrder = Math.max(0, ...scheduleColumns.map(c => c.sort_order || 0), 0);
+      const newCol = {
+        mapping_id: colMappingId,
+        name: newItem.name,
+        role_filter: newItem.name,
+        type: "worker",
+        is_core: false,
+        sort_order: maxOrder + 1,
+      };
+      const updatedCols = [...scheduleColumns, newCol];
+      await saveScheduleColumns(updatedCols);
+    }
   };
 
   const handleRemoveWorkerRole = async (idx) => {
@@ -855,6 +925,22 @@ export default function Settings() {
         };
         return base44.entities.MokedPreset.update(p.id, { template_config: updatedConfig });
       }));
+
+      // ── Step 11: Update ScheduleColumn for this role ──
+      const matchRoleCol = (c) =>
+        c.type === "worker" && ((c.role_filter || "").trim() === oldName.trim() || (c.name || "").trim() === oldName.trim());
+      const colIdx = scheduleColumns.findIndex(matchRoleCol);
+      if (colIdx >= 0) {
+        const updatedCols = scheduleColumns.map(c => {
+          if (!matchRoleCol(c)) return c;
+          return {
+            ...c,
+            name: (c.name || "").trim() === oldName.trim() ? newName : c.name,
+            role_filter: (c.role_filter || "").trim() === oldName.trim() ? newName : c.role_filter,
+          };
+        });
+        await saveScheduleColumns(updatedCols);
+      }
 
       // Invalidate caches so Schedule/Availability pick up fresh data immediately
       invalidateStaticCache();
