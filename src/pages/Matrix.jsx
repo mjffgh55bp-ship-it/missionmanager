@@ -19,6 +19,7 @@ import MatrixHeader from "../components/matrix/MatrixHeader";
 import { NotificationDialog, TypeChangeDialog, ManualShiftDialog, UnavailabilityDialog } from "../components/matrix/MatrixDialogs";
 import ClassicTimelineRow from "../components/matrix/ClassicTimelineRow";
 import SaturdayReferenceStrip from "../components/matrix/SaturdayReferenceStrip";
+import SaturdayTimelineHeader from "../components/matrix/SaturdayTimelineHeader";
 import TimelineHeaderComponent from "../components/matrix/TimelineHeader";
 import useViewPresets from "../hooks/useViewPresets";
 import ViewPresetDialog from "../components/matrix/ViewPresetDialog";
@@ -2228,9 +2229,7 @@ export default function Matrix() {
             <div style={{ width: `${timelineWidth}px` }}>
               {renderTimelineHeader()}
             </div>
-            {viewMode === 'weekly' && <div style={{ width: '96px', minWidth: '96px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', background: '#f8f9fa', borderLeft: '1px solid #e5e7eb', paddingRight: '8px' }}>
-              <span className="text-xs font-bold text-gray-500">ש׳ {format(addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), -1), 'd.M')}</span>
-            </div>}
+            {viewMode === 'weekly' && <SaturdayTimelineHeader currentDate={currentDate} ppm={ppm} />}
           </div>
         </div>
 

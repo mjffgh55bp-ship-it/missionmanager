@@ -3,19 +3,12 @@ import { format, addDays, startOfWeek } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Ban } from "lucide-react";
 
-const STRIP_WIDTH = 96;
+const DAY_MINUTES = 24 * 60; // 1440
 
 const calcOpMin = (timeStr) => {
   if (!timeStr) return 0;
   const [h, m] = timeStr.split(':').map(Number);
   return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
-};
-
-const stripTimeToPx = (timeStr, ppm) => {
-  const opMin = calcOpMin(timeStr);
-  const totalStripMin = 24 * 60;
-  const scaledPPM = STRIP_WIDTH / totalStripMin;
-  return opMin * scaledPPM;
 };
 
 const getOpEndMin = (start, end) => {
@@ -33,33 +26,43 @@ export default function SaturdayReferenceStrip({
   allTemplates,
   ROW_H,
   ppm,
-  timelineWidth,
   isStandbyStatus,
   showHeader = true,
 }) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const prevSat = addDays(weekStart, -1);
   const dateStr = format(prevSat, "yyyy-MM-dd");
+  const DAY_WIDTH = 1440 * ppm;
 
   if (filteredWorkers.length === 0) return null;
 
-  const scaledPPM = STRIP_WIDTH / (24 * 60);
+  const timeToPx = (timeStr) => {
+    const opMin = calcOpMin(timeStr);
+    return opMin * ppm;
+  };
 
   return (
     <div
       className="flex-shrink-0 border-r border-gray-300 bg-gray-50/60"
-      style={{ width: `${STRIP_WIDTH}px`, minWidth: `${STRIP_WIDTH}px` }}
+      style={{ width: `${DAY_WIDTH}px`, minWidth: `${DAY_WIDTH}px` }}
       dir="rtl"
     >
-      {/* Header — only when not provided externally (e.g. pinned layout has its own) */}
+      {/* Header — two rows: date label + hours */}
       {showHeader && (
-        <div
-          className="flex items-center justify-end bg-gray-100 border-b gap-1 pr-2"
-          style={{ height: '40px' }}
-        >
-          <span className="text-[10px] font-bold text-gray-600 whitespace-nowrap">
+        <div>
+          <div className="text-center font-semibold text-gray-800 text-xs py-0.5 border-b border-gray-300">
             ש׳ {format(prevSat, "d.M")}
-          </span>
+          </div>
+          <div className="relative flex" dir="rtl" style={{ width: `${DAY_WIDTH}px` }}>
+            {Array.from({ length: 24 }, (_, i) => {
+              const hour = (i + 6) % 24;
+              return (
+                <div key={hour} className="shrink-0 text-[10px] text-gray-600 py-0.5 text-center font-medium overflow-hidden border-l border-l-gray-200" style={{ width: `${60 * ppm}px` }}>
+                  {String(hour).padStart(2, '0')}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -127,8 +130,8 @@ export default function SaturdayReferenceStrip({
           >
             {/* Hour grid lines */}
             {Array.from({ length: 24 }, (_, h) => {
-              const leftPx = h * (STRIP_WIDTH / 24);
-              if (leftPx <= 0 || leftPx >= STRIP_WIDTH) return null;
+              const leftPx = h * (DAY_WIDTH / 24);
+              if (leftPx <= 0 || leftPx >= DAY_WIDTH) return null;
               return (
                 <div
                   key={`hourline_${h}`}
@@ -141,12 +144,13 @@ export default function SaturdayReferenceStrip({
                 />
               );
             })}
+
             {/* Assigned shifts — purple */}
             {assignedBlocks.map(b => {
-              const leftPx = stripTimeToPx(b.start_time, scaledPPM);
+              const leftPx = timeToPx(b.start_time);
               const endMin = getOpEndMin(b.start_time, b.end_time);
               const startMin = calcOpMin(b.start_time);
-              const wPx = Math.max(2, (endMin - startMin) * scaledPPM);
+              const wPx = Math.max(2, (endMin - startMin) * ppm);
               const standby = isStandbyStatus(b.status);
               if (standby) {
                 return (
@@ -195,10 +199,10 @@ export default function SaturdayReferenceStrip({
 
             {/* Availability blocks — blue/green */}
             {availBlocks.map(b => {
-              const leftPx = stripTimeToPx(b.start_time, scaledPPM);
+              const leftPx = timeToPx(b.start_time);
               const endMin = getOpEndMin(b.start_time, b.end_time);
               const startMin = calcOpMin(b.start_time);
-              const wPx = Math.max(2, (endMin - startMin) * scaledPPM);
+              const wPx = Math.max(2, (endMin - startMin) * ppm);
               const borderColor = b.type === 'wanted' ? '#16a34a' : '#3b82f6';
               const bgColor = b.type === 'wanted' ? '#16a34a18' : '#3b82f618';
               return (
@@ -221,10 +225,10 @@ export default function SaturdayReferenceStrip({
 
             {/* Unavailability blocks — red/gray */}
             {unavailBlocks.map(u => {
-              const leftPx = stripTimeToPx(u.start_time, scaledPPM);
+              const leftPx = timeToPx(u.start_time);
               const endMin = getOpEndMin(u.start_time, u.end_time);
               const startMin = calcOpMin(u.start_time);
-              const wPx = Math.max(2, (endMin - startMin) * scaledPPM);
+              const wPx = Math.max(2, (endMin - startMin) * ppm);
               const isOverseas = u.reason === 'overseas';
               return (
                 <div
