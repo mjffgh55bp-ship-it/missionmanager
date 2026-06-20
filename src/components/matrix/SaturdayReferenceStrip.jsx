@@ -35,6 +35,7 @@ export default function SaturdayReferenceStrip({
   ppm,
   timelineWidth,
   isStandbyStatus,
+  showHeader = true,
 }) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const prevSat = addDays(weekStart, -1);
@@ -50,18 +51,17 @@ export default function SaturdayReferenceStrip({
       style={{ width: `${STRIP_WIDTH}px`, minWidth: `${STRIP_WIDTH}px` }}
       dir="rtl"
     >
-      {/* Header */}
-      <div
-        className="flex items-center justify-center bg-gray-100 border-b gap-1"
-        style={{ height: '40px' }}
-      >
-        <span className="text-[10px] font-bold text-gray-600 whitespace-nowrap">
-          ש׳ {format(prevSat, "d.M")}
-        </span>
-        <span className="text-[7px] text-gray-400 bg-gray-200 px-1 rounded whitespace-nowrap">
-          תצוגה בלבד
-        </span>
-      </div>
+      {/* Header — only when not provided externally (e.g. pinned layout has its own) */}
+      {showHeader && (
+        <div
+          className="flex items-center justify-end bg-gray-100 border-b gap-1 pr-2"
+          style={{ height: '40px' }}
+        >
+          <span className="text-[10px] font-bold text-gray-600 whitespace-nowrap">
+            ש׳ {format(prevSat, "d.M")}
+          </span>
+        </div>
+      )}
 
       {/* Worker rows */}
       {filteredWorkers.map((worker, index) => {
@@ -125,6 +125,22 @@ export default function SaturdayReferenceStrip({
             className={`border-b relative overflow-hidden ${rowBg}`}
             style={{ height: `${ROW_H}px` }}
           >
+            {/* Hour grid lines */}
+            {Array.from({ length: 24 }, (_, h) => {
+              const leftPx = h * (STRIP_WIDTH / 24);
+              if (leftPx <= 0 || leftPx >= STRIP_WIDTH) return null;
+              return (
+                <div
+                  key={`hourline_${h}`}
+                  className="absolute top-0 h-full pointer-events-none"
+                  style={{
+                    right: `${leftPx}px`,
+                    width: '1px',
+                    backgroundColor: 'rgba(180,180,180,0.3)',
+                  }}
+                />
+              );
+            })}
             {/* Assigned shifts — purple */}
             {assignedBlocks.map(b => {
               const leftPx = stripTimeToPx(b.start_time, scaledPPM);
