@@ -365,30 +365,31 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const expectedRoles = roleCriteria.length > 0 ? roleCriteria.flatMap(c => c.include) : null;
   
   // Helper: check if the worker was assigned to a matching role in a given shift
-  const workerMatchesRoleInShift = (shiftData, isTemplateRow = false, template = null) => {
-    if (!expectedRoles) return true;
-    if (isTemplateRow && template) {
-      const allWorkerCols = (template.columns || []).filter(c => c.type === "worker");
-      return allWorkerCols.some(tc => {
-        // Support both column-name keys and mapping_id keys in row values
-        const valByName = shiftData.values?.[tc.name];
-        const valById = tc.column_id ? shiftData.values?.[tc.column_id] : undefined;
-        if (valByName !== workerId && valById !== workerId) return false;
-        // For columns with column_id: match via schedule column's role_filter
-        if (tc.column_id) {
-          const sc = scheduleColumns.find(s => s.mapping_id === tc.column_id);
-          return sc && expectedRoles.includes(sc.role_filter);
-        }
-        // For columns without column_id: match column name directly as role name
-        return expectedRoles.includes(tc.name);
+    const workerMatchesRoleInShift = (shiftData, isTemplateRow = false, template = null) => {
+      if (!expectedRoles) return true;
+
+      if (isTemplateRow && template) {
+        const allWorkerCols = (template.columns || []).filter(c => c.type === "worker");
+        return allWorkerCols.some(tc => {
+          // Is THIS worker assigned in this column? (support name-keyed and id-keyed storage)
+          const valByName = shiftData.values?.[tc.name];
+          const valById = tc.column_id ? shiftData.values?.[tc.column_id] : undefined;
+          if (valByName !== workerId && valById !== workerId) return false;
+          // The column's role is its OWN role_filter; fall back to the column name for legacy/default columns.
+          const colRole = tc.role_filter || tc.name;
+          return expectedRoles.includes(colRole);
+        });
+      }
+
+      // Non-template (saved assignment) path
+      const vals = shiftData.column_values || {};
+      return scheduleColumns.some(sc => {
+        if (sc.type !== "worker") return false;
+        const colRole = sc.role_filter || sc.name;
+        if (!expectedRoles.includes(colRole)) return false;
+        return vals[sc.name] === workerId || (sc.mapping_id && vals[sc.mapping_id] === workerId);
       });
-    }
-    const vals = shiftData.column_values || {};
-    return scheduleColumns.some(sc => {
-      if (sc.type !== "worker" || !expectedRoles.includes(sc.role_filter)) return false;
-      return vals[sc.name] === workerId;
-    });
-  };
+    };
 
   // Get the actual cell values for a schedule column (supports old string + new JSON)
     const getCellVals = (vals, colName) => {
