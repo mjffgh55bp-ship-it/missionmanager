@@ -239,7 +239,6 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
 
   const handleAddToSchedule = async (preset) => {
     await onAddPreset(preset);
-    onOpenChange(false);
   };
 
   return (
@@ -368,12 +367,14 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
         ) : (
           /* ── List view ── */
           <div className="py-2 overflow-y-auto flex-1">
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-sm text-gray-500">{presets.length} פריסטים שמורים</span>
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-sm text-gray-500">{presets.length} פריסטים שמורים</span>
+            <div className="flex gap-2">
               <Button onClick={handleNewPreset} className="bg-blue-700 hover:bg-blue-800">
                 <Plus className="w-4 h-4 ml-1" /> פריסט חדש
               </Button>
             </div>
+          </div>
 
             {loading ? (
               <div className="text-center py-8 text-gray-500">טוען...</div>
@@ -430,6 +431,11 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                 ))}
               </div>
             )}
+            <div className="flex justify-end mt-4 pt-2 border-t">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                <X className="w-4 h-4 ml-1" /> סגור
+              </Button>
+            </div>
           </div>
         )}
       </DialogContent>
