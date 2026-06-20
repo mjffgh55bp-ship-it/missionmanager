@@ -355,6 +355,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const WORKER_ROLE_COL_NAME = "__תפקיד__";
 
   const computeAutoValue = (col, workerId) => {
+    if (workerId && workers && workers.find(w => w.id === workerId)?.nickname === "נחמן") {
+      console.log("[COL DIAG]", {
+        colName: col.name,
+        colType: col.type,
+        criteria: JSON.stringify(col.criteria),
+        criteria_logic: col.criteria_logic
+      });
+    }
   const dateRange = getDateRange(dateFilterMode, startDate, endDate);
 
   // ── Role criteria — filter at SHIFT level ──────────────────────────
