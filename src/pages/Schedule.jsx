@@ -308,13 +308,23 @@ export default function Schedule() {
           for (const template of defaultTemplates) {
             const groupId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
             const rowsToCreate = template.default_rows && template.default_rows.length > 0 ? template.default_rows : [{}];
+            // Build column_id -> column name map for translating preset-stored keys
+            const idToName = {};
+            (template.columns || []).forEach(col => {
+              if (col.column_id) idToName[col.column_id] = col.name;
+            });
             for (const rowValues of rowsToCreate) {
-              const { moked_instance_name, moked_instance_name_locked, ...cleanRowValues } = rowValues;
+              const { moked_instance_name, moked_instance_name_locked, ...rawRowValues } = rowValues;
+              // Translate column_id keys to column names
+              const translated = {};
+              for (const [key, val] of Object.entries(rawRowValues)) {
+                translated[idToName[key] || key] = val;
+              }
               await base44.entities.TemplateRow.create({
                 template_id: template.id,
                 template_name: template.name,
                 date: dateString,
-                values: cleanRowValues,
+                values: translated,
                 group_id: groupId
               });
             }
@@ -381,15 +391,25 @@ export default function Schedule() {
       ? crypto.randomUUID()
       : `group_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const rowsToCreate = config.default_rows && config.default_rows.length > 0 ? config.default_rows : [{}];
+    // Build column_id -> column name map for translating preset-stored keys
+    const idToName = {};
+    (config.columns || []).forEach(col => {
+      if (col.column_id) idToName[col.column_id] = col.name;
+    });
     const createdRows = await Promise.all(
       rowsToCreate.map((rowValues, i) => {
-        const { moked_instance_name, moked_instance_name_locked, ...cleanRowValues } = rowValues;
-        cleanRowValues._order = i;
+        const { moked_instance_name, moked_instance_name_locked, ...rawRowValues } = rowValues;
+        // Translate column_id keys to column names so the schedule can read them
+        const translated = {};
+        for (const [key, val] of Object.entries(rawRowValues)) {
+          translated[idToName[key] || key] = val;
+        }
+        translated._order = i;
         return base44.entities.TemplateRow.create({
           template_id: newTemplate.id,
           template_name: newTemplate.name,
           date: dateString,
-          values: cleanRowValues,
+          values: translated,
           group_id: newGroupId
         });
       })
