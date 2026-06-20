@@ -184,6 +184,8 @@ export default function Matrix() {
   const [editingUnavailSource, setEditingUnavailSource] = useState(null); // the Unavailability record being edited via the unified dialog
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
+  const [qualifications, setQualifications] = useState([]);
+  const [workerQualifications, setWorkerQualifications] = useState([]);
   const timelineRefs = useRef({});
   const loadingTimeoutRef = useRef(null);
   const initialLoadDoneRef = useRef(false);
@@ -546,16 +548,20 @@ export default function Matrix() {
 
   const loadStaticData = async () => {
     try {
-      const [workersData, allSettings, trackersData] = await Promise.all([
+      const [workersData, allSettings, trackersData, qualsData, workerQualsData] = await Promise.all([
         getCachedWorkers(base44.entities),
         getCachedAllSettings(base44.entities),
         base44.entities.Tracker.list('-created_date', 200),
+        base44.entities.Qualification.filter({ active: true }),
+        base44.entities.WorkerQualification.list(),
       ]);
       const parseSetting = (key) => { const s = allSettings.find(x => x.setting_key === key); return s ? JSON.parse(s.setting_value) : null; };
       const rawPops = parseSetting("worker_populations") || ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
       setPopulations(rawPops.map(p => (typeof p === "string" ? p : p.name)));
       const rawRoles = parseSetting("worker_roles") || ["שף", "סו-שף"];
       setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
+      setQualifications((qualsData || []).map(q => ({ id: q.id, name: q.name })));
+      setWorkerQualifications(workerQualsData || []);
       const rawStatuses = parseSetting("shift_statuses") || [];
       setShiftStatuses(rawStatuses.map(s => (typeof s === "string" ? s : s.name)));
       setSummaryColumns(parseSetting("matrix_summary_columns") || []);
@@ -2436,6 +2442,8 @@ export default function Matrix() {
           workers={workers}
           populationOptions={populations}
           roleOptions={workerRoles}
+          qualifications={qualifications}
+          workerQualifications={workerQualifications}
           editingPreset={editingPreset}
           onSave={handleSavePreset}
         />

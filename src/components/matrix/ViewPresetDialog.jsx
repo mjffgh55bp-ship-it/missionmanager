@@ -2,10 +2,9 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import WorkerPillFilter from "@/components/shared/WorkerPillFilter";
 
 export default function ViewPresetDialog({
   open,
@@ -13,13 +12,17 @@ export default function ViewPresetDialog({
   workers,
   populationOptions,
   roleOptions,
+  qualifications,
+  workerQualifications,
   editingPreset,
   onSave,
 }) {
   const [name, setName] = useState("");
   const [checkedIds, setCheckedIds] = useState(new Set());
-  const [populationSelect, setPopulationSelect] = useState("");
-  const [roleSelect, setRoleSelect] = useState("");
+  const [selectedPopulations, setSelectedPopulations] = useState([]);
+  const [selectedRoles, setSelectedRoles] = useState([]);
+  const [selectedQualifications, setSelectedQualifications] = useState([]);
+  const [workerSearch, setWorkerSearch] = useState("");
 
   // Prefill when editing
   useEffect(() => {
@@ -30,17 +33,33 @@ export default function ViewPresetDialog({
       setName("");
       setCheckedIds(new Set());
     }
-    setPopulationSelect("");
-    setRoleSelect("");
+    setSelectedPopulations([]);
+    setSelectedRoles([]);
+    setSelectedQualifications([]);
+    setWorkerSearch("");
   }, [editingPreset, open]);
 
-  const sortedWorkers = useMemo(
-    () => [...workers].sort((a, b) => (a.nickname || "").localeCompare(b.nickname || "")),
-    [workers]
+  // Worker matching — same logic as reports tracker filter
+  const preFilteredWorkers = useMemo(() => workers.filter(w => {
+    if (selectedPopulations.length > 0 && !selectedPopulations.includes(w.population)) return false;
+    if (selectedRoles.length > 0) {
+      const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
+      if (!selectedRoles.some(r => roles.includes(r))) return false;
+    }
+    if (selectedQualifications.length > 0) {
+      const wqIds = (workerQualifications || []).filter(wq => wq.worker_id === w.id).map(wq => wq.qualification_id);
+      if (!selectedQualifications.some(qid => wqIds.includes(qid))) return false;
+    }
+    return true;
+  }), [workers, selectedPopulations, selectedRoles, selectedQualifications, workerQualifications]);
+
+  const searchedWorkers = useMemo(() =>
+    preFilteredWorkers.filter(w => !workerSearch || (w.nickname || "").includes(workerSearch)),
+    [preFilteredWorkers, workerSearch]
   );
 
   const handleSelectAll = () => {
-    setCheckedIds(new Set(sortedWorkers.map(w => w.id)));
+    setCheckedIds(new Set(searchedWorkers.map(w => w.id)));
   };
 
   const handleClearAll = () => {
@@ -56,42 +75,27 @@ export default function ViewPresetDialog({
     });
   };
 
-  // When population dropdown changes, pre-check all matching workers
-  useEffect(() => {
-    if (!populationSelect) return;
-    const matching = workers
-      .filter(w => w.population === populationSelect)
-      .map(w => w.id);
-    if (matching.length === 0) return;
-    setCheckedIds(prev => {
-      const next = new Set(prev);
-      matching.forEach(id => next.add(id));
-      return next;
-    });
-  }, [populationSelect]);
-
-  // When role dropdown changes, pre-check all matching workers
-  useEffect(() => {
-    if (!roleSelect) return;
-    const matching = workers
-      .filter(w => {
-        const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
-        return roles.includes(roleSelect);
-      })
-      .map(w => w.id);
-    if (matching.length === 0) return;
-    setCheckedIds(prev => {
-      const next = new Set(prev);
-      matching.forEach(id => next.add(id));
-      return next;
-    });
-  }, [roleSelect]);
-
   const handleSave = () => {
     if (!name.trim() || checkedIds.size === 0) return;
     onSave(name.trim(), [...checkedIds]);
     onClose();
   };
+
+  // Population and role pill options (normalized)
+  const popOptions = useMemo(() =>
+    (populationOptions || []).map(p => typeof p === "string" ? p : p.name).filter(Boolean),
+    [populationOptions]
+  );
+
+  const roleOptionsNorm = useMemo(() =>
+    (roleOptions || []).map(r => typeof r === "string" ? r : r.name).filter(Boolean),
+    [roleOptions]
+  );
+
+  const qualOptions = useMemo(() =>
+    (qualifications || []).map(q => ({ value: q.id, label: q.name })),
+    [qualifications]
+  );
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -114,66 +118,76 @@ export default function ViewPresetDialog({
             />
           </div>
 
-          {/* Quick-select dropdowns */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-xs text-gray-600">אוכלוסייה</Label>
-              <Select value={populationSelect} onValueChange={setPopulationSelect}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="בחר אוכלוסייה" />
-                </SelectTrigger>
-                <SelectContent>
-                  {populationOptions.map((p) => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs text-gray-600">תפקיד</Label>
-              <Select value={roleSelect} onValueChange={setRoleSelect}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="בחר תפקיד" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roleOptions.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          {/* Filter pills — identical to reports tracker filter */}
+          <div className="p-3 bg-gray-50 rounded-lg border space-y-2">
+            <WorkerPillFilter
+              label="אוכלוסייה"
+              options={popOptions}
+              selected={selectedPopulations}
+              onChange={setSelectedPopulations}
+              color="orange"
+            />
+            <WorkerPillFilter
+              label="תפקיד"
+              options={roleOptionsNorm}
+              selected={selectedRoles}
+              onChange={setSelectedRoles}
+              color="indigo"
+            />
+            <WorkerPillFilter
+              label="כשירות"
+              options={qualOptions}
+              selected={selectedQualifications}
+              onChange={setSelectedQualifications}
+              color="teal"
+            />
 
-          {/* Select all / clear all */}
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSelectAll}>
-              בחר הכל
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleClearAll}>
-              נקה הכל
-            </Button>
-            <span className="text-xs text-gray-500 self-center mr-auto">
-              {checkedIds.size} עובדים
-            </span>
-          </div>
-
-          {/* Worker checklist */}
-          <ScrollArea className="h-48 border rounded-md">
-            <div className="p-2 space-y-0.5">
-              {sortedWorkers.map((w) => (
-                <label
-                  key={w.id}
-                  className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer"
+            {/* Worker checklist — identical pattern to reports */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-1">
+                עובדים ({checkedIds.size > 0 ? `${checkedIds.size} נבחרו` : "כולם"})
+              </p>
+              <Input
+                value={workerSearch}
+                onChange={e => setWorkerSearch(e.target.value)}
+                placeholder="חיפוש עובד..."
+                className="h-7 text-xs mb-1"
+                dir="rtl"
+              />
+              <div className="flex gap-2 mb-1">
+                <button
+                  type="button"
+                  className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  onClick={handleSelectAll}
                 >
-                  <Checkbox
-                    checked={checkedIds.has(w.id)}
-                    onCheckedChange={() => handleToggleWorker(w.id)}
-                  />
-                  <span className="text-sm">{w.nickname}</span>
-                </label>
-              ))}
+                  בחר הכל ({searchedWorkers.length})
+                </button>
+                <button
+                  type="button"
+                  className="text-xs px-2 py-0.5 rounded bg-gray-400 text-white hover:bg-gray-500 transition-colors"
+                  onClick={handleClearAll}
+                >
+                  נקה
+                </button>
+              </div>
+              <div className="max-h-32 overflow-y-auto border rounded bg-white space-y-0.5 p-1">
+                {searchedWorkers.map(w => (
+                  <label key={w.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-0.5 rounded">
+                    <input
+                      type="checkbox"
+                      checked={checkedIds.has(w.id)}
+                      onChange={() => handleToggleWorker(w.id)}
+                      className="rounded"
+                    />
+                    <span className="text-xs">{w.nickname}</span>
+                  </label>
+                ))}
+                {searchedWorkers.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-1">אין תוצאות</p>
+                )}
+              </div>
             </div>
-          </ScrollArea>
+          </div>
         </div>
 
         <DialogFooter className="mt-3">
