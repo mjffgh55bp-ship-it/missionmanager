@@ -352,10 +352,27 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     }
   };
 
-  const computeAutoValue = (col, workerId) => {
-    const dateRange = getDateRange(dateFilterMode, startDate, endDate);
+  const WORKER_ROLE_COL_NAME = "__תפקיד__";
 
-    // Get the actual cell values for a schedule column (supports old string + new JSON)
+  const computeAutoValue = (col, workerId) => {
+  const dateRange = getDateRange(dateFilterMode, startDate, endDate);
+
+  // ── Worker role criteria — filter at worker level ──────────────────────
+  const roleCriteria = (col.criteria || []).filter(c => c.col_name === WORKER_ROLE_COL_NAME && c.include?.length > 0);
+  if (roleCriteria.length > 0) {
+    const w = workers.find(wk => wk.id === workerId);
+    const wRoles = w ? (Array.isArray(w.role) ? w.role : (w.role ? [w.role] : [])) : [];
+    const roleLogic = col.criteria_logic || "or";
+    const matchesOne = (c) => c.include.some(r => wRoles.includes(r));
+    const passes = roleLogic === "and" ? roleCriteria.every(c => matchesOne(c)) : roleCriteria.some(c => matchesOne(c));
+    if (!passes) {
+      if (col.type === "count_quantitative") return {};
+      if (col.type === "count_by_task") return col.task_list?.length > 0 ? Object.fromEntries(col.task_list.map(t => [t, 0])) : 0;
+      return 0;
+    }
+  }
+
+  // Get the actual cell values for a schedule column (supports old string + new JSON)
     const getCellVals = (vals, colName) => {
       const fieldVal = vals?.[colName];
       const subTypes = vals?.[`${colName}_subTypes`] || [];
@@ -478,6 +495,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             };
             if (c.logic === "and") return c.include.every(r => matches(r));
             return c.include.some(r => matches(r));
+          }
+          if (c.col_name === WORKER_ROLE_COL_NAME) {
+            // Already filtered at worker level — always pass here
+            return true;
           }
           if (c.col_name === TASK_COL) {
             // Task can be stored as:
@@ -831,14 +852,18 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           if (c.logic === "and") return c.include.every(r => calculateHoursInRange(s, e, [r]) > 0);
           return c.include.some(r => calculateHoursInRange(s, e, [r]) > 0);
         }
+        if (c.col_name === "__תפקיד__") {
+            // Worker role criterion — skip at shift level (handled per-column)
+            return true;
+          }
         if (c.col_name === TASK_COL) {
-          const tq = assignmentObj?.qualification_id || "";
-          const tv = String(vals?.["משימה"] || "");
-          if (!tq && !tv) return false;
-          const matches = (v) => v === tq || v === tv || (qualifications.find(q => q.id === v)?.name === tv) || (qualifications.find(q => q.name === tv)?.id === v);
-          if (c.logic === "and") return c.include.every(matches);
-          return c.include.some(matches);
-        }
+            const tq = assignmentObj?.qualification_id || "";
+            const tv = String(vals?.["משימה"] || "");
+            if (!tq && !tv) return false;
+            const matches = (v) => v === tq || v === tv || (qualifications.find(q => q.id === v)?.name === tv) || (qualifications.find(q => q.name === tv)?.id === v);
+            if (c.logic === "and") return c.include.every(matches);
+            return c.include.some(matches);
+          }
         const rv = vals?.[c.col_name];
         if (typeof rv === "string" && rv.startsWith("{")) {
           const p = parseQuantJson(rv);
@@ -1484,6 +1509,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           col={configuringCol}
           scheduleColumns={scheduleColumns}
           qualifications={qualifications}
+          workerRoles={workerRoles}
           onSave={saveColConfig}
           onClose={() => setConfiguringCol(null)}
         />

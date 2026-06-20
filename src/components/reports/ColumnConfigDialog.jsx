@@ -213,7 +213,7 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles,
   );
 }
 
-export default function ColumnConfigDialog({ col, scheduleColumns, qualifications = [], onSave, onClose }) {
+export default function ColumnConfigDialog({ col, scheduleColumns, qualifications = [], workerRoles = [], onSave, onClose }) {
   const [draft, setDraft] = useState({ ...col });
   const [showCriteriaPicker, setShowCriteriaPicker] = useState(false);
 
@@ -344,6 +344,7 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
               <CriterionRow criterion={c}
                 scheduleColumns={scheduleColumns}
                 qualifications={qualifications}
+                workerRoles={workerRoles}
                 onUpdate={(updated) => updateCriterion(c.id, updated)}
                 onRemove={() => removeCriterion(c.id)} />
               {idx < (draft.criteria || []).length - 1 && (
