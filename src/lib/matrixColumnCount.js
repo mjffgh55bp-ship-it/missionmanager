@@ -44,14 +44,24 @@ export function evaluateCriterionForShift(criterion, shiftRow, workerId, workerQ
         });
   }
 
-  // Schedule column criterion
-  const cellVal = shiftRow.values?.[criterion.col_name];
+  // Schedule column criterion — read BOTH the main value and the `<col>_subTypes` array
+  const mainVal = shiftRow.values?.[criterion.col_name];
+  const subTypeVal = shiftRow.values?.[`${criterion.col_name}_subTypes`];
+  const tokens = [];
+  if (Array.isArray(mainVal)) tokens.push(...mainVal);
+  else if (mainVal != null && mainVal !== '') tokens.push(String(mainVal));
+  if (Array.isArray(subTypeVal)) tokens.push(...subTypeVal);
+  else if (subTypeVal != null && subTypeVal !== '') tokens.push(String(subTypeVal));
+
   const includeVals = criterion.include || [];
-  if (includeVals.length === 0) return !!cellVal;
-  const valStr = Array.isArray(cellVal) ? cellVal.join(',') : (cellVal || '');
+  if (includeVals.length === 0) return tokens.length > 0;
+
+  // exact-token match (a token equals the wanted value), with substring fallback for legacy free-text
+  const matchesOne = (wanted) =>
+    tokens.some(t => t === wanted || t.includes(wanted));
   return criterion.logic === 'and'
-    ? includeVals.every(v => valStr.includes(v))
-    : includeVals.some(v => valStr.includes(v));
+    ? includeVals.every(matchesOne)
+    : includeVals.some(matchesOne);
 }
 
 /**
