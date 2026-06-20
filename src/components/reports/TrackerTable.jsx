@@ -394,15 +394,31 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       });
     }
 
+  // Role name↔id lookup maps built from workerRoles prop
+    const _roleIdByName = {};
+    const _roleNameById = {};
+    (workerRoles || []).forEach(r => {
+      if (typeof r === "string") return;
+      if (r.name && r.mapping_id) { _roleIdByName[r.name.trim()] = r.mapping_id; _roleNameById[r.mapping_id] = r.name.trim(); }
+    });
+
   // Helper: check if the worker was assigned to a matching role in a given shift
     const workerMatchesRoleInShift = (shiftData, isTemplateRow = false, template = null) => {
       if (!expectedRoles) return true;
 
       // A column matches if ANY of its role identifiers (stable id, role_filter name, or column name)
       // appears in expectedRoles. expectedRoles may contain ids and/or names (mixed during migration).
+      // Expand each candidate into both its id-form and name-form so a column carrying only
+      // a role_filter name still matches a criterion that stored the mapping_id (and vice versa).
       const colRoleMatches = (col) => {
-        const candidates = [col.role_mapping_id, col.role_filter, col.name].filter(Boolean);
-        return candidates.some(c => expectedRoles.includes(c));
+        const rawCandidates = [col.role_mapping_id, col.role_filter, col.name].filter(Boolean);
+        const expanded = new Set();
+        rawCandidates.forEach(c => {
+          expanded.add(c);
+          if (_roleIdByName[c]) expanded.add(_roleIdByName[c]);   // c is a name → add its id
+          if (_roleNameById[c]) expanded.add(_roleNameById[c]);   // c is an id → add its name
+        });
+        return [...expanded].some(c => expectedRoles.includes(c));
       };
 
       if (isTemplateRow && template) {
