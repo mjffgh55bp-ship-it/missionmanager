@@ -50,15 +50,24 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
 
   const normalizedDraftId = (draft.mapping_id || "").trim().toLowerCase();
   const isDuplicate = normalizedDraftId &&
-    allItems.filter(i => normalizeItem(i).mapping_id === normalizedDraftId && normalizeItem(i).name !== item.name).length > 0;
+    allItems.filter(i => {
+      const ni = normalizeItem(i);
+      return (ni.mapping_id || "").trim().toLowerCase() === normalizedDraftId && ni.name !== item.name;
+    }).length > 0;
 
   const hasMappingId = !!item.mapping_id;
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave({ ...draft, mapping_id: (draft.mapping_id || "").trim().toLowerCase() });
-    setSaving(false);
-    setExpanded(false);
+    try {
+      await onSave({ ...draft, mapping_id: (draft.mapping_id || "").trim().toLowerCase() });
+      setExpanded(false);
+    } catch (e) {
+      console.error("MappableItemRow save failed:", e);
+      alert("שגיאה בשמירה. נסה שוב.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
