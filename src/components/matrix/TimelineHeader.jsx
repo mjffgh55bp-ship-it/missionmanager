@@ -13,7 +13,7 @@ export default function TimelineHeader({ viewMode, timelineWidth, ppm, dailySlot
     return (
       <div dir="rtl">
         {/* Top row: day name + date */}
-        <div className="text-center font-semibold text-gray-800 text-xs py-0.5 border-b border-gray-300" style={{ width: `${timelineWidth}px` }}>
+        <div className="text-center font-medium text-gray-600 text-xs py-0.5 border-b border-gray-300" style={{ width: `${timelineWidth}px` }}>
           {dateStr} {dayName}
         </div>
         {/* Bottom row: hours */}
@@ -39,7 +39,7 @@ export default function TimelineHeader({ viewMode, timelineWidth, ppm, dailySlot
           return (
             <div
               key={day}
-              className="shrink-0 text-center font-semibold text-gray-800 text-xs py-0.5 border-l border-gray-200"
+              className="shrink-0 text-center font-medium text-gray-600 text-xs py-0.5 border-l border-gray-200"
               style={{ width: `${DAY_WIDTH}px` }}
             >
               {dayName} {dayDate}
