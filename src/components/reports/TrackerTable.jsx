@@ -368,14 +368,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const workerMatchesRoleInShift = (shiftData, isTemplateRow = false, template = null) => {
     if (!expectedRoles) return true;
     if (isTemplateRow && template) {
-      const workerCols = (template.columns || []).filter(c => c.type === "worker" && c.column_id);
-      return workerCols.some(tc => {
+      const allWorkerCols = (template.columns || []).filter(c => c.type === "worker");
+      return allWorkerCols.some(tc => {
         // Support both column-name keys and mapping_id keys in row values
         const valByName = shiftData.values?.[tc.name];
         const valById = tc.column_id ? shiftData.values?.[tc.column_id] : undefined;
         if (valByName !== workerId && valById !== workerId) return false;
-        const sc = scheduleColumns.find(s => s.mapping_id === tc.column_id);
-        return sc && expectedRoles.includes(sc.role_filter);
+        // For columns with column_id: match via schedule column's role_filter
+        if (tc.column_id) {
+          const sc = scheduleColumns.find(s => s.mapping_id === tc.column_id);
+          return sc && expectedRoles.includes(sc.role_filter);
+        }
+        // For columns without column_id: match column name directly as role name
+        return expectedRoles.includes(tc.name);
       });
     }
     const vals = shiftData.column_values || {};
