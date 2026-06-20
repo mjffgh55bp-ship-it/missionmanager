@@ -27,7 +27,8 @@ export function AvailabilityStatsCell({ workerId, availabilities, weekStartDate 
   const shifts = workerAvail?.shifts || [];
   const availableCount = shifts.filter(s => s.type === "available").length;
   const wantedCount = shifts.filter(s => s.type === "wanted").length;
-  const totalDesired = workerAvail?.desired_shifts ?? 0;
+  const totalDesired = workerAvail?.desired_shifts;
+  const showTotalDesired = totalDesired !== undefined && totalDesired !== null;
 
   return (
     <div
@@ -35,7 +36,9 @@ export function AvailabilityStatsCell({ workerId, availabilities, weekStartDate 
       style={{ width: `${COL_WIDTH}px`, minWidth: `${COL_WIDTH}px` }}
     >
       <div className="flex-1 text-center">
-        <span className="text-xs font-bold text-gray-800">{totalDesired}</span>
+        {showTotalDesired && (
+          <span className="text-xs font-bold text-gray-800">{totalDesired}</span>
+        )}
       </div>
       <div className="flex-1 text-center border-r border-gray-200">
         <span className="text-xs font-bold text-gray-800">{wantedCount}</span>
