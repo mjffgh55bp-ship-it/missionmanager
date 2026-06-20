@@ -714,6 +714,16 @@ export default function Matrix() {
     setTimeout(doScroll, 250);
   };
 
+  // ── Retry helper ──────────────────────────────────────────────────────────────
+  const withRetry = async (fn, tries = 4) => {
+    let last;
+    for (let i = 0; i < tries; i++) {
+      try { return await fn(); }
+      catch (e) { last = e; await new Promise(r => setTimeout(r, 400 * (i + 1))); }
+    }
+    throw last;
+  };
+
   // ── Data helpers ─────────────────────────────────────────────────────────────
   const isWorkerAssignedToRow = (row, workerId, template) => {
     if (!row.values || !workerId) return { assigned: false, workerColumnName: null };
@@ -1221,6 +1231,7 @@ export default function Matrix() {
       }
 
       // If we converted an EXISTING availability window, remove that source shift now.
+      // (already safe: constraint created first, so a failure here leaves a duplicate, not data loss)
       if (editingShift) {
         try {
           const workerAvail = getBestAvail(selectedWorkerForManual.id);
@@ -1240,7 +1251,7 @@ export default function Matrix() {
                 status: workerAvail.status || "approved",
               };
               applyOptimisticAvailability(selectedWorkerForManual.id, remaining, availData);
-              await base44.entities.Availability.update(workerAvail.id, { shifts: remaining });
+              await withRetry(() => base44.entities.Availability.update(workerAvail.id, { shifts: remaining }));
             }
           }
         } catch (e) {
@@ -1264,35 +1275,54 @@ export default function Matrix() {
       return;
     }
     const workerAvail = getBestAvail(selectedWorkerForManual.id);
+    const convertingFromConstraint = !!(editingUnavailSource?.id && !String(editingUnavailSource.id).startsWith('temp_'));
 
-    // אילוץ → זמין/רצוי : remove the Unavailability, then fall through to add the availability shift
-    if (editingUnavailSource?.id && !String(editingUnavailSource.id).startsWith('temp_')) {
-      try {
-        await base44.entities.Unavailability.delete(editingUnavailSource.id);
-        setUnavailabilities(prev => prev.filter(u => u.id !== editingUnavailSource.id));
-      } catch (e) {
-        console.error("delete source constraint failed:", e);
-        alert("שגיאה בהמרת האילוץ לזמינות. נסה שוב.");
-        return;
-      }
-    }
-
+    // Build the new availability shifts
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     const targetDate = format(currentDate, "yyyy-MM-dd");
     if (editingShift) {
-      updatedShifts = updatedShifts.map(s => s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type ? { ...s, date: targetDate, start_time: manualShiftData.start_time, end_time: manualShiftData.end_time, type: manualShiftData.type } : s);
+      updatedShifts = updatedShifts.map(s =>
+        s.date === editingShift.date && s.start_time === editingShift.start_time &&
+        s.end_time === editingShift.end_time && s.type === editingShift.type
+          ? { ...s, date: targetDate, start_time: manualShiftData.start_time, end_time: manualShiftData.end_time, type: manualShiftData.type }
+          : s
+      );
     } else {
       const pushDate = editingUnavailSource?.date || targetDate;
       updatedShifts.push({ date: pushDate, start_time: manualShiftData.start_time, end_time: manualShiftData.end_time, type: manualShiftData.type, priority: updatedShifts.length + 1 });
     }
     const availData = { worker_id: selectedWorkerForManual.id, worker_name: selectedWorkerForManual.nickname, week_start_date: weekStartDate, shifts: updatedShifts, status: workerAvail?.status || "approved" };
     const previousAvailabilities = availabilities;
+
+    // Optimistic UI
     applyOptimisticAvailability(selectedWorkerForManual.id, updatedShifts, availData);
-    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null); setEditingUnavailSource(null);
+    setShowManualDialog(false); setSelectedWorkerForManual(null);
+    setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' });
+    setEditingShift(null); setEditingUnavailSource(null);
+
+    // 1) SAVE THE AVAILABILITY FIRST (with retry). Only proceed to delete the constraint if this succeeds.
+    let availSaved = false;
     try {
-      if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
-      else await base44.entities.Availability.create(availData);
-    } catch { setAvailabilities(previousAvailabilities); }
+      if (workerAvail) await withRetry(() => base44.entities.Availability.update(workerAvail.id, availData));
+      else await withRetry(() => base44.entities.Availability.create(availData));
+      availSaved = true;
+    } catch (e) {
+      console.error("save availability failed:", e);
+      setAvailabilities(previousAvailabilities); // roll back local
+      alert("שמירת הזמינות נכשלה. שום דבר לא נמחק — נסה שוב.");
+    }
+
+    // 2) Only AFTER the availability is safely saved, delete the source אילוץ.
+    if (availSaved && convertingFromConstraint) {
+      try {
+        await withRetry(() => base44.entities.Unavailability.delete(editingUnavailSource.id));
+        setUnavailabilities(prev => prev.filter(u => u.id !== editingUnavailSource.id));
+      } catch (e) {
+        console.error("delete source constraint failed (availability already saved):", e);
+        // Availability is saved; the old אילוץ lingers. Recoverable (duplicate-ish), NOT data loss.
+        alert("הזמינות נשמרה, אך לא הצלחנו להסיר את האילוץ הישן. רענן ומחק אותו ידנית אם נשאר.");
+      }
+    }
     debouncedLoadData(true, false, true);
   };
 
