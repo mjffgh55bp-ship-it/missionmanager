@@ -106,6 +106,7 @@ export default function OperationalTimePicker({
   const minRef = useRef(null);
   const autoClosedRef = useRef(false); // prevents double-fire on auto-close
   const cursorPosRef = useRef(null);   // tracked cursor position for digit-by-digit editing
+  const pendingDigitRef = useRef(null); // digit key captured in onKeyDown, consumed in onChange
 
   const parsed = parseTimeCellLocal(value);
   // localHourValue: currently highlighted hour in the popover
@@ -168,67 +169,31 @@ export default function OperationalTimePicker({
     handleSelect(hv, m);
   };
 
-  // Digit-by-digit editing: each typed digit replaces the character at the cursor
-  // position, then the cursor advances by 1. Enter commits whatever is typed/selected.
-  const handleInputChange = (e) => {
-    if (autoClosedRef.current) return;
-
-    // Capture current cursor position BEFORE React updates the value
-    const nativeInput = e.nativeEvent?.target;
-    const selStart = nativeInput ? nativeInput.selectionStart : null;
-
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
+  // Apply a typed digit at the tracked cursor position and advance the cursor.
+  const applyDigitAtCursor = (digit) => {
     const oldRaw = hourInput.replace(/\D/g, "");
+    const pos = cursorPosRef.current !== null ? cursorPosRef.current : oldRaw.length;
+    if (pos >= 4) return; // no room — cap at 4 digits (HHMM)
 
-    // ── Digit-by-digit at cursor position ────────────────────────────
-    const pos = selStart !== null ? selStart : (cursorPosRef.current !== null ? cursorPosRef.current : oldRaw.length);
-    let result;
-
-    if (raw.length > 0 && pos < 5 && raw !== oldRaw) {
-      // Find the new digit(s) — compare old vs new
-      let newChar = "";
-      if (raw.length === oldRaw.length) {
-        // Replacement: find first differing char
-        for (let i = 0; i < raw.length; i++) {
-          if (raw[i] !== oldRaw[i]) { newChar = raw[i]; break; }
-        }
-      } else if (raw.length > oldRaw.length) {
-        // New digit(s) appended — take the last one for replacement at cursor
-        newChar = raw.slice(-1);
-      }
-      // else: deletion — skip, let raw be set as-is
-
-      if (newChar && /\d/.test(newChar) && pos < 4) {
-        const chars = (oldRaw.padEnd(4, " ")).split("");
-        chars[pos] = newChar;
-        result = chars.join("").replace(/\s/g, "").slice(0, 4);
-        cursorPosRef.current = Math.min(pos + 1, 3);
-      } else {
-        result = raw;
-        cursorPosRef.current = null;
-      }
-    } else {
-      result = raw;
-      cursorPosRef.current = null;
-    }
-
-    const final = result || "";
-    setHourInput(final);
+    const chars = (oldRaw.padEnd(4, " ")).split("");
+    chars[pos] = digit;
+    const result = chars.join("").replace(/\s/g, "").slice(0, 4);
+    setHourInput(result);
     setHasStartedTyping(true);
-
-    const hhRaw2 = final.slice(0, 2);
-    const mmRaw2 = final.slice(2, 4);
-    const hh2 = hhRaw2.padStart(2, "0");
+    cursorPosRef.current = Math.min(pos + 1, 3);
 
     // Live hour matching (cur zone only)
+    const hhRaw2 = result.slice(0, 2);
     if (hhRaw2.length >= 1) {
+      const hh2 = hhRaw2.padStart(2, "0");
       const matched = HOUR_ENTRIES.find(
         entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh2
       );
       if (matched) setLocalHourValue(matched.value);
     }
 
-    // Live minute highlighting as 3rd/4th digits arrive
+    // Live minute highlighting
+    const mmRaw2 = result.slice(2, 4);
     if (mmRaw2.length >= 1) {
       const padded = mmRaw2.padStart(2, "0");
       setLiveMin(MINUTES.includes(padded) ? padded : null);
@@ -236,7 +201,7 @@ export default function OperationalTimePicker({
       setLiveMin(null);
     }
 
-    // Restore cursor position after React re-render
+    // Restore cursor at the next position after React re-render
     requestAnimationFrame(() => {
       if (inputRef.current && cursorPosRef.current !== null) {
         const target = Math.min(cursorPosRef.current, inputRef.current.value.length);
@@ -245,34 +210,96 @@ export default function OperationalTimePicker({
     });
   };
 
-  // Enter key: resolve whatever is typed/selected, save
-  const handleKeyDown = (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
+  // onChange: used as a fallback for deletions / paste / non-digit input.
+  // Digit-by-digit inserts are handled by onKeyDown via pendingDigitRef.
+  const handleInputChange = (e) => {
     if (autoClosedRef.current) return;
 
-    let resolvedHour = localHourValue || parsed.hourValue;
-    let resolvedMin = parsed.min || "00";
-
-    const raw = hourInput.replace(/\D/g, "");
-    const hh = raw.slice(0, 2).padStart(2, "0");
-    const mm = raw.slice(2, 4);
-
-    // Try matching typed hour
-    if (raw.length >= 1) {
-      const matched = HOUR_ENTRIES.find(
-        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh
-      );
-      if (matched) resolvedHour = matched.value;
-    }
-    // Try using typed minute if 2 digits and valid
-    if (mm.length === 2 && MINUTES.includes(mm)) {
-      resolvedMin = mm;
+    // If a digit key was already captured by onKeyDown, consume it here
+    // and let applyDigitAtCursor do the work regardless of what the browser did.
+    if (pendingDigitRef.current !== null) {
+      const digit = pendingDigitRef.current;
+      pendingDigitRef.current = null;
+      applyDigitAtCursor(digit);
+      return;
     }
 
-    if (resolvedHour) {
-      cursorPosRef.current = null;
-      handleSelect(resolvedHour, resolvedMin);
+    // Fallback: the input changed without a digit key (delete, paste, etc.)
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
+    setHourInput(raw);
+    setHasStartedTyping(true);
+    cursorPosRef.current = null;
+    setLiveMin(null);
+  };
+
+  const handleKeyDown = (e) => {
+    // ── Enter: commit ──────────────────────────────────────────────────
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (autoClosedRef.current) return;
+
+      let resolvedHour = localHourValue || parsed.hourValue;
+      let resolvedMin = parsed.min || "00";
+
+      const raw = hourInput.replace(/\D/g, "");
+      const hh = raw.slice(0, 2).padStart(2, "0");
+      const mm = raw.slice(2, 4);
+
+      if (raw.length >= 1) {
+        const matched = HOUR_ENTRIES.find(
+          entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh
+        );
+        if (matched) resolvedHour = matched.value;
+      }
+      if (mm.length === 2 && MINUTES.includes(mm)) {
+        resolvedMin = mm;
+      }
+
+      if (resolvedHour) {
+        cursorPosRef.current = null;
+        handleSelect(resolvedHour, resolvedMin);
+      }
+      return;
+    }
+
+    // ── Digit: prevent browser insertion, handle ourselves ────────────
+    if (/^\d$/.test(e.key)) {
+      e.preventDefault();
+      pendingDigitRef.current = e.key;
+      applyDigitAtCursor(e.key);
+      return;
+    }
+
+    // ── Backspace: delete char before cursor ──────────────────────────
+    if (e.key === "Backspace") {
+      e.preventDefault();
+      const oldRaw = hourInput.replace(/\D/g, "");
+      if (oldRaw.length === 0) return;
+      const pos = cursorPosRef.current !== null ? cursorPosRef.current : oldRaw.length;
+      const deleteIdx = pos > 0 ? pos - 1 : 0;
+      const chars = oldRaw.split("");
+      chars.splice(deleteIdx, 1);
+      const result = chars.join("").slice(0, 4);
+      setHourInput(result);
+      cursorPosRef.current = Math.max(deleteIdx, 0);
+      setLiveMin(null);
+      requestAnimationFrame(() => {
+        if (inputRef.current && cursorPosRef.current !== null) {
+          const target = Math.min(cursorPosRef.current, inputRef.current.value.length);
+          inputRef.current.setSelectionRange(target, target);
+        }
+      });
+      return;
+    }
+
+    // ── Arrow keys: update tracked cursor position ────────────────────
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      // Let browser handle the move, then read back position
+      requestAnimationFrame(() => {
+        if (inputRef.current) {
+          cursorPosRef.current = inputRef.current.selectionStart;
+        }
+      });
     }
   };
 
