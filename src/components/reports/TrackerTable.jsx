@@ -355,6 +355,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const WORKER_ROLE_COL_NAME = "__תפקיד__";
 
   const computeAutoValue = (col, workerId) => {
+  const dateRange = getDateRange(dateFilterMode, startDate, endDate);
+
+  // ── Role criteria — filter at SHIFT level ──────────────────────────
+  // Instead of checking whether the worker HAS a role in their profile,
+  // we check whether the worker was ASSIGNED to that specific role in
+  // each individual shift. A worker might fill different roles in different shifts.
+  const roleCriteria = (col.criteria || []).filter(c => c.col_name === WORKER_ROLE_COL_NAME && c.include?.length > 0);
+  const expectedRoles = roleCriteria.length > 0 ? roleCriteria.flatMap(c => c.include) : null;
     const _isNachman = (() => { const w = workers.find(x => x.id === workerId); return w && w.nickname === "נחמן"; })();
     const _wantsManager = expectedRoles && (expectedRoles.includes("מנהל") || expectedRoles.some(r => typeof r === "string" && r.startsWith("role_")));
     if (_isNachman && _wantsManager) {
@@ -385,15 +393,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         });
       });
     }
-  const dateRange = getDateRange(dateFilterMode, startDate, endDate);
 
-  // ── Role criteria — filter at SHIFT level ──────────────────────────
-  // Instead of checking whether the worker HAS a role in their profile,
-  // we check whether the worker was ASSIGNED to that specific role in
-  // each individual shift. A worker might fill different roles in different shifts.
-  const roleCriteria = (col.criteria || []).filter(c => c.col_name === WORKER_ROLE_COL_NAME && c.include?.length > 0);
-  const expectedRoles = roleCriteria.length > 0 ? roleCriteria.flatMap(c => c.include) : null;
-  
   // Helper: check if the worker was assigned to a matching role in a given shift
     const workerMatchesRoleInShift = (shiftData, isTemplateRow = false, template = null) => {
       if (!expectedRoles) return true;
