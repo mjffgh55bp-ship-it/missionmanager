@@ -105,6 +105,7 @@ export default function OperationalTimePicker({
   const hourRef = useRef(null);
   const minRef = useRef(null);
   const autoClosedRef = useRef(false); // prevents double-fire on auto-close
+  const cursorPosRef = useRef(null);   // tracked cursor position for digit-by-digit editing
 
   const parsed = parseTimeCellLocal(value);
   // localHourValue: currently highlighted hour in the popover
@@ -118,6 +119,7 @@ export default function OperationalTimePicker({
     autoClosedRef.current = false;
     setHasStartedTyping(false);
     setLiveMin(null);
+    cursorPosRef.current = null;
     setLocalHourValue(parsed.hourValue);
     if (parsed.hourValue && !parsed.hourValue.startsWith("-1") && !parsed.hourValue.startsWith("+")) {
       setHourInput(parsed.hourValue);
@@ -156,6 +158,7 @@ export default function OperationalTimePicker({
 
   // Hour click only highlights — does NOT close or save
   const handleHourClick = (hourValue) => {
+    cursorPosRef.current = null;
     setLocalHourValue(hourValue);
   };
 
@@ -165,43 +168,81 @@ export default function OperationalTimePicker({
     handleSelect(hv, m);
   };
 
-  // Continuous HHMM typing — live highlight + auto-close on 4 valid digits
+  // Digit-by-digit editing: each typed digit replaces the character at the cursor
+  // position, then the cursor advances by 1. Enter commits whatever is typed/selected.
   const handleInputChange = (e) => {
     if (autoClosedRef.current) return;
+
+    // Capture current cursor position BEFORE React updates the value
+    const nativeInput = e.nativeEvent?.target;
+    const selStart = nativeInput ? nativeInput.selectionStart : null;
+
     const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
-    setHourInput(raw);
+    const oldRaw = hourInput.replace(/\D/g, "");
+
+    // ── Digit-by-digit at cursor position ────────────────────────────
+    const pos = selStart !== null ? selStart : (cursorPosRef.current !== null ? cursorPosRef.current : oldRaw.length);
+    let result;
+
+    if (raw.length > 0 && pos < 5 && raw !== oldRaw) {
+      // Find the new digit(s) — compare old vs new
+      let newChar = "";
+      if (raw.length === oldRaw.length) {
+        // Replacement: find first differing char
+        for (let i = 0; i < raw.length; i++) {
+          if (raw[i] !== oldRaw[i]) { newChar = raw[i]; break; }
+        }
+      } else if (raw.length > oldRaw.length) {
+        // New digit(s) appended — take the last one for replacement at cursor
+        newChar = raw.slice(-1);
+      }
+      // else: deletion — skip, let raw be set as-is
+
+      if (newChar && /\d/.test(newChar) && pos < 4) {
+        const chars = (oldRaw.padEnd(4, " ")).split("");
+        chars[pos] = newChar;
+        result = chars.join("").replace(/\s/g, "").slice(0, 4);
+        cursorPosRef.current = Math.min(pos + 1, 3);
+      } else {
+        result = raw;
+        cursorPosRef.current = null;
+      }
+    } else {
+      result = raw;
+      cursorPosRef.current = null;
+    }
+
+    const final = result || "";
+    setHourInput(final);
     setHasStartedTyping(true);
 
-    const hhRaw = raw.slice(0, 2);
-    const mmRaw = raw.slice(2, 4);
-    const hh = hhRaw.padStart(2, "0");
+    const hhRaw2 = final.slice(0, 2);
+    const mmRaw2 = final.slice(2, 4);
+    const hh2 = hhRaw2.padStart(2, "0");
 
     // Live hour matching (cur zone only)
-    if (hhRaw.length >= 1) {
+    if (hhRaw2.length >= 1) {
       const matched = HOUR_ENTRIES.find(
-        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh
+        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh2
       );
       if (matched) setLocalHourValue(matched.value);
     }
 
     // Live minute highlighting as 3rd/4th digits arrive
-    if (mmRaw.length >= 1) {
-      const padded = mmRaw.padStart(2, "0");
+    if (mmRaw2.length >= 1) {
+      const padded = mmRaw2.padStart(2, "0");
       setLiveMin(MINUTES.includes(padded) ? padded : null);
     } else {
       setLiveMin(null);
     }
 
-    // Auto-close when 4 digits entered and both are valid
-    if (raw.length === 4 && mmRaw.length === 2) {
-      const hourMatched = HOUR_ENTRIES.find(
-        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh
-      );
-      if (hourMatched && MINUTES.includes(mmRaw)) {
-        autoClosedRef.current = true;
-        handleSelect(hourMatched.value, mmRaw);
+    // Restore cursor position after React re-render
+    requestAnimationFrame(() => {
+      if (inputRef.current && cursorPosRef.current !== null) {
+        const target = Math.min(cursorPosRef.current, inputRef.current.value.length);
+        inputRef.current.setSelectionRange(target, target);
       }
-    }
+    });
   };
 
   // Enter key: resolve whatever is typed/selected, save
@@ -230,6 +271,7 @@ export default function OperationalTimePicker({
     }
 
     if (resolvedHour) {
+      cursorPosRef.current = null;
       handleSelect(resolvedHour, resolvedMin);
     }
   };
@@ -263,6 +305,8 @@ export default function OperationalTimePicker({
           inputMode="numeric"
           value={inputDisplayValue}
           onChange={handleInputChange}
+          onSelect={(e) => { cursorPosRef.current = e.target.selectionStart; }}
+          onClick={(e) => { cursorPosRef.current = e.target.selectionStart; }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={triggerClass + (open ? " bg-blue-50 ring-1 ring-blue-400" : "")}
