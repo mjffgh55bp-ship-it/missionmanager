@@ -218,7 +218,7 @@ export default function Availability() {
       if (settingsDebounceRef.current) clearTimeout(settingsDebounceRef.current);
       settingsDebounceRef.current = setTimeout(() => {
         settingsDebounceRef.current = null;
-        softInvalidateStaticCache();
+        invalidateSettingsCache(); // hard-invalidate so the next read fetches fresh data, not stale cache
         getCachedAllSettings(base44.entities).then(async freshSettings => {
         const freshOpenReg = parseSetting(freshSettings, "open_registrations", []);
         try {
