@@ -15,20 +15,26 @@ const CONFIRMED_MAPPING = {
   "בקסיט נהג": "role_02",
 };
 
-const METADATA_KEY_PREFIXES = ["_", "continuation_source_row_id"];
+// role mapping_id → canonical ScheduleColumn mapping_id
+const ROLE_TO_COLUMN_ID = {
+  "role_04": "col_role_manager",
+  "role_02": "col_role_codriver",
+  "role_05": "col_role_senior_manager",
+};
 
-function isMetadataKey(key) {
-  return METADATA_KEY_PREFIXES.some(p => key.startsWith(p));
-}
-
-function isTimeKey(key) {
-  // Common time column names
-  const timePatterns = ["התחלה", "סיום", "שעת התחלה", "שעת סיום"];
-  return timePatterns.some(p => key === p || key.startsWith(p));
-}
+const TIME_KEYS = new Set(["תדריך", "התחלה", "סיום", "שעת התחלה", "שעת סיום"]);
+const SKIP_EXACT_KEYS = new Set(["continuation_source_row_id"]);
 
 function looksLikeWorkerId(val) {
   return typeof val === "string" && val.length === 24 && /^[a-f0-9]{24}$/i.test(val);
+}
+
+function isMetadataOrTimeKey(key) {
+  if (key.startsWith("_")) return true;
+  if (SKIP_EXACT_KEYS.has(key)) return true;
+  if (key.endsWith("_subTypes")) return true;
+  if (TIME_KEYS.has(key)) return true;
+  return false;
 }
 
 export default function RoleRepairPreview() {
@@ -58,42 +64,6 @@ export default function RoleRepairPreview() {
       const roleList = workerRolesSetting.length > 0
         ? (JSON.parse(workerRolesSetting[0].setting_value) || [])
         : [];
-      const roleNameToId = {};
-      const roleIdToName = {};
-      roleList.forEach(r => {
-        if (typeof r === "string") return;
-        if (r.name && r.mapping_id) {
-          roleNameToId[r.name.trim()] = r.mapping_id;
-          roleIdToName[r.mapping_id] = r.name.trim();
-        }
-      });
-
-      // Parse schedule columns
-      const rawCols = scheduleColsSetting.length > 0
-        ? (JSON.parse(scheduleColsSetting[0].setting_value) || [])
-        : [];
-      const scheduleColumns = rawCols.map(c => ({
-        ...c,
-        mapping_id: c.mapping_id || "",
-        role_filter: c.role_filter || "",
-        name: c.name || "",
-      }));
-
-      // Build role mapping_id → ScheduleColumn mapping_id lookup
-      // For each role, find the ScheduleColumn whose role_filter matches or whose mapping_id is the canonical col_role_*
-      const roleIdToScheduleColId = {};
-      roleList.forEach(r => {
-        if (!r.mapping_id || !r.name) return;
-        // Try: ScheduleColumn with matching role_filter
-        let sc = scheduleColumns.find(c => c.role_filter && c.role_filter.trim() === r.name.trim());
-        if (!sc) {
-          // Try: ScheduleColumn with canonical col_role_* mapping_id
-          sc = scheduleColumns.find(c => c.mapping_id && c.mapping_id === `col_role_${r.mapping_id.split("_").pop()}`);
-        }
-        if (sc) {
-          roleIdToScheduleColId[r.mapping_id] = sc.mapping_id || sc.name;
-        }
-      });
 
       // Build worker lookup
       const workerById = {};
@@ -103,22 +73,14 @@ export default function RoleRepairPreview() {
       const templateById = {};
       allTemplates.forEach(t => { templateById[t.id] = t; });
 
-      // Collect col_role_* keys for filtering
-      const colRoleKeys = new Set();
-      scheduleColumns.forEach(sc => {
-        if (sc.mapping_id) colRoleKeys.add(sc.mapping_id);
-      });
-
       const rows = [];
 
-      // ── PART A: column_id relink preview ─────────────────────────────
+      // ── PART A: relink_column — unbound "מנהל בכיר" columns ───────────
       allTemplates.forEach(tmpl => {
         (tmpl.columns || []).forEach(col => {
           if (col.type !== "worker") return;
-          if (col.column_id) return; // already has column_id
+          if (col.column_id) return; // already bound
           if (col.name !== "מנהל בכיר") return;
-          // Map role_05 to its ScheduleColumn mapping_id
-          const targetColId = roleIdToScheduleColId["role_05"] || "";
           rows.push({
             action: "relink_column",
             row_id: "",
@@ -128,37 +90,42 @@ export default function RoleRepairPreview() {
             worker_nickname: "",
             old_key: col.name,
             new_role: "role_05",
-            target_column_id: targetColId,
-            new_column_id: targetColId,
+            target_column_id: "col_role_senior_manager",
+            new_column_id: "col_role_senior_manager",
           });
         });
       });
 
-      // ── PART B: orphaned assignment reconcile preview ────────────────
+      // ── PART B: reconcile orphaned assignments ──────────────────────
       allRows.forEach(row => {
         const tmpl = templateById[row.template_id];
         if (!tmpl) return;
-        const workerColsWithId = new Set(
-          (tmpl.columns || [])
-            .filter(c => c.type === "worker" && c.column_id)
-            .map(c => c.column_id)
-        );
+
+        // Build boundNames + boundColIds for this template
+        const boundNames = new Set();
+        const boundColIds = new Set();
+        (tmpl.columns || []).forEach(col => {
+          if (col.type !== "worker") return;
+          if (!col.column_id) return;
+          boundColIds.add(col.column_id);
+          boundNames.add(col.name);
+        });
 
         const values = row.values || {};
         for (const [key, val] of Object.entries(values)) {
           if (!looksLikeWorkerId(val)) continue;
-          if (workerColsWithId.has(key)) continue; // already a proper worker column
-          if (colRoleKeys.has(key)) continue; // it's a col_role_* key
-          if (isMetadataKey(key)) continue;
-          if (isTimeKey(key)) continue;
+          if (isMetadataOrTimeKey(key)) continue;
 
+          // HEALTHY check: skip if starts with "col_role", or is in boundColIds, or is in boundNames
+          if (key.startsWith("col_role") || boundColIds.has(key) || boundNames.has(key)) continue;
+
+          // ORPHANED — needs audit
           const worker = workerById[val];
           const workerNickname = worker?.nickname || val;
 
-          // Check CONFIRMED_MAPPING
           if (CONFIRMED_MAPPING[key] !== undefined) {
             const roleId = CONFIRMED_MAPPING[key];
-            const targetColId = roleIdToScheduleColId[roleId] || "";
+            const targetColId = ROLE_TO_COLUMN_ID[roleId] || "";
             rows.push({
               action: "reconcile_key",
               row_id: row.id,
@@ -205,8 +172,14 @@ export default function RoleRepairPreview() {
 
       // Summary
       const counts = { relink_column: 0, reconcile_key: 0, skip_unresolved: 0, skip_unknown: 0 };
-      rows.forEach(r => { counts[r.action] = (counts[r.action] || 0) + 1; });
-      setSummary(counts);
+      const roleBreakdown = {};
+      rows.forEach(r => {
+        counts[r.action] = (counts[r.action] || 0) + 1;
+        if (r.new_role) {
+          roleBreakdown[r.new_role] = (roleBreakdown[r.new_role] || 0) + 1;
+        }
+      });
+      setSummary({ ...counts, roleBreakdown });
 
       // Auto-download CSV
       const headers = ["action", "row_id", "date", "template_name", "worker_id", "worker_nickname", "old_key", "new_role", "target_column_id", "new_column_id"];
@@ -221,10 +194,9 @@ export default function RoleRepairPreview() {
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
 
-      // Trigger download
       const a = document.createElement("a");
       a.href = url;
-      a.download = "role_repair_preview.csv";
+      a.download = "role_repair_preview_v2.csv";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -241,7 +213,7 @@ export default function RoleRepairPreview() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-8" dir="rtl">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">תצוגה מקדימה לתיקון תפקידים</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">תצוגה מקדימה לתיקון תפקידים (v2)</h1>
           <p className="text-gray-600">סריקה לקריאה בלבד — לא מבצעת שום שינוי בנתונים. מייצרת קובץ CSV להורדה.</p>
         </div>
 
@@ -284,7 +256,6 @@ export default function RoleRepairPreview() {
               </div>
             )}
 
-            {/* Summary */}
             {summary && (
               <div className="space-y-3">
                 <h3 className="font-semibold text-gray-800">סיכום ({auditRows.length} שורות)</h3>
@@ -314,6 +285,17 @@ export default function RoleRepairPreview() {
                     color="red"
                   />
                 </div>
+                {summary.roleBreakdown && Object.keys(summary.roleBreakdown).length > 0 && (
+                  <div className="text-sm text-gray-600 mt-2">
+                    <span className="font-semibold">פירוט לפי תפקיד: </span>
+                    {Object.entries(summary.roleBreakdown).map(([role, count], i) => (
+                      <span key={role}>
+                        {i > 0 && ", "}
+                        <span className="font-medium text-gray-800">{role}: {count}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
