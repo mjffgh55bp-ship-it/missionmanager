@@ -1,0 +1,1370 @@
+{
+  "version": "1.0",
+  "export_date": "2026-06-20T18:36:00.432Z",
+  "summary": {
+    "workers": 98,
+    "roles": 9,
+    "populations": 7,
+    "statuses": 13,
+    "schedule_columns": 7,
+    "tasks": 7
+  },
+  "settings": {
+    "worker_roles": [
+      {
+        "name": "נהג",
+        "mapping_id": "role_01",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "ליד נהג",
+        "mapping_id": "role_02",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "מנהל משימה",
+        "mapping_id": "role_03",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "מנהל",
+        "mapping_id": "role_04",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "מנהל בכיר",
+        "mapping_id": "role_05",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "רצ״ת",
+        "mapping_id": "role_06",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "מתחקר",
+        "mapping_id": "role_07",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "אחמשית",
+        "mapping_id": "role_08",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "שלישית",
+        "mapping_id": "role_09",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      }
+    ],
+    "worker_populations": [
+      {
+        "name": "מנהל",
+        "mapping_id": "pop_01",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "קבוע בכיר",
+        "mapping_id": "pop_02",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "קבוע",
+        "mapping_id": "pop_03",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "קבלן בכיר",
+        "mapping_id": "pop_04",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "קבלן",
+        "mapping_id": "pop_05",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "קבלן מיוחד",
+        "mapping_id": "pop_06",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "ותיק",
+        "mapping_id": "pop_07",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      }
+    ],
+    "shift_statuses": [
+      {
+        "name": "מתוכנן",
+        "mapping_id": "status_01",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "מאושר",
+        "mapping_id": "status_02",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "בוצע",
+        "mapping_id": "status_03",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "בוטל",
+        "mapping_id": "status_04",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "15׳",
+        "mapping_id": "status_05",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "30׳",
+        "mapping_id": "status_06",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "45׳",
+        "mapping_id": "status_07",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "60׳",
+        "mapping_id": "status_08",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "75׳",
+        "mapping_id": "status_09",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "90׳",
+        "mapping_id": "status_10",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "120׳",
+        "mapping_id": "status_11",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "180׳",
+        "mapping_id": "status_12",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "240׳",
+        "mapping_id": "status_13",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      }
+    ],
+    "custom_schedule_params": [
+      {
+        "name": "גזר",
+        "report_type": "sum_hours",
+        "options": [
+          "צפון",
+          "דרום"
+        ],
+        "mapping_id": "col_00",
+        "is_exportable": true,
+        "is_importable": true
+      },
+      {
+        "name": "זנב",
+        "report_type": "sum_hours",
+        "options": [
+          "766"
+        ],
+        "sub_options": [
+          {
+            "name": "999",
+            "criterion": "999"
+          },
+          {
+            "name": "777",
+            "criterion": "777"
+          }
+        ],
+        "is_importable": true,
+        "mapping_id": "col_01"
+      },
+      {
+        "name": "קר",
+        "report_type": "sum_hours",
+        "options": [],
+        "sub_options": [
+          {
+            "name": "33",
+            "criterion": "33"
+          }
+        ],
+        "mapping_id": "col_02"
+      },
+      {
+        "name": "הערה",
+        "report_type": "count_by_text",
+        "options": [],
+        "free_text": true,
+        "mapping_id": "col_03"
+      },
+      {
+        "name": "תוצאות",
+        "report_type": "count_quantitative",
+        "options": [],
+        "quantitative_items": [
+          "A",
+          "B",
+          "D"
+        ],
+        "mapping_id": "col_04"
+      },
+      {
+        "name": "פירות",
+        "report_type": "count_quantitative",
+        "options": [],
+        "quantitative_items": [
+          "תפוח",
+          "תפוז",
+          "אבטיח"
+        ],
+        "mapping_id": "col_05"
+      },
+      {
+        "name": "סילבוס",
+        "report_type": "count_quantitative",
+        "options": [],
+        "quantitative_items": [
+          "סילבוס 1",
+          "סילבוס 2",
+          "סילבוס 3",
+          "סילבוס 4",
+          "סילבוס 5"
+        ],
+        "mapping_id": "col_06"
+      }
+    ],
+    "tasks_list": [
+      {
+        "name": "עזרה",
+        "mapping_id": "task_1",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "סטאר",
+        "mapping_id": "task_2",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "שמן",
+        "mapping_id": "task_3",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "צילום",
+        "mapping_id": "task_4",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "+",
+        "mapping_id": "task_5",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "מיוחד חדש",
+        "mapping_id": "task_6",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      },
+      {
+        "name": "מיוחד ישן",
+        "mapping_id": "task_7",
+        "export_name": "",
+        "is_importable": true,
+        "is_exportable": true
+      }
+    ],
+    "user_roles": {
+      "dorfintz@gmail.com": "manager",
+      "amitpeled2001@gmail.com": "manager",
+      "dcavenor@gmail.com": "user",
+      "adironen815@gmail.com": "manager",
+      "orinach10@gmail.com": "manager"
+    },
+    "published_weeks": [
+      "2026-06-14",
+      "2026-06-07",
+      "2026-05-24",
+      "2026-06-21"
+    ]
+  },
+  "workers": [
+    {
+      "nickname": "למפה",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_למפה",
+      "email": "Tal.lempert98@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "לירו",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_לירו",
+      "email": "lee.rnn2@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "לונדון",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_לונדון",
+      "email": "94f87pmdp2@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "כפיר",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_כפיר",
+      "email": "tombl585@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "יעקוב",
+      "role": [
+        "מתחקר"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_6a26d47e99da34b3f1c430df",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "דניתי",
+      "role": [],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_6a26d4290089e983fc4aed3f",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "שושו",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_שושו",
+      "email": "rami.schayek@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "רגוב",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_6a26aeecbc5e17633d395202",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "קיקו",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_קיקו",
+      "email": "omrishe98@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "עבור",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_עבור",
+      "email": "eladrott@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "סונול",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_6a26aec350c6ebae83cc03c9",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "ניסן",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_ניסן",
+      "email": "applicationpro6@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "מורדו",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_מורדו",
+      "email": "motiseg161@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "מגהול",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_6a26aea08d9e7e8d923b8734",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "חסר",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_חסר",
+      "email": "5nr7p469ry@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "הרצל",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_הרצל",
+      "email": "hazanoam82@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "דמבו",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_דמבו",
+      "email": "taldembin@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "ברני",
+      "role": [
+        "נהג",
+        "מנהל בכיר"
+      ],
+      "population": "מנהל",
+      "worker_mapping_id": "wrk_ברני",
+      "email": "hadarbarnea1484@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "ברד",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_ברד",
+      "email": "k264p9d298@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "עלכום",
+      "role": [
+        "מתחקר"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_6a26ae2b2ad82db1526326a7",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "מורד",
+      "role": [
+        "מתחקר"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_מורד",
+      "email": "idanbarazani@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "יעל",
+      "role": [
+        "מנהל"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_6a26ae02c2379761b51f516d",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "תרנגול",
+      "role": [
+        "ליד נהג",
+        "מנהל"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_תרנגול",
+      "email": "peckeyal@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "תפוח",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_תפוח",
+      "email": "udirimon@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "תמים",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_תמים",
+      "email": "dekeltom@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "תיבה",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבלן",
+      "worker_mapping_id": "wrk_תיבה",
+      "email": "noahmendelsohn2@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "שחף",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבלן",
+      "worker_mapping_id": "wrk_שחף",
+      "email": "maya.sigal01@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "צינורי",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבלן",
+      "worker_mapping_id": "wrk_צינורי",
+      "email": "galiliomer10@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "צינגה",
+      "role": [
+        "ליד נהג",
+        "נהג",
+        "מנהל"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_צינגה",
+      "email": "ftd52b7ndf@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "פלטיפוס",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_פלטיפוס",
+      "email": "y49975tz6b@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "עוקץ",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_עוקץ",
+      "email": "dvash.raz1@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "סילי",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_6a26ad2ba8771d2ddb0eb21c",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "סולר",
+      "role": [
+        "ליד נהג",
+        "מנהל"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_סולר",
+      "email": "alon.issler100@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "נוטלה",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_נוטלה",
+      "email": "ehud.shahar94@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "מערבי",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_מערבי",
+      "email": "yoavmiz93@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "מכונאי",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_מכונאי",
+      "email": "omrim5000@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "מוקי",
+      "role": [
+        "ליד נהג",
+        "נהג"
+      ],
+      "population": "קבלן מיוחד",
+      "worker_mapping_id": "wrk_מוקי",
+      "email": "moocki1234@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "מאגר",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_מאגר",
+      "email": "ighofman@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "לחושך",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_6a26ac9f5e2b18f75f85cb31",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "יפה",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_יפה",
+      "email": "ofek.chen12@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "חווה",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_חווה",
+      "email": "ikalivach@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "זאב",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_זאב",
+      "email": "matanwolf10@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "הירשל",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_6a26ac439418fe52735552bf",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "גרטה",
+      "role": [
+        "ליד נהג",
+        "מנהל"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_גרטה",
+      "email": "Shahargrannot@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "ברנח",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבלן",
+      "worker_mapping_id": "wrk_ברנח",
+      "email": "rr45jrw55t@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "אישה",
+      "role": [
+        "אחמשית"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_אישה",
+      "email": "adironen815@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "ללה",
+      "role": [
+        "אחמשית",
+        "נהג",
+        "ליד נהג"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_ללה",
+      "email": "ktzwmb8zwy@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "בורג",
+      "role": [
+        "נהג"
+      ],
+      "population": "קבלן בכיר",
+      "worker_mapping_id": "wrk_6a26a3eb19057ed6fe2d0f05",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "אשוח",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_אשוח",
+      "email": "giloren76@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "אריה",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_אריה",
+      "email": "shacharlav10@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "אמין",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבלן",
+      "worker_mapping_id": "wrk_אמין",
+      "email": "citai2001@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "ירח",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_ירח",
+      "email": "b4sb25whft@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "קרפ",
+      "role": [
+        "נהג"
+      ],
+      "population": "קבלן בכיר",
+      "worker_mapping_id": "wrk_קרפ",
+      "email": "6zrjgzd2fg@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "לוין",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבלן",
+      "worker_mapping_id": "wrk_לוין",
+      "email": "Rlevinrad@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "הללויה",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_הללויה",
+      "email": "dbckmy7v49@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "שירלי",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_שירלי",
+      "email": "6zkrw2kbrg@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "דובי",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_דובי",
+      "email": "7-doll-month@icloud.com",
+      "active": true
+    },
+    {
+      "nickname": "שמח",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_שמח",
+      "email": "dgh8tjpg67@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "עיפרון",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבלן מיוחד",
+      "worker_mapping_id": "wrk_עיפרון",
+      "email": "Efronim1@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "שאפ",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_שאפ",
+      "email": "shapira53@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "ישראל ישראלי",
+      "role": [
+        "נהג"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_ישראל",
+      "email": "2gbn48vc7y@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "עמיתי",
+      "role": [
+        "אחמשית",
+        "נהג"
+      ],
+      "population": "מנהל",
+      "worker_mapping_id": "wrk_עמיתי",
+      "email": "amitpeled2001@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "קפוא",
+      "role": [
+        "ליד נהג",
+        "מנהל"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_69b46e148549107930d21404",
+      "email": "ofyanai@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "קבן",
+      "role": [
+        "ליד נהג",
+        "מנהל"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_69b327f45b731975f02a42f6",
+      "email": "dcavenor@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "בירה",
+      "role": [
+        "נהג"
+      ],
+      "population": "קבלן בכיר",
+      "worker_mapping_id": "wrk_אשוח",
+      "email": "shiraoren34@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "סקי",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa34c",
+      "email": "avirogalsky@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "אמברגו",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa339",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "מתגונן",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa34b",
+      "email": "gonenazar98@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "זוג",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_זוג",
+      "email": "omergooz16@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "רמא",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa34a",
+      "email": "arama.shahar@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "לקסוס",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבלן",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa344",
+      "email": "6j7wp448s9@privaterelay.applied.com",
+      "active": true
+    },
+    {
+      "nickname": "פישי",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa346",
+      "email": "taldvd156@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "חכם",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_חכם",
+      "email": "nadav.navon@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "סטרן",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa354",
+      "email": "yoavkos@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "עמוס",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa356",
+      "email": "itaiamos@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "דוכס",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_דוכס",
+      "email": "amitrosen9945@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "טיל",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_טיל",
+      "email": "e4roket@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "צפתית",
+      "role": [
+        "ליד נהג",
+        "מנהל בכיר"
+      ],
+      "population": "מנהל",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa348",
+      "email": "sefati.eyal@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "טופז",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "קבוע בכיר",
+      "worker_mapping_id": "wrk_טופז",
+      "email": "harelmekomeko@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "קוטג",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa33b",
+      "email": "kutai370@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "רעם",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa33f",
+      "email": "j9jmjtzrv9@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "שלומי",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa34d",
+      "email": "zonnen10@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "קידושי",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa350",
+      "email": "baruchifox13@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "רזי",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa347",
+      "email": "idomeyraz@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "דוצ",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_דוצ",
+      "email": "idozur2000@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "נקודה",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa340",
+      "email": "dotanhub@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "שחרם",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa349",
+      "email": "shahar.man10@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "קרב",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa33c",
+      "email": "pk4h9fvmnr@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "תמר",
+      "role": [
+        "מנהל"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa341",
+      "email": "c8t6mcw7cs@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "נור",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa33d",
+      "email": "fd5w5g55wn@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "יובי",
+      "role": [
+        "נהג"
+      ],
+      "population": "קבלן",
+      "worker_mapping_id": "wrk_יובי",
+      "email": "Yuvalevi39@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "תכשיט",
+      "role": [
+        "נהג"
+      ],
+      "population": "קבלן בכיר",
+      "worker_mapping_id": "wrk_69ad2a0168cb3193ae0fa358",
+      "email": "adikostret@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "אנקל",
+      "role": [
+        "נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_אנקל",
+      "email": "74zs8ypswz@privaterelay.appleid.com",
+      "active": true
+    },
+    {
+      "nickname": "קק",
+      "role": [
+        "ליד נהג"
+      ],
+      "population": "ותיק",
+      "worker_mapping_id": "wrk_6998e6451b9b525909123fb6",
+      "email": "nir102k@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "נחמן",
+      "role": [
+        "ליד נהג",
+        "מנהל"
+      ],
+      "population": "קבוע",
+      "worker_mapping_id": "wrk_6990cf1804daa1058524d381",
+      "email": "orinach10@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "סלוט",
+      "role": [
+        "נהג",
+        "מנהל בכיר"
+      ],
+      "population": "מנהל",
+      "worker_mapping_id": "wrk_6990cf02919cc170f462a559",
+      "email": "dslotin@gmail.com",
+      "active": true
+    },
+    {
+      "nickname": "קאדר",
+      "role": [
+        "נהג",
+        "מנהל בכיר"
+      ],
+      "population": "מנהל",
+      "worker_mapping_id": "wrk_6990cee431a9bc6bfaaa1999",
+      "email": "",
+      "active": true
+    },
+    {
+      "nickname": "גבר",
+      "role": [
+        "נהג",
+        "מנהל בכיר"
+      ],
+      "population": "מנהל",
+      "worker_mapping_id": "wrk_גבר",
+      "email": "dorfintz@gmail.com",
+      "active": true
+    }
+  ]
+}
