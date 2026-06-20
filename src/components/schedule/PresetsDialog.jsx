@@ -161,7 +161,9 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
     } else if (newColumnName === "time_end") {
       columnToAdd = { name: "סיום", type: "time", width: 100 };
     } else if (newColumnName === "worker_member") {
-      columnToAdd = { name: newColumnRole, type: "worker", width: 150, role_filter: newColumnRole };
+      const _selRole = (workerRoles || []).find(r => (typeof r === "string" ? r : r.name) === newColumnRole);
+      const _roleMid = _selRole && typeof _selRole !== "string" ? (_selRole.mapping_id || "") : "";
+      columnToAdd = { name: newColumnRole, type: "worker", width: 150, role_filter: newColumnRole, role_mapping_id: _roleMid };
     } else if (newColumnName === "task") {
       columnToAdd = { name: "משימה", type: "task", width: 120 };
     } else {

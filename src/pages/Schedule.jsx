@@ -1251,7 +1251,9 @@ export default function Schedule() {
                     columnToAdd = { name: "סיום", type: "time", width: 100 };
                   } else if (newTemplateColumnName === "worker_member") {
                     const colName = newTemplateColumnType.trim() || newTemplateColumnRole;
-                    columnToAdd = { name: colName, type: "worker", width: 150, role_filter: newTemplateColumnRole };
+                    const _selRole2 = (workerRoles || []).find(r => (typeof r === "string" ? r : r.name) === newTemplateColumnRole);
+                    const _roleMid2 = _selRole2 && typeof _selRole2 !== "string" ? (_selRole2.mapping_id || "") : "";
+                    columnToAdd = { name: colName, type: "worker", width: 150, role_filter: newTemplateColumnRole, role_mapping_id: _roleMid2 };
                   } else if (newTemplateColumnName === "task") {
                     columnToAdd = { name: "משימה", type: "task", width: 120 };
                   } else {
