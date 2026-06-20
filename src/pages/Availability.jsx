@@ -1711,22 +1711,22 @@ END:VEVENT
             <DialogHeader><DialogTitle className="flex items-center gap-2"><Info className="w-5 h-5 text-blue-600" />נהלי הרשמה ועדכונים</DialogTitle></DialogHeader>
             <div className="py-4"><div className="bg-blue-50 border border-blue-200 rounded-lg p-4 whitespace-pre-wrap">{tipsMessage}</div></div>
             <DialogFooter><Button onClick={async () => {
-              // Save acknowledgment to database per user
-              const acknowledgedSettings = await base44.entities.AppSettings.filter({ 
-                setting_key: `tips_acknowledged_${currentUser.email}` 
-              });
-              
-              if (acknowledgedSettings.length > 0) {
-                await base44.entities.AppSettings.update(acknowledgedSettings[0].id, {
-                  setting_value: tipsMessage
+              try {
+                const acknowledgedSettings = await base44.entities.AppSettings.filter({ 
+                  setting_key: `tips_acknowledged_${currentUser.email}` 
                 });
-              } else {
-                await base44.entities.AppSettings.create({
-                  setting_key: `tips_acknowledged_${currentUser.email}`,
-                  setting_value: tipsMessage
-                });
-              }
-              
+                
+                if (acknowledgedSettings.length > 0) {
+                  await base44.entities.AppSettings.update(acknowledgedSettings[0].id, {
+                    setting_value: tipsMessage
+                  });
+                } else {
+                  await base44.entities.AppSettings.create({
+                    setting_key: `tips_acknowledged_${currentUser.email}`,
+                    setting_value: tipsMessage
+                  });
+                }
+              } catch {}
               setShowTipsPopup(false);
             }} className="bg-blue-900 hover:bg-blue-800" dir="rtl">הבנתי</Button></DialogFooter>
           </DialogContent>
