@@ -18,6 +18,8 @@ import SummaryColumnsDialog from "../components/matrix/SummaryColumnsDialog";
 import MatrixHeader from "../components/matrix/MatrixHeader";
 import { NotificationDialog, TypeChangeDialog, ManualShiftDialog, UnavailabilityDialog } from "../components/matrix/MatrixDialogs";
 import ClassicTimelineRow from "../components/matrix/ClassicTimelineRow";
+import SaturdayReferenceStrip from "../components/matrix/SaturdayReferenceStrip";
+import TimelineHeaderComponent from "../components/matrix/TimelineHeader";
 import useViewPresets from "../hooks/useViewPresets";
 import ViewPresetDialog from "../components/matrix/ViewPresetDialog";
 
@@ -184,6 +186,11 @@ export default function Matrix() {
   const [qualifications, setQualifications] = useState([]);
   const [workerQualifications, setWorkerQualifications] = useState([]);
   const timelineRefs = useRef({});
+
+  // ── Saturday reference strip (weekly only) ────────────────────────────────────
+  const [satAssigned, setSatAssigned] = useState([]);
+  const [satAvail, setSatAvail] = useState([]);
+  const [satUnavail, setSatUnavail] = useState([]);
   const loadingTimeoutRef = useRef(null);
   const initialLoadDoneRef = useRef(false);
   const isLoadingRef = useRef(false);
@@ -588,6 +595,8 @@ export default function Matrix() {
     }
     initialLoadDoneRef.current = true;
     loadDynamicData(false);
+    // Trigger Saturday strip load for initial weekly view
+    setTimeout(() => loadSaturdayStrip(), 200);
   };
 
   const queuedMatrixRefreshRef = useRef(false);
@@ -715,6 +724,39 @@ export default function Matrix() {
   };
   const debouncedLoadDataRef = useRef(null);
   debouncedLoadDataRef.current = debouncedLoadData;
+
+  // ── Saturday strip isolated data loader ─────────────────────────────────────
+  const saturdayTriggerRef = useRef('');
+  const loadSaturdayStrip = useCallback(async () => {
+    if (viewMode !== 'weekly') {
+      setSatAssigned([]); setSatAvail([]); setSatUnavail([]);
+      return;
+    }
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const prevSatStr = format(addDays(weekStart, -1), 'yyyy-MM-dd');
+    const prevWeekStartStr = format(addDays(weekStart, -7), 'yyyy-MM-dd');
+    const trigger = `${prevSatStr}__${prevWeekStartStr}`;
+    if (saturdayTriggerRef.current === trigger) return;
+    saturdayTriggerRef.current = trigger;
+    try {
+      const [tr, av, un] = await Promise.all([
+        base44.entities.TemplateRow.filter({ date: prevSatStr }),
+        base44.entities.Availability.filter({ week_start_date: prevWeekStartStr }),
+        base44.entities.Unavailability.filter({ date: prevSatStr }),
+      ]);
+      setSatAssigned(tr || []);
+      setSatAvail(av || []);
+      setSatUnavail(un || []);
+    } catch (e) {
+      console.error('Saturday strip load failed:', e);
+    }
+  }, [currentDate, viewMode]);
+
+  useEffect(() => {
+    if (viewMode === 'weekly' && initialLoadDoneRef.current) {
+      loadSaturdayStrip();
+    }
+  }, [loadSaturdayStrip]);
 
   const dateString = format(currentDate, "yyyy-MM-dd");
   const weekStartDate = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
@@ -1724,7 +1766,7 @@ export default function Matrix() {
       totalWeeklyHours += dayHours;
       days.push({ date: d, day: DAYS_OF_WEEK[i], hours: dayHours, working: dayShifts.length > 0 });
     }
-    return <div className="flex gap-0.5 items-center">{days.map((d, i) => <div key={i} className={`text-[9px] font-medium leading-tight ${d.working ? 'text-green-600' : 'text-gray-300'}`} title={`${d.day}: ${d.working ? d.hours.toFixed(1) + 'h' : 'חופש'}`}>{d.day}</div>)}</div>;
+    return <div className="flex gap-0.5 items-center">{days.map((d, i) => <div key={i} className={'text-[9px] font-medium leading-tight ' + (d.working ? 'text-green-600' : 'text-gray-300')} title={d.day + ': ' + (d.working ? d.hours.toFixed(1) + 'h' : 'חופש')}>{d.day}</div>)}</div>;
   };
 
   const exportToExcel = () => {
@@ -1914,31 +1956,7 @@ export default function Matrix() {
   };
 
   const renderTimelineHeader = () => (
-    <div className="relative flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
-      {viewMode === 'daily' ? (
-        dailySlots.map((hour) => (
-          <div key={hour} className="shrink-0 text-xs text-gray-600 py-3 border-l text-center font-medium overflow-hidden" style={{ width: `${60 * ppm}px` }}>
-            {String(hour).padStart(2, '0')}:00
-          </div>
-        ))
-      ) : (
-        <>
-          {weeklySlots.map((slot, idx) => (
-            <div key={idx} className={`shrink-0 text-xs text-gray-600 py-1 text-center font-medium overflow-hidden border-l border-l-gray-200`} style={{ width: `${60 * ppm}px` }}>
-              {slot.label && <div className="font-bold text-gray-800 text-[10px] leading-tight">{slot.label}</div>}
-              {slot.dateLabel && <div className="text-[8px] text-gray-500 leading-tight">{slot.dateLabel}</div>}
-              <div className={`text-[8px] leading-tight ${slot.opIndex === 0 ? 'text-gray-800 font-semibold' : 'text-gray-400'}`}>
-                {String(slot.hour).padStart(2, '0')}
-              </div>
-            </div>
-          ))}
-          {[0,1,2,3,4,5,6].map(day => {
-            const px = day * 1440 * ppm;
-            return <div key={`hdb-${day}`} className="absolute top-0 h-full pointer-events-none" style={{ right: `${px}px`, width: '2px', backgroundColor: 'rgba(80,80,80,0.5)', zIndex: 5 }} />;
-          })}
-        </>
-      )}
-    </div>
+    <TimelineHeaderComponent viewMode={viewMode} timelineWidth={timelineWidth} ppm={ppm} dailySlots={dailySlots} weeklySlots={weeklySlots} currentDate={currentDate} />
   );
 
   const renderWorkerCellContent = (worker, index) => {
@@ -2197,6 +2215,8 @@ export default function Matrix() {
         </div>
       </div>
 
+      {viewMode === 'weekly' && <SaturdayReferenceStrip currentDate={currentDate} filteredWorkers={filteredWorkers} satAssigned={satAssigned} satAvail={satAvail} satUnavail={satUnavail} allTemplates={allTemplates} ROW_H={ROW_H} ppm={ppm} timelineWidth={timelineWidth} isStandbyStatus={isStandbyStatus} />}
+
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
         <div
           ref={timelineHeaderRef}
@@ -2229,15 +2249,17 @@ export default function Matrix() {
 
   // ── CLASSIC (UNPINNED) LAYOUT ─────────────────────────────────────────────────
   const renderClassicLayout = () => (
-    <div
-      ref={scrollContainerRef}
-      dir="ltr"
-      className="overflow-x-auto overflow-y-auto flex-1 min-h-0 matrix-scroll-container"
-      onMouseDown={handlePointerDown}
-      onMouseMove={handlePointerMove}
-      onMouseUp={handlePointerUp}
-    >
-      <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
+    <div className="flex flex-1 min-h-0" dir="rtl">
+      {viewMode === 'weekly' && <SaturdayReferenceStrip currentDate={currentDate} filteredWorkers={filteredWorkers} satAssigned={satAssigned} satAvail={satAvail} satUnavail={satUnavail} allTemplates={allTemplates} ROW_H={ROW_H} ppm={ppm} timelineWidth={timelineWidth} isStandbyStatus={isStandbyStatus} />}
+      <div
+        ref={scrollContainerRef}
+        dir="ltr"
+        className="overflow-x-auto overflow-y-auto flex-1 min-h-0 matrix-scroll-container"
+        onMouseDown={handlePointerDown}
+        onMouseMove={handlePointerMove}
+        onMouseUp={handlePointerUp}
+      >
+        <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
         <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
           <div className="p-2 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2 relative" dir="rtl" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
             <TooltipProvider>
@@ -2349,6 +2371,7 @@ export default function Matrix() {
             );
           })
         )}
+      </div>
       </div>
     </div>
   );
