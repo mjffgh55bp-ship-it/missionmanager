@@ -197,9 +197,18 @@ export function softInvalidateStaticCache() {
 
 // Toggle a week's published state. Returns the updated array. De-dupes AppSettings rows.
 export async function toggleWeekPublished(entities, weekStartStr, published) {
+  const tryWith = async (fn, tries = 4) => {
+    let last;
+    for (let i = 0; i < tries; i++) {
+      try { return await fn(); }
+      catch (e) { last = e; await new Promise(r => setTimeout(r, 400 * (i + 1))); }
+    }
+    throw last;
+  };
+
   let rows = [];
   try {
-    rows = await entities.AppSettings.filter({ setting_key: "published_weeks" });
+    rows = await tryWith(() => entities.AppSettings.filter({ setting_key: "published_weeks" }));
   } catch (e) {
     console.error("published_weeks: read failed", e);
     throw new Error("read_failed");
@@ -215,9 +224,9 @@ export async function toggleWeekPublished(entities, weekStartStr, published) {
 
   try {
     if (rows && rows.length > 0) {
-      await entities.AppSettings.update(rows[0].id, { setting_value: value });
+      await tryWith(() => entities.AppSettings.update(rows[0].id, { setting_value: value }));
     } else {
-      await entities.AppSettings.create({ setting_key: "published_weeks", setting_value: value });
+      await tryWith(() => entities.AppSettings.create({ setting_key: "published_weeks", setting_value: value }));
     }
   } catch (e) {
     console.error("published_weeks: write failed", e);

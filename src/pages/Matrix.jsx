@@ -567,34 +567,39 @@ export default function Matrix() {
         base44.entities.Availability.filter({ week_start_date: weekStartStr }),
         viewMode === "daily"
           ? base44.entities.Unavailability.filter({ date: dateStrLocal })
-          : base44.entities.Unavailability.list(),
+          : base44.entities.Unavailability.filter({ date: { $gte: weekDates[0], $lte: weekDates[6] } }),
         getCachedTemplates(base44.entities),
       ]);
 
       if (!trackerEntriesCache.current) {
-        trackerEntriesCache.current = await base44.entities.TrackerEntry.list();
+        trackerEntriesCache.current = await base44.entities.TrackerEntry.list("-created_date", 500);
       }
       const trackerEntriesData = trackerEntriesCache.current;
 
-      const parallelFetch = (dates) =>
-        Promise.all(dates.map(d => base44.entities.TemplateRow.filter({ date: d })));
-
-      let templateRowArrays;
+      let filteredTemplateRows;
       if (viewMode === "daily") {
-        templateRowArrays = await parallelFetch([
-          addDaysString(dateStrLocal, -1),
-          dateStrLocal,
-          addDaysString(dateStrLocal, 1),
-        ]);
+        const dStart = addDaysString(dateStrLocal, -1);
+        const dEnd = addDaysString(dateStrLocal, 1);
+        let rows;
+        try {
+          rows = await base44.entities.TemplateRow.filter({ date: { $gte: dStart, $lte: dEnd } });
+        } catch {
+          const recent = await base44.entities.TemplateRow.list("-date", 1000);
+          rows = (recent || []).filter(r => r.date >= dStart && r.date <= dEnd);
+        }
+        filteredTemplateRows = rows;
       } else {
-        templateRowArrays = await parallelFetch([
-          addDaysString(weekStartStr, -1),
-          ...weekDates,
-          addDaysString(weekDates[weekDates.length - 1], 1),
-        ]);
+        // WEEKLY: ONE windowed query for the whole week instead of 7 parallel calls
+        const wStart = weekDates[0], wEnd = weekDates[6];
+        let rows;
+        try {
+          rows = await base44.entities.TemplateRow.filter({ date: { $gte: wStart, $lte: wEnd } });
+        } catch {
+          const recent = await base44.entities.TemplateRow.list("-date", 1500);
+          rows = (recent || []).filter(r => r.date >= wStart && r.date <= wEnd);
+        }
+        filteredTemplateRows = (rows || []).filter(r => weekDates.includes(r.date));
       }
-
-      let filteredTemplateRows = templateRowArrays.flat();
 
       if (viewMode === "daily") {
         const continuationRows = filteredTemplateRows.filter(r => r.values?.is_continuation && r.values?.continuation_source_row_id);
