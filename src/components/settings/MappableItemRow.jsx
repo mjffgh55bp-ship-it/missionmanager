@@ -48,14 +48,15 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
   // Sync draft when item prop changes (after parent saves)
   useEffect(() => { setDraft(item); }, [item.name, item.mapping_id, item.export_name]);
 
-  const isDuplicate = draft.mapping_id &&
-    allItems.filter(i => normalizeItem(i).mapping_id === draft.mapping_id).length > 1;
+  const normalizedDraftId = (draft.mapping_id || "").trim().toLowerCase();
+  const isDuplicate = normalizedDraftId &&
+    allItems.filter(i => normalizeItem(i).mapping_id === normalizedDraftId && normalizeItem(i).name !== item.name).length > 0;
 
   const hasMappingId = !!item.mapping_id;
 
   const handleSave = async () => {
     setSaving(true);
-    await onSave(draft);
+    await onSave({ ...draft, mapping_id: (draft.mapping_id || "").trim().toLowerCase() });
     setSaving(false);
     setExpanded(false);
   };
@@ -137,7 +138,7 @@ export default function MappableItemRow({ item, allItems, prefix, color = "indig
               <div className="flex gap-1">
                 <Input
                   value={draft.mapping_id}
-                  onChange={e => setDraft(d => ({ ...d, mapping_id: e.target.value.trim().toLowerCase() }))}
+                  onChange={e => setDraft(d => ({ ...d, mapping_id: e.target.value }))}
                   placeholder={`${prefix}_...`}
                   className="h-7 text-xs font-mono flex-1"
                   dir="ltr"
