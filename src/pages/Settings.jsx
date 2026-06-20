@@ -105,8 +105,23 @@ export default function Settings() {
 
       const rawRoles = workerRolesSettings.length > 0
         ? (JSON.parse(workerRolesSettings[0].setting_value) || [])
-        : ["שף", "סו-שף"];
-      setWorkerRoles(rawRoles.map(normalizeItem));
+        : [];
+      const normRoles = rawRoles.map(normalizeItem).map(r =>
+        r.mapping_id ? r : { ...r, mapping_id: suggestMappingId(r.name, "role") }
+      );
+      setWorkerRoles(normRoles);
+      // Persist backfilled ids quietly (don't block render), like the tasks/schedule-column backfill
+      const rolesNeedSave = rawRoles.some((r, i) => normRoles[i].mapping_id && (typeof r === "string" || !r.mapping_id));
+      if (rolesNeedSave) {
+        (async () => {
+          try {
+            const s2 = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
+            const d = { setting_key: "worker_roles", setting_value: JSON.stringify(normRoles) };
+            if (s2.length > 0) await base44.entities.AppSettings.update(s2[0].id, d);
+            else await base44.entities.AppSettings.create(d);
+          } catch (e) { console.error("role mapping_id backfill failed:", e); }
+        })();
+      }
 
       const rawStatuses = shiftStatusesSettings.length > 0
         ? (JSON.parse(shiftStatusesSettings[0].setting_value) || [])

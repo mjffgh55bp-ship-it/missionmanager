@@ -355,14 +355,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const WORKER_ROLE_COL_NAME = "__תפקיד__";
 
   const computeAutoValue = (col, workerId) => {
-    if (workerId && workers && workers.find(w => w.id === workerId)?.nickname === "נחמן") {
-      console.log("[COL DIAG]", {
-        colName: col.name,
-        colType: col.type,
-        criteria: JSON.stringify(col.criteria),
-        criteria_logic: col.criteria_logic
-      });
-    }
   const dateRange = getDateRange(dateFilterMode, startDate, endDate);
 
   // ── Role criteria — filter at SHIFT level ──────────────────────────
@@ -378,24 +370,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
       if (isTemplateRow && template) {
         const allWorkerCols = (template.columns || []).filter(c => c.type === "worker");
-        const _dbgWorker = workers.find(w => w.id === workerId);
-        if (_dbgWorker?.nickname === "נחמן" && expectedRoles && expectedRoles.includes("מנהל")) {
-          console.log("[MATCH DIAG] נחמן", {
-            templateName: template.name,
-            rowId: shiftData.id,
-            expectedRoles,
-            workerCols: allWorkerCols.map(tc => ({
-              name: tc.name,
-              role_filter: tc.role_filter,
-              column_id: tc.column_id,
-              storedValByName: shiftData.values?.[tc.name],
-              storedValById: tc.column_id ? shiftData.values?.[tc.column_id] : undefined,
-              isThisWorkerHere: shiftData.values?.[tc.name] === workerId || (tc.column_id && shiftData.values?.[tc.column_id] === workerId),
-              colRole: tc.role_filter || tc.name,
-              roleMatches: expectedRoles.includes(tc.role_filter || tc.name)
-            }))
-          });
-        }
         return allWorkerCols.some(tc => {
           // Is THIS worker assigned in this column? (support name-keyed and id-keyed storage)
           const valByName = shiftData.values?.[tc.name];
