@@ -355,6 +355,36 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const WORKER_ROLE_COL_NAME = "__תפקיד__";
 
   const computeAutoValue = (col, workerId) => {
+    const _isNachman = (() => { const w = workers.find(x => x.id === workerId); return w && w.nickname === "נחמן"; })();
+    const _wantsManager = expectedRoles && (expectedRoles.includes("מנהל") || expectedRoles.some(r => typeof r === "string" && r.startsWith("role_")));
+    if (_isNachman && _wantsManager) {
+      console.log("[DEEP DIAG] start", { colName: col.name, colType: col.type, expectedRoles, dateRangeIs: getDateRange(dateFilterMode, startDate, endDate), templateRowsCount: templateRows.length, assignmentsForWorker: assignments.filter(a => a.chef_id===workerId||a.sous_chef_id===workerId||a.additional_chef_id===workerId).length });
+      templateRows.forEach(row => {
+        const tmpl = allTemplates.find(t => t.id === row.template_id);
+        const workerCols = (tmpl?.columns || []).filter(c => c.type === "worker");
+        const hits = workerCols.filter(tc => row.values?.[tc.name] === workerId || (tc.column_id && row.values?.[tc.column_id] === workerId));
+        if (hits.length > 0) {
+          console.log("[DEEP DIAG] row-with-nachman", {
+            rowId: row.id, date: row.date, templateName: tmpl?.name, templateId: row.template_id,
+            startTime: row.values?.["התחלה"] || row.values?.["שעת התחלה"],
+            endTime: row.values?.["סיום"] || row.values?.["שעת סיום"],
+            hitColumns: hits.map(tc => ({ name: tc.name, role_filter: tc.role_filter, role_mapping_id: tc.role_mapping_id, column_id: tc.column_id })),
+            storedValueKeys: Object.keys(row.values || {})
+          });
+        }
+      });
+      templateRows.forEach(row => {
+        const tmpl = allTemplates.find(t => t.id === row.template_id);
+        const workerCols = (tmpl?.columns || []).filter(c => c.type === "worker");
+        workerCols.forEach(tc => {
+          const v = row.values?.[tc.name];
+          if (v && typeof v === "string" && v !== workerId) {
+            const w = workers.find(x => x.id === v);
+            if (!w) console.log("[DEEP DIAG] cell-value-not-a-known-id", { rowId: row.id, date: row.date, templateName: tmpl?.name, col: tc.name, storedValue: v });
+          }
+        });
+      });
+    }
   const dateRange = getDateRange(dateFilterMode, startDate, endDate);
 
   // ── Role criteria — filter at SHIFT level ──────────────────────────
