@@ -99,9 +99,10 @@ export default function Reports() {
       base44.entities.ChartWidget.list("order"),
       base44.entities.Qualification.filter({ active: true }),
     ]);
-    const [entriesData, workerQualsData] = await Promise.all([
+    const [entriesData, workerQualsData, scheduleColEntities] = await Promise.all([
       base44.entities.TrackerEntry.list(),
       base44.entities.WorkerQualification.list(),
+      base44.entities.ScheduleColumn.list(),
     ]);
 
     // Pull each setting locally from the one cached list (no per-key queries)
@@ -146,14 +147,24 @@ export default function Reports() {
       setRoleObjects(objs);
     }
 
-    // Collect all unique schedule columns from global + cart params
+    // Collect all unique schedule columns from global + cart params + entities
     const cartCols = Object.values(cartParams).flat();
-    const allCols = [...globalCols, ...cartCols];
+    const entityCols = (scheduleColEntities || []).map(c => ({
+      name: c.name,
+      type: c.type,
+      role_filter: c.role_filter,
+      mapping_id: c.mapping_id,
+      options: c.options,
+      sub_options: c.sub_options,
+      quantitative_items: c.quantitative_items,
+      is_time: c.is_time,
+    }));
+    const allCols = [...globalCols, ...cartCols, ...entityCols];
     const uniqueCols = allCols.filter((col, idx, arr) => arr.findIndex(c => c.name === col.name) === idx);
     setScheduleColumns(uniqueCols);
-    // Build id→column map for live name resolution in charts
+    // Build id→column map for live name resolution in charts (include entities)
     const byId = {};
-    globalCols.forEach(c => { if (c.mapping_id) byId[c.mapping_id] = c; });
+    [...globalCols, ...entityCols].forEach(c => { if (c.mapping_id) byId[c.mapping_id] = c; });
     setScheduleColumnsById(byId);
     } catch (error) {
       console.error('Error loading reports data:', error);

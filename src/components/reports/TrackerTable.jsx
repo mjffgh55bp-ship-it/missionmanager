@@ -370,7 +370,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     if (isTemplateRow && template) {
       const workerCols = (template.columns || []).filter(c => c.type === "worker" && c.column_id);
       return workerCols.some(tc => {
-        if (shiftData.values?.[tc.name] !== workerId) return false;
+        // Support both column-name keys and mapping_id keys in row values
+        const valByName = shiftData.values?.[tc.name];
+        const valById = tc.column_id ? shiftData.values?.[tc.column_id] : undefined;
+        if (valByName !== workerId && valById !== workerId) return false;
         const sc = scheduleColumns.find(s => s.mapping_id === tc.column_id);
         return sc && expectedRoles.includes(sc.role_filter);
       });
@@ -617,7 +620,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           const rowEndTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || (tmplTimeCols[1] ? row.values?.[tmplTimeCols[1].name] : "") || "";
           const effectiveDate = getOperationalStartDate(row.date, rowStartTime || "06:00");
           if (dateRange && (effectiveDate < dateRange.start || effectiveDate > dateRange.end)) return;
-          if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] === workerId)) return;
+          if (!(tmpl.columns || []).some(tc => tc.type === "worker" && (row.values?.[tc.name] === workerId || (tc.column_id && row.values?.[tc.column_id] === workerId)))) return;
           if (!checkTimeRange(rowStartTime, rowEndTime)) return;
           if (!workerMatchesRoleInShift(row, true, tmpl)) return;
           const raw = row.values?.[colName];
@@ -647,7 +650,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           if (!tmpl) return;
           // Check if this row has the worker anywhere (not just one column)
           const hasWorker = (tmpl.columns || []).some(tc => 
-            tc.type === "worker" && row.values?.[tc.name] === workerId
+            tc.type === "worker" && (
+              row.values?.[tc.name] === workerId ||
+              (tc.column_id && row.values?.[tc.column_id] === workerId)
+            )
           );
           if (!hasWorker) return;
           
@@ -684,7 +690,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         if (dateRange && (effectiveDate < dateRange.start || effectiveDate > dateRange.end)) return;
         const tmpl = allTemplates.find(t => t.id === row.template_id);
         if (!tmpl) return;
-        if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
+        if (!(tmpl.columns || []).some(tc => tc.type === "worker" && (row.values?.[tc.name] === workerId || (tc.column_id && row.values?.[tc.column_id] === workerId)))) return;
         const rowAsAssignment = { qualification_id: row.values?.task || "" };
         if (!matchesColValueFilter(row.values, col.schedule_col_name, rowAsAssignment)) return;
         if (!workerMatchesRoleInShift(row, true, tmpl)) return;
@@ -777,7 +783,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
          const endTime = row.values?.["סיום"] || row.values?.["שעת סיום"] || (endTimeCol ? row.values?.[endTimeCol.name] : "") || "";
          const effectiveDate = getOperationalStartDate(row.date, startTime || "06:00");
          if (dateRange && (effectiveDate < dateRange.start || effectiveDate > dateRange.end)) return;
-         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && row.values?.[tc.name] && row.values?.[tc.name] === workerId)) return;
+         if (!(tmpl.columns || []).some(tc => tc.type === "worker" && (row.values?.[tc.name] === workerId || (tc.column_id && row.values?.[tc.column_id] === workerId)))) return;
 
          if (!checkQuantCriteria(row.values)) return;
          if (!checkTimeRangeCriteria(startTime, endTime)) return;
