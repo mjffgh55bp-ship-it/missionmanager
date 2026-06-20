@@ -132,7 +132,10 @@ export default function Yearly() {
       setWorkerRoles(rolesS ? JSON.parse(rolesS.setting_value) : ["שף", "סו-שף"]);
       setWorkerPopulations(popsS ? JSON.parse(popsS.setting_value) : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
       const rawTasksY = tasksS ? JSON.parse(tasksS.setting_value) : [];
-    setTasks(rawTasksY.map(t => typeof t === 'string' ? { name: t, mapping_id: "", export_name: "", is_importable: true, is_exportable: true } : t));
+      setTasks(rawTasksY.map(t => {
+      if (typeof t === 'string') return { name: t, mapping_id: "", export_name: "", is_importable: true, is_exportable: true };
+      return { ...t, name: t.name || t.mapping_id || "" };
+      }));
       setTaskQualifications(taskQualS ? JSON.parse(taskQualS.setting_value) : {});
     } catch (error) {
       console.error('Error loading yearly data:', error);
@@ -851,13 +854,16 @@ export default function Yearly() {
                   <div>
                     <p className="text-xs font-semibold text-gray-500 mb-1">כשירות למשימה</p>
                     <div className="flex flex-wrap gap-1">
-                      {tasks.map(task => (
-                        <button key={task.name || task} type="button"
-                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filterTasks.includes(task.name || task) ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400'}`}
-                          onClick={() => setFilterTasks(prev => prev.includes(task.name || task) ? prev.filter(t => t !== (task.name || task)) : [...prev, (task.name || task)])}>
-                          {task.name || task}
-                        </button>
-                      ))}
+                      {tasks.map(task => {
+                        const taskName = task.name || "";
+                        return (
+                          <button key={taskName || Math.random()} type="button"
+                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${filterTasks.includes(taskName) ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400'}`}
+                            onClick={() => setFilterTasks(prev => prev.includes(taskName) ? prev.filter(t => t !== taskName) : [...prev, taskName])}>
+                            {taskName}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
