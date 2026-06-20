@@ -245,7 +245,8 @@ export default function Yearly() {
     const todayStr = format(todayDate, "yyyy-MM-dd");
     const todayIndex = yearDaysMap[todayStr];
     if (todayIndex !== undefined) {
-      const scrollPosition = todayIndex * CELL_WIDTH - (scrollContainerRef.current.clientWidth / 2) + (CELL_WIDTH / 2);
+      // Align today to the right edge (first visible column in RTL)
+      const scrollPosition = todayIndex * CELL_WIDTH;
       scrollContainerRef.current.scrollLeft = Math.max(0, scrollPosition);
     }
   };
