@@ -81,16 +81,56 @@ export function formatTimeTrigger(storedValue) {
   return storedValue;
 }
 
-/**
- * OperationalTimePicker
- *
- * Props:
- *   value        — stored time string (plain "HH:MM", "-1 HH:MM", "+N HH:MM")
- *   onChange     — called with new stored value string (does NOT persist itself)
- *   placeholder  — text shown when no value (default "--:--")
- *   allowClear   — show "נקה" button (default true)
- *   compact      — smaller trigger button (default false)
- */
+// ─── Slot helpers ─────────────────────────────────────────────────────────────
+// Display: "HH:MM" → string indices [0,1, 2(:), 3,4]
+const caretToSlot = (caretIdx) => {
+  if (caretIdx <= 0) return 0;
+  if (caretIdx === 1) return 1;
+  if (caretIdx >= 2 && caretIdx <= 3) return 2;
+  return 3;
+};
+const slotToCaret = (slot) => (slot <= 1 ? slot : slot + 1); // skip colon at index 2
+
+// Round a 2-digit minute string to nearest valid MINUTE
+const roundMinute = (mm) => {
+  const val = parseInt(mm, 10);
+  if (isNaN(val)) return null;
+  let best = MINUTES[0];
+  let bestDiff = Math.abs(val - parseInt(best, 10));
+  for (const m of MINUTES) {
+    const diff = Math.abs(val - parseInt(m, 10));
+    if (diff < bestDiff) { bestDiff = diff; best = m; }
+  }
+  return best;
+};
+
+// ─── Resolve + commit helper ──────────────────────────────────────────────────
+const resolveAndCommit = (slots, localHourValue, parsed, handleSelectFn, setOpenFn, onChangeFn) => {
+  const hh = (slots[0] === " " ? "0" : slots[0]) + (slots[1] === " " ? "0" : slots[1]);
+  const hh2 = hh.padStart(2, "0");
+  const mm = (slots[2] === " " ? "0" : slots[2]) + (slots[3] === " " ? "0" : slots[3]);
+
+  // Resolve hour — match in cur zone
+  let resolvedHour = localHourValue || parsed.hourValue;
+  const matched = HOUR_ENTRIES.find(
+    entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh2
+  );
+  if (matched) resolvedHour = matched.value;
+  if (!resolvedHour) resolvedHour = hh2;
+
+  // Resolve minute — round to nearest valid
+  const mm2 = mm.padStart(2, "0");
+  let resolvedMin = MINUTES.includes(mm2) ? mm2 : roundMinute(mm2);
+  if (!resolvedMin) resolvedMin = "00";
+
+  const newVal = buildStoredValue(resolvedHour, resolvedMin);
+  if (newVal) {
+    setOpenFn(false);
+    onChangeFn(newVal);
+  }
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
 export default function OperationalTimePicker({
   value,
   onChange,
@@ -99,33 +139,31 @@ export default function OperationalTimePicker({
   compact = false,
 }) {
   const [open, setOpen] = useState(false);
-  const [hourInput, setHourInput] = useState("");
-  const [hasStartedTyping, setHasStartedTyping] = useState(false);
+  const [slots, setSlots] = useState([" ", " ", " ", " "]);
+  const [cursor, setCursor] = useState(0);
   const inputRef = useRef(null);
   const hourRef = useRef(null);
   const minRef = useRef(null);
-  const autoClosedRef = useRef(false); // prevents double-fire on auto-close
-  const cursorPosRef = useRef(null);   // tracked cursor position for digit-by-digit editing
-  const pendingDigitRef = useRef(null); // digit key captured in onKeyDown, consumed in onChange
+  const autoClosedRef = useRef(false);
 
   const parsed = parseTimeCellLocal(value);
-  // localHourValue: currently highlighted hour in the popover
   const [localHourValue, setLocalHourValue] = useState(parsed.hourValue);
-  // liveMin: live-highlighted minute as user types
   const [liveMin, setLiveMin] = useState(null);
 
-  // On popover open: reset, pre-fill existing hour digits for plain values
+  // ── Initialize slots from existing value on open ───────────────────────────
   useEffect(() => {
     if (!open) return;
     autoClosedRef.current = false;
-    setHasStartedTyping(false);
     setLiveMin(null);
-    cursorPosRef.current = null;
     setLocalHourValue(parsed.hourValue);
-    if (parsed.hourValue && !parsed.hourValue.startsWith("-1") && !parsed.hourValue.startsWith("+")) {
-      setHourInput(parsed.hourValue);
+
+    // Pre-fill slots if the stored value is a plain "HH:MM"
+    if (parsed.hourValue && !parsed.hourValue.startsWith("-1") && !parsed.hourValue.startsWith("+") && parsed.min) {
+      setSlots([parsed.hourValue[0] || " ", parsed.hourValue[1] || " ", parsed.min[0] || " ", parsed.min[1] || " "]);
+      setCursor(0);
     } else {
-      setHourInput("");
+      setSlots([" ", " ", " ", " "]);
+      setCursor(0);
     }
   }, [open]);
 
@@ -150,6 +188,36 @@ export default function OperationalTimePicker({
     }, 50);
   }, [open]);
 
+  // ── Update hour highlight + liveMin from slots ─────────────────────────────
+  const syncHighlightFromSlots = (s) => {
+    const hhRaw = s[0] + s[1];
+    if (hhRaw.trim().length >= 1) {
+      const hh2 = hhRaw.replace(/\s/g, "0").padStart(2, "0").slice(0, 2);
+      const matched = HOUR_ENTRIES.find(
+        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh2
+      );
+      if (matched) setLocalHourValue(matched.value);
+    }
+
+    const mmRaw = s[2] + s[3];
+    if (mmRaw.trim().length >= 1) {
+      const padded = mmRaw.replace(/\s/g, "0").padStart(2, "0").slice(0, 2);
+      setLiveMin(MINUTES.includes(padded) ? padded : null);
+    } else {
+      setLiveMin(null);
+    }
+  };
+
+  // ── Restore caret to slot position ──────────────────────────────────────────
+  const restoreCaret = (c) => {
+    requestAnimationFrame(() => {
+      if (inputRef.current) {
+        const target = slotToCaret(c);
+        inputRef.current.setSelectionRange(target, target);
+      }
+    });
+  };
+
   const handleSelect = (hourValue, min) => {
     const newVal = buildStoredValue(hourValue, min);
     if (!newVal) return;
@@ -157,10 +225,19 @@ export default function OperationalTimePicker({
     onChange(newVal);
   };
 
-  // Hour click only highlights — does NOT close or save
+  // Hour click: fill hour slots from the roller selection
   const handleHourClick = (hourValue) => {
-    cursorPosRef.current = null;
+    // Parse the hourValue to get display digits (handle "-1 05", "+2 18", "06" etc.)
+    const parts = hourValue.split(" ");
+    const numStr = parts.length > 1 ? parts[1] : parts[0];
+    const next = [...slots];
+    next[0] = numStr[0] || " ";
+    next[1] = numStr[1] || " ";
+    setSlots(next);
+    setCursor(2); // advance to minutes
     setLocalHourValue(hourValue);
+    syncHighlightFromSlots(next);
+    restoreCaret(2);
   };
 
   // Minute click finalizes: close + save with selected hour
@@ -169,137 +246,73 @@ export default function OperationalTimePicker({
     handleSelect(hv, m);
   };
 
-  // Apply a typed digit at the tracked cursor position and advance the cursor.
-  const applyDigitAtCursor = (digit) => {
-    const oldRaw = hourInput.replace(/\D/g, "");
-    const pos = cursorPosRef.current !== null ? cursorPosRef.current : oldRaw.length;
-    if (pos >= 4) return; // no room — cap at 4 digits (HHMM)
-
-    const chars = (oldRaw.padEnd(4, " ")).split("");
-    chars[pos] = digit;
-    const result = chars.join("").replace(/\s/g, "").slice(0, 4);
-    setHourInput(result);
-    setHasStartedTyping(true);
-    cursorPosRef.current = Math.min(pos + 1, 3);
-
-    // Live hour matching (cur zone only)
-    const hhRaw2 = result.slice(0, 2);
-    if (hhRaw2.length >= 1) {
-      const hh2 = hhRaw2.padStart(2, "0");
-      const matched = HOUR_ENTRIES.find(
-        entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh2
-      );
-      if (matched) setLocalHourValue(matched.value);
-    }
-
-    // Live minute highlighting
-    const mmRaw2 = result.slice(2, 4);
-    if (mmRaw2.length >= 1) {
-      const padded = mmRaw2.padStart(2, "0");
-      setLiveMin(MINUTES.includes(padded) ? padded : null);
-    } else {
-      setLiveMin(null);
-    }
-
-    // Restore cursor at the next position after React re-render
-    requestAnimationFrame(() => {
-      if (inputRef.current && cursorPosRef.current !== null) {
-        const target = Math.min(cursorPosRef.current, inputRef.current.value.length);
-        inputRef.current.setSelectionRange(target, target);
-      }
-    });
-  };
-
-  // onChange: used as a fallback for deletions / paste / non-digit input.
-  // Digit-by-digit inserts are handled by onKeyDown via pendingDigitRef.
-  const handleInputChange = (e) => {
+  const handleInputChange = () => {
+    // onChange is only used as fallback for paste etc. — digits are handled in onKeyDown.
+    // For paste: extract digits and fill slots left-to-right.
     if (autoClosedRef.current) return;
-
-    // If a digit key was already captured by onKeyDown, consume it here
-    // and let applyDigitAtCursor do the work regardless of what the browser did.
-    if (pendingDigitRef.current !== null) {
-      const digit = pendingDigitRef.current;
-      pendingDigitRef.current = null;
-      applyDigitAtCursor(digit);
-      return;
-    }
-
-    // Fallback: the input changed without a digit key (delete, paste, etc.)
-    const raw = e.target.value.replace(/\D/g, "").slice(0, 4);
-    setHourInput(raw);
-    setHasStartedTyping(true);
-    cursorPosRef.current = null;
-    setLiveMin(null);
+    // Minimal fallback — the input is controlled, so this only fires on paste/IME.
+    // We'll just sync slots from whatever ended up in the input.
   };
 
   const handleKeyDown = (e) => {
-    // ── Enter: commit ──────────────────────────────────────────────────
+    // ── Enter: commit ────────────────────────────────────────────────────
     if (e.key === "Enter") {
       e.preventDefault();
       if (autoClosedRef.current) return;
-
-      let resolvedHour = localHourValue || parsed.hourValue;
-      let resolvedMin = parsed.min || "00";
-
-      const raw = hourInput.replace(/\D/g, "");
-      const hh = raw.slice(0, 2).padStart(2, "0");
-      const mm = raw.slice(2, 4);
-
-      if (raw.length >= 1) {
-        const matched = HOUR_ENTRIES.find(
-          entry => entry.type !== "boundary" && entry.zone === "cur" && entry.display === hh
-        );
-        if (matched) resolvedHour = matched.value;
-      }
-      if (mm.length === 2 && MINUTES.includes(mm)) {
-        resolvedMin = mm;
-      }
-
-      if (resolvedHour) {
-        cursorPosRef.current = null;
-        handleSelect(resolvedHour, resolvedMin);
-      }
+      autoClosedRef.current = true;
+      resolveAndCommit(slots, localHourValue, parsed, handleSelect, setOpen, onChange);
       return;
     }
 
-    // ── Digit: prevent browser insertion, handle ourselves ────────────
+    // ── Digit: overwrite at cursor ───────────────────────────────────────
     if (/^\d$/.test(e.key)) {
       e.preventDefault();
-      pendingDigitRef.current = e.key;
-      applyDigitAtCursor(e.key);
+
+      const next = [...slots];
+      next[cursor] = e.key;
+      setSlots(next);
+      syncHighlightFromSlots(next);
+
+      // If this was the 4th slot (index 3), auto-commit
+      if (cursor === 3) {
+        autoClosedRef.current = true;
+        resolveAndCommit(next, localHourValue, parsed, handleSelect, setOpen, onChange);
+        return;
+      }
+
+      const newCursor = cursor + 1;
+      setCursor(newCursor);
+      restoreCaret(newCursor);
       return;
     }
 
-    // ── Backspace: delete char before cursor ──────────────────────────
+    // ── Backspace: clear slot left of cursor ─────────────────────────────
     if (e.key === "Backspace") {
       e.preventDefault();
-      const oldRaw = hourInput.replace(/\D/g, "");
-      if (oldRaw.length === 0) return;
-      const pos = cursorPosRef.current !== null ? cursorPosRef.current : oldRaw.length;
-      const deleteIdx = pos > 0 ? pos - 1 : 0;
-      const chars = oldRaw.split("");
-      chars.splice(deleteIdx, 1);
-      const result = chars.join("").slice(0, 4);
-      setHourInput(result);
-      cursorPosRef.current = Math.max(deleteIdx, 0);
-      setLiveMin(null);
-      requestAnimationFrame(() => {
-        if (inputRef.current && cursorPosRef.current !== null) {
-          const target = Math.min(cursorPosRef.current, inputRef.current.value.length);
-          inputRef.current.setSelectionRange(target, target);
-        }
-      });
+      const target = cursor > 0 ? cursor - 1 : 0;
+      const next = [...slots];
+      next[target] = " ";
+      setSlots(next);
+      setCursor(target);
+      syncHighlightFromSlots(next);
+      restoreCaret(target);
       return;
     }
 
-    // ── Arrow keys: update tracked cursor position ────────────────────
-    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-      // Let browser handle the move, then read back position
-      requestAnimationFrame(() => {
-        if (inputRef.current) {
-          cursorPosRef.current = inputRef.current.selectionStart;
-        }
-      });
+    // ── Arrow keys: move cursor slot ─────────────────────────────────────
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      const newCursor = Math.max(cursor - 1, 0);
+      setCursor(newCursor);
+      restoreCaret(newCursor);
+      return;
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      const newCursor = Math.min(cursor + 1, 3);
+      setCursor(newCursor);
+      restoreCaret(newCursor);
+      return;
     }
   };
 
@@ -312,14 +325,15 @@ export default function OperationalTimePicker({
     ? "w-full h-full text-xs text-center py-1 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none"
     : "w-full h-full text-sm text-center py-2 px-1 hover:bg-blue-50 transition-colors whitespace-nowrap outline-none";
 
-  // Input display: formatted value when closed, formatted value when open but hasn't started typing, raw digits once typing begins
+  // Display: when open, show slots as "--:--" style with dashes for blanks
+  const slotChar = (ch) => ch === " " ? "-" : ch;
   const inputDisplayValue = open
-    ? (hasStartedTyping ? hourInput : (value || ""))
+    ? `${slotChar(slots[0])}${slotChar(slots[1])}:${slotChar(slots[2])}${slotChar(slots[3])}`
     : (value || "");
 
-  const inputStyle = (open && !hasStartedTyping) || (!open && value)
+  const inputStyle = open
     ? {}
-    : !open && !value
+    : !value
       ? { color: "#9ca3af" }
       : {};
 
@@ -332,8 +346,12 @@ export default function OperationalTimePicker({
           inputMode="numeric"
           value={inputDisplayValue}
           onChange={handleInputChange}
-          onSelect={(e) => { cursorPosRef.current = e.target.selectionStart; }}
-          onClick={(e) => { cursorPosRef.current = e.target.selectionStart; }}
+          onSelect={(e) => setCursor(caretToSlot(e.target.selectionStart))}
+          onClick={(e) => {
+            const c = caretToSlot(e.target.selectionStart);
+            setCursor(c);
+            restoreCaret(c);
+          }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={triggerClass + (open ? " bg-blue-50 ring-1 ring-blue-400" : "")}
@@ -394,7 +412,10 @@ export default function OperationalTimePicker({
           <div ref={minRef} className="flex-1 overflow-y-auto scroll-smooth">
             <div className="text-center text-[10px] text-gray-400 mb-1 sticky top-0 bg-white z-10">דקות</div>
             {MINUTES.map(m => {
-              const isSelected = hasStartedTyping ? m === liveMin : m === parsed.min;
+              // Show minute as selected if it matches liveMin, OR if typed minutes match
+              const typedMm = (slots[2] === " " ? "0" : slots[2]) + (slots[3] === " " ? "0" : slots[3]);
+              const typedMm2 = typedMm.replace(/\s/g, "0").padStart(2, "0").slice(0, 2);
+              const isSelected = liveMin !== null ? m === liveMin : m === parsed.min;
               return (
                 <button
                   key={m}
