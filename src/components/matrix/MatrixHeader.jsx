@@ -35,6 +35,7 @@ export default function MatrixHeader({
   signupMode,
   saveSignupMode,
   savingSignupMode,
+  onToday,
 }) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
@@ -55,7 +56,7 @@ export default function MatrixHeader({
         <Button
           variant="outline"
           className="h-7 text-xs px-2"
-          onClick={() => setCurrentDate(new Date())}
+          onClick={() => (onToday ? onToday() : setCurrentDate(new Date()))}
         >
           היום
         </Button>

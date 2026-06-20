@@ -691,6 +691,29 @@ export default function Matrix() {
     }
   };
 
+  // ── "היום" : jump to today + center the timeline on the current day ───────────
+  const goToToday = () => {
+    const today = new Date();
+    setCurrentDate(today);
+    const doScroll = () => {
+      const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+      if (!sc) return;
+      const maxScroll = Math.max(0, sc.scrollWidth - sc.clientWidth);
+      if (viewMode === 'weekly') {
+        // Align the start of today's column to the right edge of the timeline viewport.
+        const dayIndex = today.getDay(); // 0 = Sunday (weekStartsOn: 0)
+        const R = dayIndex * 1440 * ppmRef.current;
+        const target = totalMins * ppmRef.current - R - sc.clientWidth;
+        sc.scrollLeft = Math.max(0, Math.min(target, maxScroll));
+      } else {
+        // Daily: show the start of the day on the right.
+        sc.scrollLeft = maxScroll;
+      }
+    };
+    requestAnimationFrame(() => requestAnimationFrame(doScroll));
+    setTimeout(doScroll, 250);
+  };
+
   // ── Data helpers ─────────────────────────────────────────────────────────────
   const isWorkerAssignedToRow = (row, workerId, template) => {
     if (!row.values || !workerId) return { assigned: false, workerColumnName: null };
@@ -2299,6 +2322,7 @@ export default function Matrix() {
             statusFilter={statusFilter} setStatusFilter={setStatusFilter}
             populations={populations} workerRoles={workerRoles} shiftStatuses={shiftStatuses}
             signupMode={signupMode} saveSignupMode={saveSignupMode} savingSignupMode={savingSignupMode}
+            onToday={goToToday}
           />
         </Card>
 
