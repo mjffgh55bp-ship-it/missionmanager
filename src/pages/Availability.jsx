@@ -983,11 +983,9 @@ END:VEVENT
 
   const getAssignmentForDate = (date) => {
     const dateStr = format(date, "yyyy-MM-dd");
-    // TEMP DEBUG: confirm publish gate sees correct role + weeks
-    if (typeof window !== "undefined" && !window.__gateLogged) { console.log("GATE:", { isManager, publishedWeeksLoaded, publishedWeeks }); window.__gateLogged = true; }
-    // Eye-toggle gate: workers see MANAGER-ASSIGNED shifts only for PUBLISHED weeks.
-    // Managers/admins always see everything. This does NOT touch moked signup.
-    if (!isManager && publishedWeeksLoaded) {
+    // Eye-toggle gate: assigned shifts only show for PUBLISHED weeks.
+    // Applies to everyone — managers included — so they can verify what workers see.
+    if (publishedWeeksLoaded) {
       const wkStart = format(startOfWeek(date, { weekStartsOn: 0 }), "yyyy-MM-dd");
       if (!publishedWeeks.includes(wkStart)) {
         return [];
