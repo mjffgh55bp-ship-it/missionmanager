@@ -246,7 +246,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setEditingPreset(null); }}>
       <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-hidden flex flex-col" dir="rtl">
         <DialogHeader>
-          <DialogTitle className="text-xl">
+          <DialogTitle className="text-xl text-right">
             {editingPreset ? (editingPreset.id ? "עריכת פריסט" : "פריסט חדש") : "פריסטים"}
           </DialogTitle>
         </DialogHeader>
