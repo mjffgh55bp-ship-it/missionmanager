@@ -1576,7 +1576,7 @@ END:VEVENT
                         </div>
                       ) : (
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs text-gray-600" dir="rtl">{tipsMessage || <span className="text-gray-400">לא הוגדרה הודעה</span>}</p>
+                          <p className="text-xs text-gray-600 text-right whitespace-pre-wrap" dir="rtl">{tipsMessage || <span className="text-gray-400">לא הוגדרה הודעה</span>}</p>
                           {isManager && (
                             <Button size="sm" variant="ghost" className="h-6 px-2 text-xs shrink-0" onClick={() => { setTipsEditValue(tipsMessage); setEditingTips(true); }} dir="rtl">
                               <Pencil className="w-3 h-3" />
@@ -1709,7 +1709,7 @@ END:VEVENT
         <Dialog open={showTipsPopup} onOpenChange={setShowTipsPopup}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader><DialogTitle className="flex items-center gap-2"><Info className="w-5 h-5 text-blue-600" />נהלי הרשמה ועדכונים</DialogTitle></DialogHeader>
-            <div className="py-4"><div className="bg-blue-50 border border-blue-200 rounded-lg p-4 whitespace-pre-wrap">{tipsMessage}</div></div>
+            <div className="py-4"><div className="bg-blue-50 border border-blue-200 rounded-lg p-4 whitespace-pre-wrap text-right" dir="rtl">{tipsMessage}</div></div>
             <DialogFooter><Button onClick={async () => {
               try {
                 const acknowledgedSettings = await base44.entities.AppSettings.filter({ 
