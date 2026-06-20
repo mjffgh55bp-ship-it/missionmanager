@@ -52,7 +52,7 @@ export default function TimelineHeader({ viewMode, timelineWidth, ppm, dailySlot
       <div className="relative flex" dir="rtl" style={{ width: `${timelineWidth}px` }}>
         {weeklySlots.map((slot, idx) => (
           <div key={idx} className="shrink-0 text-[10px] text-gray-600 py-0.5 text-center font-medium overflow-hidden border-l border-l-gray-200" style={{ width: `${60 * ppm}px` }}>
-            <div className={slot.opIndex === 0 ? 'text-gray-800 font-semibold' : 'text-gray-400'} style={{ fontSize: '9px' }}>
+            <div className="text-gray-600" style={{ fontSize: '10px' }}>
               {String(slot.hour).padStart(2, '0')}
             </div>
           </div>
