@@ -366,6 +366,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
           </div>
         ) : (
           /* ── List view ── */
+          <>
           <div className="py-2 overflow-y-auto flex-1">
           <div className="flex justify-between items-center mb-4">
             <span className="text-sm text-gray-500">{presets.length} פריסטים שמורים</span>
@@ -431,12 +432,13 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                 ))}
               </div>
             )}
-            <div className="flex justify-end mt-4 pt-2 border-t">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                <X className="w-4 h-4 ml-1" /> סגור
-              </Button>
-            </div>
           </div>
+          <div className="flex justify-end pt-2 border-t flex-shrink-0">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              <X className="w-4 h-4 ml-1" /> סגור
+            </Button>
+          </div>
+          </>
         )}
       </DialogContent>
     </Dialog>
