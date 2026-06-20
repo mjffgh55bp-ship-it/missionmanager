@@ -27,38 +27,28 @@ export default function ChartCanvas({
   const containerRef = useRef(null);
   const cardRefs = useRef({});
 
-  // Sync posRef when posState changes (so event handlers always read fresh data)
-  useEffect(() => { posRef.current = posState; }, [posState]);
-
-  // Save to localStorage whenever positions change
-  useEffect(() => {
-    if (Object.keys(posState).length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(posState));
-    }
-  }, [posState]);
-
   // Initialize positions for new charts (restoring from localStorage first)
   useEffect(() => {
     const saved = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; } })();
-    setPosState(prev => {
-      const next = { ...saved, ...prev };
-      charts.forEach((chart, i) => {
-        if (!next[chart.id]) {
-          const col = i % 2;
-          const row = Math.floor(i / 2);
-          next[chart.id] = {
-            x: col * (DEFAULT_W + 24) + 12,
-            y: row * (DEFAULT_H + 24) + 12,
-            w: DEFAULT_W,
-            h: DEFAULT_H,
-          };
-        }
-      });
-      Object.keys(next).forEach(id => {
-        if (!charts.find(c => c.id === id)) delete next[id];
-      });
-      return next;
+    const merged = { ...saved };
+    charts.forEach((chart, i) => {
+      if (!merged[chart.id]) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        merged[chart.id] = {
+          x: col * (DEFAULT_W + 24) + 12,
+          y: row * (DEFAULT_H + 24) + 12,
+          w: DEFAULT_W,
+          h: DEFAULT_H,
+        };
+      }
     });
+    // Remove stale entries
+    Object.keys(merged).forEach(id => {
+      if (!charts.find(c => c.id === id)) delete merged[id];
+    });
+    setPosState(merged);
+    posRef.current = merged;
   }, [charts]);
 
   const getOtherRects = (excludeId) => {
@@ -108,6 +98,7 @@ export default function ChartCanvas({
     const onUp = () => {
       setActiveId(null);
       setSnapGuides([]);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current));
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -145,6 +136,7 @@ export default function ChartCanvas({
     const onUp = () => {
       setActiveId(null);
       setSnapGuides([]);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current));
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };

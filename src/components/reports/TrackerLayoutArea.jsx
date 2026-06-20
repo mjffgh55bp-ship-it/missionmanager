@@ -24,31 +24,22 @@ export default function TrackerLayoutArea({
   const containerRef = useRef(null);
   const cardRefs = useRef({});
 
-  // Keep posRef in sync
-  useEffect(() => { posRef.current = posState; }, [posState]);
-
-  // Save to localStorage whenever positions change
-  useEffect(() => {
-    if (Object.keys(posState).length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(posState));
-    }
-  }, [posState]);
-
-  // Initialize positions for new trackers (restoring from localStorage first)
+  // Update positions from localStorage when trackers change
   useEffect(() => {
     const saved = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); } catch { return {}; } })();
-    setPosState(prev => {
-      const next = { ...saved, ...prev };
-      trackers.forEach((tracker, i) => {
-        if (!next[tracker.id]) {
-          next[tracker.id] = { x: 12, y: i * 420 + 12, w: DEFAULT_W, h: null };
-        }
-      });
-      Object.keys(next).forEach(id => {
-        if (!trackers.find(t => t.id === id)) delete next[id];
-      });
-      return next;
+    // Only merge: load from saved, fill defaults for missing trackers
+    const merged = { ...saved };
+    trackers.forEach((tracker, i) => {
+      if (!merged[tracker.id]) {
+        merged[tracker.id] = { x: 12, y: i * 420 + 12, w: DEFAULT_W, h: null };
+      }
     });
+    // Remove stale entries
+    Object.keys(merged).forEach(id => {
+      if (!trackers.find(t => t.id === id)) delete merged[id];
+    });
+    setPosState(merged);
+    posRef.current = merged;
   }, [trackers]);
 
   const getOtherRects = (excludeId) => {
@@ -104,6 +95,8 @@ export default function TrackerLayoutArea({
     const onUp = () => {
       setActiveId(null);
       setSnapGuides([]);
+      // Persist immediately to localStorage so positions survive navigation
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current));
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -145,6 +138,7 @@ export default function TrackerLayoutArea({
     const onUp = () => {
       setActiveId(null);
       setSnapGuides([]);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(posRef.current));
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
