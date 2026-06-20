@@ -46,7 +46,7 @@ export default function SaturdayReferenceStrip({
 
   return (
     <div
-      className="flex-shrink-0 border-l border-gray-300 bg-gray-50/60"
+      className="flex-shrink-0 border-r border-gray-300 bg-gray-50/60"
       style={{ width: `${STRIP_WIDTH}px`, minWidth: `${STRIP_WIDTH}px` }}
       dir="rtl"
     >

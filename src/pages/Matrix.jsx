@@ -2223,12 +2223,12 @@ export default function Matrix() {
           dir="ltr"
         >
           <div style={{ display: 'flex', flexDirection: 'row' }}>
-            {viewMode === 'weekly' && <div style={{ width: '96px', minWidth: '96px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fa', borderRight: '1px solid #e5e7eb' }}>
-              <div className="text-center"><span className="text-xs font-bold text-gray-500">ש׳ {format(addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), -1), 'd.M')}</span></div>
-            </div>}
             <div style={{ width: `${timelineWidth}px` }}>
               {renderTimelineHeader()}
             </div>
+            {viewMode === 'weekly' && <div style={{ width: '96px', minWidth: '96px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8f9fa', borderLeft: '1px solid #e5e7eb' }}>
+              <div className="text-center"><span className="text-xs font-bold text-gray-500">ש׳ {format(addDays(startOfWeek(currentDate, { weekStartsOn: 0 }), -1), 'd.M')}</span></div>
+            </div>}
           </div>
         </div>
 
@@ -2241,12 +2241,12 @@ export default function Matrix() {
           onMouseUp={handlePointerUp}
         >
           <div style={{ display: 'flex', flexDirection: 'row' }}>
-            {viewMode === 'weekly' && <SaturdayReferenceStrip currentDate={currentDate} filteredWorkers={filteredWorkers} satAssigned={satAssigned} satAvail={satAvail} satUnavail={satUnavail} allTemplates={allTemplates} ROW_H={ROW_H} ppm={ppm} timelineWidth={timelineWidth} isStandbyStatus={isStandbyStatus} />}
             <div dir="rtl" style={{ width: `${timelineWidth}px` }}>
               {loading && !initialLoaded ? null : (
                 filteredWorkers.map((worker, index) => renderTimelineRow(worker, index, selectedWorkerIds.has(worker.id)))
               )}
             </div>
+            {viewMode === 'weekly' && <SaturdayReferenceStrip currentDate={currentDate} filteredWorkers={filteredWorkers} satAssigned={satAssigned} satAvail={satAvail} satUnavail={satUnavail} allTemplates={allTemplates} ROW_H={ROW_H} ppm={ppm} timelineWidth={timelineWidth} isStandbyStatus={isStandbyStatus} />}
           </div>
         </div>
       </div>
@@ -2264,7 +2264,6 @@ export default function Matrix() {
       onMouseUp={handlePointerUp}
     >
       <div style={{ display: 'flex', flexDirection: 'row' }}>
-        {viewMode === 'weekly' && <SaturdayReferenceStrip currentDate={currentDate} filteredWorkers={filteredWorkers} satAssigned={satAssigned} satAvail={satAvail} satUnavail={satUnavail} allTemplates={allTemplates} ROW_H={ROW_H} ppm={ppm} timelineWidth={timelineWidth} isStandbyStatus={isStandbyStatus} />}
         <div dir="rtl" style={{ width: `${totalMatrixWidth}px`, minWidth: `${totalMatrixWidth}px` }}>
         <div className="flex sticky top-0 bg-gray-100 z-30 border-b" style={{ width: `${totalMatrixWidth}px` }}>
           <div className="p-2 font-semibold text-gray-700 border-r sticky left-0 bg-gray-100 z-30 flex items-center justify-start gap-2 relative" dir="rtl" style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
@@ -2378,6 +2377,7 @@ export default function Matrix() {
           })
         )}
       </div>
+      {viewMode === 'weekly' && <SaturdayReferenceStrip currentDate={currentDate} filteredWorkers={filteredWorkers} satAssigned={satAssigned} satAvail={satAvail} satUnavail={satUnavail} allTemplates={allTemplates} ROW_H={ROW_H} ppm={ppm} timelineWidth={timelineWidth} isStandbyStatus={isStandbyStatus} />}
       </div>
     </div>
   );
