@@ -218,7 +218,14 @@ export default function OperationalTimePicker({
     setSlots(next);
     setCursor(2); // advance to minutes
     setLocalHourValue(hourValue);
-    syncHighlightFromSlots(next);
+    // Update liveMin without letting syncHighlightFromSlots overwrite the zone
+    const mmRaw = next[2] + next[3];
+    if (mmRaw.trim().length >= 1) {
+      const padded = mmRaw.replace(/\s/g, "0").padStart(2, "0").slice(0, 2);
+      setLiveMin(MINUTES.includes(padded) ? padded : null);
+    } else {
+      setLiveMin(null);
+    }
     // Refocus the slot input so user can keep typing minutes
     setTimeout(() => inputRef.current?.focus(), 50);
   };
