@@ -176,6 +176,7 @@ export default function Matrix() {
   const [manualShiftData, setManualShiftData] = useState({ start_time: '', end_time: '', type: 'available' });
   const [editingShift, setEditingShift] = useState(null);
   const [editingUnavail, setEditingUnavail] = useState(null); // Unavailability record being edited (null or {worker_id, worker_name, date, ...})
+  const [editingUnavailSource, setEditingUnavailSource] = useState(null); // the Unavailability record being edited via the unified dialog
   const [populations, setPopulations] = useState([]);
   const [workerRoles, setWorkerRoles] = useState([]);
   const timelineRefs = useRef({});
@@ -1134,13 +1135,53 @@ export default function Matrix() {
       reason: shift.reason || "occupied",
     });
     setEditingShift(shift);
+    setEditingUnavailSource(null);
+    setShowManualDialog(true);
+  };
+
+  // Open the unified ManualShiftDialog pre-filled from an existing אילוץ (Unavailability)
+  const openUnavailInUnifiedDialog = (unavail) => {
+    if (!canManage) return;
+    setSelectedWorkerForManual({ id: unavail.worker_id, nickname: unavail.worker_name });
+    setEditingUnavailSource(unavail);
+    setEditingShift(null);
+    setManualShiftData({
+      start_time: unavail.start_time,
+      end_time: unavail.end_time,
+      type: "constraint",
+      date: unavail.date,
+      reason: unavail.reason || "occupied",
+    });
     setShowManualDialog(true);
   };
 
   const submitManualShift = async () => {
     if (!selectedWorkerForManual || !manualShiftData.start_time || !manualShiftData.end_time) return;
     if (manualShiftData.type === "constraint") {
-      const constraintDate = (editingShift?.date) || manualShiftData.date || dateString;
+      const constraintDate = editingUnavailSource?.date || editingShift?.date || manualShiftData.date || dateString;
+
+      // אילוץ → אילוץ : edit the existing one in place (no duplicate)
+      if (editingUnavailSource?.id && !String(editingUnavailSource.id).startsWith('temp_')) {
+        try {
+          const updated = await base44.entities.Unavailability.update(editingUnavailSource.id, {
+            date: constraintDate,
+            start_time: manualShiftData.start_time,
+            end_time: manualShiftData.end_time,
+            reason: manualShiftData.reason || "occupied",
+          });
+          setUnavailabilities(prev => prev.map(u => u.id === updated.id ? updated : u));
+        } catch (e) {
+          console.error("update constraint failed:", e);
+          alert("שגיאה בעדכון האילוץ. נסה שוב.");
+          return;
+        }
+        setShowManualDialog(false); setSelectedWorkerForManual(null);
+        setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' });
+        setEditingShift(null); setEditingUnavailSource(null);
+        debouncedLoadData(true, false, true);
+        return;
+      }
+
       try {
         await base44.entities.Unavailability.create({
           worker_id: selectedWorkerForManual.id,
@@ -1195,22 +1236,36 @@ export default function Matrix() {
         reason: manualShiftData.reason || "occupied",
       }]);
       setShowManualDialog(false); setSelectedWorkerForManual(null);
-      setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null);
+      setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null); setEditingUnavailSource(null);
       debouncedLoadData(true, false, true);
       return;
     }
     const workerAvail = getBestAvail(selectedWorkerForManual.id);
+
+    // אילוץ → זמין/רצוי : remove the Unavailability, then fall through to add the availability shift
+    if (editingUnavailSource?.id && !String(editingUnavailSource.id).startsWith('temp_')) {
+      try {
+        await base44.entities.Unavailability.delete(editingUnavailSource.id);
+        setUnavailabilities(prev => prev.filter(u => u.id !== editingUnavailSource.id));
+      } catch (e) {
+        console.error("delete source constraint failed:", e);
+        alert("שגיאה בהמרת האילוץ לזמינות. נסה שוב.");
+        return;
+      }
+    }
+
     let updatedShifts = workerAvail?.shifts ? [...workerAvail.shifts] : [];
     const targetDate = format(currentDate, "yyyy-MM-dd");
     if (editingShift) {
       updatedShifts = updatedShifts.map(s => s.date === editingShift.date && s.start_time === editingShift.start_time && s.end_time === editingShift.end_time && s.type === editingShift.type ? { ...s, date: targetDate, start_time: manualShiftData.start_time, end_time: manualShiftData.end_time, type: manualShiftData.type } : s);
     } else {
-      updatedShifts.push({ date: targetDate, start_time: manualShiftData.start_time, end_time: manualShiftData.end_time, type: manualShiftData.type, priority: updatedShifts.length + 1 });
+      const pushDate = editingUnavailSource?.date || targetDate;
+      updatedShifts.push({ date: pushDate, start_time: manualShiftData.start_time, end_time: manualShiftData.end_time, type: manualShiftData.type, priority: updatedShifts.length + 1 });
     }
     const availData = { worker_id: selectedWorkerForManual.id, worker_name: selectedWorkerForManual.nickname, week_start_date: weekStartDate, shifts: updatedShifts, status: workerAvail?.status || "approved" };
     const previousAvailabilities = availabilities;
     applyOptimisticAvailability(selectedWorkerForManual.id, updatedShifts, availData);
-    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null);
+    setShowManualDialog(false); setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null); setEditingUnavailSource(null);
     try {
       if (workerAvail) await base44.entities.Availability.update(workerAvail.id, availData);
       else await base44.entities.Availability.create(availData);
@@ -1219,6 +1274,20 @@ export default function Matrix() {
   };
 
   const deleteManualShift = async () => {
+    // If editing an existing אילוץ via the unified dialog, delete the Unavailability
+    if (editingUnavailSource?.id) {
+      try {
+        if (!String(editingUnavailSource.id).startsWith('temp_')) {
+          await base44.entities.Unavailability.delete(editingUnavailSource.id);
+        }
+        setUnavailabilities(prev => prev.filter(u => u.id !== editingUnavailSource.id));
+      } catch (e) { console.error("delete constraint failed:", e); alert("שגיאה במחיקת האילוץ."); return; }
+      setShowManualDialog(false); setSelectedWorkerForManual(null);
+      setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' });
+      setEditingShift(null); setEditingUnavailSource(null);
+      debouncedLoadData(true, false, true);
+      return;
+    }
     if (!selectedWorkerForManual || !editingShift) return;
     const workerAvail = getBestAvail(selectedWorkerForManual.id);
     if (!workerAvail) return;
@@ -1515,7 +1584,7 @@ export default function Matrix() {
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
         <div
-          onClick={(e) => { e.stopPropagation(); if (canManage) setEditingUnavail(unavail); }}
+          onClick={(e) => { e.stopPropagation(); openUnavailInUnifiedDialog(unavail); }}
           className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${canManage ? 'cursor-pointer' : ''} ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`}
           style={{ right: `${rightPx}px`, width: `${widthPx}px` }}
         >
@@ -2172,7 +2241,7 @@ export default function Matrix() {
                   handleTypeClick={handleTypeClick}
                   handleShiftDoubleClick={handleShiftDoubleClick}
                   canManage={canManage}
-                  onEditUnavail={setEditingUnavail}
+                  onEditUnavail={openUnavailInUnifiedDialog}
                 />
               </div>
             );
@@ -2258,7 +2327,7 @@ export default function Matrix() {
         <SummaryColumnsDialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog} summaryColumns={summaryColumns} saveSummaryColumns={saveSummaryColumns} shiftStatuses={shiftStatuses} scheduleParams={scheduleParams} trackers={trackers} />
         <NotificationDialog open={showNotificationDialog} onOpenChange={setShowNotificationDialog} viewMode={viewMode} currentDate={currentDate} selectedWorkerForNotification={selectedWorkerForNotification} notificationNotes={notificationNotes} setNotificationNotes={setNotificationNotes} getWorkerTemplateShifts={getWorkerTemplateShifts} getWorkerExtraTaskShifts={getWorkerExtraTaskShifts} sendNotification={sendNotification} />
         <TypeChangeDialog open={showTypeDialog} onOpenChange={setShowTypeDialog} handleChangeType={handleChangeType} />
-        <ManualShiftDialog open={showManualDialog} onOpenChange={(v) => { setShowManualDialog(v); if (!v) { setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null); } }} editingShift={editingShift} selectedWorkerForManual={selectedWorkerForManual} manualShiftData={manualShiftData} setManualShiftData={setManualShiftData} submitManualShift={submitManualShift} deleteShift={deleteManualShift} />
+        <ManualShiftDialog open={showManualDialog} onOpenChange={(v) => { setShowManualDialog(v); if (!v) { setSelectedWorkerForManual(null); setManualShiftData({ start_time: '', end_time: '', type: 'available', date: dateString, reason: 'occupied' }); setEditingShift(null); setEditingUnavailSource(null); } }} editingShift={editingShift || editingUnavailSource} selectedWorkerForManual={selectedWorkerForManual} manualShiftData={manualShiftData} setManualShiftData={setManualShiftData} submitManualShift={submitManualShift} deleteShift={deleteManualShift} />
         <UnavailabilityDialog
           open={!!editingUnavail}
           onOpenChange={(v) => { if (!v) setEditingUnavail(null); }}
