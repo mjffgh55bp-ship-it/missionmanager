@@ -172,19 +172,31 @@ export default function Schedule() {
     applyStaticData({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData });
     applyDailyData({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     staticDataLoaded.current = true;
-    // ── Change 2: one-time backfill of mapping_id for existing Templates ──────
+    // ── One-time backfill of mapping_id for existing Templates ───────────────
+    // Batched (10 at a time, 200ms apart) to avoid rate limits.
+    // Only sets the localStorage flag when ALL updates succeeded — retries on next load otherwise.
     const BACKFILL_KEY = 'template_mapping_id_v1';
     if (!localStorage.getItem(BACKFILL_KEY)) {
       try {
         const all = await base44.entities.Template.list('-created_date', 1500);
         const missing = (all || []).filter(t => !t.mapping_id);
         if (missing.length > 0) {
-          await Promise.all(missing.map(t =>
-            base44.entities.Template.update(t.id, { mapping_id: genTemplateMappingId() })
-          ));
-          console.log(`[template_backfill] stamped ${missing.length} templates with mapping_id`);
+          const BATCH = 10;
+          let failed = 0;
+          for (let i = 0; i < missing.length; i += BATCH) {
+            const batch = missing.slice(i, i + BATCH);
+            const results = await Promise.allSettled(
+              batch.map(t => base44.entities.Template.update(t.id, { mapping_id: genTemplateMappingId() }))
+            );
+            failed += results.filter(r => r.status === 'rejected').length;
+            if (i + BATCH < missing.length) await new Promise(r => setTimeout(r, 200));
+          }
+          console.log(`[template_backfill] stamped ${missing.length - failed}/${missing.length} templates with mapping_id; failed=${failed}`);
+          if (failed === 0) localStorage.setItem(BACKFILL_KEY, '1');
+          else console.warn(`[template_backfill] ${failed} failures — will retry on next load`);
+        } else {
+          localStorage.setItem(BACKFILL_KEY, '1');
         }
-        localStorage.setItem(BACKFILL_KEY, '1');
       } catch (e) {
         console.warn('[template_backfill] failed:', e);
       }
@@ -606,14 +618,6 @@ export default function Schedule() {
     // loadDailyData (which fires asynchronously on every AppSettings change)
     // does NOT overwrite the moked order we just set.
     setTimeout(() => { mokedOrderSavingRef.current = false; }, 3000);
-  };
-
-  const handleSaveTemplateMappingId = async (newMappingId) => {
-    if (!mokedIdEditorTarget) return;
-    await base44.entities.Template.update(mokedIdEditorTarget.templateId, { mapping_id: newMappingId });
-    setAllTemplates(prev => prev.map(t => t.id === mokedIdEditorTarget.templateId ? { ...t, mapping_id: newMappingId } : t));
-    setTemplates(prev => prev.map(t => t.id === mokedIdEditorTarget.templateId ? { ...t, mapping_id: newMappingId } : t));
-    setMokedIdEditorTarget(prev => prev ? { ...prev, mappingId: newMappingId } : null);
   };
 
   const weekStartStrForPublish = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
@@ -1248,7 +1252,6 @@ export default function Schedule() {
           templateName={mokedIdEditorTarget?.name || ""}
           mappingId={mokedIdEditorTarget?.mappingId || ""}
           onClose={() => setMokedIdEditorTarget(null)}
-          onSave={handleSaveTemplateMappingId}
         />
 
         <PresetsDialog
