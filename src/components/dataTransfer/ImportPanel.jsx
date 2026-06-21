@@ -296,9 +296,9 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           templateMatchMethod[it.template_id] = "mapping_id";
           return;
         }
-        // mapping_id present but no local match → skip with specific warning
+        // mapping_id present but no local match → plan to CREATE new מוקד
         templateMatch[it.template_id] = null;
-        templateMatchMethod[it.template_id] = "mapping_id_missing";
+        templateMatchMethod[it.template_id] = "will_create";
         return;
       }
       // Priority 2: same-environment template_id
@@ -316,6 +316,18 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       templateMatchMethod[it.template_id] = "not_found";
     });
 
+    // ── Build templatesToCreate map (for will_create templates) ──────────────
+    const templatesToCreate = {}; // imported template_id → { mapping_id, templateMeta, columns }
+    importedTmplRows.forEach(it => {
+      if (templateMatchMethod[it.template_id] === "will_create") {
+        templatesToCreate[it.template_id] = {
+          mapping_id: it.template_mapping_id?.trim() || "",
+          templateMeta: it,
+          columns: [], // filled after importedColsByTemplate is built
+        };
+      }
+    });
+
     // ── STEP 4: Match columns ─────────────────────────────────────────────────
     const { rows: importedColRows } = rawSheets.mokedColumns;
     // Group imported columns by template_id, preserving order (column_index)
@@ -327,6 +339,10 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     });
     Object.values(importedColsByTemplate).forEach(cols => {
       cols.sort((a, b) => Number(a.column_index || 0) - Number(b.column_index || 0));
+    });
+    // Attach columns to templatesToCreate entries
+    Object.keys(templatesToCreate).forEach(tid => {
+      templatesToCreate[tid].columns = importedColsByTemplate[tid] || [];
     });
 
     // Load existing TemplateRows for import dates (needed before column matching for date-aware effective cols)
@@ -346,14 +362,13 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     Object.entries(importedColsByTemplate).forEach(([tid, cols]) => {
       const liveTemplate = templateMatch[tid];
       if (!liveTemplate) {
-        const isMappingIdMissing = templateMatchMethod[tid] === "mapping_id_missing";
         cols.forEach(ic => {
           const key = colMatchKey(tid, ic.column_name);
           if (ic.column_name === "status") {
             colMatchResult[key] = { importedCol: ic, liveCol: null, action: "status", internalKey: "status", matchedSource: "implicit", matchMethod: "implicit" };
           } else {
-            const reason = isMappingIdMissing
-              ? `מוקד לא זוהה לפי מזהה מיפוי (${templateMatchMethod[tid]})`
+            const reason = templateMatchMethod[tid] === "will_create"
+              ? "מוקד חדש ייווצר"
               : "תבנית לא קיימת";
             colMatchResult[key] = { importedCol: ic, liveCol: null, action: "no_template", internalKey: null, reason, matchedSource: "not_found", matchMethod: null };
           }
@@ -419,7 +434,12 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         return;
       }
       if (!liveTemplate) {
-        rowPlan.push({ rowNum, status: "שגיאה", errors: [`תבנית "${irow.template_name}" לא קיימת`], irow, action: "skip" });
+        if (templateMatchMethod[irow.template_id] === "will_create") {
+          // Planned for new מוקד creation — mark and continue (no writes yet)
+          rowPlan.push({ rowNum, status: "תקין", errors: [], warnings: [], irow, action: "create_moked_row" });
+        } else {
+          rowPlan.push({ rowNum, status: "שגיאה", errors: [`תבנית "${irow.template_name}" לא קיימת`], irow, action: "skip" });
+        }
         return;
       }
 
@@ -640,7 +660,9 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
         parsedValues,
         fieldsUpdated,
         fieldsUnchanged,
-        action: existingRow ? "update" : "create",
+        action: existingRow
+          ? (templateMatchMethod[irow.template_id] === "mapping_id" ? "rewrite_moked_row" : "update")
+          : (templateMatchMethod[irow.template_id] === "mapping_id" ? "rewrite_moked_row" : "create"),
       });
     });
 
@@ -671,7 +693,25 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       matchMethod:         templateMatchMethod[it.template_id] || "not_found",
     }));
 
-    setPreview({ rowPlan, colDiagList, tmplDiagList, workerDiagAll });
+    // Compute summary counts for will_create / rewrite
+    const templatesToCreateCount = Object.values(templateMatchMethod).filter(m => m === "will_create").length;
+    const templatesToRewriteCount = Object.values(templateMatchMethod).filter(m => m === "mapping_id").length;
+    // Per-template row counts for will_create
+    const createMokedRowsByTemplate = {}; // imported template_id → { name, rowCount }
+    rowPlan.forEach(p => {
+      if (p.action === "create_moked_row" && p.irow?.template_id) {
+        const tid = p.irow.template_id;
+        if (!createMokedRowsByTemplate[tid]) {
+          createMokedRowsByTemplate[tid] = {
+            name: p.irow.template_name || tid,
+            rowCount: 0,
+          };
+        }
+        createMokedRowsByTemplate[tid].rowCount++;
+      }
+    });
+
+    setPreview({ rowPlan, colDiagList, tmplDiagList, workerDiagAll, templatesToCreate, templatesToCreateCount, templatesToRewriteCount, createMokedRowsByTemplate });
     setLoadingPreview(false);
   };
 
@@ -687,6 +727,12 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       if (plan.action === "skip" || plan.status === "שגיאה") {
         errors++;
         resultRows.push({ ...plan, finalStatus: "שגיאה", reason: plan.errors.join("; ") });
+        continue;
+      }
+      // will_create / rewrite_moked_row: not yet implemented — skip for now
+      if (plan.action === "create_moked_row" || plan.action === "rewrite_moked_row") {
+        skipped++;
+        resultRows.push({ ...plan, finalStatus: "דולג", reason: "יצירת/החלפת מוקד — טרם מופעל" });
         continue;
       }
 
@@ -809,7 +855,7 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
 
 // ── Preview panel ─────────────────────────────────────────────────────────────
 function PreviewPanel({ preview, fileName, showColDiag, setShowColDiag, showRowDiag, setShowRowDiag, applying, onApply, onCancel }) {
-  const { rowPlan, colDiagList, tmplDiagList, workerDiagAll } = preview;
+  const { rowPlan, colDiagList, tmplDiagList, workerDiagAll, templatesToCreateCount, templatesToRewriteCount, createMokedRowsByTemplate } = preview;
   const [showTmplDiag, setShowTmplDiag] = useState(false);
   const errCount  = rowPlan.filter(r => r.status === "שגיאה").length;
   const warnCount = rowPlan.filter(r => r.status === "אזהרה").length;
@@ -818,7 +864,7 @@ function PreviewPanel({ preview, fileName, showColDiag, setShowColDiag, showRowD
   const missingCols = colDiagList.filter(c => c.action === "missing" || c.action === "missing_mapping_id");
   const missingMappingIdCols = colDiagList.filter(c => c.action === "missing_mapping_id");
   const unresWorkers = workerDiagAll.filter(d => d.status === "unresolved");
-  const missingMappingIdTemplates = (tmplDiagList || []).filter(t => t.matchMethod === "mapping_id_missing");
+  const willCreateTemplates = (tmplDiagList || []).filter(t => t.matchMethod === "will_create");
 
   return (
     <div className="space-y-4">
@@ -835,13 +881,23 @@ function PreviewPanel({ preview, fileName, showColDiag, setShowColDiag, showRowD
         <Button variant="ghost" size="sm" onClick={onCancel}><X className="w-4 h-4" /></Button>
       </div>
 
-      {/* Missing mapping_id templates alert */}
-      {missingMappingIdTemplates.length > 0 && (
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800 space-y-1">
-          <div className="font-semibold flex items-center gap-2"><AlertTriangle className="w-4 h-4" />מוקדים שלא זוהו לפי מזהה מיפוי — ידולגו:</div>
-          {missingMappingIdTemplates.map((t, i) => (
-            <div key={i} className="text-xs">מזהה מיפוי: "{t.importedMappingId}" (שם מיוצא: {t.importedName}) — לא נמצא מוקד מקומי עם מזהה זה</div>
+      {/* New מוקדים to create + rewrite summary */}
+      {(templatesToCreateCount > 0 || templatesToRewriteCount > 0) && (
+        <div className="bg-blue-50 border border-blue-300 rounded-lg p-3 text-sm text-blue-900 space-y-1">
+          <div className="font-semibold flex items-center gap-2">
+            <Info className="w-4 h-4" />
+            {templatesToCreateCount > 0 && templatesToRewriteCount > 0
+              ? `${templatesToCreateCount} מוקדים חדשים ייווצרו, ${templatesToRewriteCount} מוקדים יוחלפו`
+              : templatesToCreateCount > 0
+                ? `${templatesToCreateCount} מוקדים חדשים ייווצרו`
+                : `${templatesToRewriteCount} מוקדים יוחלפו`}
+          </div>
+          {templatesToCreateCount > 0 && createMokedRowsByTemplate && Object.values(createMokedRowsByTemplate).map((t, i) => (
+            <div key={i} className="text-xs text-blue-700">
+              ➕ {t.name} — {t.rowCount} שורות
+            </div>
           ))}
+          <div className="text-xs text-blue-600 mt-1">⚠ יצירת מוקדים טרם מופעלת — שורות אלה יידולגו בשלב זה</div>
         </div>
       )}
 
@@ -930,6 +986,7 @@ function TmplDiagTable({ tmplDiagList }) {
   const methodLabel = {
     mapping_id:         { label: "🔑 מזהה מיפוי",    cls: "text-green-700 font-semibold" },
     mapping_id_missing: { label: "✗ מזהה לא נמצא",   cls: "text-orange-600 font-semibold" },
+    will_create:        { label: "➕ ייווצר חדש",     cls: "text-blue-700 font-semibold" },
     template_id:        { label: "ID זהה",            cls: "text-blue-600" },
     name:               { label: "שם (fallback)",     cls: "text-yellow-700" },
     not_found:          { label: "✗ לא נמצא",         cls: "text-red-600" },
@@ -1049,8 +1106,8 @@ function RowDiagTable({ rowPlan }) {
           </thead>
           <tbody>
             {display.map((row, i) => {
-              const actionLabel = row.action === "create" ? "יצירה" : row.action === "update" ? "עדכון" : "דילוג";
-              const actionColor = row.action === "create" ? "text-emerald-700" : row.action === "update" ? "text-blue-700" : "text-gray-400";
+              const actionLabel = row.action === "create" ? "יצירה" : row.action === "update" ? "עדכון" : row.action === "create_moked_row" ? "מוקד חדש" : row.action === "rewrite_moked_row" ? "החלפת מוקד" : "דילוג";
+              const actionColor = row.action === "create" ? "text-emerald-700" : row.action === "update" ? "text-blue-700" : row.action === "create_moked_row" ? "text-blue-600 font-semibold" : row.action === "rewrite_moked_row" ? "text-purple-700 font-semibold" : "text-gray-400";
               const allWarnings = [...(row.errors || []), ...(row.warnings || [])];
               return (
                 <tr key={i} className="border-b hover:bg-gray-50">
