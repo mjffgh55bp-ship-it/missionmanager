@@ -180,7 +180,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
     const colHeader = [
       "template_id", "template_mapping_id", "column_index",
       "column_mapping_id", "internal_value_key", "type", "width",
-      "default_value", "options_json", "role_filter", "is_worker_column",
+      "default_value", "options_json", "role_filter", "role_mapping_id", "is_worker_column",
       "is_task_column", "is_importable", "is_exportable",
     ];
     const colRows = [];
@@ -208,6 +208,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
           sanitizeText(col.default_value || ""),
           col.options ? JSON.stringify(col.options) : "",
           sanitizeText(col.role_filter || ""),
+          sanitizeText(col.role_mapping_id || ""),
           isWorker ? "true" : "false",
           isTask   ? "true" : "false",
           col.is_importable !== false ? "true" : "false",
