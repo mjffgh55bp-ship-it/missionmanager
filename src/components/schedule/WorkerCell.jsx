@@ -2,6 +2,21 @@ import React, { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Star, Check, X } from "lucide-react";
+import { getOperationalMinutes, getOperationalEndMinutes } from "@/lib/operationalDate";
+
+// Operational-aware time helpers (handle overnight shifts that cross midnight,
+// e.g. 22:00–02:00). Mirrors the logic used on the Matrix page.
+const opOverlap = (aStart, aEnd, bStart, bEnd) => {
+  if (!aStart || !aEnd || !bStart || !bEnd) return false;
+  const aS = getOperationalMinutes(aStart), aE = getOperationalEndMinutes(aStart, aEnd);
+  const bS = getOperationalMinutes(bStart), bE = getOperationalEndMinutes(bStart, bEnd);
+  return aS < bE && aE > bS;
+};
+const opContains = (outerStart, outerEnd, innerStart, innerEnd) => {
+  const oS = getOperationalMinutes(outerStart), oE = getOperationalEndMinutes(outerStart, outerEnd);
+  const iS = getOperationalMinutes(innerStart), iE = getOperationalEndMinutes(innerStart, innerEnd);
+  return iS >= oS && iE <= oE;
+};
 
 export default function WorkerCell({
   rowId,
@@ -47,9 +62,7 @@ export default function WorkerCell({
   const isWorkerUnavailable = (workerId, startTime, endTime) => {
     if (!workerId || !startTime || !endTime) return false;
     return unavailabilities.filter((u) => u.worker_id === workerId).some((u) =>
-      startTime >= u.start_time && startTime < u.end_time ||
-      endTime > u.start_time && endTime <= u.end_time ||
-      startTime <= u.start_time && endTime >= u.end_time
+      opOverlap(startTime, endTime, u.start_time, u.end_time)
     );
   };
 
@@ -59,15 +72,12 @@ export default function WorkerCell({
       a.worker_id === workerId && (a.status === "approved" || a.status === "submitted")
     );
     if (!workerAvail?.shifts) return null;
-    const exactShift = workerAvail.shifts.find((s) =>
-      s.date === dateString && s.type !== "unavailable" &&
-      startTime >= s.start_time && endTime <= s.end_time
+    const dayShifts = workerAvail.shifts.filter((s) =>
+      (s.operational_date || s.date) === dateString && s.type !== "unavailable"
     );
+    const exactShift = dayShifts.find((s) => opContains(s.start_time, s.end_time, startTime, endTime));
     if (exactShift) return { priority: exactShift.priority, type: exactShift.type };
-    const overlapShift = workerAvail.shifts.find((s) =>
-      s.date === dateString && s.type !== "unavailable" &&
-      startTime < s.end_time && endTime > s.start_time
-    );
+    const overlapShift = dayShifts.find((s) => opOverlap(startTime, endTime, s.start_time, s.end_time));
     return overlapShift ? { priority: overlapShift.priority, type: overlapShift.type } : null;
   };
 
