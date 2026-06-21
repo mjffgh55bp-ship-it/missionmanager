@@ -73,7 +73,7 @@ export default function WorkerCell({
     );
     if (!workerAvail?.shifts) return null;
     const dayShifts = workerAvail.shifts.filter((s) =>
-      (s.operational_date || s.date) === dateString && s.type !== "unavailable"
+      s.date === dateString && s.type !== "unavailable"
     );
     const exactShift = dayShifts.find((s) => opContains(s.start_time, s.end_time, startTime, endTime));
     if (exactShift) return { priority: exactShift.priority, type: exactShift.type };
