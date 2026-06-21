@@ -9,6 +9,7 @@ import { Plus, Trash2, Pencil, Check, X, BookmarkPlus, GripVertical } from "luci
 import { useColumnDrag } from "@/hooks/useColumnDrag";
 import toast from "react-hot-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { suggestMappingId } from "@/components/settings/MappableItemRow";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import OperationalTimePicker from "./OperationalTimePicker";
 
@@ -162,7 +163,24 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
       columnToAdd = { name: "סיום", type: "time", width: 100 };
     } else if (newColumnName === "worker_member") {
       const _selRole = (workerRoles || []).find(r => (typeof r === "string" ? r : r.name) === newColumnRole);
-      const _roleMid = _selRole && typeof _selRole !== "string" ? (_selRole.mapping_id || "") : "";
+      let _roleMid = (_selRole && typeof _selRole !== "string") ? (_selRole.mapping_id || "") : "";
+      if (!_roleMid && newColumnRole) {
+        _roleMid = suggestMappingId(newColumnRole, "role");
+        // Persist back so future columns also get this id
+        const updated = (workerRoles || []).map(r => {
+          const n = typeof r === "string" ? r : r.name;
+          return n === newColumnRole ? (typeof r === "string" ? { name: r, mapping_id: _roleMid } : { ...r, mapping_id: _roleMid }) : r;
+        });
+        (async () => {
+          try {
+            const s = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
+            const d = { setting_key: "worker_roles", setting_value: JSON.stringify(updated) };
+            if (s.length > 0) await base44.entities.AppSettings.update(s[0].id, d);
+            else await base44.entities.AppSettings.create(d);
+            setWorkerRoles(updated);
+          } catch (e) { console.error("role_mapping_id gen failed:", e); }
+        })();
+      }
       columnToAdd = { name: newColumnRole, type: "worker", width: 150, role_filter: newColumnRole, role_mapping_id: _roleMid };
     } else if (newColumnName === "task") {
       columnToAdd = { name: "משימה", type: "task", width: 120 };

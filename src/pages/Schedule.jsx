@@ -44,6 +44,7 @@ import ColumnCell from "../components/schedule/ColumnCell";
 import WorkerCell from "../components/schedule/WorkerCell";
 import TimeCell from "../components/schedule/TimeCell";
 import PresetsDialog from "../components/schedule/PresetsDialog";
+import { suggestMappingId } from "@/components/settings/MappableItemRow";
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 import { getMokedDisplayName } from "@/lib/shiftDemand";
 import { useMemo } from "react";
@@ -1260,7 +1261,23 @@ export default function Schedule() {
                   } else if (newTemplateColumnName === "worker_member") {
                     const colName = newTemplateColumnType.trim() || newTemplateColumnRole;
                     const _selRole2 = (workerRoles || []).find(r => (typeof r === "string" ? r : r.name) === newTemplateColumnRole);
-                    const _roleMid2 = _selRole2 && typeof _selRole2 !== "string" ? (_selRole2.mapping_id || "") : "";
+                    let _roleMid2 = (_selRole2 && typeof _selRole2 !== "string") ? (_selRole2.mapping_id || "") : "";
+                    if (!_roleMid2 && newTemplateColumnRole) {
+                      _roleMid2 = suggestMappingId(newTemplateColumnRole, "role");
+                      const updated = (workerRoles || []).map(r => {
+                        const n = typeof r === "string" ? r : r.name;
+                        return n === newTemplateColumnRole ? (typeof r === "string" ? { name: r, mapping_id: _roleMid2 } : { ...r, mapping_id: _roleMid2 }) : r;
+                      });
+                      (async () => {
+                        try {
+                          const s = await base44.entities.AppSettings.filter({ setting_key: "worker_roles" });
+                          const d = { setting_key: "worker_roles", setting_value: JSON.stringify(updated) };
+                          if (s.length > 0) await base44.entities.AppSettings.update(s[0].id, d);
+                          else await base44.entities.AppSettings.create(d);
+                          setWorkerRoles(updated);
+                        } catch (e) { console.error("role_mapping_id gen failed:", e); }
+                      })();
+                    }
                     columnToAdd = { name: colName, type: "worker", width: 150, role_filter: newTemplateColumnRole, role_mapping_id: _roleMid2 };
                   } else if (newTemplateColumnName === "task") {
                     columnToAdd = { name: "משימה", type: "task", width: 120 };
