@@ -234,6 +234,7 @@ export default function Matrix() {
   const vScrollSyncRef = useRef(false);
 
   const midMouseDragRef = useRef(null);
+  const touchStateRef = useRef(null);
   const pendingDragRef = useRef(null);
   const lastBarMouseDownRef = useRef({ t: 0, key: null });
   const pendingScrollRef = useRef(null);
@@ -437,6 +438,51 @@ export default function Matrix() {
 
   const zoomIn  = () => applyZoom(ppmRef.current * 1.25);
   const zoomOut = () => applyZoom(ppmRef.current * 0.8);
+
+  // ── Touch handlers (mobile pinch-to-zoom + pan) ──────────────────────────────
+  const handleTouchStart = useCallback((e) => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      touchStateRef.current = { type: 'pinch', prevDist: dist, midX };
+      e.preventDefault(); // prevent browser native zoom
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    const state = touchStateRef.current;
+    if (!state || state.type !== 'pinch' || e.touches.length < 2) return;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+    const factor = dist / state.prevDist;
+    if (Math.abs(factor - 1) > 0.005) {
+      applyZoom(ppmRef.current * factor, midX);
+    }
+    touchStateRef.current = { ...state, prevDist: dist, midX };
+    e.preventDefault();
+  }, [applyZoom]);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (e.touches.length < 2) touchStateRef.current = null;
+  }, []);
+
+  // Attach touch listeners to the scroll container
+  useEffect(() => {
+    const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
+    if (!sc) return;
+    sc.addEventListener('touchstart', handleTouchStart, { passive: false });
+    sc.addEventListener('touchmove', handleTouchMove, { passive: false });
+    sc.addEventListener('touchend', handleTouchEnd);
+    return () => {
+      sc.removeEventListener('touchstart', handleTouchStart);
+      sc.removeEventListener('touchmove', handleTouchMove);
+      sc.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd, pinned]);
 
   const handleSavePreset = (name, workerIds) => {
     if (editingPreset) {
@@ -2389,7 +2435,8 @@ export default function Matrix() {
           <span className="text-xs text-gray-500 font-medium">רזולוציה:</span>
           <button onClick={zoomOut} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הקטן רזולוציית זמן">−</button>
           <button onClick={zoomIn} className="w-7 h-7 flex items-center justify-center rounded border border-gray-300 bg-white hover:bg-gray-50 text-gray-600 text-sm font-bold transition-colors" title="הגדל רזולוציית זמן">+</button>
-          <span className="text-[10px] text-gray-400 mr-auto">Ctrl+גלגל לזום · גרירת גלגל לגלילה</span>
+          <span className="text-[10px] text-gray-400 mr-auto hidden md:inline">Ctrl+גלגל לזום · גרירת גלגל לגלילה</span>
+          <span className="text-[10px] text-gray-400 mr-auto md:hidden">צביטה לזום · גרירה לגלילה</span>
           <button
             onClick={exportToExcel}
             className="flex items-center gap-1 px-2 py-1 rounded border border-green-300 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-medium transition-colors"
