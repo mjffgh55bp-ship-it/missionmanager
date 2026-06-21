@@ -187,8 +187,12 @@ export default function WorkerCell({
       return 0;
     });
 
+  // Show red warning only if worker has an Unavailability record AND has NOT
+  // explicitly submitted an availability (wanted/available) for this shift.
+  // An explicit "wanted"/"available" submission overrides the Unavailability entry.
   const isCurrentUnavailable = selectedWorker && rowStartTime && rowEndTime &&
-    isWorkerUnavailable(selectedWorker.id, rowStartTime, rowEndTime);
+    isWorkerUnavailable(selectedWorker.id, rowStartTime, rowEndTime) &&
+    !getWorkerAvailabilityPriority(selectedWorker.id, rowStartTime, rowEndTime);
   const isCurrentUnqualified = selectedWorker && taskQualifiedWorkerIds &&
     !taskQualifiedWorkerIds.includes(selectedWorker.id);
   const isCurrentDoubleBooked = selectedWorker ? isWorkerDoubleBooked(selectedWorker.id) : false;
