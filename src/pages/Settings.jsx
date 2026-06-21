@@ -321,6 +321,29 @@ export default function Settings() {
         })();
       }
 
+      // ── One-time backfill: stamp mapping_id on populations ──
+      const popMappingIdDone = localStorage.getItem('pop_mapping_id_v1');
+      if (!popMappingIdDone) {
+        (async () => {
+          try {
+            const popSettings = await base44.entities.AppSettings.filter({ setting_key: "worker_populations" });
+            if (popSettings.length > 0) {
+              const pops = JSON.parse(popSettings[0].setting_value) || [];
+              let changed = false;
+              const updated = pops.map(p => {
+                if (typeof p === "string") { changed = true; return { name: p, mapping_id: suggestMappingId(p, "pop"), export_name: "", is_importable: true, is_exportable: true }; }
+                if (!p.mapping_id) { changed = true; return { ...p, mapping_id: suggestMappingId(p.name, "pop") }; }
+                return p;
+              });
+              if (changed) {
+                await base44.entities.AppSettings.update(popSettings[0].id, { setting_value: JSON.stringify(updated) });
+              }
+            }
+            localStorage.setItem('pop_mapping_id_v1', '1');
+          } catch (e) { console.error("population mapping_id backfill failed:", e); }
+        })();
+      }
+
       setWorkers(workersData);
     } catch (err) {
       console.error("loadSettings failed:", err);
@@ -631,7 +654,7 @@ export default function Settings() {
 
   const handleAddPopulation = async () => {
     if (!newPopulation.trim()) return;
-    const newItem = { name: newPopulation.trim(), mapping_id: "", export_name: "", is_importable: true, is_exportable: true };
+    const newItem = { name: newPopulation.trim(), mapping_id: suggestMappingId(newPopulation.trim(), "pop"), export_name: "", is_importable: true, is_exportable: true };
     const updated = [...populations, newItem];
     await saveListSetting("worker_populations", updated);
     setPopulations(updated);

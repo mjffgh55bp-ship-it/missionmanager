@@ -1026,9 +1026,36 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_by_task", "count_quantitative"].includes(type);
 
+  // Build population id↔name maps for id-aware matching
+  const _popIdByName = {};
+  const _popNameById = {};
+  (populations || []).forEach(p => {
+    if (typeof p === "string") return;
+    const n = (p.name || "").trim();
+    const mid = p.mapping_id || "";
+    if (n && mid) { _popIdByName[n] = mid; _popNameById[mid] = n; }
+  });
+  const popMatchesSelected = (workerPopulation) => {
+    if (selectedPopulations.length === 0) return true;
+    const wp = (workerPopulation || "").trim();
+    // Expand selected values through id/name maps so a stored id matches a name and vice versa
+    const expanded = new Set();
+    for (const sp of selectedPopulations) {
+      expanded.add(sp);
+      if (_popIdByName[sp]) expanded.add(_popIdByName[sp]);
+      if (_popNameById[sp]) expanded.add(_popNameById[sp]);
+    }
+    // Worker population could be stored as name (legacy) or id — check both
+    if (expanded.has(wp)) return true;
+    const wpId = _popIdByName[wp];
+    if (wpId && expanded.has(wpId)) return true;
+    const wpName = _popNameById[wp];
+    return !!(wpName && expanded.has(wpName));
+  };
+
   const filteredWorkers = workers.filter(w => {
     if (!w.active) return false;
-    if (selectedPopulations.length > 0 && !selectedPopulations.includes(w.population)) return false;
+    if (!popMatchesSelected(w.population)) return false;
     if (selectedRoles.length > 0) {
       const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
       if (!selectedRoles.some(r => roles.includes(r))) return false;
@@ -1118,7 +1145,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   // Workers visible after population/role/qualification filter (for the worker picker)
   const preFilteredWorkers = workers.filter(w => {
     if (!w.active) return false;
-    if (selectedPopulations.length > 0 && !selectedPopulations.includes(w.population)) return false;
+    if (!popMatchesSelected(w.population)) return false;
     if (selectedRoles.length > 0) {
       const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
       if (!selectedRoles.some(r => roles.includes(r))) return false;
@@ -1535,7 +1562,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               <div className="p-3 bg-gray-50 rounded-lg border space-y-2">
                 <WorkerPillFilter
                   label="אוכלוסייה"
-                  options={(populations || []).map(p => typeof p === "string" ? p : p.name).filter(Boolean)}
+                  options={(populations || []).map(p =>
+                    typeof p === "string"
+                      ? { value: p, label: p }
+                      : { value: p.mapping_id || p.name, label: p.name }
+                  ).filter(o => o.label)}
                   selected={selectedPopulations}
                   onChange={setSelectedPopulations}
                   color="orange"
