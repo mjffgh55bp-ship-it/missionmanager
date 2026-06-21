@@ -44,9 +44,14 @@ import ColumnCell from "../components/schedule/ColumnCell";
 import WorkerCell from "../components/schedule/WorkerCell";
 import TimeCell from "../components/schedule/TimeCell";
 import PresetsDialog from "../components/schedule/PresetsDialog";
+import MokedIdEditor from "../components/schedule/MokedIdEditor";
 import { suggestMappingId } from "@/components/settings/MappableItemRow";
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 import { getMokedDisplayName } from "@/lib/shiftDemand";
+
+/** Generate a unique stable id for a מוקד: tmpl_ + random hex. */
+const genTemplateMappingId = () =>
+  "tmpl_" + Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, "0")).join("");
 import { useMemo } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 
@@ -89,6 +94,7 @@ export default function Schedule() {
   const [taskQualifications, setTaskQualifications] = useState({});
   const [publishedWeeks, setPublishedWeeks] = useState([]);
   const [togglingPublish, setTogglingPublish] = useState(false);
+  const [mokedIdEditorTarget, setMokedIdEditorTarget] = useState(null); // { templateId, name, mappingId }
   const staticDataLoaded = useRef(false);
   const lastWeekStart = useRef(null);
   const initialLoadStarted = useRef(false);
@@ -166,6 +172,23 @@ export default function Schedule() {
     applyStaticData({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData });
     applyDailyData({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     staticDataLoaded.current = true;
+    // ── Change 2: one-time backfill of mapping_id for existing Templates ──────
+    const BACKFILL_KEY = 'template_mapping_id_v1';
+    if (!localStorage.getItem(BACKFILL_KEY)) {
+      try {
+        const all = await base44.entities.Template.list('-created_date', 1500);
+        const missing = (all || []).filter(t => !t.mapping_id);
+        if (missing.length > 0) {
+          await Promise.all(missing.map(t =>
+            base44.entities.Template.update(t.id, { mapping_id: genTemplateMappingId() })
+          ));
+          console.log(`[template_backfill] stamped ${missing.length} templates with mapping_id`);
+        }
+        localStorage.setItem(BACKFILL_KEY, '1');
+      } catch (e) {
+        console.warn('[template_backfill] failed:', e);
+      }
+    }
     } finally {
       isLoadingAll.current = false;
       setLoading(false);
@@ -388,6 +411,7 @@ export default function Schedule() {
     const config = preset.template_config;
     const newTemplate = await base44.entities.Template.create({
       name: preset.name,
+      mapping_id: genTemplateMappingId(),
       color: config.color || '#3b82f6',
       columns: config.columns || [],
       default_rows: config.default_rows || [],
@@ -582,6 +606,14 @@ export default function Schedule() {
     // loadDailyData (which fires asynchronously on every AppSettings change)
     // does NOT overwrite the moked order we just set.
     setTimeout(() => { mokedOrderSavingRef.current = false; }, 3000);
+  };
+
+  const handleSaveTemplateMappingId = async (newMappingId) => {
+    if (!mokedIdEditorTarget) return;
+    await base44.entities.Template.update(mokedIdEditorTarget.templateId, { mapping_id: newMappingId });
+    setAllTemplates(prev => prev.map(t => t.id === mokedIdEditorTarget.templateId ? { ...t, mapping_id: newMappingId } : t));
+    setTemplates(prev => prev.map(t => t.id === mokedIdEditorTarget.templateId ? { ...t, mapping_id: newMappingId } : t));
+    setMokedIdEditorTarget(prev => prev ? { ...prev, mappingId: newMappingId } : null);
   };
 
   const weekStartStrForPublish = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
@@ -854,6 +886,15 @@ export default function Schedule() {
                             <span className="text-[10px] bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded font-normal" dir="rtl">
                               המשך מ-{group.rows.find((r) => r.values?.continuation_from_date)?.values?.continuation_from_date || "יום קודם"}
                             </span>
+                          )}
+                          {editMode && (
+                            <button
+                              className="text-[10px] bg-white/20 hover:bg-white/40 text-black/70 rounded px-1.5 py-0.5 font-mono transition-colors"
+                              title="ערוך/צפה במזהה מוקד"
+                              onClick={e => { e.stopPropagation(); setMokedIdEditorTarget({ templateId: template.id, name: getMokedDisplayName(group.rows[0], template), mappingId: template.mapping_id || "" }); }}
+                            >
+                              {template.mapping_id ? template.mapping_id.slice(0, 14) + "…" : "no-id"}
+                            </button>
                           )}
                           {editingMokedName === `${group.key}` ? (
                             <Input
@@ -1201,6 +1242,14 @@ export default function Schedule() {
             </Droppable>
           </DragDropContext>
         )}
+
+        <MokedIdEditor
+          open={!!mokedIdEditorTarget}
+          templateName={mokedIdEditorTarget?.name || ""}
+          mappingId={mokedIdEditorTarget?.mappingId || ""}
+          onClose={() => setMokedIdEditorTarget(null)}
+          onSave={handleSaveTemplateMappingId}
+        />
 
         <PresetsDialog
           open={showPresetsDialog}

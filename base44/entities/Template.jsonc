@@ -6,6 +6,10 @@
       "type": "string",
       "description": "\u05e9\u05dd \u05d4\u05ea\u05d1\u05e0\u05d9\u05ea"
     },
+    "mapping_id": {
+      "type": "string",
+      "description": "Unique stable identity token for this \u05de\u05d5\u05e7\u05d3 (tmpl_...). Used for cross-network sync. Never changes even if name changes."
+    },
     "color": {
       "type": "string",
       "default": "#3b82f6",
