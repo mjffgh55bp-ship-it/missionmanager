@@ -1136,28 +1136,34 @@ export default function Schedule() {
                                     );
                                   })}
                                   <TableCell className="p-0 text-center">
-                                    <Select
-                                      value={row.values?.status || ""}
-                                      onValueChange={async (value) => {
-                                        const newValues = { ...row.values, status: value };
-                                        try {
-                                          await base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                          setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
-                                        } catch {
-                                          await loadData();
-                                        }
-                                      }}>
-                                      <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
-                                        <SelectValue placeholder="-" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value={null}>ללא</SelectItem>
-                                        {shiftStatuses.map((s) => {
-                                          const label = typeof s === 'string' ? s : (s?.name || '');
-                                          return <SelectItem key={label} value={label}>{label}</SelectItem>;
-                                        })}
-                                      </SelectContent>
-                                    </Select>
+                                   <Select
+                                     value={(() => {
+                                       const raw = row.values?.status || "";
+                                       if (!raw) return raw;
+                                       return shiftStatuses.find(s => (typeof s !== 'string') && s.mapping_id === raw) ? raw
+                                         : (shiftStatuses.find(s => (typeof s === 'string' ? s : s.name) === raw)?.mapping_id || raw);
+                                     })()}
+                                     onValueChange={async (value) => {
+                                       const newValues = { ...row.values, status: value };
+                                       try {
+                                         await base44.entities.TemplateRow.update(row.id, { values: newValues });
+                                         setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                       } catch {
+                                         await loadData();
+                                       }
+                                     }}>
+                                     <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
+                                       <SelectValue placeholder="-" />
+                                     </SelectTrigger>
+                                     <SelectContent>
+                                       <SelectItem value={null}>ללא</SelectItem>
+                                       {shiftStatuses.map((s) => {
+                                         const sid = typeof s === 'string' ? s : (s?.mapping_id || s?.name || '');
+                                         const label = typeof s === 'string' ? s : (s?.name || '');
+                                         return <SelectItem key={sid} value={sid}>{label}</SelectItem>;
+                                       })}
+                                     </SelectContent>
+                                   </Select>
                                   </TableCell>
                                   {editMode && (
                                     <TableCell className="p-0">

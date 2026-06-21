@@ -321,6 +321,29 @@ export default function Settings() {
         })();
       }
 
+      // ── One-time backfill: stamp mapping_id on shift statuses ──
+      const statusMappingIdDone = localStorage.getItem('status_mapping_id_v1');
+      if (!statusMappingIdDone) {
+        (async () => {
+          try {
+            const statusSettings = await base44.entities.AppSettings.filter({ setting_key: "shift_statuses" });
+            if (statusSettings.length > 0) {
+              const statuses = JSON.parse(statusSettings[0].setting_value) || [];
+              let changed = false;
+              const updated = statuses.map(s => {
+                if (typeof s === "string") { changed = true; return { name: s, mapping_id: suggestMappingId(s, "status"), export_name: "", is_importable: true, is_exportable: true }; }
+                if (!s.mapping_id) { changed = true; return { ...s, mapping_id: suggestMappingId(s.name, "status") }; }
+                return s;
+              });
+              if (changed) {
+                await base44.entities.AppSettings.update(statusSettings[0].id, { setting_value: JSON.stringify(updated) });
+              }
+            }
+            localStorage.setItem('status_mapping_id_v1', '1');
+          } catch (e) { console.error("status mapping_id backfill failed:", e); }
+        })();
+      }
+
       // ── One-time backfill: stamp mapping_id on populations ──
       const popMappingIdDone = localStorage.getItem('pop_mapping_id_v1');
       if (!popMappingIdDone) {
@@ -1020,7 +1043,7 @@ export default function Settings() {
 
   const handleAddShiftStatus = async () => {
     if (!newShiftStatus.trim()) return;
-    const newItem = { name: newShiftStatus.trim(), mapping_id: "", export_name: "", is_importable: true, is_exportable: true };
+    const newItem = { name: newShiftStatus.trim(), mapping_id: suggestMappingId(newShiftStatus.trim(), "status"), export_name: "", is_importable: true, is_exportable: true };
     const updated = [...shiftStatuses, newItem];
     await saveListSetting("shift_statuses", updated);
     setShiftStatuses(updated);
