@@ -715,51 +715,208 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     setLoadingPreview(false);
   };
 
+  // ── Helpers ─────────────────────────────────────────────────────────────────
+  /** Run items in batches of batchSize with delayMs between batches using Promise.allSettled */
+  const batchAllSettled = async (items, fn, batchSize = 10, delayMs = 200) => {
+    const results = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const batchResults = await Promise.allSettled(batch.map(fn));
+      results.push(...batchResults);
+      if (i + batchSize < items.length) await new Promise(r => setTimeout(r, delayMs));
+    }
+    return results;
+  };
+
+  /** Reconstruct a Template.columns array from imported MokedColumns rows */
+  const reconstructColumns = (importedCols) => {
+    return (importedCols || [])
+      .sort((a, b) => Number(a.column_index || 0) - Number(b.column_index || 0))
+      .map(ic => {
+        const col = {
+          name: ic.internal_value_key || ic.column_name || ic.display_name || "",
+          type: ic.column_type || "text",
+          width: Number(ic.width) || 120,
+        };
+        if (ic.column_mapping_id && ic.column_mapping_id !== "__status__" && ic.column_mapping_id !== "__task__")
+          col.column_id = ic.column_mapping_id;
+        if (ic.role_filter)     col.role_filter     = ic.role_filter;
+        if (ic.role_mapping_id) col.role_mapping_id = ic.role_mapping_id;
+        if (ic.default_value)   col.default_value   = ic.default_value;
+        if (ic.options_json) {
+          try { col.options = JSON.parse(ic.options_json); } catch {}
+        }
+        return col;
+      });
+  };
+
+  /** Trigger a browser download of a JSON blob */
+  const triggerJsonDownload = (data, filename) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
   // ── Step 3: Apply ───────────────────────────────────────────────────────────
   const handleApply = async () => {
     if (!preview) return;
     setApplying(true);
 
     let imported = 0, updated = 0, skipped = 0, errors = 0;
+    let templatesCreated = 0, templatesRewritten = 0, rowsDeleted = 0, workerSkips = 0;
     const resultRows = [];
 
+    // ── (1) SNAPSHOT: collect existing rows for all rewrite pairs ──────────────
+    const rewritePlans = preview.rowPlan.filter(p => p.action === "rewrite_moked_row");
+    // Build set of (liveTemplateId, date) pairs to rewrite
+    const rewritePairs = new Set();
+    rewritePlans.forEach(p => {
+      if (p.liveTemplate?.id && p.irow?.date) rewritePairs.add(`${p.liveTemplate.id}::${p.irow.date}`);
+    });
+    let snapshotRows = [];
+    if (rewritePairs.size > 0) {
+      // Fetch all existing rows for each pair (may already be in existingRows but re-fetch to be safe)
+      const pairList = [...rewritePairs].map(k => { const [tid, date] = k.split("::"); return { tid, date }; });
+      const fetchResults = await batchAllSettled(pairList, ({ tid, date }) =>
+        base44.entities.TemplateRow.filter({ template_id: tid, date })
+      );
+      fetchResults.forEach(r => {
+        if (r.status === "fulfilled") snapshotRows.push(...r.value);
+      });
+      // Trigger download immediately (before any deletion)
+      if (snapshotRows.length > 0) {
+        const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        triggerJsonDownload(snapshotRows, `restore_snapshot_${ts}.json`);
+      }
+    }
+
+    // ── (2) CREATE missing Templates ───────────────────────────────────────────
+    const createdTemplateByImportedId = {}; // importedTemplateId → new live Template
+    const failedCreateTemplateIds = new Set();
+    const templatesToCreateEntries = Object.entries(preview.templatesToCreate || {});
+    if (templatesToCreateEntries.length > 0) {
+      const createResults = await batchAllSettled(templatesToCreateEntries, async ([importedTid, entry]) => {
+        const cols = reconstructColumns(entry.columns);
+        const tmplName = entry.templateMeta?.local_template_name || entry.templateMeta?.template_name || entry.templateMeta?.exported_template_name || "מוקד חדש";
+        const newTmpl = await base44.entities.Template.create({
+          name: tmplName,
+          mapping_id: entry.mapping_id,
+          columns: cols,
+          color: entry.templateMeta?.color || "#3b82f6",
+          is_default: false,
+          active: true,
+        });
+        return { importedTid, newTmpl };
+      });
+      createResults.forEach((r, idx) => {
+        const importedTid = templatesToCreateEntries[idx][0];
+        if (r.status === "fulfilled") {
+          createdTemplateByImportedId[importedTid] = r.value.newTmpl;
+          templatesCreated++;
+        } else {
+          console.error(`[import] failed to create template for ${importedTid}:`, r.reason);
+          failedCreateTemplateIds.add(importedTid);
+        }
+      });
+    }
+
+    // ── (3) DELETE existing rows for rewrite pairs ────────────────────────────
+    if (snapshotRows.length > 0) {
+      const deleteResults = await batchAllSettled(snapshotRows, row =>
+        base44.entities.TemplateRow.delete(row.id)
+      );
+      rowsDeleted = deleteResults.filter(r => r.status === "fulfilled").length;
+      const deleteFailed = deleteResults.filter(r => r.status === "rejected").length;
+      if (deleteFailed > 0) console.warn(`[import] ${deleteFailed} row deletes failed`);
+    }
+    // Track rewritten template ids (for count — count distinct live template ids rewritten)
+    const rewrittenLiveTemplateIds = new Set(
+      rewritePlans.map(p => p.liveTemplate?.id).filter(Boolean)
+    );
+    templatesRewritten = rewrittenLiveTemplateIds.size;
+
+    // ── (4) CREATE rows for create_moked_row + rewrite_moked_row ─────────────
+    // Collect plans that need row creation
+    const mokedRowPlans = preview.rowPlan.filter(
+      p => p.action === "create_moked_row" || p.action === "rewrite_moked_row"
+    );
+    // Build plan → resolved live template id mapping
+    const mokedRowCreateResults = await batchAllSettled(mokedRowPlans, async (plan) => {
+      // Resolve which live template to write to
+      let liveTemplateId, liveTemplateName;
+      if (plan.action === "create_moked_row") {
+        const created = createdTemplateByImportedId[plan.irow.template_id];
+        if (!created) throw new Error(`template create failed for ${plan.irow.template_id}`);
+        liveTemplateId = created.id;
+        liveTemplateName = created.name;
+      } else {
+        // rewrite_moked_row: liveTemplate was matched during preview
+        if (!plan.liveTemplate?.id) throw new Error("no live template for rewrite");
+        liveTemplateId = plan.liveTemplate.id;
+        liveTemplateName = plan.liveTemplate.name;
+      }
+
+      // Build values — apply worker guardrail: skip unresolved workers (already null in parsedValues)
+      const orderVal = plan.irow?._order !== "" && plan.irow?._order !== undefined ? Number(plan.irow._order) : undefined;
+      const newValues = { ...plan.parsedValues };
+      if (orderVal !== undefined && !isNaN(orderVal)) newValues._order = orderVal;
+
+      const groupId = plan.irow?.group_id || (Date.now().toString() + Math.random().toString(36).substr(2, 6));
+
+      await base44.entities.TemplateRow.create({
+        template_id: liveTemplateId,
+        template_name: liveTemplateName,
+        date: plan.irow.date,
+        values: newValues,
+        group_id: groupId,
+      });
+      return { plan };
+    });
+
+    mokedRowCreateResults.forEach((r, idx) => {
+      const plan = mokedRowPlans[idx];
+      // Count worker skips from parsedValues inspection (fields that were worker cols but resolved to nothing)
+      const wSkips = (plan.workerDiag || []).filter(d => d.status === "unresolved").length;
+      workerSkips += wSkips;
+      if (r.status === "fulfilled") {
+        imported++;
+        const rej = wSkips > 0 ? ` | עובדים שלא נמצאו: ${wSkips}` : "";
+        resultRows.push({ ...plan, finalStatus: "יובא", reason: `שורת מוקד נוצרה${rej}` });
+      } else {
+        errors++;
+        const isFailed = failedCreateTemplateIds.has(plan.irow?.template_id);
+        resultRows.push({ ...plan, finalStatus: "שגיאה", reason: isFailed ? "יצירת תבנית נכשלה" : (r.reason?.message || "שגיאה ביצירה") });
+      }
+    });
+
+    // ── (5) Standard update / create rows (unchanged) ─────────────────────────
     for (const plan of preview.rowPlan) {
       if (plan.action === "skip" || plan.status === "שגיאה") {
         errors++;
         resultRows.push({ ...plan, finalStatus: "שגיאה", reason: plan.errors.join("; ") });
         continue;
       }
-      // will_create / rewrite_moked_row: not yet implemented — skip for now
       if (plan.action === "create_moked_row" || plan.action === "rewrite_moked_row") {
-        skipped++;
-        resultRows.push({ ...plan, finalStatus: "דולג", reason: "יצירת/החלפת מוקד — טרם מופעל" });
-        continue;
+        continue; // already handled above
       }
 
       if (plan.action === "update" && plan.existingRow) {
-        // Non-destructive merge: existing values first, overlay non-empty imported values
-        // Preserve _order from existing
         const baseValues = { ...(plan.existingValues || {}) };
         const incomingValues = { ...plan.parsedValues };
-        // Keep existing _order
-        if (baseValues._order !== undefined) {
-          delete incomingValues._order;
-        }
+        if (baseValues._order !== undefined) delete incomingValues._order;
         const newValues = { ...baseValues, ...incomingValues };
         await base44.entities.TemplateRow.update(plan.existingRow.id, { values: newValues });
         updated++;
-        const note = plan.fieldsUpdated.length > 0
-          ? `עודכנו: ${plan.fieldsUpdated.join(", ")}`
-          : "ללא שינויים";
+        const note = plan.fieldsUpdated.length > 0 ? `עודכנו: ${plan.fieldsUpdated.join(", ")}` : "ללא שינויים";
         const rej = plan.rejectedFields?.length > 0 ? ` | נדחו: ${plan.rejectedFields.map(r => r.col).join(", ")}` : "";
         resultRows.push({ ...plan, finalStatus: "עודכן", reason: note + rej });
       } else {
-        // Create new row
         const groupId = plan.irow.group_id || (Date.now().toString() + Math.random().toString(36).substr(2, 6));
         const orderVal = plan.irow._order !== "" && plan.irow._order !== undefined ? Number(plan.irow._order) : undefined;
         const newValues = { ...plan.parsedValues };
         if (orderVal !== undefined && !isNaN(orderVal)) newValues._order = orderVal;
-
         await base44.entities.TemplateRow.create({
           template_id: plan.liveTemplate.id,
           template_name: plan.liveTemplate.name,
@@ -778,10 +935,11 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
       user_email: currentUser?.email || "", user_name: currentUser?.full_name || "",
       row_count: resultRows.length, imported_count: imported, updated_count: updated,
       skipped_count: skipped, error_count: errors,
+      notes: `templates_created=${templatesCreated} templates_rewritten=${templatesRewritten} rows_deleted=${rowsDeleted} worker_skips=${workerSkips}`,
     });
     if (onAuditLog) onAuditLog();
 
-    setResult({ rows: resultRows, imported, updated, skipped, errors, total: resultRows.length });
+    setResult({ rows: resultRows, imported, updated, skipped, errors, total: resultRows.length, templatesCreated, templatesRewritten, rowsDeleted, workerSkips, hadSnapshot: snapshotRows.length > 0 });
     setApplying(false);
     setPreview(null);
   };
@@ -897,7 +1055,7 @@ function PreviewPanel({ preview, fileName, showColDiag, setShowColDiag, showRowD
               ➕ {t.name} — {t.rowCount} שורות
             </div>
           ))}
-          <div className="text-xs text-blue-600 mt-1">⚠ יצירת מוקדים טרם מופעלת — שורות אלה יידולגו בשלב זה</div>
+          {templatesToRewriteCount > 0 && <div className="text-xs text-blue-600 mt-1">🔄 מוקדים מוחלפים: נתוני התאריכים שבקובץ יוחלפו במלואם (snapshot יורד לפני המחיקה)</div>}
         </div>
       )}
 
@@ -1178,6 +1336,35 @@ function ResultPanel({ result, onReset }) {
               <span className={`font-semibold ${color || "text-gray-900"}`}>{val}</span>
             </div>
           ))}
+          {result.templatesCreated > 0 && (
+            <div className="flex justify-between col-span-2 border-t pt-1 mt-1">
+              <span className="text-gray-600">מוקדים חדשים שנוצרו:</span>
+              <span className="font-semibold text-blue-700">{result.templatesCreated}</span>
+            </div>
+          )}
+          {result.templatesRewritten > 0 && (
+            <div className="flex justify-between col-span-2">
+              <span className="text-gray-600">מוקדים שהוחלפו:</span>
+              <span className="font-semibold text-purple-700">{result.templatesRewritten}</span>
+            </div>
+          )}
+          {result.rowsDeleted > 0 && (
+            <div className="flex justify-between col-span-2">
+              <span className="text-gray-600">שורות שנמחקו (הוחלפו):</span>
+              <span className="font-semibold text-orange-700">{result.rowsDeleted}</span>
+            </div>
+          )}
+          {result.workerSkips > 0 && (
+            <div className="flex justify-between col-span-2">
+              <span className="text-gray-600">עובדים שלא זוהו (ידולגו):</span>
+              <span className="font-semibold text-orange-600">{result.workerSkips}</span>
+            </div>
+          )}
+          {result.hadSnapshot && (
+            <div className="col-span-2 text-xs text-green-700 bg-green-50 rounded px-2 py-1 mt-1">
+              ✓ קובץ restore_snapshot הורד לפני המחיקה
+            </div>
+          )}
         </div>
       </div>
 
