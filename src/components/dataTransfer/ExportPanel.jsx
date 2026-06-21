@@ -24,7 +24,7 @@ import {
 
 const HEBREW_MONTHS = ["ינואר","פברואר","מרץ","אפריל","מאי","יוני","יולי","אוגוסט","ספטמבר","אוקטובר","נובמבר","דצמבר"];
 
-export default function ExportPanel({ currentUser, onAuditLog }) {
+export default function ExportPanel({ currentUser, onAuditLog, selectedTemplateIds }) {
   const [calMonth, setCalMonth] = useState(new Date());
   const [selectedDates, setSelectedDates] = useState(new Set());
   const [exporting, setExporting] = useState(false);
@@ -108,9 +108,10 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       return ordered;
     };
 
-    // Filter rows to selected dates, sorted stably
+    // Filter rows to selected dates (and optionally to specific template ids), sorted stably
+    const tmplIdSet = (selectedTemplateIds && selectedTemplateIds.length > 0) ? new Set(selectedTemplateIds) : null;
     const filteredRows = templateRows
-      .filter(r => dateSet.has(r.date))
+      .filter(r => dateSet.has(r.date) && (!tmplIdSet || tmplIdSet.has(r.template_id)))
       .sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date);
         if ((a.group_id || "") !== (b.group_id || "")) return (a.group_id || "").localeCompare(b.group_id || "");
@@ -151,6 +152,7 @@ export default function ExportPanel({ currentUser, onAuditLog }) {
       ["date_end", dateEnd],
       ["days_count", dates.length],
       ["rows_count", filteredRows.length],
+      ["selected_templates", tmplIdSet ? selectedTemplateIds.length : "all"],
       ["exported_by", sanitizeText(currentUser?.email || "")],
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(manifestData), SHEET_MANIFEST);
