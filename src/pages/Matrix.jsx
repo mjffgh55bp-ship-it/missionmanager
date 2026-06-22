@@ -566,11 +566,6 @@ export default function Matrix() {
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
       debouncedLoadDataRef.current(true, false, false);
     });
-    // Availability and Unavailability subscriptions removed — they fire on every
-    // optimistic update from this same page, causing flicker. Data is kept fresh
-    // via explicit debouncedLoadData calls after mutations and via visibility change.
-    const unsubAvailability = { unsubscribe: () => {} };
-    const unsubUnavailability = { unsubscribe: () => {} };
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') debouncedLoadDataRef.current(true, false);
@@ -1668,7 +1663,7 @@ export default function Matrix() {
     const endPx = endTimeToPixels(assignment.start_time, assignment.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 2);
     const rightPx = startPx;
-    if (startPx < 0 || startPx > timelineWidth) return null;
+    if (endPx < 0 || startPx > timelineWidth) return null;
     const isTemplate = assignment.isTemplateShift;
     const standby = isStandbyStatus(assignment.status);
     if (standby) {
