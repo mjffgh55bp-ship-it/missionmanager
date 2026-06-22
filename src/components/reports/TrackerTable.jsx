@@ -57,7 +57,7 @@ const DATE_MODES = [
 
 
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], workerQualifications = [], onDelete, onUpdated, onDragStart }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], workerQualifications = [], onDelete, onUpdated, onDragStart, cardHeight }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -1489,7 +1489,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   return (
     // ReportCard: flex column, clips overflow
-    <div className="border rounded-xl shadow-lg mb-6 bg-white" dir="rtl" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div className="border rounded-xl shadow-lg mb-6 bg-white" dir="rtl" style={{ display: "flex", flexDirection: "column", overflow: "hidden", height: cardHeight ? "100%" : "auto" }}>
 
       {/* ── RedHeader: outside HorizontalScrollContainer, never scrolls horizontally ── */}
       <div style={{ flexShrink: 0, zIndex: 50, backgroundColor: "white" }}>
@@ -1637,14 +1637,14 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
 
       {/* ── Single horizontal scroll container — header + body + summary all move together ── */}
-      <div style={{ overflowX: "auto", overflowY: "hidden" }}>
-        <div style={{ width: totalTableWidth, minWidth: totalTableWidth, display: "flex", flexDirection: "column" }}>
+      <div style={{ overflowX: "auto", overflowY: "hidden", flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div style={{ width: totalTableWidth, minWidth: totalTableWidth, display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
 
           {/* Header — always visible, never scrolls vertically */}
           {renderGridHeaderRow()}
 
-          {/* Body rows — only vertical scroll here */}
-          <div style={{ overflowY: "auto", overflowX: "visible", maxHeight: "55vh", minHeight: 0 }}>
+          {/* Body rows — fills remaining space, vertical scroll only */}
+          <div style={{ overflowY: "auto", overflowX: "visible", flex: 1, minHeight: 0 }}>
             {filteredWorkers.map(worker => renderGridBodyRow(worker))}
           </div>
 

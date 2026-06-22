@@ -166,7 +166,9 @@ export default function TrackerLayoutArea({
               height: p.h || "auto",
               minWidth: MIN_W,
               zIndex: isActive ? 20 : 10,
-              overflow: "auto",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
             }}
             className={`bg-white rounded-xl shadow-sm border ${isActive ? "border-blue-400 shadow-md" : "border-gray-200"}`}
           >
@@ -184,6 +186,7 @@ export default function TrackerLayoutArea({
               onDelete={() => onDeleteTracker(tracker.id)}
               onUpdated={onUpdatedTracker}
               onDragStart={(e) => startDrag(e, tracker.id)}
+              cardHeight={p.h || null}
             />
 
             {/* Resize handle — absolute bottom-left corner */}
