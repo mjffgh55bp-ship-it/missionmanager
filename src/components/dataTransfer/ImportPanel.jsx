@@ -218,6 +218,23 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
     const customParams     = getSetting("custom_schedule_params") || [];
     const tasksList        = (getSetting("tasks_list") || []).map(t => typeof t === 'string' ? t : (t.name || t));
 
+    // Resolve an incoming building-block value to its LOCAL representation.
+    // Cross-network values arrive as stable ids (status_NN, role_NN, pop_NN, task_N,
+    // wrk_*). Each environment maps that id to its own local name. This helper takes
+    // a registry list of { name, mapping_id } and returns the local name for an
+    // incoming value, matching by mapping_id first and falling back to name (legacy
+    // files that exported names). Returns null if nothing matches.
+    const resolveLocalByMappingId = (registry, incoming) => {
+      if (incoming == null || incoming === "") return null;
+      const val = String(incoming).trim();
+      const list = Array.isArray(registry) ? registry : [];
+      const byId = list.find(x => x && (x.mapping_id === val || x.id === val));
+      if (byId) return byId.name ?? val;
+      const byName = list.find(x => x && (x.name === val));
+      if (byName) return byName.name;
+      return null;
+    };
+
     // ── Build per-date daily columns + column orders (mirrors ExportPanel / Schedule.jsx) ──
     const dailyColumnsPerDate = {};   // dateStr → { [templateId]: col[] }
     const columnOrderPerDate  = {};   // dateStr → { [templateId]: string[] }
@@ -531,7 +548,13 @@ export default function ImportPanel({ currentUser, onAuditLog }) {
           const rawVal = iv.value_raw || iv.value_exported;
           if (!isEmpty(rawVal)) {
             const stripped = String(rawVal).startsWith("'") ? String(rawVal).slice(1) : String(rawVal);
-            if (shiftStatuses.length === 0 || shiftStatuses.includes(stripped)) {
+            // Incoming status is a stable id (status_NN). Resolve to the local status
+            // name via the registry. Accept an exact local-name match too (legacy files).
+            const localStatus = resolveLocalByMappingId(shiftStatuses, stripped);
+            if (localStatus != null) {
+              parsedValues.status = localStatus;
+              fieldsDiag.push({ col: colName, internalKey: "status", rawVal: stripped, writtenVal: localStatus, status: "written" });
+            } else if (shiftStatuses.length === 0) {
               parsedValues.status = stripped;
               fieldsDiag.push({ col: colName, internalKey: "status", rawVal: stripped, writtenVal: stripped, status: "written" });
             } else {
