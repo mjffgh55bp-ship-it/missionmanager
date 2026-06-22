@@ -31,6 +31,8 @@ const getDateRange = (mode, startDate, endDate) => {
   if (mode === "daily") { const d = format(today, "yyyy-MM-dd"); return { start: d, end: d }; }
   if (mode === "week") return { start: format(startOfWeek(today, { weekStartsOn: 0 }), "yyyy-MM-dd"), end: format(endOfWeek(today, { weekStartsOn: 0 }), "yyyy-MM-dd") };
   if (mode === "month") return { start: format(startOfMonth(today), "yyyy-MM-dd"), end: format(endOfMonth(today), "yyyy-MM-dd") };
+  if (mode === "last_2_weeks") { return { start: format(subDays(today, 14), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }; }
+  if (mode === "last_3_weeks") { return { start: format(subDays(today, 21), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }; }
   if (mode === "last_30_days") { return { start: format(subDays(today, 30), "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }; }
   if (mode === "half_year") { const s = new Date(today); s.setMonth(s.getMonth() - 6); return { start: format(s, "yyyy-MM-dd"), end: format(today, "yyyy-MM-dd") }; }
   if (mode === "half_year_start") {
@@ -48,6 +50,8 @@ const DATE_MODES = [
   { value: "daily", label: "היום" },
   { value: "week", label: "השבוע" },
   { value: "month", label: "החודש" },
+  { value: "last_2_weeks", label: "שבועיים אחרונים" },
+  { value: "last_3_weeks", label: "שלושה שבועות" },
   { value: "last_30_days", label: "30 יום אחרונים" },
   { value: "half_year", label: "חצי שנה" },
   { value: "half_year_start", label: "מתחילת חציון" },
