@@ -438,6 +438,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     // Check criteria array (new format) or fall back to old col_value_filter
     const TASK_COL = "__משימה__";
     const TIME_RANGE_COL = "__טווח_שעות__";
+    const DAY_OF_WEEK_COL = "__ימי_שבוע__";
     const parseQuantJson = (raw) => {
       if (!raw) return {};
       if (typeof raw === "object") return raw;
@@ -551,6 +552,13 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             };
             if (c.logic === "and") return c.include.every(r => matches(r));
             return c.include.some(r => matches(r));
+          }
+          if (c.col_name === DAY_OF_WEEK_COL) {
+            // assignmentObj.date is "YYYY-MM-DD"; getDay() returns 0=Sun..6=Sat
+            const date = assignmentObj?.date || vals?.["תאריך"];
+            if (!date) return false;
+            const dayNum = String(new Date(date + "T12:00:00").getDay());
+            return c.include.includes(dayNum);
           }
           if (c.col_name === WORKER_ROLE_COL_NAME) {
             // Already filtered at worker level — always pass here
@@ -903,6 +911,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
     // Build a fake "match criteria" that works without workerId
     const TASK_COL = "__משימה__";
+    const DAY_OF_WEEK_COL_SHIFT = "__ימי_שבוע__";
     const getCellVals = (vals, colName) => {
       const fv = vals?.[colName]; const st = vals?.[`${colName}_subTypes`] || [];
       return [fv, ...st].filter(Boolean).map(String);
@@ -924,6 +933,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         if (c.col_name === "__תפקיד__") {
             // Worker role criterion — skip at shift level (handled per-column)
             return true;
+          }
+        if (c.col_name === DAY_OF_WEEK_COL_SHIFT) {
+            const date = assignmentObj?.date || vals?.["תאריך"];
+            if (!date) return false;
+            const dayNum = String(new Date(date + "T12:00:00").getDay());
+            return c.include.includes(dayNum);
           }
         if (c.col_name === TASK_COL) {
             const tq = assignmentObj?.qualification_id || "";
