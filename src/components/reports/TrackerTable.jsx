@@ -1149,12 +1149,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     !workerSearch || (w.nickname || "").includes(workerSearch)
   );
 
+  // Check if ANY displayed column is "per_shift" (criterion mode) — hide workers when true
+  const hasPerShiftColumn = displayColumns.some(col => col.type === "schedule_col" && col.count_mode === "per_shift");
+
   // Compute total table width (worker col + all data cols)
   const totalTableWidth = (hasPerShiftColumn ? 0 : (colWidths["__worker__"] || 120)) + displayColumns.reduce((sum, col) => sum + (colWidths[col.id] || 140), 0) + (editMode ? 40 : 0);
-
-  // Check if ANY displayed column is "per_shift" (criterion mode) — hide workers when true
-  // NOTE: must be computed before colTemplate so the template can omit the worker column
-  const hasPerShiftColumn = displayColumns.some(col => col.type === "schedule_col" && col.count_mode === "per_shift");
 
   // Build gridTemplateColumns string — shared by header row and every body row
   const colTemplate = [
