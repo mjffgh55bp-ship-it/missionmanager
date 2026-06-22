@@ -1636,29 +1636,27 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         />
       )}
 
-      {/* ── HorizontalScrollContainer: THE ONLY element with overflow-x:auto ── */}
-      <div style={{ overflowX: "auto", overflowY: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
+      {/* ── Single scroll container: horizontal + vertical, one unified scroll area ── */}
+      <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "65vh", minHeight: 0, position: "relative" }}>
 
-        {/* ── WideTableGrid: width = totalColumnWidth, contains BlueHeaderRow + BodyVerticalScrollArea ── */}
+        {/* ── WideTableGrid: width = totalColumnWidth ── */}
         <div style={{ width: totalTableWidth, minWidth: totalTableWidth, display: "flex", flexDirection: "column" }}>
 
-          {/* ── BlueHeaderRow: always visible, outside BodyVerticalScrollArea ── */}
-          {headerPinned && renderGridHeaderRow()}
-
-          {/* ── BodyVerticalScrollArea: THE ONLY element with overflow-y:auto ── */}
-          <div style={{ overflowY: "auto", overflowX: "visible", maxHeight: "60vh", minHeight: 0 }}>
-            {/* Header row when not pinned */}
-            {!headerPinned && renderGridHeaderRow()}
-
-            {/* Body rows */}
-            {filteredWorkers.map(worker => renderGridBodyRow(worker))}
+          {/* ── Header row: sticky at top ── */}
+          <div style={{ position: "sticky", top: 0, zIndex: 40 }}>
+            {renderGridHeaderRow()}
           </div>
 
-          {/* ── Summary row: always docked at bottom, outside scroll area ── */}
-          {renderGridSummaryRow()}
+          {/* ── Body rows ── */}
+          {filteredWorkers.map(worker => renderGridBodyRow(worker))}
+
+          {/* ── Summary row: sticky at bottom ── */}
+          <div style={{ position: "sticky", bottom: 0, zIndex: 40 }}>
+            {renderGridSummaryRow()}
+          </div>
 
         </div>{/* end WideTableGrid */}
-      </div>{/* end HorizontalScrollContainer */}
+      </div>{/* end ScrollContainer */}
     </div>
   );
 }
