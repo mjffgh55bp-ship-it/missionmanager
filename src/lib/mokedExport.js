@@ -85,6 +85,26 @@ export async function runMokedExport({
     if (coMatch) { try { columnOrderPerDate[coMatch[1]] = JSON.parse(s.setting_value); } catch {} }
   });
 
+  // Build a name → registry mapping_id lookup from the column registry
+  // (AppSettings "custom_schedule_params"). This is the source of the col_XX IDs
+  // set in Settings → "עמודות לוח ודוחות". Columns are matched across networks by
+  // this stable ID, never by their local display name.
+  const colRegistry = (() => {
+    const s = allSettings.find(x => x.setting_key === "custom_schedule_params");
+    if (!s) return [];
+    try { return JSON.parse(s.setting_value) || []; } catch { return []; }
+  })();
+  const colMappingIdByName = {};
+  colRegistry.forEach(c => {
+    if (c && c.name && c.mapping_id) colMappingIdByName[String(c.name).trim()] = c.mapping_id;
+  });
+  const resolveColMappingId = (col) => {
+    if (!col) return "";
+    if (col.mapping_id) return col.mapping_id;
+    if (col.name && colMappingIdByName[String(col.name).trim()]) return colMappingIdByName[String(col.name).trim()];
+    return "";
+  };
+
   const workerById = {};
   workers.forEach(w => { workerById[w.id] = w; });
 
@@ -180,7 +200,7 @@ export async function runMokedExport({
         t.id,
         sanitizeText(t.mapping_id || ""),
         idx,
-        sanitizeText(isTask ? "__task__" : (col.mapping_id || "")),
+        sanitizeText(isTask ? "__task__" : resolveColMappingId(col)),
         sanitizeText(internalKey),
         sanitizeText(isTask ? "task" : col.type || "text"),
         col.width || 120,
@@ -237,7 +257,7 @@ export async function runMokedExport({
       const isTask   = !col._isStatusCol && col.type === "task";
       const internalKey = col._isStatusCol ? "status" : (isTask ? "task" : getInternalValueKey(col));
       const isWorker = !col._isStatusCol && !isTask && (col.type === "worker" || isKnownWorkerCol(col.name));
-      const colMappingId = col._isStatusCol ? "__status__" : (isTask ? "__task__" : (col.mapping_id || ""));
+      const colMappingId = col._isStatusCol ? "__status__" : (isTask ? "__task__" : resolveColMappingId(col));
       const rawVal = values[internalKey];
       let exportValue = "";
       if (!isEmpty(rawVal)) {
