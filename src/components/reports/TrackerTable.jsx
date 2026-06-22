@@ -406,17 +406,32 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const workerMatchesRoleInShift = (shiftData, isTemplateRow = false, template = null) => {
       if (!expectedRoles) return true;
 
+      // Check if a column name/role_filter matches any of the expected roles
+      // Expected roles can be mapping_ids (e.g. "role_abc") or plain names (e.g. "נהג")
       const colRoleMatches = (col) => {
-        // Role identity = the role's stable id carried on the column (role_mapping_id). Names are display only.
-        const colRoleId = col.role_mapping_id
-          || (col.role_filter && _roleIdByName[col.role_filter.trim()])
-          || (col.name && _roleIdByName[col.name.trim()])
-          || null;
-        if (!colRoleId) return false;
-        // expectedRoles holds selected role ids (and possibly legacy names). Match by id; allow a name match only as legacy fallback.
-        if (expectedRoles.includes(colRoleId)) return true;
-        const colRoleName = _roleNameById[colRoleId];
-        return colRoleName ? expectedRoles.includes(colRoleName) : false;
+        // Collect all possible identifiers for this column's role:
+        // 1. explicit role_mapping_id on column
+        // 2. role_filter field
+        // 3. the column name itself (most common case: column named "נהג" = that role)
+        const candidates = [
+          col.role_mapping_id,
+          col.role_filter,
+          col.name,
+          col.name && _roleIdByName[col.name.trim()],   // name → id
+          col.role_filter && _roleIdByName[col.role_filter.trim()],
+        ].filter(Boolean);
+
+        return expectedRoles.some(er => {
+          // Direct match against any candidate
+          if (candidates.includes(er)) return true;
+          // er might be a mapping_id — check if its display name matches any candidate
+          const erName = _roleNameById[er];
+          if (erName && candidates.includes(erName)) return true;
+          // er might be a display name — check if any candidate is its id
+          const erId = _roleIdByName[er];
+          if (erId && candidates.includes(erId)) return true;
+          return false;
+        });
       };
 
       if (isTemplateRow && template) {
@@ -430,12 +445,21 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         });
       }
 
-      // Non-template (saved assignment) path
+      // Non-template (saved assignment) path — check scheduleColumns registry
       const vals = shiftData.column_values || {};
-      return scheduleColumns.some(sc => {
+      const matchedViaRegistry = scheduleColumns.some(sc => {
         if (sc.type !== "worker") return false;
         if (!colRoleMatches(sc)) return false;
         return vals[sc.name] === workerId || (sc.mapping_id && vals[sc.mapping_id] === workerId);
+      });
+      if (matchedViaRegistry) return true;
+
+      // Fallback: check column_values keys directly — key name IS the role column name
+      return Object.entries(vals).some(([colName, colVal]) => {
+        if (colVal !== workerId) return false;
+        // Check if this column name corresponds to one of the expected roles
+        const fakecol = { name: colName, role_filter: colName, role_mapping_id: null };
+        return colRoleMatches(fakecol);
       });
     };
 
