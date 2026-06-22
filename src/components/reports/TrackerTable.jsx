@@ -1173,22 +1173,24 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         zIndex: 40,
       }}
     >
-      {/* Worker column header */}
-      <div className="font-bold px-4 py-2 relative flex items-center">
-        <button
-          onClick={() => handleSortClick(null)}
-          className="flex items-center gap-1 hover:text-blue-700 transition-colors text-sm"
-          title="מיון לפי שם"
-        >
-          עובד
-          {sortColId === null
-            ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
-            : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
-        </button>
-        <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors"
-          onMouseDown={e => startColResize(e, "__worker__")}
-          style={{ userSelect: "none" }} />
-      </div>
+      {/* Worker column header — hidden when all columns are per_shift */}
+      {!allColumnsPerShift && (
+        <div className="font-bold px-4 py-2 relative flex items-center">
+          <button
+            onClick={() => handleSortClick(null)}
+            className="flex items-center gap-1 hover:text-blue-700 transition-colors text-sm"
+            title="מיון לפי שם"
+          >
+            עובד
+            {sortColId === null
+              ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3 text-blue-600" /> : <ArrowDown className="w-3 h-3 text-blue-600" />)
+              : <ArrowUpDown className="w-3 h-3 text-gray-300" />}
+          </button>
+          <div className="absolute left-0 top-0 h-full w-1 cursor-col-resize hover:bg-blue-400 transition-colors"
+            onMouseDown={e => startColResize(e, "__worker__")}
+            style={{ userSelect: "none" }} />
+        </div>
+      )}
 
       {/* Data column headers */}
       {displayColumns.map((col, idx) => (
@@ -1287,6 +1289,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
     </div>
   );
+
+  // Check if ALL displayed columns are "per_shift" (criterion mode)
+  const allColumnsPerShift = displayColumns.every(col => isAuto(col.type) && col.count_mode === "per_shift");
 
   // Render a single body data row as a CSS-grid div
   const renderGridBodyRow = (worker) => {
@@ -1412,7 +1417,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           fontWeight: 600,
         }}
       >
-        <div className="px-4 py-1 text-blue-900 font-bold text-sm flex items-center">סה"כ</div>
+        {!allColumnsPerShift && (
+          <div className="px-4 py-1 text-blue-900 font-bold text-sm flex items-center">סה"כ</div>
+        )}
+        {allColumnsPerShift && (
+          <div className="px-4 py-1 text-blue-900 font-bold text-sm flex items-center">סכום כללי</div>
+        )}
         {displayColumns.map(col => {
           if (col.type === "count_by_task") {
             const grandTotal = filteredWorkers.reduce((sum, w) => {
@@ -1642,11 +1652,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
           {/* Body rows — fills remaining space, vertical scroll only */}
           <div style={{ overflowY: "auto", overflowX: "visible", flex: 1, minHeight: 0 }}>
-            {filteredWorkers.map(worker => renderGridBodyRow(worker))}
+            {!allColumnsPerShift && filteredWorkers.map(worker => renderGridBodyRow(worker))}
           </div>
 
           {/* Summary row — always visible, never scrolls vertically */}
-          {renderGridSummaryRow()}
+          {allColumnsPerShift ? renderGridSummaryRow() : renderGridSummaryRow()}
 
         </div>
       </div>
