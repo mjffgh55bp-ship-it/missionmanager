@@ -1173,8 +1173,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         zIndex: 40,
       }}
     >
-      {/* Worker column header — hidden when all columns are per_shift */}
-      {!allColumnsPerShift && (
+      {/* Worker column header — hidden when any column is per_shift */}
+      {!hasPerShiftColumn && (
         <div className="font-bold px-4 py-2 relative flex items-center">
           <button
             onClick={() => handleSortClick(null)}
@@ -1290,8 +1290,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     </div>
   );
 
-  // Check if ALL displayed columns are "per_shift" (criterion mode)
-  const allColumnsPerShift = displayColumns.every(col => isAuto(col.type) && col.count_mode === "per_shift");
+  // Check if ANY displayed column is "per_shift" (criterion mode) — hide workers when true
+  const hasPerShiftColumn = displayColumns.some(col => col.type === "schedule_col" && col.count_mode === "per_shift");
 
   // Render a single body data row as a CSS-grid div
   const renderGridBodyRow = (worker) => {
@@ -1417,10 +1417,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           fontWeight: 600,
         }}
       >
-        {!allColumnsPerShift && (
+        {!hasPerShiftColumn && (
           <div className="px-4 py-1 text-blue-900 font-bold text-sm flex items-center">סה"כ</div>
         )}
-        {allColumnsPerShift && (
+        {hasPerShiftColumn && (
           <div className="px-4 py-1 text-blue-900 font-bold text-sm flex items-center">סכום כללי</div>
         )}
         {displayColumns.map(col => {
@@ -1652,11 +1652,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
           {/* Body rows — fills remaining space, vertical scroll only */}
           <div style={{ overflowY: "auto", overflowX: "visible", flex: 1, minHeight: 0 }}>
-            {!allColumnsPerShift && filteredWorkers.map(worker => renderGridBodyRow(worker))}
+            {!hasPerShiftColumn && filteredWorkers.map(worker => renderGridBodyRow(worker))}
           </div>
 
           {/* Summary row — always visible, never scrolls vertically */}
-          {allColumnsPerShift ? renderGridSummaryRow() : renderGridSummaryRow()}
+          {renderGridSummaryRow()}
 
         </div>
       </div>
