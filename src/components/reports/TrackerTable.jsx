@@ -1500,13 +1500,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-base">{tracker.name}</CardTitle>
             <div className="flex gap-2" onMouseDown={e => e.stopPropagation()}>
-              <Button size="sm"
-                variant={pinUserModified && !headerPinned ? "default" : "outline"}
-                className={`w-8 px-0 ${pinUserModified && !headerPinned ? "bg-blue-700 hover:bg-blue-800" : ""}`}
-                onClick={togglePin}
-                title={headerPinned ? "בטל נעיצת כותרת" : "נעץ כותרת"}>
-                {pinUserModified && !headerPinned ? <X className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
-              </Button>
               <Button size="sm" variant={showFilters ? "default" : "outline"}
                 className={`w-8 px-0 ${showFilters ? "bg-gray-700 hover:bg-gray-800" : ""}`}
                 onClick={() => setShowFilters(!showFilters)}
