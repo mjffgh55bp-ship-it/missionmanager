@@ -1652,10 +1652,10 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
             {/* Body rows */}
             {filteredWorkers.map(worker => renderGridBodyRow(worker))}
-
-            {/* Summary row */}
-            {renderGridSummaryRow()}
           </div>
+
+          {/* ── Summary row: always docked at bottom, outside scroll area ── */}
+          {renderGridSummaryRow()}
 
         </div>{/* end WideTableGrid */}
       </div>{/* end HorizontalScrollContainer */}
