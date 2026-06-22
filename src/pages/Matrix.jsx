@@ -1688,7 +1688,7 @@ export default function Matrix() {
     }
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <div className={`absolute border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${rightPx}px`, width: `${widthPx}px`, top: '15%', height: '70%' }}>
+         <div className={`absolute border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${rightPx}px`, width: `${widthPx}px`, top: '8%', height: '84%' }}>
           {!isTemplate && <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>}
           {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
         </div>
@@ -1741,9 +1741,9 @@ export default function Matrix() {
       >
         <div data-matrix-existing-bar="true" className="absolute right-0 top-0 h-full cursor-ew-resize z-30" style={{ width: '16px', marginRight: '-6px' }} onMouseDown={handleBarMD('resize-start')} onDoubleClick={handleBarDblClick} />
         <div data-matrix-existing-bar="true" className="absolute left-0 top-0 h-full cursor-ew-resize z-30" style={{ width: '16px', marginLeft: '-6px' }} onMouseDown={handleBarMD('resize-end')} onDoubleClick={handleBarDblClick} />
-        <button data-matrix-existing-bar="true" className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform" style={{ borderColor }} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }} onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }} onDoubleClick={handleBarDblClick}>
-          {typeLabels[shift.type] || "A"}
-        </button>
+        <button data-matrix-existing-bar="true" className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white border-2 flex items-center justify-center text-[8px] font-bold z-30 hover:scale-110 transition-transform" style={{ borderColor }} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }} onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleTypeClick(e, worker, shift); }} onDoubleClick={handleBarDblClick}>
+           {typeLabels[shift.type] || "A"}
+         </button>
         {overlappingAssignments.map((ass, i) => {
           const avS = getOperationalMinutes(shift.start_time);
           const avE = getOperationalEndMinutes(shift.start_time, shift.end_time);
