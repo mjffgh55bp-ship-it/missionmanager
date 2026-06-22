@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ArrowLeftRight } from "lucide-react";
 
 /**
  * Given a numeric value and a visual config, returns a background color string (or null).
@@ -28,36 +28,42 @@ export function getVisualColor(value, config) {
     const avg = config._avg;
     if (avg === undefined || avg === null) return null;
     if (avg === 0) return null;
+    const reversed = !!config.reversed;
     const ratio = (num - avg) / avg; // negative = below avg, positive = above avg
     const clamped = Math.max(-1, Math.min(1, ratio));
-    if (clamped < 0) {
-      // below average -> red gradient
-      const intensity = Math.round(Math.abs(clamped) * 180);
+    const effectiveClamped = reversed ? -clamped : clamped;
+    if (effectiveClamped < 0) {
+      const intensity = Math.round(Math.abs(effectiveClamped) * 180);
       return `rgb(255, ${255 - intensity}, ${255 - intensity})`;
     } else {
-      // above average -> green gradient
-      const intensity = Math.round(clamped * 180);
+      const intensity = Math.round(effectiveClamped * 180);
       return `rgb(${255 - intensity}, 255, ${255 - intensity})`;
     }
   }
 
   if (config.mode === "custom_scale") {
     const { target, lower, upper } = config;
+    const reversed = !!config.reversed;
     const t = parseFloat(target);
     const lo = parseFloat(lower);
     const hi = parseFloat(upper);
     if (isNaN(t) || isNaN(lo) || isNaN(hi)) return null;
-    if (num <= lo) return "rgb(255, 80, 80)";
-    if (num >= hi) return "rgb(60, 200, 100)";
+    const red = "rgb(255, 80, 80)";
+    const green = "rgb(60, 200, 100)";
+    if (num <= lo) return reversed ? green : red;
+    if (num >= hi) return reversed ? red : green;
     if (num < t) {
-      // lo..t -> red to yellow
       const ratio = (num - lo) / (t - lo);
-      const r = 255;
-      const g = Math.round(ratio * 200);
-      return `rgb(${r}, ${g}, 60)`;
+      if (reversed) {
+        const g = Math.round((1 - ratio) * 200);
+        return `rgb(${255 - Math.round(ratio * 195)}, ${g + 55}, 60)`;
+      }
+      return `rgb(255, ${Math.round(ratio * 200)}, 60)`;
     }
-    // t..hi -> yellow to green
     const ratio = (num - t) / (hi - t);
+    if (reversed) {
+      return `rgb(${Math.round(ratio * 220)}, ${Math.round(120 * (1 - ratio) + 60)}, 60)`;
+    }
     const r = Math.round((1 - ratio) * 220);
     const g = Math.round(120 + ratio * 135);
     return `rgb(${r}, ${g}, 60)`;
@@ -74,6 +80,7 @@ export default function VisualAnalysisDialog({ col, values, open, onOpenChange, 
   const [customTarget, setCustomTarget] = useState(config?.target ?? "");
   const [customLower, setCustomLower] = useState(config?.lower ?? "");
   const [customUpper, setCustomUpper] = useState(config?.upper ?? "");
+  const [reversed, setReversed] = useState(config?.reversed || false);
 
   // Compute average from values
   const nums = values.map(v => typeof v === "number" ? v : parseFloat(v)).filter(v => !isNaN(v) && v > 0);
@@ -84,9 +91,9 @@ export default function VisualAnalysisDialog({ col, values, open, onOpenChange, 
     if (mode === "thresholds") {
       cfg = { mode, thresholds };
     } else if (mode === "avg_scale") {
-      cfg = { mode, _avg: avg };
+      cfg = { mode, _avg: avg, reversed };
     } else if (mode === "custom_scale") {
-      cfg = { mode, target: customTarget, lower: customLower, upper: customUpper };
+      cfg = { mode, target: customTarget, lower: customLower, upper: customUpper, reversed };
     }
     onConfigChange(cfg);
     onOpenChange(false);
@@ -104,8 +111,8 @@ export default function VisualAnalysisDialog({ col, values, open, onOpenChange, 
   const previewConfig = mode === "thresholds"
     ? { mode, thresholds }
     : mode === "avg_scale"
-    ? { mode, _avg: avg }
-    : { mode, target: customTarget, lower: customLower, upper: customUpper };
+    ? { mode, _avg: avg, reversed }
+    : { mode, target: customTarget, lower: customLower, upper: customUpper, reversed };
 
   const PRESET_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#8b5cf6", "#ec4899", "#06b6d4"];
 
@@ -178,30 +185,45 @@ export default function VisualAnalysisDialog({ col, values, open, onOpenChange, 
         {/* Mode: Average scale */}
         {mode === "avg_scale" && (
           <div className="space-y-3">
-            <p className="text-xs text-gray-500">הערכים יצבעו בהדרגה: מתחת לממוצע — אדום, מעל — ירוק.</p>
+            <p className="text-xs text-gray-500">הערכים יצבעו בהדרגה: מתחת לממוצע — {reversed ? "ירוק" : "אדום"}, מעל — {reversed ? "אדום" : "ירוק"}.</p>
             <div className="bg-gray-50 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-blue-900">{avg}</div>
               <div className="text-xs text-gray-500">ממוצע מחושב מהנתונים הנוכחיים ({nums.length} ערכים)</div>
             </div>
             <div className="flex items-center justify-center gap-0 h-6 rounded overflow-hidden text-xs">
-              <div className="flex-1 h-full" style={{ background: "rgb(255,80,80)" }} />
-              <div className="flex-1 h-full" style={{ background: "rgb(255,168,100)" }} />
-              <div className="flex-1 h-full" style={{ background: "rgb(255,255,180)" }} />
-              <div className="flex-1 h-full" style={{ background: "rgb(160,255,160)" }} />
-              <div className="flex-1 h-full" style={{ background: "rgb(60,200,100)" }} />
+              {reversed ? <>
+                <div className="flex-1 h-full" style={{ background: "rgb(60,200,100)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(160,255,160)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(255,255,180)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(255,168,100)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(255,80,80)" }} />
+              </> : <>
+                <div className="flex-1 h-full" style={{ background: "rgb(255,80,80)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(255,168,100)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(255,255,180)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(160,255,160)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(60,200,100)" }} />
+              </>}
             </div>
             <div className="flex justify-between text-xs text-gray-400 px-1">
               <span>הכי נמוך</span>
               <span>ממוצע ({avg})</span>
               <span>הכי גבוה</span>
             </div>
+            <button
+              onClick={() => setReversed(r => !r)}
+              className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg border text-xs font-medium transition-colors ${reversed ? "bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100" : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"}`}
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+              {reversed ? "סקאלה הפוכה פעילה — לחץ לביטול" : "הפוך סקאלה (גבוה = אדום)"}
+            </button>
           </div>
         )}
 
         {/* Mode: Custom scale */}
         {mode === "custom_scale" && (
           <div className="space-y-3">
-            <p className="text-xs text-gray-500">הגדר יעד, סף תחתון וסף עליון. הצבע יוצג בהדרגה בין אדום לירוק.</p>
+            <p className="text-xs text-gray-500">הגדר יעד, סף תחתון וסף עליון. הצבע יוצג בהדרגה בין {reversed ? "ירוק לאדום" : "אדום לירוק"}.</p>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label className="text-xs block mb-1">סף תחתון</Label>
@@ -220,17 +242,32 @@ export default function VisualAnalysisDialog({ col, values, open, onOpenChange, 
               </div>
             </div>
             <div className="flex items-center justify-center gap-0 h-6 rounded overflow-hidden">
-              <div className="flex-1 h-full" style={{ background: "rgb(255,80,80)" }} />
-              <div className="flex-1 h-full" style={{ background: "rgb(255,140,60)" }} />
-              <div className="flex-1 h-full" style={{ background: "rgb(255,220,60)" }} />
-              <div className="flex-1 h-full" style={{ background: "rgb(160,235,60)" }} />
-              <div className="flex-1 h-full" style={{ background: "rgb(60,200,100)" }} />
+              {reversed ? <>
+                <div className="flex-1 h-full" style={{ background: "rgb(60,200,100)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(160,235,60)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(255,220,60)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(255,140,60)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(255,80,80)" }} />
+              </> : <>
+                <div className="flex-1 h-full" style={{ background: "rgb(255,80,80)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(255,140,60)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(255,220,60)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(160,235,60)" }} />
+                <div className="flex-1 h-full" style={{ background: "rgb(60,200,100)" }} />
+              </>}
             </div>
             <div className="flex justify-between text-xs text-gray-400 px-1">
               <span>{customLower || "?"}</span>
               <span>יעד: {customTarget || "?"}</span>
               <span>{customUpper || "?"}</span>
             </div>
+            <button
+              onClick={() => setReversed(r => !r)}
+              className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg border text-xs font-medium transition-colors ${reversed ? "bg-orange-50 border-orange-300 text-orange-700 hover:bg-orange-100" : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"}`}
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5" />
+              {reversed ? "סקאלה הפוכה פעילה — לחץ לביטול" : "הפוך סקאלה (גבוה = אדום)"}
+            </button>
           </div>
         )}
 
