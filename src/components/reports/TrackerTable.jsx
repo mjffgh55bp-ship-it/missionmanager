@@ -1150,11 +1150,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   );
 
   // Compute total table width (worker col + all data cols)
-  const totalTableWidth = (colWidths["__worker__"] || 120) + displayColumns.reduce((sum, col) => sum + (colWidths[col.id] || 140), 0) + (editMode ? 40 : 0);
+  const totalTableWidth = (hasPerShiftColumn ? 0 : (colWidths["__worker__"] || 120)) + displayColumns.reduce((sum, col) => sum + (colWidths[col.id] || 140), 0) + (editMode ? 40 : 0);
+
+  // Check if ANY displayed column is "per_shift" (criterion mode) — hide workers when true
+  // NOTE: must be computed before colTemplate so the template can omit the worker column
+  const hasPerShiftColumn = displayColumns.some(col => col.type === "schedule_col" && col.count_mode === "per_shift");
 
   // Build gridTemplateColumns string — shared by header row and every body row
   const colTemplate = [
-    `${colWidths["__worker__"] || 120}px`,
+    ...(hasPerShiftColumn ? [] : [`${colWidths["__worker__"] || 120}px`]),
     ...displayColumns.map(col => `${colWidths[col.id] || 140}px`),
     ...(editMode ? ["40px"] : []),
   ].join(" ");
@@ -1289,9 +1293,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
       )}
     </div>
   );
-
-  // Check if ANY displayed column is "per_shift" (criterion mode) — hide workers when true
-  const hasPerShiftColumn = displayColumns.some(col => col.type === "schedule_col" && col.count_mode === "per_shift");
 
   // Render a single body data row as a CSS-grid div
   const renderGridBodyRow = (worker) => {
