@@ -2390,6 +2390,7 @@ export default function Matrix() {
             onAddPreset={handleOpenCreatePreset}
             onRenamePreset={handleRenamePreset}
             onRemovePreset={handleRemovePreset}
+            onEditPreset={handleOpenEditPreset}
           />
         </Card>
 

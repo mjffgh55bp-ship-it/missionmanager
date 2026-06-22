@@ -34,6 +34,7 @@ export default function MatrixHeader({
   onAddPreset,
   onRenamePreset,
   onRemovePreset,
+  onEditPreset,
 }) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekNum = getCustomWeekNumber(weekStart);
@@ -186,6 +187,15 @@ export default function MatrixHeader({
               >
                 שמור
               </button>
+              {onEditPreset && (
+                <button
+                  onClick={() => { onEditPreset(p); exitEditMode(); }}
+                  className="text-gray-500 hover:text-blue-600 p-0.5 shrink-0"
+                  title="ערוך עובדים"
+                >
+                  <Pencil className="w-3 h-3" />
+                </button>
+              )}
               <button
                 onClick={() => handleDeletePreset(p.id)}
                 className="text-red-400 hover:text-red-600 p-0.5 shrink-0"
