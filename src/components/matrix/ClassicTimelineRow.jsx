@@ -71,7 +71,7 @@ function ClassicTimelineRow({
     }
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
-        <div className={`absolute h-full border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${startPx}px`, width: `${widthPx}px` }}>
+        <div className={`absolute border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${startPx}px`, width: `${widthPx}px`, top: '15%', height: '70%' }}>
           {!isTemplate && <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>}
           {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
         </div>
