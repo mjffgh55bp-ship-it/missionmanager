@@ -88,8 +88,8 @@ export default function Availability() {
     start_time: "09:00",
     end_time: "17:00",
     reason: "personal",
-    multiDay: false
   });
+  const [endDateTouched, setEndDateTouched] = useState(false);
   const [desiredShiftsCount, setDesiredShiftsCount] = useState("");
   const [extraTaskStates, setExtraTaskStates] = useState({});
   const [openRegistrations, setOpenRegistrations] = useState([]);
@@ -732,7 +732,7 @@ export default function Availability() {
     }
 
     const startDate = new Date(unavailabilityForm.start_date + "T12:00:00");
-    const endDate = unavailabilityForm.multiDay && unavailabilityForm.end_date
+    const endDate = unavailabilityForm.end_date
       ? new Date(unavailabilityForm.end_date + "T12:00:00")
       : startDate;
 
@@ -790,13 +790,13 @@ export default function Availability() {
 
     // ── Reset and close ───────────────────────────────────────────────────────
     setShowUnavailabilityDialog(false);
+    setEndDateTouched(false);
     setUnavailabilityForm({
       start_date: format(new Date(), "yyyy-MM-dd"),
       end_date: format(new Date(), "yyyy-MM-dd"),
       start_time: "09:00",
       end_time: "17:00",
       reason: "personal",
-      multiDay: false,
     });
   };
 
@@ -1654,39 +1654,41 @@ END:VEVENT
             <div className="h-6" />
 
           {/* ── Dialogs ── */}
-        <Dialog open={showUnavailabilityDialog} onOpenChange={setShowUnavailabilityDialog}>
+        <Dialog open={showUnavailabilityDialog} onOpenChange={(v) => { setShowUnavailabilityDialog(v); if (!v) setEndDateTouched(false); }}>
           <DialogContent className="w-[92vw] max-w-sm p-4" dir="rtl">
             <DialogHeader><DialogTitle className="text-right text-base">הוסף אילוץ</DialogTitle></DialogHeader>
             <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-end gap-2">
-                <Label htmlFor="multiDay" className="text-sm">מספר ימים</Label>
-                <input type="checkbox" id="multiDay" checked={unavailabilityForm.multiDay} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, multiDay: e.target.checked })} className="w-4 h-4" />
-              </div>
-              {unavailabilityForm.multiDay ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="block mb-1 text-xs text-gray-600">תאריך התחלה</Label>
-                    <Input type="date" value={unavailabilityForm.start_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_date: e.target.value })} className="text-sm h-9" />
-                  </div>
-                  <div>
-                    <Label className="block mb-1 text-xs text-gray-600">תאריך סיום</Label>
-                    <Input type="date" value={unavailabilityForm.end_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_date: e.target.value })} className="text-sm h-9" />
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <Label className="block mb-1 text-xs text-gray-600">תאריך</Label>
-                  <Input type="date" value={unavailabilityForm.start_date} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_date: e.target.value })} className="text-sm h-9 w-full" />
-                </div>
-              )}
+              {/* Two date columns always visible */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="block mb-1 text-xs text-gray-600">שעת התחלה</Label>
-                  <Input type="time" value={unavailabilityForm.start_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_time: e.target.value })} className="text-sm h-9" />
+                  <Label className="block mb-1 text-xs text-gray-600 text-center">תאריך סיום</Label>
+                  <Input type="date" value={unavailabilityForm.end_date}
+                    onChange={(e) => { setEndDateTouched(true); setUnavailabilityForm(prev => ({ ...prev, end_date: e.target.value })); }}
+                    className="text-sm h-9" />
                 </div>
                 <div>
-                  <Label className="block mb-1 text-xs text-gray-600">שעת סיום</Label>
+                  <Label className="block mb-1 text-xs text-gray-600 text-center">תאריך התחלה</Label>
+                  <Input type="date" value={unavailabilityForm.start_date}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      setUnavailabilityForm(prev => ({
+                        ...prev,
+                        start_date: newStart,
+                        end_date: endDateTouched ? prev.end_date : newStart,
+                      }));
+                    }}
+                    className="text-sm h-9" />
+                </div>
+              </div>
+              {/* Two time columns */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="block mb-1 text-xs text-gray-600 text-center">שעת סיום</Label>
                   <Input type="time" value={unavailabilityForm.end_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_time: e.target.value })} className="text-sm h-9" />
+                </div>
+                <div>
+                  <Label className="block mb-1 text-xs text-gray-600 text-center">שעת התחלה</Label>
+                  <Input type="time" value={unavailabilityForm.start_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_time: e.target.value })} className="text-sm h-9" />
                 </div>
               </div>
               <div>
@@ -1704,7 +1706,7 @@ END:VEVENT
             </div>
             <div className="flex flex-col gap-2 pt-3">
               <Button onClick={handleAddUnavailability} className="bg-red-600 hover:bg-red-700 h-10">הוסף</Button>
-              <Button variant="outline" onClick={() => setShowUnavailabilityDialog(false)} className="h-9">ביטול</Button>
+              <Button variant="outline" onClick={() => { setShowUnavailabilityDialog(false); setEndDateTouched(false); }} className="h-9">ביטול</Button>
             </div>
           </DialogContent>
         </Dialog>
