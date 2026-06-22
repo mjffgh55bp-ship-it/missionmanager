@@ -1636,27 +1636,23 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         />
       )}
 
-      {/* ── Single scroll container: horizontal + vertical, one unified scroll area ── */}
-      <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: "65vh", minHeight: 0, position: "relative" }}>
-
-        {/* ── WideTableGrid: width = totalColumnWidth ── */}
+      {/* ── Single horizontal scroll container — header + body + summary all move together ── */}
+      <div style={{ overflowX: "auto", overflowY: "hidden" }}>
         <div style={{ width: totalTableWidth, minWidth: totalTableWidth, display: "flex", flexDirection: "column" }}>
 
-          {/* ── Header row: sticky at top ── */}
-          <div style={{ position: "sticky", top: 0, zIndex: 40 }}>
-            {renderGridHeaderRow()}
+          {/* Header — always visible, never scrolls vertically */}
+          {renderGridHeaderRow()}
+
+          {/* Body rows — only vertical scroll here */}
+          <div style={{ overflowY: "auto", overflowX: "visible", maxHeight: "55vh", minHeight: 0 }}>
+            {filteredWorkers.map(worker => renderGridBodyRow(worker))}
           </div>
 
-          {/* ── Body rows ── */}
-          {filteredWorkers.map(worker => renderGridBodyRow(worker))}
+          {/* Summary row — always visible, never scrolls vertically */}
+          {renderGridSummaryRow()}
 
-          {/* ── Summary row: sticky at bottom ── */}
-          <div style={{ position: "sticky", bottom: 0, zIndex: 40 }}>
-            {renderGridSummaryRow()}
-          </div>
-
-        </div>{/* end WideTableGrid */}
-      </div>{/* end ScrollContainer */}
+        </div>
+      </div>
     </div>
   );
 }
