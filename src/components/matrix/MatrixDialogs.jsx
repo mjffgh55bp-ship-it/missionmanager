@@ -261,13 +261,16 @@ export function UnavailabilityDialog({
           <div>
             <Label className="block mb-1 text-xs text-gray-600">סיבה</Label>
             <Select
-              value={editingUnavail?.reason || 'occupied'}
+              value={editingUnavail?.reason || 'personal'}
               onValueChange={v => setEditingUnavail(prev => ({ ...prev, reason: v }))}
             >
               <SelectTrigger dir="rtl" className="h-9 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent dir="rtl">
-                <SelectItem value="occupied">תפוס</SelectItem>
-                <SelectItem value="overseas">בחו"ל</SelectItem>
+                <SelectItem value="overseas">חו״ל</SelectItem>
+                <SelectItem value="vacation">חופש</SelectItem>
+                <SelectItem value="scheduled_time">לו״ז</SelectItem>
+                <SelectItem value="personal">אישי</SelectItem>
+                <SelectItem value="periodic_event">אילוץ תקופתי</SelectItem>
               </SelectContent>
             </Select>
           </div>

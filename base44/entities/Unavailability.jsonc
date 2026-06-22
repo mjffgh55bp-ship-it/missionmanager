@@ -27,9 +27,33 @@
       "type": "string",
       "enum": [
         "overseas",
-        "occupied"
+        "vacation",
+        "scheduled_time",
+        "personal",
+        "periodic_event"
       ],
-      "description": "Reason for unavailability"
+      "description": "Type of unavailability constraint"
+    },
+    "yearly_event_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Reference to YearlyEvent if reason is 'periodic_event'"
+    },
+    "yearly_event_name": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Display name of the yearly event for quick reference"
+    },
+    "created_by_role": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Role of the user who created this constraint (admin, user, etc.)"
     }
   },
   "required": [
