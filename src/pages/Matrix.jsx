@@ -26,6 +26,7 @@ import TimelineHeaderComponent from "../components/matrix/TimelineHeader";
 import useViewPresets from "../hooks/useViewPresets";
 import ViewPresetDialog from "../components/matrix/ViewPresetDialog";
 import { popUndo } from "@/lib/undoStack";
+import { exportMatrixToExcel } from "@/lib/matrixExport";
 
 // ── Timeline constants ──────────────────────────────────────────────────────
 const DAILY_TOTAL_MINUTES = 24 * 60;        // 1440
@@ -1795,69 +1796,15 @@ export default function Matrix() {
   };
 
   const exportToExcel = () => {
-    const HEBREW_DAYS_FULL = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-    const typeLabel = { wanted: "רצוי", available: "זמין", unavailable: "לא זמין" };
-
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekDates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
-
-    // Build rows: one row per worker × per signup shift
-    const rows = [];
-    filteredWorkers.forEach(worker => {
-      const avail = getBestAvail(worker.id);
-      const shifts = avail?.shifts || [];
-
-      // Determine which shifts are relevant to current view
-      const relevantShifts = shifts.filter(s => {
-        const opDate = s.operational_date || s.date;
-        if (viewMode === "daily") return opDate === dateString;
-        return weekDates.includes(opDate);
-      });
-
-      if (relevantShifts.length === 0) {
-        rows.push({
-          "שם עובד": worker.nickname,
-          "תאריך": viewMode === "daily" ? dateString : `${format(weekStart, "d.M")}-${format(addDays(weekStart, 6), "d.M")}`,
-          "יום": "",
-          "שעת התחלה": "",
-          "שעת סיום": "",
-          "סוג הרשמה": "",
-          "שם מוקד": "",
-          "הערות": "לא נרשם",
-        });
-      } else {
-        relevantShifts.forEach(s => {
-          const opDate = s.operational_date || s.date;
-          const d = new Date(opDate + "T12:00:00");
-          rows.push({
-            "שם עובד": worker.nickname,
-            "תאריך": opDate,
-            "יום": HEBREW_DAYS_FULL[d.getDay()],
-            "שעת התחלה": s.start_time || "",
-            "שעת סיום": s.end_time || "",
-            "סוג הרשמה": typeLabel[s.type] || s.type || "",
-            "שם מוקד": s.moked_name || "",
-            "הערות": "",
-          });
-        });
-      }
+    exportMatrixToExcel({
+      filteredWorkers,
+      viewMode,
+      currentDate,
+      dateString,
+      getWorkerAvailabilityForDate,
+      getWorkerTemplateShifts,
+      getWorkerUnavailabilityForDate,
     });
-
-    // Convert to CSV (UTF-8 BOM for Hebrew Excel support)
-    const headers = ["שם עובד", "תאריך", "יום", "שעת התחלה", "שעת סיום", "סוג הרשמה", "שם מוקד", "הערות"];
-    const csvLines = [
-      headers.join(","),
-      ...rows.map(row => headers.map(h => `"${String(row[h] || "").replace(/"/g, '""')}"`).join(","))
-    ];
-    const BOM = "\uFEFF";
-    const blob = new Blob([BOM + csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const label = viewMode === "daily" ? dateString : `${format(weekStart, "d.M")}-${format(addDays(weekStart, 6), "d.M")}`;
-    a.download = `מטריצה_${label}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
   };
 
   const briefingMarkers = useMemo(() => {
