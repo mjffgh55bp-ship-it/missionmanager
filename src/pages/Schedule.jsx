@@ -49,7 +49,7 @@ import { suggestMappingId } from "@/components/settings/MappableItemRow";
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 import { getMokedDisplayName } from "@/lib/shiftDemand";
 import { runMokedExport } from "@/lib/mokedExport";
-import { recordChange, popUndo } from "@/lib/undoStack";
+import { recordChange, popUndo, popRedo } from "@/lib/undoStack";
 
 /** Generate a unique stable id for a מוקד: tmpl_ + random hex. */
 const genTemplateMappingId = () =>
@@ -120,22 +120,36 @@ export default function Schedule() {
   // ── Ctrl/Cmd+Z global listener ────────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = async (e) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key !== 'z' || e.shiftKey) return;
+      const k = e.key.toLowerCase();
+      const mod = e.metaKey || e.ctrlKey;
+      const isRedo = mod && e.shiftKey && (k === 'y' || k === 'z');
+      const isUndo = mod && !e.shiftKey && k === 'z';
+      if (!isRedo && !isUndo) return;
       const tag = document.activeElement?.tagName?.toLowerCase();
       const ce = document.activeElement?.isContentEditable;
       if (tag === 'input' || tag === 'textarea' || ce) return;
       e.preventDefault();
-      const entry = popUndo();
-      if (!entry) return;
-      // Verify row still exists in local state before reverting
-      setTemplateRows((prev) => {
-        const exists = prev.some(r => r.id === entry.rowId);
-        if (!exists) return prev; // row was deleted — skip silently
-        // Fire the DB write asynchronously (can't await inside setState)
-        base44.entities.TemplateRow.update(entry.rowId, { values: entry.beforeValues }).catch(() => {});
-        toast.success("בוטל השינוי האחרון");
-        return prev.map(r => r.id === entry.rowId ? { ...r, values: entry.beforeValues } : r);
-      });
+      if (isRedo) {
+        const entry = popRedo();
+        if (!entry) return;
+        setTemplateRows((prev) => {
+          const exists = prev.some(r => r.id === entry.rowId);
+          if (!exists) return prev;
+          base44.entities.TemplateRow.update(entry.rowId, { values: entry.afterValues }).catch(() => {});
+          toast.success("השינוי שוחזר");
+          return prev.map(r => r.id === entry.rowId ? { ...r, values: entry.afterValues } : r);
+        });
+      } else {
+        const entry = popUndo();
+        if (!entry) return;
+        setTemplateRows((prev) => {
+          const exists = prev.some(r => r.id === entry.rowId);
+          if (!exists) return prev;
+          base44.entities.TemplateRow.update(entry.rowId, { values: entry.beforeValues }).catch(() => {});
+          toast.success("בוטל השינוי האחרון");
+          return prev.map(r => r.id === entry.rowId ? { ...r, values: entry.beforeValues } : r);
+        });
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
