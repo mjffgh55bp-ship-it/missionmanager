@@ -478,22 +478,23 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
         </div>
 
         <DialogFooter className="px-4 pb-4 gap-2">
-          <Button variant="outline" onClick={onClose} dir="rtl" className="flex-1">ביטול</Button>
-          <Button onClick={() => {
-              const validQualIds = qualifications.map(q => q.id);
-              const cleaned = {
-                ...draft,
-                criteria: (draft.criteria || []).map(c => ({
-                  ...c,
-                  include: c.col_name === TASK_COL_NAME
-                    ? (c.include || []).filter(v => validQualIds.includes(v))
-                    : (c.include || [])
-                }))
-              };
-              onSave(cleaned);
-            }}
-            className="bg-green-600 hover:bg-green-700 flex-1" dir="rtl">אישור</Button>
-        </DialogFooter>
+           <Button variant="outline" onClick={onClose} dir="rtl" className="flex-1">ביטול</Button>
+           <Button onClick={() => {
+               const validQualIds = qualifications.map(q => q.id);
+               const cleaned = {
+                 ...draft,
+                 criteria: (draft.criteria || []).map(c => ({
+                   ...c,
+                   include: c.col_name === TASK_COL_NAME
+                     ? (c.include || []).filter(v => validQualIds.includes(v))
+                     : (c.include || [])
+                 }))
+               };
+               onSave(cleaned);
+             }}
+             disabled={draft.count_mode === "per_shift" && (!draft.criteria || draft.criteria.length === 0)}
+             className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex-1" dir="rtl">אישור</Button>
+         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
