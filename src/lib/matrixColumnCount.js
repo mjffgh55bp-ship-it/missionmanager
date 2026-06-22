@@ -100,7 +100,7 @@ export function countWithCriteria(column, workerId, templateRows, allTemplates, 
     const match = column.criteria_logic === 'and' ? results.every(Boolean) : results.some(Boolean);
     if (match) count++;
   });
-  console.log('[matrixColumnCount] workerId:', workerId, 'column:', column.name, 'criteria:', JSON.stringify(column.criteria), 'assignedRows:', assignedCount, 'matchCount:', count);
+
   return count;
 }
 
