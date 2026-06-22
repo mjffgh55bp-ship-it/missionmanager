@@ -5,7 +5,7 @@ import { getTaskQuals } from "@/lib/taskQuals";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Pencil, X, Copy, UserCheck, Users, GripVertical, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Copy, UserCheck, Users, GripVertical, Eye, EyeOff, Download, CheckSquare } from "lucide-react";
 import { format, addDays, subDays, startOfWeek, differenceInDays } from "date-fns";
 import { getHebrewDate } from "../components/utils/HebrewDate";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -48,6 +48,7 @@ import MokedIdEditor from "../components/schedule/MokedIdEditor";
 import { suggestMappingId } from "@/components/settings/MappableItemRow";
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 import { getMokedDisplayName } from "@/lib/shiftDemand";
+import { runMokedExport } from "@/lib/mokedExport";
 
 /** Generate a unique stable id for a מוקד: tmpl_ + random hex. */
 const genTemplateMappingId = () =>
@@ -95,6 +96,9 @@ export default function Schedule() {
   const [publishedWeeks, setPublishedWeeks] = useState([]);
   const [togglingPublish, setTogglingPublish] = useState(false);
   const [mokedIdEditorTarget, setMokedIdEditorTarget] = useState(null); // { templateId, name, mappingId }
+  const [exportSelectionMode, setExportSelectionMode] = useState(false);
+  const [selectedMokedIds, setSelectedMokedIds] = useState(new Set());
+  const [exportingMokeds, setExportingMokeds] = useState(false);
   const staticDataLoaded = useRef(false);
   const lastWeekStart = useRef(null);
   const initialLoadStarted = useRef(false);
@@ -548,6 +552,38 @@ export default function Schedule() {
     }
   };
 
+  const handleExportSelectedMokeds = async () => {
+    if (selectedMokedIds.size === 0) return;
+    setExportingMokeds(true);
+    try {
+      const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+      const dates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
+      const [workers, allTemplatesData, allSettings] = await Promise.all([
+        base44.entities.Worker.list(),
+        base44.entities.Template.list(),
+        base44.entities.AppSettings.list(),
+      ]);
+      // Fetch rows for each date in the week
+      const rowsPerDate = await Promise.all(dates.map(d => base44.entities.TemplateRow.filter({ date: d })));
+      const allRows = rowsPerDate.flat();
+      await runMokedExport({
+        workers,
+        allTemplates: allTemplatesData,
+        templateRows: allRows,
+        allSettings,
+        dates,
+        selectedTemplateIds: [...selectedMokedIds],
+        currentUser: null,
+        onAuditLog: null,
+        createAuditLog: (data) => base44.entities.AuditLog.create(data),
+      });
+      setExportSelectionMode(false);
+      setSelectedMokedIds(new Set());
+    } finally {
+      setExportingMokeds(false);
+    }
+  };
+
   const handleDeleteTemplateRow = async (rowId) => {
     if (confirm("האם למחוק שורה זו?")) {
       await base44.entities.TemplateRow.delete(rowId);
@@ -797,6 +833,38 @@ export default function Schedule() {
                     </Tooltip>
                   </TooltipProvider>
                 )}
+                {/* מוקד export selection mode */}
+                {!editMode && !exportSelectionMode && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={() => { setExportSelectionMode(true); setSelectedMokedIds(new Set()); }}>
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent dir="rtl">ייצא מוקדים נבחרים</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {exportSelectionMode && (
+                  <>
+                    {selectedMokedIds.size > 0 && (
+                      <Button
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs h-8 px-3"
+                        onClick={handleExportSelectedMokeds}
+                        disabled={exportingMokeds}
+                        dir="rtl"
+                      >
+                        {exportingMokeds
+                          ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin ml-1" />מייצא...</>
+                          : <><Download className="w-3 h-3 ml-1" />ייצא מוקדים נבחרים ({selectedMokedIds.size})</>}
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => { setExportSelectionMode(false); setSelectedMokedIds(new Set()); }} dir="rtl">
+                      <X className="w-3 h-3 ml-1" />ביטול בחירה
+                    </Button>
+                  </>
+                )}
               </div>
               {(() => {
                 const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
@@ -837,6 +905,13 @@ export default function Schedule() {
           </CardHeader>
         </Card>
 
+        {exportSelectionMode && (
+          <div className="bg-emerald-50 border border-emerald-300 rounded-lg px-4 py-2 text-sm text-emerald-800 flex items-center gap-2 mb-2" dir="rtl">
+            <CheckSquare className="w-4 h-4 flex-shrink-0" />
+            לחץ על כותרת מוקד לבחירתו לייצוא. הייצוא יכלול את כל שבעת ימי השבוע הנוכחי.
+            {selectedMokedIds.size === 0 && <span className="text-emerald-600 text-xs">(אין מוקדים נבחרים)</span>}
+          </div>
+        )}
         {templates.length === 0 && templateRows.length === 0 ? (
           <Card className="border-none shadow-lg">
             <CardContent className="py-16 text-center" dir="rtl">
@@ -877,10 +952,28 @@ export default function Schedule() {
                   <Draggable key={group.key} draggableId={group.key} index={groupIndex} isDragDisabled={!editMode}>
                     {(provided, snapshot) => (
                       <div ref={provided.innerRef} {...provided.draggableProps} className={snapshot.isDragging ? "opacity-70" : ""}>
-                  <Card className="border-none shadow-lg overflow-hidden">
-                    <CardHeader className="text-black py-3" style={{ background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)` }}>
+                  <Card className={`border-none shadow-lg overflow-hidden transition-all ${exportSelectionMode && selectedMokedIds.has(template.id) ? "ring-4 ring-emerald-400 ring-offset-1" : ""}`}>
+                    <CardHeader
+                      className="text-black py-3"
+                      style={{
+                        background: `linear-gradient(to left, ${template.color || '#3b82f6'}, ${template.color || '#3b82f6'}dd)`,
+                        cursor: exportSelectionMode ? "pointer" : undefined,
+                      }}
+                      onClick={exportSelectionMode ? () => {
+                        setSelectedMokedIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(template.id)) next.delete(template.id); else next.add(template.id);
+                          return next;
+                        });
+                      } : undefined}
+                    >
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
+                          {exportSelectionMode && (
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selectedMokedIds.has(template.id) ? "bg-white border-white" : "border-white/70 bg-white/20"}`}>
+                              {selectedMokedIds.has(template.id) && <CheckSquare className="w-3.5 h-3.5 text-emerald-700" />}
+                            </div>
+                          )}
                           {editMode && (
                             <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing p-1">
                               <GripVertical className="w-5 h-5 text-black/60" />
