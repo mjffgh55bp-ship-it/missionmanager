@@ -1599,12 +1599,7 @@ END:VEVENT
               <div className="text-center py-3 text-sm text-gray-400" dir="rtl">טוען משמרות…</div>
             )}
             <ShiftDemandPanel
-              templateRows={openRegistrations.length === 0
-                ? []
-                : templateRows.filter(row => {
-                    const key = `${row.template_id}_${row.group_id || 'default'}`;
-                    return openRegistrations.some(r => r && r.key === key);
-                  })}
+              templateRows={templateRows}
               allTemplates={allTemplates}
               allAvailabilities={weekAvailabilities}
               workers={workers}
