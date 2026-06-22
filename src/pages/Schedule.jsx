@@ -122,7 +122,7 @@ export default function Schedule() {
     const handleKeyDown = async (e) => {
       const k = e.key.toLowerCase();
       const mod = e.metaKey || e.ctrlKey;
-      const isRedo = mod && e.shiftKey && (k === 'y' || k === 'z');
+      const isRedo = mod && e.shiftKey && k === 'z';
       const isUndo = mod && !e.shiftKey && k === 'z';
       if (!isRedo && !isUndo) return;
       const tag = document.activeElement?.tagName?.toLowerCase();
