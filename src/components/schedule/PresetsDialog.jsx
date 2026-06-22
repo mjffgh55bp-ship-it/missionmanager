@@ -100,6 +100,7 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
   const [presets, setPresets] = useState([]);
   const [editingPreset, setEditingPreset] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [addedCounts, setAddedCounts] = useState({});
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false);
   const [newColumnName, setNewColumnName] = useState("");
   const [newColumnRole, setNewColumnRole] = useState("");
@@ -259,11 +260,12 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
 
   const handleAddToSchedule = async (preset) => {
     await onAddPreset(preset);
+    setAddedCounts(prev => ({ ...prev, [preset.id]: (prev[preset.id] || 0) + 1 }));
   };
 
   return (
     <>
-    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setEditingPreset(null); }}>
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) { setEditingPreset(null); setAddedCounts({}); } }}>
       <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-hidden flex flex-col" dir="rtl">
         <DialogHeader>
           <DialogTitle className="text-xl text-right">
@@ -428,7 +430,13 @@ export default function PresetsDialog({ open, onOpenChange, onAddPreset }) {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
+                      {addedCounts[preset.id] > 0 && (
+                        <div className="flex items-center gap-1 text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5 text-xs font-medium animate-pulse">
+                          <Check className="w-3 h-3" />
+                          {addedCounts[preset.id] === 1 ? "נוסף!" : `נוסף ×${addedCounts[preset.id]}`}
+                        </div>
+                      )}
                       <Button
                         size="sm"
                         className="bg-green-600 hover:bg-green-700 text-white h-8"
