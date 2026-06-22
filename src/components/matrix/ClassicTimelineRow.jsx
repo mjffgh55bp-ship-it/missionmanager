@@ -163,17 +163,23 @@ function ClassicTimelineRow({
     const endPx = endTimeToPixels(unavail.start_time, unavail.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 0);
     if (startPx < 0 || startPx > timelineWidth) return null;
+    const REASON_LABELS = { overseas: 'חו״ל', vacation: 'חופש', scheduled_time: 'לו״ז', personal: 'אישי', periodic_event: 'אילוץ תקופתי', occupied: 'תפוס' };
+    const isEvent = unavail.reason === 'periodic_event' && unavail.yearly_event_id;
+    // Red: חו״ל, חופש, and manager-set periodic constraints (not yearly-event ones). Gray: לו״ז, אישי, and yearly-event constraints.
+    const isRed = ['overseas', 'vacation'].includes(unavail.reason) || (unavail.reason === 'periodic_event' && !unavail.yearly_event_id);
+    const colorClass = isRed ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500';
+    const label = isEvent ? `אירוע - ${unavail.yearly_event_name || ''}` : (REASON_LABELS[unavail.reason] || unavail.reason);
     return (
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
         <div
           onClick={(e) => { e.stopPropagation(); if (canManage) onEditUnavail && onEditUnavail(unavail); }}
-          className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${canManage ? 'cursor-pointer' : ''} ${unavail.reason === 'overseas' ? 'bg-red-200 border-r-2 border-red-500' : 'bg-gray-300 border-r-2 border-gray-500'}`}
+          className={`absolute h-full rounded-sm flex items-center justify-center z-15 ${canManage ? 'cursor-pointer' : ''} ${colorClass}`}
           style={{ right: `${startPx}px`, width: `${widthPx}px` }}
         >
           <Ban className="w-3 h-3 text-gray-600" />
         </div>
       </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
-        <p className="font-bold capitalize">{unavail.reason}</p><p>{unavail.start_time} - {unavail.end_time}</p>
+        <p className="font-bold">{label}</p><p>{unavail.start_time} - {unavail.end_time}</p>
       </TooltipContent></Tooltip></TooltipProvider>
     );
   };

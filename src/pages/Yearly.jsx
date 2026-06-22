@@ -128,7 +128,8 @@ export default function Yearly() {
       setRows(rowsData);
       setEvents(eventsData.filter(e => (e.start_date >= yearStart && e.start_date <= yearEnd) || (e.end_date >= yearStart && e.end_date <= yearEnd)));
       setWorkers(workersData);
-      setUnavailabilities(unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd));
+      // People row in Yearly shows only חו״ל / חופש. לו״ז, אישי and event constraints are excluded.
+      setUnavailabilities(unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd && ['overseas', 'vacation'].includes(u.reason)));
       setWorkerRoles(rolesS ? JSON.parse(rolesS.setting_value) : ["שף", "סו-שף"]);
       setWorkerPopulations(popsS ? JSON.parse(popsS.setting_value) : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
       const rawTasksY = tasksS ? JSON.parse(tasksS.setting_value) : [];
@@ -164,6 +165,8 @@ export default function Yearly() {
   const handleDeleteRow = async (rowId) => {
     await base44.entities.YearlyRow.delete(rowId);
     for (const event of events.filter(e => e.row_id === rowId)) {
+      const linked = await base44.entities.Unavailability.filter({ yearly_event_id: event.id });
+      for (const u of linked) await base44.entities.Unavailability.delete(u.id);
       await base44.entities.YearlyEvent.delete(event.id);
     }
     loadData();
@@ -204,6 +207,32 @@ export default function Yearly() {
     }
   };
 
+  // Sync auto-generated matrix constraints for a yearly event's participants.
+  // Wipes the event's existing linked constraints, then recreates one per worker per day.
+  const syncEventConstraints = async (eventId, ev) => {
+    const existing = await base44.entities.Unavailability.filter({ yearly_event_id: eventId });
+    for (const u of existing) await base44.entities.Unavailability.delete(u.id);
+    const dates = [];
+    let d = parseISO(ev.start_date);
+    const end = parseISO(ev.end_date);
+    while (d <= end && dates.length < 120) { dates.push(format(d, "yyyy-MM-dd")); d = addDays(d, 1); }
+    for (const wid of ev.worker_ids || []) {
+      const w = workers.find(x => x.id === wid);
+      for (const dateStr of dates) {
+        await base44.entities.Unavailability.create({
+          worker_id: wid,
+          worker_name: w?.nickname || "",
+          date: dateStr,
+          start_time: ev.start_time || "00:00",
+          end_time: ev.end_time || "23:59",
+          reason: "periodic_event",
+          yearly_event_id: eventId,
+          yearly_event_name: ev.title || "אירוע",
+        });
+      }
+    }
+  };
+
   const handleSaveEvent = async () => {
     const workerNames = eventForm.worker_ids.map(id => workers.find(w => w.id === id)?.nickname).filter(Boolean);
     const data = {
@@ -217,13 +246,17 @@ export default function Yearly() {
       worker_id: eventForm.worker_ids[0] || null,
       worker_name: workerNames.join(", ") || null
     };
-    if (editingEvent) await base44.entities.YearlyEvent.update(editingEvent.id, data);
-    else await base44.entities.YearlyEvent.create(data);
+    let savedId;
+    if (editingEvent) { await base44.entities.YearlyEvent.update(editingEvent.id, data); savedId = editingEvent.id; }
+    else { const created = await base44.entities.YearlyEvent.create(data); savedId = created.id; }
+    await syncEventConstraints(savedId, data);
     setShowEventDialog(false); setSelectedCell(null); setEditingEvent(null); loadData();
   };
 
   const handleDeleteEvent = async () => {
     if (editingEvent) {
+      const linked = await base44.entities.Unavailability.filter({ yearly_event_id: editingEvent.id });
+      for (const u of linked) await base44.entities.Unavailability.delete(u.id);
       await base44.entities.YearlyEvent.delete(editingEvent.id);
       setShowEventDialog(false); setEditingEvent(null); loadData();
     }

@@ -26,7 +26,7 @@ function parseSheet(ws) {
 }
 
 const VALID_SHIFT_TYPES = new Set(["wanted", "available", "unavailable"]);
-const VALID_UNAVAIL_REASONS = new Set(["overseas", "occupied"]);
+const VALID_UNAVAIL_REASONS = new Set(["overseas", "vacation", "scheduled_time", "personal", "periodic_event"]);
 const TIME_RE = /^\d{2}:\d{2}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -287,7 +287,7 @@ export default function AvailabilityImportPanel({ currentUser, onAuditLog }) {
         return;
       }
 
-      const reason = VALID_UNAVAIL_REASONS.has(u.reason) ? u.reason : "occupied";
+      const reason = VALID_UNAVAIL_REASONS.has(u.reason) ? u.reason : "personal";
 
       // Check for duplicate
       const dup = existingUnavail.find(e =>

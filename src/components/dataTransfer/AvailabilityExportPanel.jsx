@@ -73,8 +73,9 @@ export default function AvailabilityExportPanel({ currentUser, onAuditLog }) {
     );
 
     // Filter unavailability by date range, only for live workers
+    // Exclude auto-generated yearly-event constraints — they regenerate from the event itself.
     const filteredUnavail = unavailabilities.filter(u =>
-      u.date >= dateStart && u.date <= dateEnd && liveWorkerIds.has(u.worker_id)
+      u.date >= dateStart && u.date <= dateEnd && liveWorkerIds.has(u.worker_id) && !u.yearly_event_id
     );
 
     const exportedAt = format(new Date(), "yyyy-MM-dd HH:mm");

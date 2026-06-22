@@ -25,6 +25,8 @@ const HEBREW_DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמי
 const HEBREW_DAYS_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
 
+const REASON_LABELS = { overseas: "חו״ל", vacation: "חופש", scheduled_time: "לו״ז", personal: "אישי", periodic_event: "אילוץ תקופתי", occupied: "תפוס" };
+
 const formatDateHebrew = (date, formatType = "short") => {
   const d = new Date(date);
   const dayName = HEBREW_DAYS[d.getDay()];
@@ -85,7 +87,7 @@ export default function Availability() {
     end_date: format(new Date(), "yyyy-MM-dd"),
     start_time: "09:00",
     end_time: "17:00",
-    reason: "occupied",
+    reason: "personal",
     multiDay: false
   });
   const [desiredShiftsCount, setDesiredShiftsCount] = useState("");
@@ -793,7 +795,7 @@ export default function Availability() {
       end_date: format(new Date(), "yyyy-MM-dd"),
       start_time: "09:00",
       end_time: "17:00",
-      reason: "occupied",
+      reason: "personal",
       multiDay: false,
     });
   };
@@ -1692,8 +1694,10 @@ END:VEVENT
                 <Select value={unavailabilityForm.reason} onValueChange={(value) => setUnavailabilityForm({ ...unavailabilityForm, reason: value })}>
                   <SelectTrigger dir="rtl" className="h-9 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent dir="rtl">
-                    <SelectItem value="occupied">תפוס</SelectItem>
-                    <SelectItem value="overseas">בחו"ל</SelectItem>
+                    <SelectItem value="overseas">חו״ל</SelectItem>
+                    <SelectItem value="vacation">חופש</SelectItem>
+                    <SelectItem value="scheduled_time">לו״ז</SelectItem>
+                    <SelectItem value="personal">אישי</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1871,7 +1875,7 @@ END:VEVENT
                 <div key={i} className="p-3 bg-red-50 border border-red-200 rounded-lg mb-2 flex items-center justify-between">
                         <div dir="rtl">
                           <p className="text-sm font-medium text-red-800">{u.start_time} – {u.end_time}</p>
-                          <p className="text-xs text-red-600">{u.reason === "overseas" ? "בחו\"ל" : "תפוס"}</p>
+                          <p className="text-xs text-red-600">{REASON_LABELS[u.reason] || u.reason}</p>
                         </div>
                         <button onClick={() => handleDeleteUnavailability(u.id)} className="text-red-400 hover:text-red-600 ml-2">
                           <XCircle className="w-4 h-4" />
