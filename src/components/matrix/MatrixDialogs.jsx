@@ -128,19 +128,19 @@ export function ManualShiftDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-right" dir="rtl">
+          <DialogTitle className="text-right pr-8" dir="rtl">
             {editingShift ? 'עריכת' : 'הוספת'} חלון זמינות - {selectedWorkerForManual?.nickname}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4" dir="rtl">
             <div>
-              <Label className="text-center block mb-2" dir="rtl">שעת סיום (HH:MM)</Label>
-              <Input type="time" value={manualShiftData.end_time} onChange={(e) => setManualShiftData({ ...manualShiftData, end_time: e.target.value })} />
-            </div>
-            <div>
               <Label className="text-center block mb-2" dir="rtl">שעת התחלה (HH:MM)</Label>
               <Input type="time" value={manualShiftData.start_time} onChange={(e) => setManualShiftData({ ...manualShiftData, start_time: e.target.value })} />
+            </div>
+            <div>
+              <Label className="text-center block mb-2" dir="rtl">שעת סיום (HH:MM)</Label>
+              <Input type="time" value={manualShiftData.end_time} onChange={(e) => setManualShiftData({ ...manualShiftData, end_time: e.target.value })} />
             </div>
           </div>
           <div>
@@ -168,13 +168,11 @@ export function ManualShiftDialog({
             </div>
           )}
         </div>
-        <DialogFooter className="flex justify-between" dir="rtl">
-          <div>
-            {editingShift && (
-              <Button variant="destructive" onClick={deleteShift} dir="rtl">מחק</Button>
-            )}
-          </div>
-          <div className="flex gap-2">
+        <DialogFooter className="flex items-center gap-2 justify-start" dir="rtl">
+          {editingShift && (
+            <Button variant="destructive" onClick={deleteShift} dir="rtl">מחק</Button>
+          )}
+          <div className="ml-auto flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} dir="rtl">ביטול</Button>
             <Button onClick={submitManualShift} className="bg-blue-900 hover:bg-blue-800" disabled={!manualShiftData.start_time || !manualShiftData.end_time} dir="rtl">
               {editingShift ? 'עדכן' : <><Plus className="w-4 h-4 mr-2" />הוסף</>}
