@@ -566,6 +566,12 @@ export default function Matrix() {
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
       debouncedLoadDataRef.current(true, false, false);
     });
+    const unsubAvailability = base44.entities.Availability.subscribe(() => {
+      debouncedLoadDataRef.current(true, false, false);
+    });
+    const unsubUnavailability = base44.entities.Unavailability.subscribe(() => {
+      debouncedLoadDataRef.current(true, false, false);
+    });
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') debouncedLoadDataRef.current(true, false);
@@ -609,6 +615,8 @@ export default function Matrix() {
 
     return () => {
       unsubTemplateRow();
+      unsubAvailability();
+      unsubUnavailability();
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('templateRowsUpdated', onTemplateRowsUpdated);
       window.removeEventListener('storage', onStorage);
