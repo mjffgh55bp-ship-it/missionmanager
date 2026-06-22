@@ -29,25 +29,35 @@ export function exportMatrixToExcel({
         return { date: format(d, 'yyyy-MM-dd'), label: format(d, 'd.M') };
       });
 
-  // ── Build header rows ──────────────────────────────────────────────────────
-  const headerRow1 = ['שם עובד'];
-  const headerRow2 = [''];
-  dateCols.forEach((dc, di) => {
-    HOURS.forEach((h, idx) => {
+  // ── Build header rows (RTL layout: worker name on RIGHT, hours go right→left) ──
+  // We build columns left-to-right as: [hours cols reversed] | [worker name]
+  // This means in Excel the rightmost column is the worker name (RTL reading order)
+
+  // Hours in display order for each day: last hour first (05:00 → 06:00 reading RTL)
+  // Actually: we reverse the day order AND hour order so it reads right-to-left naturally
+  const reversedDateCols = [...dateCols].reverse();
+  const reversedHours = [...HOURS].reverse();
+
+  const headerRow1 = [];
+  const headerRow2 = [];
+  reversedDateCols.forEach((dc, di) => {
+    reversedHours.forEach((h, idx) => {
       headerRow1.push(idx === 0 ? dc.label : '');
       headerRow2.push(`${String(h).padStart(2, '0')}:00`);
     });
   });
+  headerRow1.push('שם עובד');
+  headerRow2.push('');
 
   // ── Build data rows ────────────────────────────────────────────────────────
   const dataRows = filteredWorkers.map(worker => {
-    const row = [worker.nickname];
-    dateCols.forEach(dc => {
+    const row = [];
+    reversedDateCols.forEach(dc => {
       const avail = getWorkerAvailabilityForDate(worker.id, dc.date);
       const tShifts = getWorkerTemplateShifts(worker.id, dc.date);
       const unavails = getWorkerUnavailabilityForDate(worker.id, dc.date);
 
-      HOURS.forEach(h => {
+      reversedHours.forEach(h => {
         const hS = getOperationalMinutes(`${String(h).padStart(2, '0')}:00`);
         const hE = hS + 60;
 
@@ -73,6 +83,7 @@ export function exportMatrixToExcel({
         row.push(cell);
       });
     });
+    row.push(worker.nickname); // worker name on the far right
     return row;
   });
 
@@ -82,8 +93,8 @@ export function exportMatrixToExcel({
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(sheetData);
 
-  // Column widths
-  ws['!cols'] = [{ wch: 18 }, ...Array(numCols - 1).fill({ wch: 4 })];
+  // Column widths: hour cols first (narrow), worker name last (wide)
+  ws['!cols'] = [...Array(numCols - 1).fill({ wch: 4 }), { wch: 18 }];
 
   // Cell styling
   const colorMap = { 'X': 'CC99FF', 'W': '99FF99', 'A': '99CCFF', '!': 'FF9999' };
@@ -94,9 +105,10 @@ export function exportMatrixToExcel({
       const ref = XLSX.utils.encode_cell({ r, c });
       if (!ws[ref]) ws[ref] = { v: sheetData[r][c] || '', t: 's' };
       const bg = c > 0 ? colorMap[sheetData[r][c]] : null;
+      const isWorkerCol = c === numCols - 1;
       if (bg) {
         ws[ref].s = { fill: { fgColor: { rgb: bg }, patternType: 'solid' }, alignment: { horizontal: 'center' } };
-      } else if (c === 0) {
+      } else if (isWorkerCol) {
         ws[ref].s = { font: { bold: true }, alignment: { horizontal: 'right' } };
       } else {
         ws[ref].s = { alignment: { horizontal: 'center' } };
@@ -117,9 +129,9 @@ export function exportMatrixToExcel({
     }
   }
 
-  // Merge date header cells (row 0)
-  ws['!merges'] = dateCols.map((_, di) => {
-    const sC = 1 + di * HOURS.length;
+  // Merge date header cells (row 0) — reversed order, no merge on worker name col
+  ws['!merges'] = reversedDateCols.map((_, di) => {
+    const sC = di * HOURS.length;
     return { s: { r: 0, c: sC }, e: { r: 0, c: sC + HOURS.length - 1 } };
   });
 
