@@ -32,6 +32,13 @@ function parseSheet(ws) {
   const rows = raw.slice(1).map(r => {
     const obj = {};
     headers.forEach((h, i) => { obj[h] = r[i] !== undefined && r[i] !== null ? String(r[i]).trim() : ""; });
+    // The v2.0 export identifies each column by internal_value_key and (for ID-bearing
+    // columns) column_mapping_id. The matching logic also reads column_name, so alias it
+    // from internal_value_key when absent. This is the structural-column fallback
+    // (time columns, status); ID-based columns are still matched by mapping_id first.
+    if ((!obj.column_name || obj.column_name === "") && obj.internal_value_key) {
+      obj.column_name = obj.internal_value_key;
+    }
     return obj;
   }).filter(row => Object.values(row).some(v => v !== ""));
   return { headers, rows };

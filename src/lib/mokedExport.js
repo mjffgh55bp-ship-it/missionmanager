@@ -98,6 +98,24 @@ export async function runMokedExport({
   colRegistry.forEach(c => {
     if (c && c.name && c.mapping_id) colMappingIdByName[String(c.name).trim()] = c.mapping_id;
   });
+  // Roles registry: name → role_XX id, so a worker column named like a role
+  // (e.g. "נהג") resolves to that role's stable id even when the column itself
+  // carries no mapping_id.
+  const rolesSetting = allSettings.find(x => x.setting_key === "worker_roles");
+  const roleIdByName = {};
+  if (rolesSetting) {
+    try {
+      (JSON.parse(rolesSetting.setting_value) || []).forEach(r => {
+        if (r && r.name && r.mapping_id) roleIdByName[String(r.name).trim()] = r.mapping_id;
+      });
+    } catch {}
+  }
+  const resolveColRoleMappingId = (col) => {
+    if (!col) return "";
+    if (col.role_mapping_id) return col.role_mapping_id;
+    if (col.name && roleIdByName[String(col.name).trim()]) return roleIdByName[String(col.name).trim()];
+    return "";
+  };
   const resolveColMappingId = (col) => {
     if (!col) return "";
     if (col.mapping_id) return col.mapping_id;
@@ -207,7 +225,7 @@ export async function runMokedExport({
         sanitizeText(col.default_value || ""),
         col.options ? JSON.stringify(col.options) : "",
         sanitizeText(col.role_filter || ""),
-        sanitizeText(col.role_mapping_id || ""),
+        sanitizeText(resolveColRoleMappingId(col)),
         isWorker ? "true" : "false",
         isTask   ? "true" : "false",
         col.is_importable !== false ? "true" : "false",
