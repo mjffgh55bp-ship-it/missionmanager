@@ -1713,7 +1713,7 @@ export default function Matrix() {
     const endPx = endTimeToPixels(shift.start_time, shift.end_time, viewMode, ppm, dayIndex);
     const widthPx = Math.max(endPx - startPx, 0);
     const rightPx = startPx;
-    if (startPx < 0 || startPx > timelineWidth) return null;
+    if (endPx < 0 || startPx > timelineWidth) return null;
     const typeLabels = { wanted: "W", available: "A", unavailable: "U" };
     const borderColors = { wanted: '#16a34a', available: '#3b82f6', unavailable: '#dc2626' };
     const borderColor = borderColors[shift.type] || '#3b82f6';
