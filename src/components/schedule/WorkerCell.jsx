@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, Star, Check, X } from "lucide-react";
-import { getOperationalMinutes, getOperationalEndMinutes } from "@/lib/operationalDate";
+import { getOperationalMinutes, getOperationalEndMinutes, getOperationalDate } from "@/lib/operationalDate";
 
 // Operational-aware time helpers (handle overnight shifts that cross midnight,
 // e.g. 22:00–02:00). Mirrors the logic used on the Matrix page.
@@ -72,8 +72,9 @@ export default function WorkerCell({
       a.worker_id === workerId && (a.status === "approved" || a.status === "submitted")
     );
     if (!workerAvail?.shifts) return null;
+    const shiftOperationalDate = getOperationalDate(dateString, startTime);
     const dayShifts = workerAvail.shifts.filter((s) =>
-      s.date === dateString && s.type !== "unavailable"
+      (s.operational_date || s.date) === shiftOperationalDate && s.type !== "unavailable"
     );
     const exactShift = dayShifts.find((s) => opContains(s.start_time, s.end_time, startTime, endTime));
     if (exactShift) return { priority: exactShift.priority, type: exactShift.type };
