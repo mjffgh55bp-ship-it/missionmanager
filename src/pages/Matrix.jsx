@@ -25,6 +25,7 @@ import { AvailabilityStatsHeader, AvailabilityStatsCell, AVAILABILITY_STATS_COL_
 import TimelineHeaderComponent from "../components/matrix/TimelineHeader";
 import useViewPresets from "../hooks/useViewPresets";
 import ViewPresetDialog from "../components/matrix/ViewPresetDialog";
+import { popUndo } from "@/lib/undoStack";
 
 // ── Timeline constants ──────────────────────────────────────────────────────
 const DAILY_TOTAL_MINUTES = 24 * 60;        // 1440
@@ -531,6 +532,28 @@ export default function Matrix() {
     const sc = pinned ? timelineScrollRef.current : scrollContainerRef.current;
     if (sc) sc.scrollLeft = 0;
   }, [viewMode]);
+
+  // ── Ctrl/Cmd+Z undo listener ──────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = async (e) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== 'z' || e.shiftKey) return;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      const ce = document.activeElement?.isContentEditable;
+      if (tag === 'input' || tag === 'textarea' || ce) return;
+      e.preventDefault();
+      const entry = popUndo();
+      if (!entry) return;
+      setTemplateRows(prev => {
+        const exists = prev.some(r => r.id === entry.rowId);
+        if (!exists) return prev;
+        base44.entities.TemplateRow.update(entry.rowId, { values: entry.beforeValues }).catch(() => {});
+        import('react-hot-toast').then(m => m.default.success("בוטל השינוי האחרון")).catch(() => {});
+        return prev.map(r => r.id === entry.rowId ? { ...r, values: entry.beforeValues } : r);
+      });
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // ── Data loading ─────────────────────────────────────────────────────────────
   useEffect(() => { loadStaticData(); }, []);

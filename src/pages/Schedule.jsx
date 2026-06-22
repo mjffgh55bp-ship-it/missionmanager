@@ -49,6 +49,7 @@ import { suggestMappingId } from "@/components/settings/MappableItemRow";
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 import { getMokedDisplayName } from "@/lib/shiftDemand";
 import { runMokedExport } from "@/lib/mokedExport";
+import { recordChange, popUndo } from "@/lib/undoStack";
 
 /** Generate a unique stable id for a מוקד: tmpl_ + random hex. */
 const genTemplateMappingId = () =>
@@ -108,6 +109,37 @@ export default function Schedule() {
   const columnOrderSettingIdRef = useRef(null);
   const appSettingsIdCache = useRef({});
   const mokedOrderSavingRef = useRef(false);
+
+  // ── Undo helper: record → write → update local state ────────────────────────
+  const updateRowValues = async (rowId, currentValues, newValues) => {
+    recordChange({ rowId, beforeValues: currentValues, afterValues: newValues });
+    await base44.entities.TemplateRow.update(rowId, { values: newValues });
+    setTemplateRows((prev) => prev.map((r) => r.id === rowId ? { ...r, values: newValues } : r));
+  };
+
+  // ── Ctrl/Cmd+Z global listener ────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = async (e) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key !== 'z' || e.shiftKey) return;
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      const ce = document.activeElement?.isContentEditable;
+      if (tag === 'input' || tag === 'textarea' || ce) return;
+      e.preventDefault();
+      const entry = popUndo();
+      if (!entry) return;
+      // Verify row still exists in local state before reverting
+      setTemplateRows((prev) => {
+        const exists = prev.some(r => r.id === entry.rowId);
+        if (!exists) return prev; // row was deleted — skip silently
+        // Fire the DB write asynchronously (can't await inside setState)
+        base44.entities.TemplateRow.update(entry.rowId, { values: entry.beforeValues }).catch(() => {});
+        toast.success("בוטל השינוי האחרון");
+        return prev.map(r => r.id === entry.rowId ? { ...r, values: entry.beforeValues } : r);
+      });
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!initialLoadStarted.current) {
@@ -1178,8 +1210,12 @@ export default function Schedule() {
                                            const b = rows[rowIndex - 1];
                                            const aOrder = a.values?._order ?? rowIndex;
                                            const bOrder = b.values?._order ?? (rowIndex - 1);
-                                           await base44.entities.TemplateRow.update(a.id, { values: { ...a.values, _order: bOrder } });
-                                           await base44.entities.TemplateRow.update(b.id, { values: { ...b.values, _order: aOrder } });
+                                           const aNew = { ...a.values, _order: bOrder };
+                                           const bNew = { ...b.values, _order: aOrder };
+                                           recordChange({ rowId: a.id, beforeValues: a.values || {}, afterValues: aNew });
+                                           recordChange({ rowId: b.id, beforeValues: b.values || {}, afterValues: bNew });
+                                           await base44.entities.TemplateRow.update(a.id, { values: aNew });
+                                           await base44.entities.TemplateRow.update(b.id, { values: bNew });
                                            loadData();
                                          }}>
                                          <ChevronUp className="w-3 h-3" />
@@ -1191,8 +1227,12 @@ export default function Schedule() {
                                            const b = rows[rowIndex + 1];
                                            const aOrder = a.values?._order ?? rowIndex;
                                            const bOrder = b.values?._order ?? (rowIndex + 1);
-                                           await base44.entities.TemplateRow.update(a.id, { values: { ...a.values, _order: bOrder } });
-                                           await base44.entities.TemplateRow.update(b.id, { values: { ...b.values, _order: aOrder } });
+                                           const aNew = { ...a.values, _order: bOrder };
+                                           const bNew = { ...b.values, _order: aOrder };
+                                           recordChange({ rowId: a.id, beforeValues: a.values || {}, afterValues: aNew });
+                                           recordChange({ rowId: b.id, beforeValues: b.values || {}, afterValues: bNew });
+                                           await base44.entities.TemplateRow.update(a.id, { values: aNew });
+                                           await base44.entities.TemplateRow.update(b.id, { values: bNew });
                                            loadData();
                                          }}>
                                          <ChevronDown className="w-3 h-3" />
@@ -1224,6 +1264,7 @@ export default function Schedule() {
                                             workerDayAssignments={workerDayAssignments}
                                             onSaved={(workerId) => {
                                             const newValues = { ...row.values, [col.name]: workerId };
+                                            recordChange({ rowId: row.id, beforeValues: row.values || {}, afterValues: newValues });
                                             setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
                                             }} />
                                         ) : col.type === "time" ? (
@@ -1233,17 +1274,17 @@ export default function Schedule() {
                                             value={row.values?.[col.name] || ""}
                                             defaultValue={col.default_value || ""}
                                             onSaved={(newValues) => {
+                                            recordChange({ rowId: row.id, beforeValues: row.values || {}, afterValues: newValues });
                                             setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
-                                             handleTimeSaved(row, newValues);
+                                            handleTimeSaved(row, newValues);
                                             }}
                                             rowValues={row.values || {}} />
                                         ) : col.type === 'task' ? (
                                           <Select
                                             value={row.values?.task || ""}
                                             onValueChange={async (value) => {
-                                              const newValues = { ...row.values, task: value };
-                                              await base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                              setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                             const newValues = { ...row.values, task: value };
+                                             await updateRowValues(row.id, row.values || {}, newValues);
                                             }}>
                                             <SelectTrigger className="h-full border-0 rounded-none text-xs justify-center">
                                               <SelectValue placeholder="-" />
@@ -1264,8 +1305,7 @@ export default function Schedule() {
                                             isQuantitative={!!(columnQuantitative[resolveColName(col)] || columnQuantitative[col.name])}
                                             onSaved={(updatedColumnValues) => {
                                             const newValues = { ...row.values, ...updatedColumnValues };
-                                            base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                             setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                            updateRowValues(row.id, row.values || {}, newValues);
                                             }} />
                                         ) : (
                                           <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
@@ -1284,8 +1324,7 @@ export default function Schedule() {
                                      onValueChange={async (value) => {
                                        const newValues = { ...row.values, status: value };
                                        try {
-                                         await base44.entities.TemplateRow.update(row.id, { values: newValues });
-                                         setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                         await updateRowValues(row.id, row.values || {}, newValues);
                                        } catch {
                                          await loadData();
                                        }
