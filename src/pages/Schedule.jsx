@@ -98,7 +98,7 @@ export default function Schedule() {
   const [togglingPublish, setTogglingPublish] = useState(false);
   const [mokedIdEditorTarget, setMokedIdEditorTarget] = useState(null); // { templateId, name, mappingId }
   const [exportSelectionMode, setExportSelectionMode] = useState(false);
-  const [selectedMokedIds, setSelectedMokedIds] = useState(new Set());
+  const [selectedMokedKeys, setSelectedMokedKeys] = useState(new Set()); // group keys: templateId_groupId
   const [exportingMokeds, setExportingMokeds] = useState(false);
   const staticDataLoaded = useRef(false);
   const lastWeekStart = useRef(null);
@@ -599,32 +599,50 @@ export default function Schedule() {
   };
 
   const handleExportSelectedMokeds = async () => {
-    if (selectedMokedIds.size === 0) return;
+    if (selectedMokedKeys.size === 0) return;
     setExportingMokeds(true);
     try {
-      const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-      const dates = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), "yyyy-MM-dd"));
+      // Parse selected group keys to get template_id + group_id pairs
+      const selectedPairs = [...selectedMokedKeys].map(key => {
+        const idx = key.indexOf('_');
+        // key format: templateId_groupId  (group key as used in groupedMokeds)
+        const templateId = key.substring(0, key.lastIndexOf('_') === key.indexOf('_') ? key.indexOf('_') : key.lastIndexOf('_'));
+        return key; // keep full key for row matching
+      });
+
+      // Collect all row IDs that belong to selected groups
+      const selectedRowIds = new Set();
+      groupedMokeds.forEach(group => {
+        if (selectedMokedKeys.has(group.key)) {
+          group.rows.forEach(r => selectedRowIds.add(r.id));
+        }
+      });
+
+      // Only export today's date (current date) for the selected groups
+      const exportDates = [dateString];
+
       const [workers, allTemplatesData, allSettings] = await Promise.all([
         base44.entities.Worker.list(),
         base44.entities.Template.list(),
         base44.entities.AppSettings.list(),
       ]);
-      // Fetch rows for each date in the week
-      const rowsPerDate = await Promise.all(dates.map(d => base44.entities.TemplateRow.filter({ date: d })));
-      const allRows = rowsPerDate.flat();
+
+      // Filter rows to only the selected groups' rows
+      const filteredRows = templateRows.filter(r => selectedRowIds.has(r.id));
+
       await runMokedExport({
         workers,
         allTemplates: allTemplatesData,
-        templateRows: allRows,
+        templateRows: filteredRows,
         allSettings,
-        dates,
-        selectedTemplateIds: [...selectedMokedIds],
+        dates: exportDates,
+        selectedTemplateIds: null, // filtering already done above
         currentUser: null,
         onAuditLog: null,
         createAuditLog: (data) => base44.entities.AuditLog.create(data),
       });
       setExportSelectionMode(false);
-      setSelectedMokedIds(new Set());
+      setSelectedMokedKeys(new Set());
     } finally {
       setExportingMokeds(false);
     }
@@ -884,7 +902,7 @@ export default function Schedule() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={() => { setExportSelectionMode(true); setSelectedMokedIds(new Set()); }}>
+                        <Button variant="outline" size="icon" onClick={() => { setExportSelectionMode(true); setSelectedMokedKeys(new Set()); }}>
                           <Download className="w-4 h-4" />
                         </Button>
                       </TooltipTrigger>
@@ -893,24 +911,24 @@ export default function Schedule() {
                   </TooltipProvider>
                 )}
                 {exportSelectionMode && (
-                  <>
-                    {selectedMokedIds.size > 0 && (
-                      <Button
-                        className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs h-8 px-3"
-                        onClick={handleExportSelectedMokeds}
-                        disabled={exportingMokeds}
-                        dir="rtl"
-                      >
-                        {exportingMokeds
-                          ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin ml-1" />מייצא...</>
-                          : <><Download className="w-3 h-3 ml-1" />ייצא מוקדים נבחרים ({selectedMokedIds.size})</>}
-                      </Button>
-                    )}
-                    <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => { setExportSelectionMode(false); setSelectedMokedIds(new Set()); }} dir="rtl">
-                      <X className="w-3 h-3 ml-1" />ביטול בחירה
-                    </Button>
-                  </>
-                )}
+                   <>
+                     {selectedMokedKeys.size > 0 && (
+                       <Button
+                         className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs h-8 px-3"
+                         onClick={handleExportSelectedMokeds}
+                         disabled={exportingMokeds}
+                         dir="rtl"
+                       >
+                         {exportingMokeds
+                           ? <><div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin ml-1" />מייצא...</>
+                           : <><Download className="w-3 h-3 ml-1" />ייצא מוקדים נבחרים ({selectedMokedKeys.size})</>}
+                       </Button>
+                     )}
+                     <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => { setExportSelectionMode(false); setSelectedMokedKeys(new Set()); }} dir="rtl">
+                       <X className="w-3 h-3 ml-1" />ביטול בחירה
+                     </Button>
+                   </>
+                 )}
               </div>
               {(() => {
                 const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
@@ -954,8 +972,8 @@ export default function Schedule() {
         {exportSelectionMode && (
           <div className="bg-emerald-50 border border-emerald-300 rounded-lg px-4 py-2 text-sm text-emerald-800 flex items-center gap-2 mb-2" dir="rtl">
             <CheckSquare className="w-4 h-4 flex-shrink-0" />
-            לחץ על כותרת מוקד לבחירתו לייצוא. הייצוא יכלול את כל שבעת ימי השבוע הנוכחי.
-            {selectedMokedIds.size === 0 && <span className="text-emerald-600 text-xs">(אין מוקדים נבחרים)</span>}
+            לחץ על כותרת מוקד לבחירתו לייצוא. הייצוא יכלול רק את המוקדים הנבחרים ליום הנוכחי.
+            {selectedMokedKeys.size === 0 && <span className="text-emerald-600 text-xs">(אין מוקדים נבחרים)</span>}
           </div>
         )}
         {templates.length === 0 && templateRows.length === 0 ? (
@@ -998,7 +1016,7 @@ export default function Schedule() {
                   <Draggable key={group.key} draggableId={group.key} index={groupIndex} isDragDisabled={!editMode}>
                     {(provided, snapshot) => (
                       <div ref={provided.innerRef} {...provided.draggableProps} className={snapshot.isDragging ? "opacity-70" : ""}>
-                  <Card className={`border-none shadow-lg overflow-hidden transition-all ${exportSelectionMode && selectedMokedIds.has(template.id) ? "ring-4 ring-emerald-400 ring-offset-1" : ""}`}>
+                  <Card className={`border-none shadow-lg overflow-hidden transition-all ${exportSelectionMode && selectedMokedKeys.has(group.key) ? "ring-4 ring-emerald-400 ring-offset-1" : ""}`}>
                     <CardHeader
                       className="text-black py-3"
                       style={{
@@ -1006,9 +1024,9 @@ export default function Schedule() {
                         cursor: exportSelectionMode ? "pointer" : undefined,
                       }}
                       onClick={exportSelectionMode ? () => {
-                        setSelectedMokedIds(prev => {
+                        setSelectedMokedKeys(prev => {
                           const next = new Set(prev);
-                          if (next.has(template.id)) next.delete(template.id); else next.add(template.id);
+                          if (next.has(group.key)) next.delete(group.key); else next.add(group.key);
                           return next;
                         });
                       } : undefined}
@@ -1016,8 +1034,8 @@ export default function Schedule() {
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
                           {exportSelectionMode && (
-                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selectedMokedIds.has(template.id) ? "bg-white border-white" : "border-white/70 bg-white/20"}`}>
-                              {selectedMokedIds.has(template.id) && <CheckSquare className="w-3.5 h-3.5 text-emerald-700" />}
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selectedMokedKeys.has(group.key) ? "bg-white border-white" : "border-white/70 bg-white/20"}`}>
+                              {selectedMokedKeys.has(group.key) && <CheckSquare className="w-3.5 h-3.5 text-emerald-700" />}
                             </div>
                           )}
                           {editMode && (
