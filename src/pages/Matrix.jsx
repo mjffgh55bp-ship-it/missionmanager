@@ -787,10 +787,23 @@ export default function Matrix() {
     }
   };
 
+  const lastFullReloadRef = useRef(0);
   const debouncedLoadData = (silent = false, fast = false, postsave = false) => {
     if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
-    const delay = postsave ? 100 : fast ? 200 : 500;
-    loadingTimeoutRef.current = setTimeout(() => loadDynamicData(silent), delay);
+    const delay = postsave ? 300 : fast ? 800 : 1500;
+    loadingTimeoutRef.current = setTimeout(() => {
+      const now = Date.now();
+      // Throttle: don't reload more than once every 3 seconds
+      if (now - lastFullReloadRef.current < 3000) {
+        loadingTimeoutRef.current = setTimeout(() => {
+          lastFullReloadRef.current = Date.now();
+          loadDynamicData(silent);
+        }, 3000 - (now - lastFullReloadRef.current));
+        return;
+      }
+      lastFullReloadRef.current = now;
+      loadDynamicData(silent);
+    }, delay);
   };
   const applyOptimisticAvailability = (workerId, newShifts, newRecord = null) => {
     setAvailabilities(prev => {
