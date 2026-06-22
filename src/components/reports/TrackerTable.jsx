@@ -1011,12 +1011,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     return [...cands].some(c => selected.includes(c));
   };
 
-  const filteredWorkers = workers.filter(w => {
+  // Step 1: filter workers (no sort yet — sort needs cellValueMap)
+  const filteredWorkersBase = workers.filter(w => {
     if (!w.active) return false;
     if (!popMatches(w.population, selectedPopulations)) return false;
     if (selectedRoles.length > 0) {
       const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
-      // selectedRoles may hold mapping_ids or names — match against both
       const roleMatches = selectedRoles.some(sr => {
         if (roles.includes(sr)) return true;
         const srName = roleNameById[sr];
@@ -1035,7 +1035,23 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     if (guide === "yes" && !w.is_guide) return false;
     if (guide === "no" && w.is_guide) return false;
     return true;
-  }).sort((a, b) => {
+  });
+
+  // Step 2: pre-compute cell values (depends on filtered workers list)
+  const cellValueMap = useMemo(() => {
+    const map = new Map();
+    if (!tracker?.columns || !filteredWorkersBase) return map;
+    tracker.columns.forEach(col => {
+      filteredWorkersBase.forEach(worker => {
+        map.set(`${col.id}_${worker.id}`, computeAutoValue(col, worker.id));
+      });
+    });
+    return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracker?.columns, filteredWorkersBase, assignments, templateRows, entries, dateFilterMode, startDate, endDate]);
+
+  // Step 3: sort using cellValueMap (now safe to reference)
+  const filteredWorkers = [...filteredWorkersBase].sort((a, b) => {
     const mult = sortDir === "asc" ? 1 : -1;
     if (sortColId === null) {
       return mult * (a.nickname || "").localeCompare(b.nickname || "", "he");
@@ -1059,19 +1075,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const vb = getEntry(b.id, sortColId)?.value || "";
     return mult * va.localeCompare(vb, "he");
   });
-
-  // Pre-compute all cell values — only recomputes when actual data changes, not on every render
-  const cellValueMap = useMemo(() => {
-    const map = new Map();
-    if (!tracker?.columns || !filteredWorkers) return map;
-    tracker.columns.forEach(col => {
-      filteredWorkers.forEach(worker => {
-        map.set(`${col.id}_${worker.id}`, computeAutoValue(col, worker.id));
-      });
-    });
-    return map;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracker?.columns, filteredWorkers, assignments, templateRows, entries, dateFilterMode, startDate, endDate]);
 
   const displayColumns = editMode ? editColumns : (tracker.columns || []);
 
