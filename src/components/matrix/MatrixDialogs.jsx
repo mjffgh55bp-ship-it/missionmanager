@@ -160,10 +160,12 @@ export function ManualShiftDialog({
           {manualShiftData.type === "constraint" && (
             <div>
               <Label className="text-center block mb-2" dir="rtl">סיבת האילוץ</Label>
-              <div className="flex gap-2 justify-center" dir="rtl">
-                <Button variant={manualShiftData.reason === "occupied" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "occupied" })} dir="rtl">עיסוק</Button>
-                <Button variant={manualShiftData.reason === "overseas" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "overseas" })} dir="rtl">חו״ל</Button>
-                <Button variant={manualShiftData.reason === "other" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "other" })} dir="rtl">אחר</Button>
+              <div className="flex flex-wrap gap-2 justify-center" dir="rtl">
+                <Button size="sm" variant={manualShiftData.reason === "overseas" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "overseas" })} dir="rtl">חו״ל</Button>
+                <Button size="sm" variant={manualShiftData.reason === "vacation" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "vacation" })} dir="rtl">חופש</Button>
+                <Button size="sm" variant={manualShiftData.reason === "scheduled_time" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "scheduled_time" })} dir="rtl">לו״ז</Button>
+                <Button size="sm" variant={manualShiftData.reason === "personal" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "personal" })} dir="rtl">אישי</Button>
+                <Button size="sm" variant={manualShiftData.reason === "periodic_event" ? "default" : "outline"} onClick={() => setManualShiftData({ ...manualShiftData, reason: "periodic_event" })} dir="rtl">תקופתי</Button>
               </div>
             </div>
           )}
