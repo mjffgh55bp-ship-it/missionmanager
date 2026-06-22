@@ -114,7 +114,7 @@ export default function Layout({ children }) {
         }
         .nav-item-label {
           opacity: 0;
-          pointer-events: none;
+          pointer-events: none !important;
           transform: translateX(8px);
           transition: opacity 0.15s ease, transform 0.15s ease;
           white-space: nowrap;
@@ -132,7 +132,7 @@ export default function Layout({ children }) {
         }
         .nav-icon-btn:hover .nav-item-label {
           opacity: 1;
-          pointer-events: auto;
+          pointer-events: none !important;
           transform: translateX(0);
         }
       `}} />
@@ -182,7 +182,7 @@ export default function Layout({ children }) {
         </nav>
 
         {/* Main content — right margin on desktop, bottom padding on mobile */}
-        <main className="min-h-screen pb-12 md:pb-0 md:mr-12 overflow-y-auto overflow-x-hidden">
+        <main className="min-h-screen pb-12 md:pb-0 md:mr-12 overflow-y-auto overflow-x-hidden relative z-0">
           {children}
         </main>
       </div>
