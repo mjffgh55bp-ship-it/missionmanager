@@ -564,14 +564,13 @@ export default function Matrix() {
   }, [currentDate, viewMode]);
   useEffect(() => {
     const unsubTemplateRow = base44.entities.TemplateRow.subscribe(() => {
-      debouncedLoadDataRef.current(true, false);
+      debouncedLoadDataRef.current(true, false, false);
     });
-    const unsubAvailability = base44.entities.Availability.subscribe(() => {
-      debouncedLoadDataRef.current(true, true);
-    });
-    const unsubUnavailability = base44.entities.Unavailability.subscribe(() => {
-      debouncedLoadDataRef.current(true, false);
-    });
+    // Availability and Unavailability subscriptions removed — they fire on every
+    // optimistic update from this same page, causing flicker. Data is kept fresh
+    // via explicit debouncedLoadData calls after mutations and via visibility change.
+    const unsubAvailability = { unsubscribe: () => {} };
+    const unsubUnavailability = { unsubscribe: () => {} };
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') debouncedLoadDataRef.current(true, false);
@@ -615,8 +614,6 @@ export default function Matrix() {
 
     return () => {
       unsubTemplateRow();
-      unsubAvailability();
-      unsubUnavailability();
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('templateRowsUpdated', onTemplateRowsUpdated);
       window.removeEventListener('storage', onStorage);
@@ -790,15 +787,15 @@ export default function Matrix() {
   const lastFullReloadRef = useRef(0);
   const debouncedLoadData = (silent = false, fast = false, postsave = false) => {
     if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
-    const delay = postsave ? 300 : fast ? 800 : 1500;
+    const delay = postsave ? 500 : 3000;
     loadingTimeoutRef.current = setTimeout(() => {
       const now = Date.now();
-      // Throttle: don't reload more than once every 3 seconds
-      if (now - lastFullReloadRef.current < 3000) {
+      const minGap = postsave ? 2000 : 5000;
+      if (now - lastFullReloadRef.current < minGap) {
         loadingTimeoutRef.current = setTimeout(() => {
           lastFullReloadRef.current = Date.now();
-          loadDynamicData(silent);
-        }, 3000 - (now - lastFullReloadRef.current));
+          loadDynamicData(true);
+        }, minGap - (now - lastFullReloadRef.current));
         return;
       }
       lastFullReloadRef.current = now;
