@@ -363,44 +363,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   // each individual shift. A worker might fill different roles in different shifts.
   const roleCriteria = (col.criteria || []).filter(c => c.col_name === WORKER_ROLE_COL_NAME && c.include?.length > 0);
   const expectedRoles = roleCriteria.length > 0 ? roleCriteria.flatMap(c => c.include) : null;
-    const _isNachman = (() => { const w = workers.find(x => x.id === workerId); return w && w.nickname === "נחמן"; })();
-    const _wantsManager = expectedRoles && (expectedRoles.includes("מנהל") || expectedRoles.some(r => typeof r === "string" && r.startsWith("role_")));
-    if (_isNachman && _wantsManager) {
-      console.log("[DEEP DIAG] start", { colName: col.name, colType: col.type, expectedRoles, dateRangeIs: getDateRange(dateFilterMode, startDate, endDate), templateRowsCount: templateRows.length, assignmentsForWorker: assignments.filter(a => a.chef_id===workerId||a.sous_chef_id===workerId||a.additional_chef_id===workerId).length });
-      templateRows.forEach(row => {
-        const tmpl = allTemplates.find(t => t.id === row.template_id);
-        const workerCols = (tmpl?.columns || []).filter(c => c.type === "worker");
-        const hits = workerCols.filter(tc => row.values?.[tc.name] === workerId || (tc.column_id && row.values?.[tc.column_id] === workerId));
-        if (hits.length > 0) {
-          console.log("[DEEP DIAG] row-with-nachman", {
-            rowId: row.id, date: row.date, templateName: tmpl?.name, templateId: row.template_id,
-            startTime: row.values?.["התחלה"] || row.values?.["שעת התחלה"],
-            endTime: row.values?.["סיום"] || row.values?.["שעת סיום"],
-            hitColumns: hits.map(tc => ({ name: tc.name, role_filter: tc.role_filter, role_mapping_id: tc.role_mapping_id, column_id: tc.column_id })),
-            storedValueKeys: Object.keys(row.values || {})
-          });
-        }
-      });
-      templateRows.forEach(row => {
-        const tmpl = allTemplates.find(t => t.id === row.template_id);
-        const workerCols = (tmpl?.columns || []).filter(c => c.type === "worker");
-        workerCols.forEach(tc => {
-          const v = row.values?.[tc.name];
-          if (v && typeof v === "string" && v !== workerId) {
-            const w = workers.find(x => x.id === v);
-            if (!w) console.log("[DEEP DIAG] cell-value-not-a-known-id", { rowId: row.id, date: row.date, templateName: tmpl?.name, col: tc.name, storedValue: v });
-          }
-        });
-      });
-    }
-
-  // Role name↔id lookup maps built from workerRoles prop
-    const _roleIdByName = {};
-    const _roleNameById = {};
-    (workerRoles || []).forEach(r => {
-      if (typeof r === "string") return;
-      if (r.name && r.mapping_id) { _roleIdByName[r.name.trim()] = r.mapping_id; _roleNameById[r.mapping_id] = r.name.trim(); }
-    });
+  // Use component-level role maps (roleIdByName / roleNameById)
+    const _roleIdByName = roleIdByName;
+    const _roleNameById = roleNameById;
 
   // Helper: check if the worker was assigned to a matching role in a given shift
     const workerMatchesRoleInShift = (shiftData, isTemplateRow = false, template = null) => {
@@ -735,29 +700,6 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           );
           if (!hasWorker) return;
           
-          if (expectedRoles && expectedRoles.includes("מנהל")) {
-            const workerObj = workers.find(w => w.id === workerId);
-            if (workerObj && workerObj.nickname === "נחמן") {
-              const workerCols = (tmpl?.columns || []).filter(c => c.type === "worker");
-              console.log("[ROLE DIAG] נחמן row", row.id, "date", row.date, "effectiveDate", effectiveDate,
-                "dateRange", dateRange,
-                "hasWorker", hasWorker,
-                "workerId", workerId,
-                "workerCols", workerCols.map(tc => ({
-                  name: tc.name,
-                  role_filter: tc.role_filter,
-                  column_id: tc.column_id,
-                  valByName: row.values?.[tc.name],
-                  valById: tc.column_id ? row.values?.[tc.column_id] : undefined,
-                  matchesThisWorker: row.values?.[tc.name] === workerId || (tc.column_id && row.values?.[tc.column_id] === workerId)
-                })),
-                "expectedRoles", expectedRoles,
-                "passesMatchesCriteria", matchesCriteria(row.values, { qualification_id: row.values?.task || "" }),
-                "passesRoleMatch", workerMatchesRoleInShift(row, true, tmpl)
-              );
-            }
-          }
-          
           // Check if criteria match this row (as if it's an assignment)
           const rowAsAssignment = { qualification_id: row.values?.task || "" };
           if (!matchesCriteria(row.values, rowAsAssignment)) return;
@@ -1050,6 +992,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
   const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_by_task", "count_quantitative"].includes(type);
 
+  // Role name↔id maps at component level (used by both computeAutoValue and filteredWorkers)
+  const roleIdByName = {};
+  const roleNameById = {};
+  (workerRoles || []).forEach(r => {
+    const name = typeof r === "string" ? r : r.name;
+    const mid = typeof r === "string" ? r : (r.mapping_id || r.name);
+    if (name && mid) { roleIdByName[name.trim()] = mid; roleNameById[mid] = name.trim(); }
+  });
+
   const popIdByName = {}; const popNameById = {};
   (populations || []).forEach(p => { if (typeof p === "string") return; if (p.name && p.mapping_id) { popIdByName[p.name.trim()] = p.mapping_id; popNameById[p.mapping_id] = p.name.trim(); } });
   const popMatches = (workerPop, selected) => {
@@ -1065,7 +1016,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     if (!popMatches(w.population, selectedPopulations)) return false;
     if (selectedRoles.length > 0) {
       const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
-      if (!selectedRoles.some(r => roles.includes(r))) return false;
+      // selectedRoles may hold mapping_ids or names — match against both
+      const roleMatches = selectedRoles.some(sr => {
+        if (roles.includes(sr)) return true;
+        const srName = roleNameById[sr];
+        if (srName && roles.includes(srName)) return true;
+        const srId = roleIdByName[sr];
+        if (srId && roles.includes(srId)) return true;
+        return false;
+      });
+      if (!roleMatches) return false;
     }
     if (selectedQualifications.length > 0) {
       const wqIds = workerQualifications.filter(wq => wq.worker_id === w.id).map(wq => wq.qualification_id);
@@ -1580,7 +1540,9 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 />
                 <WorkerPillFilter
                   label="תפקיד"
-                  options={(workerRoles || []).map(r => typeof r === "string" ? r : r.name).filter(Boolean)}
+                  options={(workerRoles || []).map(r =>
+                    typeof r === "string" ? { value: r, label: r } : { value: r.mapping_id || r.name, label: r.name }
+                  ).filter(o => o.label)}
                   selected={selectedRoles}
                   onChange={setSelectedRoles}
                   color="indigo"

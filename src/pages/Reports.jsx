@@ -143,7 +143,7 @@ export default function Reports() {
     }
     {
       const objs = workerRolesRaw.map(r => typeof r === "string" ? { name: r, mapping_id: r } : r).filter(r => r.name);
-      setWorkerRoles(objs.map(r => r.name));
+      setWorkerRoles(objs); // Pass full objects so reports can resolve mapping_id ↔ name
       setRoleObjects(objs);
     }
 
