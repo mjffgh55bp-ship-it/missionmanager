@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { getCachedWorkers, getCachedAllSettings } from "@/lib/appDataCache";
 import { Card, CardContent } from "@/components/ui/card";
@@ -270,9 +270,12 @@ export default function Yearly() {
     return days;
   };
 
-  const yearDays = generateYearDays();
-  const yearDaysMap = {};
-  yearDays.forEach((d, i) => { yearDaysMap[format(d, "yyyy-MM-dd")] = i; });
+  const yearDays = useMemo(() => generateYearDays(), [currentYear]);
+  const yearDaysMap = useMemo(() => {
+    const map = {};
+    yearDays.forEach((d, i) => { map[format(d, "yyyy-MM-dd")] = i; });
+    return map;
+  }, [yearDays]);
 
   const scrollToToday = () => {
     if (!scrollContainerRef.current) return;
@@ -326,32 +329,35 @@ export default function Yearly() {
     setDragging({ event, type, startX: e.clientX, originalStart: event.start_date, originalEnd: event.end_date });
   };
 
-  const handleMouseMove = (e) => {
-    if (!dragging) return;
-    const { event, type, startX, originalStart, originalEnd } = dragging;
-    const deltaX = startX - e.clientX;
-    const deltaDays = Math.round(deltaX / CELL_WIDTH);
-    const origStartDate = parseISO(originalStart);
-    const origEndDate = parseISO(originalEnd);
-    let newStart = origStartDate, newEnd = origEndDate;
-    if (type === "move") { newStart = addDays(origStartDate, deltaDays); newEnd = addDays(origEndDate, deltaDays); }
-    else if (type === "resize-start") { newStart = addDays(origStartDate, deltaDays); if (newStart > newEnd) newStart = newEnd; }
-    else if (type === "resize-end") { newEnd = addDays(origEndDate, deltaDays); if (newEnd < newStart) newEnd = newStart; }
-    const yearStart = new Date(currentYear, 0, 1), yearEnd = new Date(currentYear, 11, 31);
-    if (newStart < yearStart) newStart = yearStart;
-    if (newEnd > yearEnd) newEnd = yearEnd;
-    setDragging(prev => ({ ...prev, newStart: format(newStart, "yyyy-MM-dd"), newEnd: format(newEnd, "yyyy-MM-dd") }));
-  };
+  const handleMouseMove = useCallback((e) => {
+    setDragging(prev => {
+      if (!prev) return prev;
+      const { type, startX, originalStart, originalEnd } = prev;
+      const deltaX = startX - e.clientX;
+      const deltaDays = Math.round(deltaX / CELL_WIDTH);
+      const origStartDate = parseISO(originalStart);
+      const origEndDate = parseISO(originalEnd);
+      let newStart = origStartDate, newEnd = origEndDate;
+      if (type === "move") { newStart = addDays(origStartDate, deltaDays); newEnd = addDays(origEndDate, deltaDays); }
+      else if (type === "resize-start") { newStart = addDays(origStartDate, deltaDays); if (newStart > newEnd) newStart = newEnd; }
+      else if (type === "resize-end") { newEnd = addDays(origEndDate, deltaDays); if (newEnd < newStart) newEnd = newStart; }
+      const yearStart = new Date(currentYear, 0, 1), yearEnd = new Date(currentYear, 11, 31);
+      if (newStart < yearStart) newStart = yearStart;
+      if (newEnd > yearEnd) newEnd = yearEnd;
+      return { ...prev, newStart: format(newStart, "yyyy-MM-dd"), newEnd: format(newEnd, "yyyy-MM-dd") };
+    });
+  }, [currentYear]);
 
-  const handleMouseUp = async () => {
-    if (!dragging) return;
-    const { event, newStart, newEnd } = dragging;
-    if (newStart && newEnd) {
-      await base44.entities.YearlyEvent.update(event.id, { start_date: newStart, end_date: newEnd });
-      loadData();
-    }
-    setDragging(null);
-  };
+  const handleMouseUp = useCallback(async () => {
+    setDragging(prev => {
+      if (!prev) return prev;
+      const { event, newStart, newEnd } = prev;
+      if (newStart && newEnd) {
+        base44.entities.YearlyEvent.update(event.id, { start_date: newStart, end_date: newEnd }).then(() => loadData());
+      }
+      return null;
+    });
+  }, []);
 
   useEffect(() => {
     if (dragging) {
@@ -359,7 +365,7 @@ export default function Yearly() {
       document.addEventListener("mouseup", handleMouseUp);
       return () => { document.removeEventListener("mousemove", handleMouseMove); document.removeEventListener("mouseup", handleMouseUp); };
     }
-  }, [dragging]);
+  }, [!!dragging, handleMouseMove, handleMouseUp]);
 
   const getMonthGroups = () => {
     const groups = [];
@@ -385,8 +391,8 @@ export default function Yearly() {
     return groups;
   };
 
-  const monthGroups = getMonthGroups();
-  const weekGroups = getWeekGroups();
+  const monthGroups = useMemo(() => getMonthGroups(), [yearDays]);
+  const weekGroups = useMemo(() => getWeekGroups(), [yearDays]);
 
   const layoutEventsInTracks = (rowEvents) => {
     const sorted = [...rowEvents].sort((a, b) => (yearDaysMap[a.start_date] ?? 999) - (yearDaysMap[b.start_date] ?? 999));
@@ -405,7 +411,7 @@ export default function Yearly() {
     return tracks;
   };
 
-  const filteredWorkersForDialog = workers.filter(w => {
+  const filteredWorkersForDialog = useMemo(() => workers.filter(w => {
     if (filterRoles.length > 0) {
       const workerRoleArr = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
       if (!filterRoles.some(r => workerRoleArr.includes(r))) return false;
@@ -422,7 +428,7 @@ export default function Yearly() {
       if (!passesAll) return false;
     }
     return true;
-  });
+  }), [workers, filterRoles, filterPopulations, filterTasks, taskQualifications]);
 
   const addAllFiltered = () => {
     const filteredIds = filteredWorkersForDialog.map(w => w.id);
