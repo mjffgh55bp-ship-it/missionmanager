@@ -236,7 +236,7 @@ export default function WorkerCell({
   return (
     <div 
       ref={containerRef} 
-      className={`relative w-full h-full min-h-full`} 
+      className="relative w-full h-full min-h-full" 
       style={{ height: '100%' }} 
       dir="rtl"
     >
