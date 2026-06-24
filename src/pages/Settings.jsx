@@ -568,8 +568,11 @@ export default function Settings() {
     await saveScheduleColumns(updated);
   };
 
-  const handleRemoveScheduleColumn = async (idx) => {
-    await saveScheduleColumns(scheduleColumns.filter((_, i) => i !== idx));
+  const handleRemoveScheduleColumn = async (mappingIdOrIdx) => {
+    const updated = typeof mappingIdOrIdx === "string"
+      ? scheduleColumns.filter(c => c.mapping_id !== mappingIdOrIdx)
+      : scheduleColumns.filter((_, i) => i !== mappingIdOrIdx);
+    await saveScheduleColumns(updated);
   };
 
   const handleAddOption = async (colIdx) => {
@@ -1284,7 +1287,7 @@ export default function Settings() {
             <div className="space-y-2">
               {scheduleColumns.length === 0 && <p className="text-sm text-gray-400" dir="rtl">לא הוגדרו עמודות</p>}
               {scheduleColumns.map((col, idx) => (
-                <div key={idx} className="border rounded-lg overflow-hidden">
+                <div key={col.mapping_id || idx} className="border rounded-lg overflow-hidden">
                   <div className="flex items-center justify-between px-3 py-2 bg-gray-50" dir="rtl">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm">{col.name}</span>
@@ -1306,7 +1309,7 @@ export default function Settings() {
                       <button onClick={() => setExpandedCol(expandedCol === idx ? null : idx)} className="text-gray-400 hover:text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-200">
                         {expandedCol === idx ? "סגור" : "אפשרויות"}
                       </button>
-                      <ConfirmDeleteButton onConfirm={() => handleRemoveScheduleColumn(idx)} />
+                      <ConfirmDeleteButton onConfirm={() => handleRemoveScheduleColumn(col.mapping_id || idx)} />
                     </div>
                   </div>
                   {expandedCol === idx && (
