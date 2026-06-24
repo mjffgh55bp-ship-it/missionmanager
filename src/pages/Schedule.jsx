@@ -108,6 +108,8 @@ export default function Schedule() {
     const saved = localStorage.getItem('schedule_highlighted_cells');
     return saved ? JSON.parse(saved) : {};
   });
+  const [dragSelectStart, setDragSelectStart] = useState(null);
+  const [isCtrlDragging, setIsCtrlDragging] = useState(false);
   const staticDataLoaded = useRef(false);
   const lastWeekStart = useRef(null);
   const initialLoadStarted = useRef(false);
@@ -766,6 +768,83 @@ export default function Schedule() {
     localStorage.setItem('schedule_highlighted_cells', JSON.stringify(newHighlighted));
   };
 
+  const handleTableMouseDown = (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    const cell = e.target.closest('[data-cell-key]');
+    if (!cell) return;
+    const cellKey = cell.getAttribute('data-cell-key');
+    if (!cellKey) return;
+    setDragSelectStart(cellKey);
+    setIsCtrlDragging(true);
+  };
+
+  const handleTableMouseMove = (e) => {
+    if (!isCtrlDragging || !dragSelectStart) return;
+    // Highlight on drag is visual feedback only; actual selection happens on mouse up
+  };
+
+  const handleTableMouseUp = (e) => {
+    if (!isCtrlDragging || !dragSelectStart) {
+      setDragSelectStart(null);
+      setIsCtrlDragging(false);
+      return;
+    }
+    const cell = e.target.closest('[data-cell-key]');
+    if (!cell) {
+      setDragSelectStart(null);
+      setIsCtrlDragging(false);
+      return;
+    }
+    const endCellKey = cell.getAttribute('data-cell-key');
+    if (!endCellKey) {
+      setDragSelectStart(null);
+      setIsCtrlDragging(false);
+      return;
+    }
+
+    // Parse row and column indices from cell keys
+    const parseKey = (key) => {
+      const [rowId, colIdx] = key.split('__');
+      return { rowId, colIdx: parseInt(colIdx, 10) };
+    };
+    const startParsed = parseKey(dragSelectStart);
+    const endParsed = parseKey(endCellKey);
+    const startRowIdx = templateRows.findIndex(r => r.id === startParsed.rowId);
+    const endRowIdx = templateRows.findIndex(r => r.id === endParsed.rowId);
+    const startCol = Math.min(startParsed.colIdx, endParsed.colIdx);
+    const endCol = Math.max(startParsed.colIdx, endParsed.colIdx);
+    const minRow = Math.min(startRowIdx, endRowIdx);
+    const maxRow = Math.max(startRowIdx, endRowIdx);
+
+    // Determine if toggling or deselecting
+    const firstCellKey = dragSelectStart;
+    const isCurrentlyHighlighted = !!highlightedCells[firstCellKey];
+    
+    const newHighlighted = { ...highlightedCells };
+    for (let r = minRow; r <= maxRow; r++) {
+      if (r < 0 || r >= templateRows.length) continue;
+      const row = templateRows[r];
+      for (let c = startCol; c <= endCol; c++) {
+        const cellKey = `${row.id}__${c}`;
+        if (isCurrentlyHighlighted) {
+          delete newHighlighted[cellKey];
+        } else {
+          newHighlighted[cellKey] = true;
+        }
+      }
+    }
+    setHighlightedCells(newHighlighted);
+    localStorage.setItem('schedule_highlighted_cells', JSON.stringify(newHighlighted));
+    
+    setDragSelectStart(null);
+    setIsCtrlDragging(false);
+  };
+
+  useEffect(() => {
+    window.addEventListener('mouseup', handleTableMouseUp);
+    return () => window.removeEventListener('mouseup', handleTableMouseUp);
+  }, [isCtrlDragging, dragSelectStart, templateRows, highlightedCells]);
+
   const weekStartStrForPublish = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
   const isCurrentWeekPublished = publishedWeeks.includes(weekStartStrForPublish);
 
@@ -1279,7 +1358,7 @@ export default function Schedule() {
                       </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto" onMouseDown={handleTableMouseDown} onMouseMove={handleTableMouseMove}>
                       <Table>
                         <TableHeader>
                           <DraggableColumnHeader
@@ -1371,11 +1450,13 @@ export default function Schedule() {
                                     </TableCell>
                                   )}
                                   {orderedColumns.map((col, idx) => {
-                                    const spanKey = `${rowIndex}_${idx}`;
-                                    const span = spanMap[spanKey] ?? 1;
-                                    if (span === 0) return null;
-                                     return (
-                                       <TableCell key={idx} dir="rtl" className="p-0 text-center" rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
+                                     const spanKey = `${rowIndex}_${idx}`;
+                                     const span = spanMap[spanKey] ?? 1;
+                                     if (span === 0) return null;
+                                     const cellKey = `${row.id}__${idx}`;
+                                     const isHighlighted = !!highlightedCells[cellKey];
+                                      return (
+                                        <TableCell key={idx} dir="rtl" data-cell-key={cellKey} className={`p-0 text-center cursor-pointer select-none ${isHighlighted ? 'bg-red-200/40' : ''}`} onClick={(e) => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey) { e.preventDefault(); toggleCellHighlight(row.id, idx); } }} rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
                                         {col.type === "worker" ? (
                                            <WorkerCell
                                              rowId={row.id}
