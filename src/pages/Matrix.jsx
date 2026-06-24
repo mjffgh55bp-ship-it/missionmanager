@@ -146,6 +146,9 @@ export default function Matrix() {
   const [summaryColWidths, setSummaryColWidths] = useState(() => {
     try { return JSON.parse(localStorage.getItem('matrix_summary_col_widths') || '{}'); } catch { return {}; }
   });
+  const [workerColWidth, setWorkerColWidth] = useState(() => {
+    try { return parseInt(localStorage.getItem('matrix_worker_col_width') || '170', 10); } catch { return 170; }
+  });
   const [workerOrder, setWorkerOrder] = useState(() => {
     try { return JSON.parse(localStorage.getItem('matrix_worker_order') || 'null'); } catch { return null; }
   });
@@ -153,11 +156,14 @@ export default function Matrix() {
   const totalMins = viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES;
 
   const fixedColumnsWidth = useMemo(() => {
-    return WORKER_COL_WIDTH +
+    const summaryTotal = viewMode === 'weekly'
+      ? summaryColumns.reduce((sum, col) => sum + (summaryColWidths[col.id] || 60), 0)
+      : 0;
+    return workerColWidth +
       (viewMode === 'weekly' ? AVAILABILITY_STATS_COL_WIDTH : 0) +
-      (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH : 0) +
+      summaryTotal +
       (viewMode === 'weekly' ? SUMMARY_ADD_COL_WIDTH : 0);
-  }, [viewMode, summaryColumns]);
+  }, [viewMode, summaryColumns, summaryColWidths, workerColWidth]);
 
   const ppm = useMemo(() => {
     if (!containerWidth) return 1;
@@ -333,9 +339,13 @@ export default function Matrix() {
     const cw = sc.clientWidth;
     if (!cw) return;
 
-    const fixedW = pinned ? 0 : (WORKER_COL_WIDTH +
+    const summaryTotal = viewMode === 'weekly'
+      ? summaryColumns.reduce((sum, col) => sum + (summaryColWidths[col.id] || 60), 0)
+      : 0;
+    const fixedW = pinned ? 0 : (workerColWidth +
       (viewMode === 'weekly' ? AVAILABILITY_STATS_COL_WIDTH : 0) +
-      (viewMode === 'weekly' ? summaryColumns.length * SUMMARY_COL_WIDTH + SUMMARY_ADD_COL_WIDTH : 0));
+      summaryTotal +
+      (viewMode === 'weekly' ? SUMMARY_ADD_COL_WIDTH : 0));
     const available = Math.max(300, cw - fixedW);
     const ppmFit = available / totalMins;
     const newPpm = Math.max(ppmFit, newPpmRaw);
@@ -1991,6 +2001,13 @@ export default function Matrix() {
     [currentDate]
   );
 
+  // ── Worker column resize ──────────────────────────────────────────────────────
+  const handleWorkerColResize = (newWidth) => {
+    const clamped = Math.max(100, Math.min(400, newWidth));
+    setWorkerColWidth(clamped);
+    try { localStorage.setItem('matrix_worker_col_width', String(clamped)); } catch {}
+  };
+
   // ── Summary column helpers ────────────────────────────────────────────────────
   const handleSummaryColReorder = (newCols) => {
     saveSummaryColumns(newCols);
@@ -2292,7 +2309,7 @@ export default function Matrix() {
   };
 
   const sharedLayoutProps = {
-    togglePin, fixedColumnsWidth, WORKER_COL_WIDTH, viewMode, workers, sendingWhatsApp,
+    togglePin, fixedColumnsWidth, WORKER_COL_WIDTH: workerColWidth, workerColWidth, handleWorkerColResize, viewMode, workers, sendingWhatsApp,
     getWorkerSendStatus, sendWhatsAppNotification, setSelectedWorkerForNotification,
     setNotificationNotes, setShowNotificationDialog, isCurrentWeekPublished, handleTogglePublish,
     togglingPublish, refreshWorkers, summaryColumns, setShowSummaryColumnsDialog,

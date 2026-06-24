@@ -25,8 +25,21 @@ export function PinnedLayout({
   renderTimelineRow, satAssigned, satAvail, satUnavail, allTemplates, isStandbyStatus,
   summaryColWidths, handleSummaryColReorder, handleSummaryColResize,
   handleWorkerDragStart, handleWorkerDrop, SummaryColumnsHeaderComponent,
+  handleWorkerColResize,
 }) {
   const [dragOverWorkerId, setDragOverWorkerId] = useState(null);
+
+  const startWorkerColResize = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = WORKER_COL_WIDTH;
+    const onMove = (ev) => handleWorkerColResize(startW + (startX - ev.clientX));
+    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   return (
     <div className="flex flex-1 min-h-0" dir="rtl">
       <div className="flex flex-col flex-shrink-0 bg-white z-20" style={{ width: `${fixedColumnsWidth}px`, boxShadow: '-4px 0 8px rgba(0,0,0,0.06)', borderLeft: '1px solid #e5e7eb' }}>
@@ -41,6 +54,8 @@ export function PinnedLayout({
                 onSendEmail={async (vw) => { for (const w of vw) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
                 sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
                 isWeekPublished={isCurrentWeekPublished} onTogglePublish={handleTogglePublish} togglingPublish={togglingPublish} />
+              {/* Worker column resize handle */}
+              <div className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize z-20 hover:bg-blue-300 hover:opacity-60" onMouseDown={startWorkerColResize} />
             </div>
             {viewMode === 'weekly' && <AvailabilityStatsHeader />}
             {viewMode === 'weekly' && SummaryColumnsHeaderComponent && (
@@ -80,7 +95,7 @@ export function PinnedLayout({
                   </div>
                   {viewMode === 'weekly' && <AvailabilityStatsCell workerId={worker.id} availabilities={availabilities} weekStartDate={weekStartDate} />}
                   {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index, isSelected))}
-                  {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${rowBg}`} />}
+                  {viewMode === 'weekly' && <div className={`w-7 min-w-7 border-r h-full ${rowBg}`} />}
                 </div>
               );
             })}
@@ -118,8 +133,20 @@ export function ClassicLayout({
   weekStartDate, renderSummaryCell, renderWorkerCellContent, handleRowClick,
   summaryColWidths, handleSummaryColReorder, handleSummaryColResize,
   handleWorkerDragStart, handleWorkerDrop, SummaryColumnsHeaderComponent,
+  handleWorkerColResize,
 }) {
   const [dragOverWorkerId, setDragOverWorkerId] = useState(null);
+
+  const startWorkerColResize = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = WORKER_COL_WIDTH;
+    const onMove = (ev) => handleWorkerColResize(startW + (startX - ev.clientX));
+    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
   return (
     <div ref={scrollContainerRef} dir="ltr" className="overflow-x-auto overflow-y-auto flex-1 min-h-0 matrix-scroll-container" onMouseDown={handlePointerDown} onMouseMove={handlePointerMove} onMouseUp={handlePointerUp}>
       <div style={{ display: 'flex', flexDirection: 'row' }}>
@@ -154,6 +181,8 @@ export function ClassicLayout({
                   onSendEmail={async (vw) => { for (const w of vw) { setSelectedWorkerForNotification(w); setNotificationNotes(""); setShowNotificationDialog(true); await new Promise(r => setTimeout(r, 100)); } }}
                   sendingWhatsApp={sendingWhatsApp} onUpdate={refreshWorkers}
                   isWeekPublished={isCurrentWeekPublished} onTogglePublish={handleTogglePublish} togglingPublish={togglingPublish} />
+                {/* Worker column resize handle */}
+                <div className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize z-20 hover:bg-blue-300 hover:opacity-60" onMouseDown={startWorkerColResize} />
               </div>
               {viewMode === 'weekly' && <AvailabilityStatsHeader />}
               {viewMode === 'weekly' && SummaryColumnsHeaderComponent && (
@@ -192,7 +221,7 @@ export function ClassicLayout({
                   </div>
                   {viewMode === 'weekly' && <AvailabilityStatsCell workerId={worker.id} availabilities={availabilities} weekStartDate={weekStartDate} />}
                   {viewMode === 'weekly' && summaryColumns.map(col => renderSummaryCell(worker, col, index, isSelected))}
-                  {viewMode === 'weekly' && <div className={`w-[28px] min-w-[28px] border-r h-full ${rowBg}`} />}
+                  {viewMode === 'weekly' && <div className={`w-7 min-w-7 border-r h-full ${rowBg}`} />}
                 </div>
               );
             })}
