@@ -11,7 +11,7 @@ const MIN_H = 150;
 export default function TrackerLayoutArea({
   trackers,
   workers, assignments, templateRows, allTemplates,
-  populations, workerRoles, scheduleColumns, qualifications, workerQualifications = [],
+  populations, workerRoles, scheduleColumns, qualifications, workerQualifications = [], shiftStatuses = [],
   onDeleteTracker, onUpdatedTracker,
 }) {
   const STORAGE_KEY = "tracker_layout_positions";
@@ -183,6 +183,7 @@ export default function TrackerLayoutArea({
               scheduleColumns={scheduleColumns}
               qualifications={qualifications}
               workerQualifications={workerQualifications}
+              shiftStatuses={shiftStatuses}
               onDelete={() => onDeleteTracker(tracker.id)}
               onUpdated={onUpdatedTracker}
               onDragStart={(e) => startDrag(e, tracker.id)}

@@ -33,6 +33,7 @@ export default function Reports() {
   const [taskQualifications, setTaskQualifications] = useState({});
   const [qualifications, setQualifications] = useState([]);
   const [workerQualifications, setWorkerQualifications] = useState([]);
+  const [shiftStatuses, setShiftStatuses] = useState([]);
   const [trackerEditorOpen, setTrackerEditorOpen] = useState(false);
   const [editingTracker, setEditingTracker] = useState(null);
 
@@ -110,6 +111,8 @@ export default function Reports() {
     const tasksList = parseSetting(allSettings, "tasks_list", []) || [];
     const populationsRaw = parseSetting(allSettings, "worker_populations", []) || [];
     const workerRolesRaw = parseSetting(allSettings, "worker_roles", []) || [];
+    const shiftStatusesRaw = parseSetting(allSettings, "shift_statuses", []) || [];
+    setShiftStatuses(shiftStatusesRaw);
     const globalCols = parseSetting(allSettings, "custom_schedule_params", []) || [];
     const cartParams = parseSetting(allSettings, "cart_specific_params", {}) || {};
 
@@ -286,6 +289,7 @@ export default function Reports() {
               scheduleColumns={scheduleColumns}
               qualifications={qualifications}
               workerQualifications={workerQualifications}
+              shiftStatuses={shiftStatuses}
               onDeleteTracker={handleDeleteTracker}
               onUpdatedTracker={handleTrackerUpdated}
             />
@@ -348,6 +352,7 @@ export default function Reports() {
         qualifications={qualifications}
         populations={populations}
         workerRoles={workerRoles}
+        shiftStatuses={shiftStatuses}
       />
 
       <ChartBuilder

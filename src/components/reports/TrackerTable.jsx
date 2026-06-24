@@ -971,6 +971,12 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             const dayNum = String(new Date(date + "T12:00:00").getDay());
             return c.include.includes(dayNum);
           }
+        if (c.col_name === "__סטטוס_משמרת__") {
+            const statusVal = assignmentObj?.status || vals?.status || "";
+            if (!statusVal) return false;
+            const aliases = getStatusAliases(statusVal);
+            return c.include.some(v => aliases.includes(v));
+          }
         if (c.col_name === TASK_COL) {
             const tq = assignmentObj?.qualification_id || "";
             const tv = String(vals?.["משימה"] || "");
