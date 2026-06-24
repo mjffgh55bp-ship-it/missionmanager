@@ -9,7 +9,7 @@ import { Plus, Trash2, Pencil, X, Copy, UserCheck, Users, GripVertical, Eye, Eye
 import { format, addDays, subDays, startOfWeek, differenceInDays } from "date-fns";
 import { getHebrewDate } from "../components/utils/HebrewDate";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import toast from 'react-hot-toast';
 
 const HEBREW_MONTHS = ["ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
@@ -1038,6 +1038,26 @@ export default function Schedule() {
         ) : (
           <DragDropContext onDragEnd={(result) => {
             if (!result.destination || !editMode) return;
+            if (result.type === 'ROW') {
+              const groupKey = result.source.droppableId.replace(/^rows-/, '');
+              const grp = groupedMokeds.find(g => g.key === groupKey);
+              if (!grp) return;
+              const rows = [...grp.rows];
+              const [movedRow] = rows.splice(result.source.index, 1);
+              rows.splice(result.destination.index, 0, movedRow);
+              setTemplateRows(prev => {
+                const next = [...prev];
+                rows.forEach((r, i) => {
+                  const idx = next.findIndex(x => x.id === r.id);
+                  if (idx !== -1) next[idx] = { ...next[idx], values: { ...(next[idx].values || {}), _order: i } };
+                });
+                return next;
+              });
+              rows.forEach((r, i) => {
+                base44.entities.TemplateRow.update(r.id, { values: { ...(r.values || {}), _order: i } }).catch(() => {});
+              });
+              return;
+            }
             // Build the full ordered list including the notes item
             const allItems = buildOrderedItems(groupedMokeds, mokedOrder);
             const keys = allItems.map(item => item.type === 'notes' ? '__notes__' : item.group.key);
@@ -1045,7 +1065,7 @@ export default function Schedule() {
             keys.splice(result.destination.index, 0, removed);
             saveMokedOrder(keys);
           }}>
-            <Droppable droppableId="moked-list">
+            <Droppable droppableId="moked-list" type="MOKED">
               {(provided) => (
                 <div className="space-y-4" ref={provided.innerRef} {...provided.droppableProps}>
                   {(() => {
@@ -1272,7 +1292,9 @@ export default function Schedule() {
                             onAddColumn={() => { setSelectedTemplate(template); setShowAddTemplateColumnDialog(true); }}
                           />
                         </TableHeader>
-                          <TableBody>
+                          <Droppable droppableId={`rows-${group.key}`} type="ROW">
+                          {(rowsProvided) => (
+                          <TableBody ref={rowsProvided.innerRef} {...rowsProvided.droppableProps}>
                             {templateRowsForTemplate.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={orderedColumns.length + 3} className="text-center text-gray-500 py-8" dir="rtl">
@@ -1306,44 +1328,13 @@ export default function Schedule() {
                                 }
                               });
                               return templateRowsForTemplate.map((row, rowIndex) => (
-                                <TableRow key={row.id} className={`h-8 ${row.values?.is_continuation ? "bg-orange-50" : ""}`}>
+                                <Draggable key={row.id} draggableId={`row-${row.id}`} index={rowIndex} isDragDisabled={!editMode}>
+                                {(rowDrag, rowSnap) => (
+                                <TableRow ref={rowDrag.innerRef} {...rowDrag.draggableProps} className={`h-8 ${row.values?.is_continuation ? "bg-orange-50" : ""} ${rowSnap.isDragging ? "opacity-70 bg-blue-50" : ""}`}>
                                   {editMode && (
-                                    <TableCell className="w-[60px] p-0">
-                                      <div className="flex flex-col gap-0 items-center">
-                                       <Button size="icon" variant="ghost" className="h-4 w-4" disabled={rowIndex === 0}
-                                         onClick={async () => {
-                                           const rows = [...templateRowsForTemplate];
-                                           const a = rows[rowIndex];
-                                           const b = rows[rowIndex - 1];
-                                           const aOrder = a.values?._order ?? rowIndex;
-                                           const bOrder = b.values?._order ?? (rowIndex - 1);
-                                           const aNew = { ...a.values, _order: bOrder };
-                                           const bNew = { ...b.values, _order: aOrder };
-                                           recordChange({ rowId: a.id, beforeValues: a.values || {}, afterValues: aNew });
-                                           recordChange({ rowId: b.id, beforeValues: b.values || {}, afterValues: bNew });
-                                           await base44.entities.TemplateRow.update(a.id, { values: aNew });
-                                           await base44.entities.TemplateRow.update(b.id, { values: bNew });
-                                           loadData();
-                                         }}>
-                                         <ChevronUp className="w-3 h-3" />
-                                       </Button>
-                                       <Button size="icon" variant="ghost" className="h-4 w-4" disabled={rowIndex === templateRowsForTemplate.length - 1}
-                                         onClick={async () => {
-                                           const rows = [...templateRowsForTemplate];
-                                           const a = rows[rowIndex];
-                                           const b = rows[rowIndex + 1];
-                                           const aOrder = a.values?._order ?? rowIndex;
-                                           const bOrder = b.values?._order ?? (rowIndex + 1);
-                                           const aNew = { ...a.values, _order: bOrder };
-                                           const bNew = { ...b.values, _order: aOrder };
-                                           recordChange({ rowId: a.id, beforeValues: a.values || {}, afterValues: aNew });
-                                           recordChange({ rowId: b.id, beforeValues: b.values || {}, afterValues: bNew });
-                                           await base44.entities.TemplateRow.update(a.id, { values: aNew });
-                                           await base44.entities.TemplateRow.update(b.id, { values: bNew });
-                                           loadData();
-                                         }}>
-                                         <ChevronDown className="w-3 h-3" />
-                                       </Button>
+                                    <TableCell className="w-[28px] p-0 text-center">
+                                      <div {...rowDrag.dragHandleProps} className="cursor-grab active:cursor-grabbing flex items-center justify-center h-full px-1 text-gray-400 hover:text-gray-600">
+                                        <GripVertical className="w-3.5 h-3.5" />
                                       </div>
                                     </TableCell>
                                   )}
@@ -1457,9 +1448,14 @@ export default function Schedule() {
                                     </TableCell>
                                   )}
                                 </TableRow>
-                              ));
-                            })()}
-                          </TableBody>
+                                )}
+                                </Draggable>
+                                ));
+                                })()}
+                                {rowsProvided.placeholder}
+                                </TableBody>
+                                )}
+                                </Droppable>
                         </Table>
                       </div>
                       {editMode && (
