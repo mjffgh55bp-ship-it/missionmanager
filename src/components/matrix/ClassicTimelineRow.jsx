@@ -44,6 +44,7 @@ function ClassicTimelineRow({
   handleShiftDoubleClick,
   canManage,
   onEditUnavail,
+  resolveStatusName,
 }) {
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
 
@@ -56,16 +57,17 @@ function ClassicTimelineRow({
     const widthPx = Math.max(endPx - startPx, 2);
     if (startPx < 0 || startPx > timelineWidth) return null;
     const isTemplate = assignment.isTemplateShift;
+    const resolvedStatus = resolveStatusName ? resolveStatusName(assignment.status) : assignment.status;
     const standby = isStandbyStatus(assignment.status);
     if (standby) {
       const borderColor = isTemplate ? '#a855f7' : '#3b82f6';
       return (
         <TooltipProvider><Tooltip><TooltipTrigger asChild>
           <div className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden" style={{ right: `${startPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px dashed ${borderColor}` }}>
-            <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{assignment.status}</span>
+            <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{resolvedStatus}</span>
           </div>
         </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
-          <p className="font-bold">{assignment.food_cart_name}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p><p>סטטוס כוננות: {assignment.status}</p>
+          <p className="font-bold">{assignment.food_cart_name}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p><p>סטטוס כוננות: {resolvedStatus}</p>
         </TooltipContent></Tooltip></TooltipProvider>
       );
     }
@@ -73,10 +75,10 @@ function ClassicTimelineRow({
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
         <div className={`absolute border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${startPx}px`, width: `${widthPx}px`, top: '15%', height: '70%' }}>
           {!isTemplate && <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>}
-          {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
+          {resolvedStatus && <span className="text-white text-[8px] truncate">{resolvedStatus}</span>}
         </div>
       </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
-        <p className="font-bold">{assignment.food_cart_name}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p>{assignment.status && <p>סטטוס: {assignment.status}</p>}
+        <p className="font-bold">{assignment.food_cart_name}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p>{resolvedStatus && <p>סטטוס: {resolvedStatus}</p>}
       </TooltipContent></Tooltip></TooltipProvider>
     );
   };
@@ -151,7 +153,8 @@ function ClassicTimelineRow({
           const assE = getOperationalEndMinutes(ass.start_time, ass.end_time);
           const overS = Math.max(avS, assS), overE = Math.min(avE, assE);
           const totalM = avE - avS;
-          return <div key={i} className="absolute top-0 h-full" style={{ left: `${((overS - avS) / totalM) * 100}%`, width: `${((overE - overS) / totalM) * 100}%`, backgroundColor: isStandbyStatus(ass.status) ? 'rgba(200,200,210,0.55)' : 'rgba(192,132,252,0.55)', pointerEvents: 'none' }} />;
+          const resolvedAssStatus = resolveStatusName ? resolveStatusName(ass.status) : ass.status;
+          return <div key={i} className="absolute top-0 h-full" style={{ left: `${((overS - avS) / totalM) * 100}%`, width: `${((overE - overS) / totalM) * 100}%`, backgroundColor: isStandbyStatus(resolvedAssStatus) ? 'rgba(200,200,210,0.55)' : 'rgba(192,132,252,0.55)', pointerEvents: 'none' }} />;
         })}
       </div>
     );

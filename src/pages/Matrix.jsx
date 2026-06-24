@@ -648,7 +648,7 @@ export default function Matrix() {
       setQualifications((qualsData || []).map(q => ({ id: q.id, name: q.name })));
       setWorkerQualifications(workerQualsData || []);
       const rawStatuses = parseSetting("shift_statuses") || [];
-      setShiftStatuses(rawStatuses.map(s => (typeof s === "string" ? s : s.name)));
+      setShiftStatuses(rawStatuses.map(s => (typeof s === "string" ? { name: s, mapping_id: s } : { name: s.name, mapping_id: s.mapping_id || s.name })));
       setSummaryColumns(parseSetting("matrix_summary_columns") || []);
       setScheduleParams(parseSetting("custom_schedule_params") || []);
 
@@ -1030,7 +1030,17 @@ export default function Matrix() {
     return unavailabilities.filter(u => u.worker_id === workerId && u.date === targetDate);
   };
 
-  const isStandbyStatus = (status) => /^\d+[׳']/.test(status || '');
+  // Resolve a raw status value (which may be a mapping_id like "status_05") to its display name
+  const resolveStatusName = (status) => {
+    if (!status) return status;
+    const found = shiftStatuses.find(s => s.mapping_id === status || s.name === status);
+    return found ? found.name : status;
+  };
+
+  const isStandbyStatus = (status) => {
+    const name = resolveStatusName(status);
+    return /^\d+[׳']/.test(name || '');
+  };
 
   const getWorkerSendStatus = (worker) => {
     const allAssigned = [...getWorkerTemplateShifts(worker.id), ...getWorkerExtraTaskShifts(worker.id)];
@@ -1673,16 +1683,17 @@ export default function Matrix() {
     const rightPx = startPx;
     if (endPx < 0 || startPx > timelineWidth) return null;
     const isTemplate = assignment.isTemplateShift;
+    const resolvedStatus = resolveStatusName(assignment.status);
     const standby = isStandbyStatus(assignment.status);
     if (standby) {
       const borderColor = isTemplate ? '#a855f7' : '#3b82f6';
       return (
         <TooltipProvider><Tooltip><TooltipTrigger asChild>
           <div className="absolute h-full rounded-sm z-20 flex items-center justify-center px-1 overflow-hidden" style={{ right: `${rightPx}px`, width: `${widthPx}px`, backgroundColor: 'transparent', border: `2px dashed ${borderColor}` }}>
-            <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{assignment.status}</span>
+            <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{resolvedStatus}</span>
           </div>
         </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
-          <p className="font-bold">{assignment.food_cart_name}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p><p>סטטוס כוננות: {assignment.status}</p>
+          <p className="font-bold">{assignment.food_cart_name}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p><p>סטטוס כוננות: {resolvedStatus}</p>
         </TooltipContent></Tooltip></TooltipProvider>
       );
     }
@@ -1690,10 +1701,10 @@ export default function Matrix() {
       <TooltipProvider><Tooltip><TooltipTrigger asChild>
          <div className={`absolute border-r-2 rounded-sm flex flex-col items-center justify-center px-2 overflow-hidden z-20 ${isTemplate ? "bg-purple-400 border-purple-600" : assignment.has_trainee ? "bg-orange-400 border-orange-600" : "bg-blue-400 border-blue-600"}`} style={{ right: `${rightPx}px`, width: `${widthPx}px`, top: '8%', height: '84%' }}>
           {!isTemplate && <span className="text-white text-xs font-medium truncate">{assignment.hours}h</span>}
-          {assignment.status && <span className="text-white text-[8px] truncate">{assignment.status}</span>}
+          {resolvedStatus && <span className="text-white text-[8px] truncate">{resolvedStatus}</span>}
         </div>
       </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
-        <p className="font-bold">{assignment.food_cart_name}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p>{assignment.status && <p>סטטוס: {assignment.status}</p>}
+        <p className="font-bold">{assignment.food_cart_name}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p>{resolvedStatus && <p>סטטוס: {resolvedStatus}</p>}
       </TooltipContent></Tooltip></TooltipProvider>
     );
   };
