@@ -35,8 +35,6 @@ export default function WorkerCell({
   currentValue,
   currentRowValues,
   workers,
-  isHighlighted_prop = false,
-  onHighlightToggle,
   workerRoles,
   roleFilter,
   availabilities,
@@ -234,12 +232,11 @@ export default function WorkerCell({
   const isCurrentDoubleBooked = selectedWorker ? isWorkerDoubleBooked(selectedWorker.id) : false;
 
   const existingComment = selectedWorker ? getWorkerComment(selectedWorker.id) : "";
-  const isHighlighted = isHighlighted_prop;
 
   return (
     <div 
       ref={containerRef} 
-      className={`relative w-full h-full min-h-full ${isHighlighted ? "bg-red-200/40" : ""}`} 
+      className={`relative w-full h-full min-h-full`} 
       style={{ height: '100%' }} 
       dir="rtl"
     >
@@ -265,12 +262,7 @@ export default function WorkerCell({
         <div className="relative group w-full h-full">
           <button
             onClick={(e) => {
-              if (e.ctrlKey || e.metaKey) {
-                e.preventDefault();
-                onHighlightToggle?.();
-              } else {
-                setEditing(true);
-              }
+              setEditing(true);
             }}
             onContextMenu={(e) => {
               if (!selectedWorker) return;

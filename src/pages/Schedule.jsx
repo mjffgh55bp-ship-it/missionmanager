@@ -110,6 +110,7 @@ export default function Schedule() {
   });
   const [dragSelectStart, setDragSelectStart] = useState(null);
   const [isCtrlDragging, setIsCtrlDragging] = useState(false);
+  const [dragPreviewCells, setDragPreviewCells] = useState(new Set());
   const staticDataLoaded = useRef(false);
   const lastWeekStart = useRef(null);
   const initialLoadStarted = useRef(false);
@@ -776,33 +777,17 @@ export default function Schedule() {
     if (!cellKey) return;
     setDragSelectStart(cellKey);
     setIsCtrlDragging(true);
+    setDragPreviewCells(new Set([cellKey]));
   };
 
   const handleTableMouseMove = (e) => {
     if (!isCtrlDragging || !dragSelectStart) return;
-    // Highlight on drag is visual feedback only; actual selection happens on mouse up
-  };
-
-  const handleTableMouseUp = (e) => {
-    if (!isCtrlDragging || !dragSelectStart) {
-      setDragSelectStart(null);
-      setIsCtrlDragging(false);
-      return;
-    }
     const cell = e.target.closest('[data-cell-key]');
-    if (!cell) {
-      setDragSelectStart(null);
-      setIsCtrlDragging(false);
-      return;
-    }
+    if (!cell) return;
     const endCellKey = cell.getAttribute('data-cell-key');
-    if (!endCellKey) {
-      setDragSelectStart(null);
-      setIsCtrlDragging(false);
-      return;
-    }
+    if (!endCellKey) return;
 
-    // Parse row and column indices from cell keys
+    // Parse and calculate range for live preview
     const parseKey = (key) => {
       const [rowId, colIdx] = key.split('__');
       return { rowId, colIdx: parseInt(colIdx, 10) };
@@ -816,9 +801,54 @@ export default function Schedule() {
     const minRow = Math.min(startRowIdx, endRowIdx);
     const maxRow = Math.max(startRowIdx, endRowIdx);
 
-    // Determine if toggling or deselecting
-    const firstCellKey = dragSelectStart;
-    const isCurrentlyHighlighted = !!highlightedCells[firstCellKey];
+    const previewSet = new Set();
+    for (let r = minRow; r <= maxRow; r++) {
+      if (r < 0 || r >= templateRows.length) continue;
+      const row = templateRows[r];
+      for (let c = startCol; c <= endCol; c++) {
+        previewSet.add(`${row.id}__${c}`);
+      }
+    }
+    setDragPreviewCells(previewSet);
+  };
+
+  const handleTableMouseUp = (e) => {
+    if (!isCtrlDragging || !dragSelectStart) {
+      setDragSelectStart(null);
+      setIsCtrlDragging(false);
+      setDragPreviewCells(new Set());
+      return;
+    }
+    const cell = e.target.closest('[data-cell-key]');
+    if (!cell) {
+      setDragSelectStart(null);
+      setIsCtrlDragging(false);
+      setDragPreviewCells(new Set());
+      return;
+    }
+    const endCellKey = cell.getAttribute('data-cell-key');
+    if (!endCellKey) {
+      setDragSelectStart(null);
+      setIsCtrlDragging(false);
+      setDragPreviewCells(new Set());
+      return;
+    }
+
+    // Apply the selection
+    const parseKey = (key) => {
+      const [rowId, colIdx] = key.split('__');
+      return { rowId, colIdx: parseInt(colIdx, 10) };
+    };
+    const startParsed = parseKey(dragSelectStart);
+    const endParsed = parseKey(endCellKey);
+    const startRowIdx = templateRows.findIndex(r => r.id === startParsed.rowId);
+    const endRowIdx = templateRows.findIndex(r => r.id === endParsed.rowId);
+    const startCol = Math.min(startParsed.colIdx, endParsed.colIdx);
+    const endCol = Math.max(startParsed.colIdx, endParsed.colIdx);
+    const minRow = Math.min(startRowIdx, endRowIdx);
+    const maxRow = Math.max(startRowIdx, endRowIdx);
+
+    const isCurrentlyHighlighted = !!highlightedCells[dragSelectStart];
     
     const newHighlighted = { ...highlightedCells };
     for (let r = minRow; r <= maxRow; r++) {
@@ -838,11 +868,16 @@ export default function Schedule() {
     
     setDragSelectStart(null);
     setIsCtrlDragging(false);
+    setDragPreviewCells(new Set());
   };
 
   useEffect(() => {
+    window.addEventListener('mousemove', handleTableMouseMove);
     window.addEventListener('mouseup', handleTableMouseUp);
-    return () => window.removeEventListener('mouseup', handleTableMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleTableMouseMove);
+      window.removeEventListener('mouseup', handleTableMouseUp);
+    };
   }, [isCtrlDragging, dragSelectStart, templateRows, highlightedCells]);
 
   const weekStartStrForPublish = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
@@ -1358,7 +1393,7 @@ export default function Schedule() {
                       </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                    <div className="overflow-x-auto" onMouseDown={handleTableMouseDown} onMouseMove={handleTableMouseMove}>
+                    <div className="overflow-x-auto" onMouseDown={handleTableMouseDown}>
                       <Table>
                         <TableHeader>
                           <DraggableColumnHeader
@@ -1455,8 +1490,9 @@ export default function Schedule() {
                                      if (span === 0) return null;
                                      const cellKey = `${row.id}__${idx}`;
                                      const isHighlighted = !!highlightedCells[cellKey];
+                                     const isDragPreview = dragPreviewCells.has(cellKey);
                                       return (
-                                        <TableCell key={idx} dir="rtl" data-cell-key={cellKey} className={`p-0 text-center cursor-pointer select-none ${isHighlighted ? 'bg-red-200/40' : ''}`} onClick={(e) => { if ((e.ctrlKey || e.metaKey) && !e.shiftKey) { e.preventDefault(); toggleCellHighlight(row.id, idx); } }} rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
+                                        <TableCell key={idx} dir="rtl" data-cell-key={cellKey} className={`p-0 text-center cursor-pointer select-none transition-colors ${isHighlighted ? 'bg-red-200/40' : isDragPreview ? 'bg-red-100/60' : ''}`} onClick={(e) => { if ((e.ctrlKey || e.metaKey) && !isCtrlDragging && !dragSelectStart) { e.preventDefault(); toggleCellHighlight(row.id, idx); } }} rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
                                         {col.type === "worker" ? (
                                            <WorkerCell
                                              rowId={row.id}
@@ -1473,8 +1509,6 @@ export default function Schedule() {
                                              rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
                                              taskQualifiedWorkerIds={(() => { const key = col.task_name || (row.values?.task); if (!key) return undefined; const tObj = typeof key === 'string' ? tasksList.find(tt => (typeof tt === 'object' ? tt.name : tt) === key) || key : key; const q = getTaskQuals(taskQualifications, tObj); return Object.values(q).flat(); })()}
                                              workerDayAssignments={workerDayAssignments}
-                                             isHighlighted_prop={!!highlightedCells[`${row.id}__${col.name}`]}
-                                             onHighlightToggle={() => toggleCellHighlight(row.id, col.name)}
                                              onSaved={(workerId) => {
                                              const newValues = { ...row.values, [col.name]: workerId };
                                              recordChange({ rowId: row.id, beforeValues: row.values || {}, afterValues: newValues });
