@@ -1681,6 +1681,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           scheduleColumns={scheduleColumns}
           qualifications={qualifications}
           workerRoles={workerRoles}
+          shiftStatuses={shiftStatuses}
           onSave={saveColConfig}
           onClose={() => setConfiguringCol(null)}
         />
