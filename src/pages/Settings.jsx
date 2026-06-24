@@ -49,6 +49,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const loadedRef = useRef(false);
+  const scheduleColsSettingIdRef = useRef(null); // cached record ID to avoid repeated filter queries
 
   useEffect(() => {
     if (!loadedRef.current) {
@@ -78,6 +79,7 @@ export default function Settings() {
       if (rolesSettings.length > 0) setUserRoles(JSON.parse(rolesSettings[0].setting_value));
 
       if (scheduleColsSettings.length > 0) {
+        scheduleColsSettingIdRef.current = scheduleColsSettings[0].id;
         const loadedCols = JSON.parse(scheduleColsSettings[0].setting_value) || [];
         const needsSave = loadedCols.some(c => !c.mapping_id);
         const withIds = needsSave
@@ -420,9 +422,18 @@ export default function Settings() {
   const saveScheduleColumns = async (updated) => {
     const data = { setting_key: "custom_schedule_params", setting_value: JSON.stringify(updated) };
     await withRateLimitRetry(async () => {
-      const settings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
-      if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-      else await base44.entities.AppSettings.create(data);
+      if (scheduleColsSettingIdRef.current) {
+        await base44.entities.AppSettings.update(scheduleColsSettingIdRef.current, data);
+      } else {
+        const settings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
+        if (settings.length > 0) {
+          scheduleColsSettingIdRef.current = settings[0].id;
+          await base44.entities.AppSettings.update(settings[0].id, data);
+        } else {
+          const created = await base44.entities.AppSettings.create(data);
+          scheduleColsSettingIdRef.current = created.id;
+        }
+      }
     });
     setScheduleColumns(updated);
   };
