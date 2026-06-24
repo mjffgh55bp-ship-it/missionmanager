@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 
 const TASK_COL_NAME = "__משימה__";
 const TIME_RANGE_COL_NAME = "__טווח_שעות__";
+const WORKER_ROLE_COL_NAME = "__תפקיד__";
+const DAY_OF_WEEK_COL_NAME = "__ימי_שבוע__";
+const SHIFT_STATUS_COL_NAME = "__סטטוס_משמרת__";
+const DAY_OPTIONS = [
+  { value: "0", label: "ראשון" }, { value: "1", label: "שני" }, { value: "2", label: "שלישי" },
+  { value: "3", label: "רביעי" }, { value: "4", label: "חמישי" }, { value: "5", label: "שישי" }, { value: "6", label: "שבת" },
+];
 
 function TimeRangeSelector({ criterion, onUpdate }) {
   const timeRanges = (criterion.include || []).map(str => {
@@ -64,17 +71,26 @@ function TimeRangeSelector({ criterion, onUpdate }) {
   );
 }
 
-function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, onRemove }) {
+function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles = [], shiftStatuses = [], onUpdate, onRemove }) {
   const [showColPicker, setShowColPicker] = useState(!criterion.col_name);
 
   const isTaskCriterion = criterion.col_name === TASK_COL_NAME;
   const isTimeRangeCriterion = criterion.col_name === TIME_RANGE_COL_NAME;
+  const isRoleCriterion = criterion.col_name === WORKER_ROLE_COL_NAME;
+  const isDayOfWeekCriterion = criterion.col_name === DAY_OF_WEEK_COL_NAME;
+  const isShiftStatusCriterion = criterion.col_name === SHIFT_STATUS_COL_NAME;
   const sc = scheduleColumns.find(c => c.name === criterion.col_name);
 
   const availableOptions = isTaskCriterion
     ? qualifications.map(q => ({ value: q.id, label: q.name }))
     : isTimeRangeCriterion
     ? []
+    : isRoleCriterion
+    ? (workerRoles || []).map(r => (typeof r === "object" ? { value: r.mapping_id || r.name, label: r.name } : { value: r, label: r }))
+    : isDayOfWeekCriterion
+    ? DAY_OPTIONS
+    : isShiftStatusCriterion
+    ? (shiftStatuses || []).map(s => (typeof s === "object" ? { value: s.mapping_id || s.name, label: s.name } : { value: s, label: s }))
     : sc
       ? [
           ...(sc.options || []),
@@ -107,7 +123,7 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
     setShowColPicker(false);
   };
 
-  const displayName = isTaskCriterion ? "משימה" : isTimeRangeCriterion ? "טווח שעות" : (criterion.col_name || "בחר עמודה");
+  const displayName = isTaskCriterion ? "משימה" : isTimeRangeCriterion ? "טווח שעות" : isRoleCriterion ? "תפקיד" : isDayOfWeekCriterion ? "ימי שבוע" : isShiftStatusCriterion ? "סטטוס משמרת" : (criterion.col_name || "בחר עמודה");
 
   return (
     <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden mb-2">
@@ -189,7 +205,7 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, onUpdate, on
   );
 }
 
-export default function SummaryColumnsDialog({ open, onOpenChange, summaryColumns, saveSummaryColumns, shiftStatuses, scheduleParams, trackers, qualifications = [], allTemplates = [], templateRows = [] }) {
+export default function SummaryColumnsDialog({ open, onOpenChange, summaryColumns, saveSummaryColumns, shiftStatuses, scheduleParams, trackers, qualifications = [], allTemplates = [], templateRows = [], workerRoles = [] }) {
   const [editingColumn, setEditingColumn] = useState(null);
   const [draft, setDraft] = useState({ name: '', criteria: [], criteria_logic: 'or' });
   const [showCriteriaPicker, setShowCriteriaPicker] = useState(false);
@@ -267,6 +283,21 @@ export default function SummaryColumnsDialog({ open, onOpenChange, summaryColumn
     setShowCriteriaPicker(false);
   };
 
+  const addWorkerRoleCriterion = () => {
+    const newC = { id: Date.now().toString(), col_name: WORKER_ROLE_COL_NAME, col_type: "worker_role", include: [], logic: "or" };
+    update("criteria", [...(draft.criteria || []), newC]);
+    setShowCriteriaPicker(false);
+  };
+  const addDayOfWeekCriterion = () => {
+    const newC = { id: Date.now().toString(), col_name: DAY_OF_WEEK_COL_NAME, col_type: "day_of_week", include: [], logic: "or" };
+    update("criteria", [...(draft.criteria || []), newC]);
+    setShowCriteriaPicker(false);
+  };
+  const addShiftStatusCriterion = () => {
+    const newC = { id: Date.now().toString(), col_name: SHIFT_STATUS_COL_NAME, col_type: "shift_status", include: [], logic: "or" };
+    update("criteria", [...(draft.criteria || []), newC]);
+    setShowCriteriaPicker(false);
+  };
   const addTaskCriterion = () => {
     const newC = { id: Date.now().toString(), col_name: TASK_COL_NAME, col_type: "task", include: [], logic: "or" };
     update("criteria", [...(draft.criteria || []), newC]);
@@ -316,6 +347,9 @@ export default function SummaryColumnsDialog({ open, onOpenChange, summaryColumn
     return col.criteria.map(c => {
       if (c.col_name === TASK_COL_NAME) return `משימה`;
       if (c.col_name === TIME_RANGE_COL_NAME) return `טווח שעות`;
+      if (c.col_name === WORKER_ROLE_COL_NAME) return `תפקיד`;
+      if (c.col_name === DAY_OF_WEEK_COL_NAME) return `ימי שבוע`;
+      if (c.col_name === SHIFT_STATUS_COL_NAME) return `סטטוס משמרת`;
       const includeDesc = (c.include || []).length > 0 ? `: ${c.include.join(', ')}` : '';
       return `${c.col_name}${includeDesc}`;
     }).join(col.criteria_logic === 'and' ? ' וגם ' : ' או ');
@@ -348,6 +382,8 @@ export default function SummaryColumnsDialog({ open, onOpenChange, summaryColumn
               <CriterionRow criterion={c}
                 scheduleColumns={scheduleParams}
                 qualifications={qualifications}
+                workerRoles={workerRoles}
+                shiftStatuses={shiftStatuses}
                 onUpdate={(updated) => updateCriterion(c.id, updated)}
                 onRemove={() => removeCriterion(c.id)} />
               {idx < (draft.criteria || []).length - 1 && (
@@ -390,6 +426,22 @@ export default function SummaryColumnsDialog({ open, onOpenChange, summaryColumn
                   <button type="button" onClick={addTaskCriterion}
                     className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors font-medium border-b border-gray-200">
                     משימה
+                  </button>
+                )}
+                {(workerRoles && workerRoles.length > 0) && (
+                  <button type="button" onClick={addWorkerRoleCriterion}
+                    className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors font-medium border-b border-gray-200">
+                    תפקיד
+                  </button>
+                )}
+                <button type="button" onClick={addDayOfWeekCriterion}
+                  className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors font-medium border-b border-gray-200">
+                  ימי שבוע
+                </button>
+                {(shiftStatuses && shiftStatuses.length > 0) && (
+                  <button type="button" onClick={addShiftStatusCriterion}
+                    className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors font-medium border-b border-gray-200">
+                    סטטוס משמרת
                   </button>
                 )}
                 {scheduleParams.map(sc => (

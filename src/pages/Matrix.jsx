@@ -1726,7 +1726,7 @@ export default function Matrix() {
   };
 
   const columnCount = (workerId, column) => getWorkerColumnCount(column, workerId, {
-    templateRows, allTemplates, workerQualifications, currentDate, trackerEntries
+    templateRows, allTemplates, workerQualifications, currentDate, trackerEntries, workerRoles, shiftStatuses
   });
 
   const AssignmentBar = ({ assignment }) => {
@@ -2298,7 +2298,7 @@ export default function Matrix() {
           </button>
         </div>
 
-        <SummaryColumnsDialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog} summaryColumns={summaryColumns} saveSummaryColumns={saveSummaryColumns} shiftStatuses={shiftStatuses} scheduleParams={scheduleParams} trackers={trackers} qualifications={qualifications} allTemplates={allTemplates} templateRows={templateRows} />
+        <SummaryColumnsDialog open={showSummaryColumnsDialog} onOpenChange={setShowSummaryColumnsDialog} summaryColumns={summaryColumns} saveSummaryColumns={saveSummaryColumns} shiftStatuses={shiftStatuses} scheduleParams={scheduleParams} trackers={trackers} qualifications={qualifications} allTemplates={allTemplates} templateRows={templateRows} workerRoles={workerRoles} />
         <ViewPresetDialog
           open={showPresetDialog}
           onClose={() => { setShowPresetDialog(false); setEditingPreset(null); }}

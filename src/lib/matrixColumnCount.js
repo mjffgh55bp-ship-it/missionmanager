@@ -8,7 +8,49 @@ import { getOperationalMinutes, getOperationalEndMinutes } from "@/lib/operation
 /**
  * Evaluate a single criterion against a shift row.
  */
-export function evaluateCriterionForShift(criterion, shiftRow, workerId, workerQualifications) {
+export function evaluateCriterionForShift(criterion, shiftRow, workerId, workerQualifications, ctx = {}) {
+  // Day-of-week criterion (0=Sun..6=Sat)
+  if (criterion.col_name === "__ימי_שבוע__") {
+    const days = criterion.include || [];
+    if (days.length === 0) return true;
+    if (!shiftRow.date) return false;
+    const dayNum = String(new Date(shiftRow.date + "T12:00:00").getDay());
+    return days.includes(dayNum);
+  }
+
+  // Shift-status criterion — status id (status_NN) lives in row.values.status
+  if (criterion.col_name === "__סטטוס_משמרת__") {
+    const wanted = criterion.include || [];
+    if (wanted.length === 0) return true;
+    const statusVal = shiftRow.values?.status || "";
+    if (!statusVal) return false;
+    const localName = (ctx.statusNameById || {})[statusVal] || statusVal;
+    return wanted.includes(statusVal) || wanted.includes(localName);
+  }
+
+  // Role criterion — worker sits in a column bound to one of the wanted roles
+  if (criterion.col_name === "__תפקיד__") {
+    const wantedRoles = criterion.include || [];
+    if (wantedRoles.length === 0) return true;
+    const roleIdByName = ctx.roleIdByName || {};
+    const cols = ctx.template?.columns || [];
+    const colRoleId = (col) =>
+      col.role_mapping_id
+      || (col.role_filter && roleIdByName[String(col.role_filter).trim()])
+      || (col.name && roleIdByName[String(col.name).trim()])
+      || null;
+    for (const col of cols) {
+      if (col.type !== "worker") continue;
+      const val = shiftRow.values?.[col.name];
+      const inCol = val === workerId || (Array.isArray(val) && val.includes(workerId));
+      if (!inCol) continue;
+      const rid = colRoleId(col);
+      const ridName = rid && ctx.roleNameById ? ctx.roleNameById[rid] : null;
+      if (wantedRoles.includes(rid) || (ridName && wantedRoles.includes(ridName))) return true;
+    }
+    return false;
+  }
+
   // Task/qualification criterion
   if (criterion.col_name === "__משימה__") {
     const qualIds = criterion.include || [];
@@ -67,7 +109,17 @@ export function evaluateCriterionForShift(criterion, shiftRow, workerId, workerQ
 /**
  * Count shifts for a worker using the new criteria-based column format.
  */
-export function countWithCriteria(column, workerId, templateRows, allTemplates, workerQualifications, currentDate) {
+export function countWithCriteria(column, workerId, templateRows, allTemplates, workerQualifications, currentDate, workerRoles, shiftStatuses) {
+  if (workerRoles && !column._roleIdByName) {
+    const byName = {}; const byId = {};
+    (workerRoles || []).forEach(r => { if (typeof r === "object" && r.name && r.mapping_id) { byName[r.name.trim()] = r.mapping_id; byId[r.mapping_id] = r.name.trim(); } });
+    column._roleIdByName = byName; column._roleNameById = byId;
+  }
+  if (shiftStatuses && !column._statusNameById) {
+    const sById = {};
+    (shiftStatuses || []).forEach(s => { if (typeof s === "object" && s.name && s.mapping_id) sById[s.mapping_id] = s.name.trim(); });
+    column._statusNameById = sById;
+  }
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
   const weekStartStr = format(weekStart, 'yyyy-MM-dd');
   const weekEndStr = format(endOfWeek(currentDate, { weekStartsOn: 0 }), 'yyyy-MM-dd');
@@ -96,7 +148,7 @@ export function countWithCriteria(column, workerId, templateRows, allTemplates, 
     if (!assigned) return;
     assignedCount++;
 
-    const results = column.criteria.map(c => evaluateCriterionForShift(c, row, workerId, workerQualifications));
+    const results = column.criteria.map(c => evaluateCriterionForShift(c, row, workerId, workerQualifications, { template: tmpl, roleIdByName: column._roleIdByName, roleNameById: column._roleNameById, statusNameById: column._statusNameById }));
     const match = column.criteria_logic === 'and' ? results.every(Boolean) : results.some(Boolean);
     if (match) count++;
   });
