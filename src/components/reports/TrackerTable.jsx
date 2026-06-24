@@ -1178,19 +1178,29 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   };
 
   // Workers visible after population/role/qualification filter (for the worker picker)
-  const preFilteredWorkers = workers.filter(w => {
+  // Must use same role matching logic as filteredWorkersBase
+  const preFilteredWorkers = useMemo(() => workers.filter(w => {
     if (!w.active) return false;
     if (!popMatches(w.population, selectedPopulations)) return false;
     if (selectedRoles.length > 0) {
       const roles = Array.isArray(w.role) ? w.role : (w.role ? [w.role] : []);
-      if (!selectedRoles.some(r => roles.includes(r))) return false;
+      const roleMatches = selectedRoles.some(sr => {
+        if (roles.includes(sr)) return true;
+        const srName = roleNameById[sr];
+        if (srName && roles.includes(srName)) return true;
+        const srId = roleIdByName[sr];
+        if (srId && roles.includes(srId)) return true;
+        return false;
+      });
+      if (!roleMatches) return false;
     }
     if (selectedQualifications.length > 0) {
       const wqIds = workerQualifications.filter(wq => wq.worker_id === w.id).map(wq => wq.qualification_id);
       if (!selectedQualifications.some(qid => wqIds.includes(qid))) return false;
     }
     return true;
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [workers, selectedPopulations, selectedRoles, selectedQualifications, workerQualifications, roleNameById, roleIdByName]);
   const searchedWorkers = preFilteredWorkers.filter(w =>
     !workerSearch || (w.nickname || "").includes(workerSearch)
   );
@@ -1624,11 +1634,19 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   <Input value={workerSearch} onChange={e => setWorkerSearch(e.target.value)} placeholder="חיפוש עובד..." className="h-7 text-xs mb-1" dir="rtl" />
                   <div className="flex gap-2 mb-1">
                     <button type="button" className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                      onClick={() => setSelectedWorkerIds(prev => {
-                        const newIds = searchedWorkers.map(w => w.id);
-                        const existing = prev.filter(id => !searchedWorkers.some(w => w.id === id));
-                        return [...existing, ...newIds];
-                      })}>
+                      onClick={() => {
+                        // If no search active and all preFiltered are already shown, reset to "all"
+                        if (!workerSearch) {
+                          setSelectedWorkerIds([]);
+                        } else {
+                          // Add searched workers to selection (keep others)
+                          setSelectedWorkerIds(prev => {
+                            const base = prev.length === 0 ? preFilteredWorkers.map(w => w.id) : prev;
+                            const newIds = searchedWorkers.map(w => w.id);
+                            return [...new Set([...base, ...newIds])];
+                          });
+                        }
+                      }}>
                       בחר הכל ({searchedWorkers.length})
                     </button>
                     <button type="button" className="text-xs px-2 py-0.5 rounded bg-gray-400 text-white hover:bg-gray-500 transition-colors"
@@ -1644,10 +1662,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                           <input type="checkbox" checked={isChecked}
                             onChange={e => {
                               if (e.target.checked) {
-                                // Adding: if currently "all selected" (empty array), start explicit list from preFiltered minus this worker
                                 setSelectedWorkerIds(prev => prev.length === 0 ? [] : [...prev, w.id]);
                               } else {
-                                // Removing: if "all selected", expand to explicit list first
                                 setSelectedWorkerIds(prev => {
                                   const base = prev.length === 0 ? preFilteredWorkers.map(pw => pw.id) : prev;
                                   return base.filter(id => id !== w.id);
