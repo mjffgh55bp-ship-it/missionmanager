@@ -242,13 +242,12 @@ export function countLegacy(column, workerId, templateRows, allTemplates, curren
  * Main entry point: get count for a worker column.
  * Supports both old (criteria_type/criteria_value) and new (criteria array) formats.
  */
-export function getWorkerColumnCount(column, workerId, { templateRows, allTemplates, workerQualifications, currentDate, trackerEntries }) {
+export function getWorkerColumnCount(column, workerId, { templateRows, allTemplates, workerQualifications, currentDate, trackerEntries, workerRoles, shiftStatuses }) {
   if (column.criteria && Array.isArray(column.criteria) && column.criteria.length > 0) {
-    return countWithCriteria(column, workerId, templateRows, allTemplates, workerQualifications, currentDate);
+    return countWithCriteria(column, workerId, templateRows, allTemplates, workerQualifications, currentDate, workerRoles, shiftStatuses);
   }
   if (column.criteria && Array.isArray(column.criteria) && column.criteria.length === 0) {
-    // Empty criteria = count all shifts (same as no-criteria, but through criteria path)
-    return countWithCriteria(column, workerId, templateRows, allTemplates, workerQualifications, currentDate);
+    return countWithCriteria(column, workerId, templateRows, allTemplates, workerQualifications, currentDate, workerRoles, shiftStatuses);
   }
   return countLegacy(column, workerId, templateRows, allTemplates, currentDate, trackerEntries);
 }
