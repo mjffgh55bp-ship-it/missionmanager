@@ -9,15 +9,21 @@ export default function ScheduleNotes({ notes, height, editMode, onSave, onHeigh
   const [draft, setDraft] = useState(notes || "");
   const [expanded, setExpanded] = useState(false);
   const [resizing, setResizing] = useState(false);
+  const [localHeight, setLocalHeight] = useState(null);
   const resizeStartY = useRef(0);
   const resizeStartH = useRef(0);
   const textareaRef = useRef(null);
 
-  const displayHeight = height || DEFAULT_HEIGHT;
+  const displayHeight = localHeight ?? height ?? DEFAULT_HEIGHT;
 
   useEffect(() => {
     if (editing && textareaRef.current) textareaRef.current.focus();
   }, [editing]);
+
+  // sync local height when the saved height loads for the first time
+  useEffect(() => {
+    if (height && localHeight === null) setLocalHeight(height);
+  }, [height]);
 
   const handleSave = () => {
     onSave(draft);
@@ -42,9 +48,13 @@ export default function ScheduleNotes({ notes, height, editMode, onSave, onHeigh
     const onMove = (e) => {
       const delta = e.clientY - resizeStartY.current;
       const newH = Math.max(MIN_HEIGHT, resizeStartH.current + delta);
-      onHeightChange(newH);
+      setLocalHeight(newH); // update UI instantly, no API call
     };
-    const onUp = () => setResizing(false);
+    const onUp = () => {
+      setResizing(false);
+      // persist only once when the user releases the mouse
+      setLocalHeight(prev => { if (prev !== null) { onHeightChange(prev); } return prev; });
+    };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
     return () => { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); };
