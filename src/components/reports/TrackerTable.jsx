@@ -61,7 +61,7 @@ const DATE_MODES = [
 
 
 
-export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], workerQualifications = [], onDelete, onUpdated, onDragStart, cardHeight }) {
+export default function TrackerTable({ tracker: initialTracker, workers, assignments, templateRows, allTemplates, populations, workerRoles, scheduleColumns = [], qualifications = [], workerQualifications = [], shiftStatuses = [], onDelete, onUpdated, onDragStart, cardHeight }) {
   const [tracker, setTracker] = useState(initialTracker);
   const [entries, setEntries] = useState([]);
   const [editingCell, setEditingCell] = useState(null);
@@ -443,6 +443,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const TASK_COL = "__משימה__";
     const TIME_RANGE_COL = "__טווח_שעות__";
     const DAY_OF_WEEK_COL = "__ימי_שבוע__";
+    const SHIFT_STATUS_COL = "__סטטוס_משמרת__";
     const parseQuantJson = (raw) => {
       if (!raw) return {};
       if (typeof raw === "object") return raw;
@@ -568,6 +569,13 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             // Already filtered at worker level — always pass here
             return true;
           }
+          if (c.col_name === SHIFT_STATUS_COL) {
+            // Shift status stored as assignment.status or row.values.status (mapping_id or name)
+            const statusVal = assignmentObj?.status || vals?.status || "";
+            if (!statusVal) return false;
+            const aliases = getStatusAliases(statusVal);
+            return c.include.some(v => aliases.includes(v));
+          }
           if (c.col_name === TASK_COL) {
             // Task can be stored as:
             // 1. assignmentObj.qualification_id = ID of qualification
@@ -629,9 +637,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     }
 
     if (col.type === "schedule_col") {
+      // Shift status filter for this column (applies across both quant-sum and hours paths)
+      const scStatusCriteria = (col.criteria || []).filter(c => c.col_name === SHIFT_STATUS_COL && c.include?.length > 0);
+      const checkScStatus = (statusVal) => {
+        if (scStatusCriteria.length === 0) return true;
+        if (!statusVal) return false;
+        const aliases = getStatusAliases(statusVal);
+        return scStatusCriteria.every(c => c.include.some(v => aliases.includes(v)));
+      };
       // Check if this is a quantitative-sum mode: criteria targets a quantitative column (JSON values)
       const quantCriteria = (col.criteria || []).filter(c =>
-        c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0
+        c.col_name && c.col_name !== "__משימה__" && c.col_name !== SHIFT_STATUS_COL && c.include?.length > 0
       );
       const isQuantSum = quantCriteria.length > 0 && (() => {
         // Check if any templateRow has that column stored as JSON
@@ -661,6 +677,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         const includeItems = quantCriteria.flatMap(c => c.include);
         filtered.forEach(a => {
           if (!checkTimeRange(a.start_time, a.end_time)) return;
+          if (!checkScStatus(a.status)) return;
           if (!workerMatchesRoleInShift(a)) return;
           const raw = a.column_values?.[colName];
           if (!raw) return;
@@ -677,6 +694,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
           if (dateRange && (effectiveDate < dateRange.start || effectiveDate > dateRange.end)) return;
           if (!(tmpl.columns || []).some(tc => tc.type === "worker" && (row.values?.[tc.name] === workerId || (tc.column_id && row.values?.[tc.column_id] === workerId)))) return;
           if (!checkTimeRange(rowStartTime, rowEndTime)) return;
+          if (!checkScStatus(row.values?.status)) return;
           if (!workerMatchesRoleInShift(row, true, tmpl)) return;
           const raw = row.values?.[colName];
           if (!raw) return;
@@ -783,9 +801,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
         try { return JSON.parse(raw); } catch { return {}; }
       };
 
-      // Separate quantitative items criteria from time range criteria
-      const quantCriteria = (col.criteria || []).filter(c => c.col_name && c.col_name !== TIME_RANGE_COL && c.include?.length > 0);
+      // Separate quantitative items criteria from time range / shift status criteria
+      const quantCriteria = (col.criteria || []).filter(c => c.col_name && c.col_name !== TIME_RANGE_COL && c.col_name !== SHIFT_STATUS_COL && c.include?.length > 0);
       const timeRangeCriteria = (col.criteria || []).find(c => c.col_name === TIME_RANGE_COL);
+      const statusCriteria = (col.criteria || []).filter(c => c.col_name === SHIFT_STATUS_COL && c.include?.length > 0);
+      const checkStatusCriteria = (statusVal) => {
+        if (statusCriteria.length === 0) return true;
+        if (!statusVal) return false;
+        const aliases = getStatusAliases(statusVal);
+        return statusCriteria.every(c => c.include.some(v => aliases.includes(v)));
+      };
 
       const checkQuantCriteria = (vals) => {
         if (quantCriteria.length === 0) return true;
@@ -820,6 +845,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
        filtered.forEach(a => {
          if (!checkQuantCriteria(a.column_values)) return;
          if (!checkTimeRangeCriteria(a.start_time, a.end_time)) return;
+         if (!checkStatusCriteria(a.status)) return;
          if (!workerMatchesRoleInShift(a)) return;
 
          const raw = a.column_values?.[col.schedule_col_name]?.value || a.column_values?.[col.schedule_col_name];
@@ -842,6 +868,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
 
          if (!checkQuantCriteria(row.values)) return;
          if (!checkTimeRangeCriteria(startTime, endTime)) return;
+         if (!checkStatusCriteria(row.values?.status)) return;
          if (!workerMatchesRoleInShift(row, true, tmpl)) return;
 
          const raw = row.values?.[col.schedule_col_name];
@@ -1019,6 +1046,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     const mid = typeof r === "string" ? r : (r.mapping_id || r.name);
     if (name && mid) { roleIdByName[name.trim()] = mid; roleNameById[mid] = name.trim(); }
   });
+
+  // Shift status aliases: map any stored status value (mapping_id OR name) to all its equivalents
+  const statusAliasMap = {};
+  (shiftStatuses || []).forEach(s => {
+    const mid = typeof s === "string" ? s : (s?.mapping_id || s?.name);
+    const nm = typeof s === "string" ? s : s?.name;
+    const aliases = [mid, nm].filter(Boolean);
+    aliases.forEach(a => { statusAliasMap[a] = aliases; });
+  });
+  const getStatusAliases = (val) => statusAliasMap[val] || (val ? [val] : []);
 
   const popIdByName = {}; const popNameById = {};
   (populations || []).forEach(p => { if (typeof p === "string") return; if (p.name && p.mapping_id) { popIdByName[p.name.trim()] = p.mapping_id; popNameById[p.mapping_id] = p.name.trim(); } });
@@ -1369,7 +1406,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                 </div>
               );
             }
-            const quantCriteriaCheck = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
+            const quantCriteriaCheck = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.col_name !== "__סטטוס_משמרת__" && c.include?.length > 0);
             const isQuantSumCol = col.type === "schedule_col" && quantCriteriaCheck.length > 0;
             const showAsHours = col.type === "schedule_col" && !isQuantSumCol;
             const bgColor = typeof value === "number" ? getVisualColor(value, getEffectiveVisualConfig(col.id)) : null;
@@ -1486,7 +1523,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               const v = cellValueMap.get(`${col.id}_${w.id}`);
               return sum + (typeof v === "number" ? v : 0);
             }, 0);
-            const quantCriteriaCheckTotal = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.include?.length > 0);
+            const quantCriteriaCheckTotal = (col.criteria || []).filter(c => c.col_name && c.col_name !== "__משימה__" && c.col_name !== "__סטטוס_משמרת__" && c.include?.length > 0);
             const isQuantSumTotal = col.type === "schedule_col" && quantCriteriaCheckTotal.length > 0;
             const showAsHours = col.type === "schedule_col" && !isQuantSumTotal;
             return (

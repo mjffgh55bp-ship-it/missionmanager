@@ -8,6 +8,15 @@ const TASK_COL_NAME = "__משימה__";
 const TIME_RANGE_COL_NAME = "__טווח_שעות__";
 const WORKER_ROLE_COL_NAME = "__תפקיד__";
 const DAY_OF_WEEK_COL_NAME = "__ימי_שבוע__";
+const SHIFT_STATUS_COL_NAME = "__סטטוס_משמרת__";
+
+// Only schedule columns that have countable values defined in Settings
+// (options / sub-options / quantitative items). Columns that are just named
+// (no defined values) are NOT selectable as counting criteria.
+const isCountableScheduleColumn = (sc) =>
+  !!((sc.options && sc.options.length) ||
+     (sc.sub_options && sc.sub_options.length) ||
+     (sc.quantitative_items && sc.quantitative_items.length));
 
 const DAYS_OF_WEEK = [
   { value: "0", label: "ראשון" },
@@ -125,20 +134,28 @@ function TimeRangeSelector({ criterion, onUpdate }) {
   );
 }
 
-function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles, onUpdate, onRemove }) {
+function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles, shiftStatuses = [], onUpdate, onRemove }) {
   const [showColPicker, setShowColPicker] = useState(!criterion.col_name);
 
   const isTaskCriterion = criterion.col_name === TASK_COL_NAME;
   const isTimeRangeCriterion = criterion.col_name === TIME_RANGE_COL_NAME;
   const isRoleCriterion = criterion.col_name === WORKER_ROLE_COL_NAME;
   const isDayOfWeekCriterion = criterion.col_name === DAY_OF_WEEK_COL_NAME;
+  const isShiftStatusCriterion = criterion.col_name === SHIFT_STATUS_COL_NAME;
   const sc = scheduleColumns.find(c => c.name === criterion.col_name);
+  const countableScheduleColumns = scheduleColumns.filter(isCountableScheduleColumn);
 
   // For task criterion: store id as value but display name
   const availableOptions = isTaskCriterion
     ? qualifications.map(q => ({ value: q.id, label: q.name }))
     : isTimeRangeCriterion
     ? []
+    : isShiftStatusCriterion
+    ? (shiftStatuses || []).map(s =>
+        typeof s === "string"
+          ? { value: s, label: s }
+          : { value: s.mapping_id || s.name, label: s.name, _altName: s.name }
+      )
     : isRoleCriterion
     ? (workerRoles || []).map(r =>
         typeof r === "string"
@@ -178,7 +195,7 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles,
     setShowColPicker(false);
   };
 
-  const displayName = isTaskCriterion ? "משימה" : isTimeRangeCriterion ? "טווח שעות" : isRoleCriterion ? "תפקיד" : isDayOfWeekCriterion ? "ימי שבוע" : (criterion.col_name || "בחר עמודה");
+  const displayName = isTaskCriterion ? "משימה" : isTimeRangeCriterion ? "טווח שעות" : isShiftStatusCriterion ? "סטטוס משמרת" : isRoleCriterion ? "תפקיד" : isDayOfWeekCriterion ? "ימי שבוע" : (criterion.col_name || "בחר עמודה");
 
   return (
     <div className="border border-gray-200 rounded-lg bg-gray-50 overflow-hidden mb-2">
@@ -204,13 +221,13 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles,
               משימה
             </button>
           )}
-          {scheduleColumns.map(col => (
+          {countableScheduleColumns.map(col => (
             <button key={col.name} type="button" onClick={() => selectCol(col)}
               className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors">
               {col.name}
             </button>
           ))}
-          {scheduleColumns.length === 0 && qualifications.length === 0 && (
+          {countableScheduleColumns.length === 0 && qualifications.length === 0 && (
             <p className="text-center text-xs text-gray-400 py-2">אין עמודות מוגדרות</p>
           )}
         </div>
@@ -267,9 +284,10 @@ function CriterionRow({ criterion, scheduleColumns, qualifications, workerRoles,
   );
 }
 
-export default function ColumnConfigDialog({ col, scheduleColumns, qualifications = [], workerRoles = [], onSave, onClose }) {
+export default function ColumnConfigDialog({ col, scheduleColumns, qualifications = [], workerRoles = [], shiftStatuses = [], onSave, onClose }) {
   const [draft, setDraft] = useState({ ...col });
   const [showCriteriaPicker, setShowCriteriaPicker] = useState(false);
+  const countableScheduleColumns = scheduleColumns.filter(isCountableScheduleColumn);
 
   // count_mode is only relevant for schedule_col type
   // "per_worker" = sum hours per worker (default, current behavior)
@@ -352,6 +370,18 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
     setShowCriteriaPicker(false);
   };
 
+  const addShiftStatusCriterion = () => {
+    const newC = {
+      id: Date.now().toString(),
+      col_name: SHIFT_STATUS_COL_NAME,
+      col_type: "shift_status",
+      include: [],
+      logic: "or",
+    };
+    update("criteria", [...(draft.criteria || []), newC]);
+    setShowCriteriaPicker(false);
+  };
+
   const updateCriterion = (id, updated) => {
     update("criteria", (draft.criteria || []).map(c => c.id === id ? updated : c));
   };
@@ -411,6 +441,7 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
                 scheduleColumns={scheduleColumns}
                 qualifications={qualifications}
                 workerRoles={workerRoles}
+                shiftStatuses={shiftStatuses}
                 onUpdate={(updated) => updateCriterion(c.id, updated)}
                 onRemove={() => removeCriterion(c.id)} />
               {idx < (draft.criteria || []).length - 1 && (
@@ -463,13 +494,19 @@ export default function ColumnConfigDialog({ col, scheduleColumns, qualification
                   className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors font-medium border-b border-gray-200">
                   ימי שבוע
                 </button>
-                {scheduleColumns.map(sc => (
+                {shiftStatuses.length > 0 && (
+                  <button type="button" onClick={addShiftStatusCriterion}
+                    className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors font-medium border-b border-gray-200">
+                    סטטוס משמרת
+                  </button>
+                )}
+                {countableScheduleColumns.map(sc => (
                   <button key={sc.name} type="button" onClick={() => addCriterion(sc)}
                     className="w-full text-right px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-200 transition-colors">
                     {sc.name}
                   </button>
                 ))}
-                {scheduleColumns.length === 0 && qualifications.length === 0 && (
+                {countableScheduleColumns.length === 0 && qualifications.length === 0 && shiftStatuses.length === 0 && (
                   <p className="text-center text-xs text-gray-400 py-2">אין עמודות מוגדרות</p>
                 )}
               </div>
