@@ -769,12 +769,27 @@ export default function Schedule() {
     localStorage.setItem('schedule_highlighted_cells', JSON.stringify(newHighlighted));
   };
 
+  // Read the on-screen ordered list of cell keys straight from the DOM, so range
+  // selection follows exactly what the user sees (grouped/sorted), not the flat
+  // unsorted templateRows array.
+  const getOrderedCellKeys = (container) => {
+    const root = container || document.querySelector('[data-schedule-grid]');
+    if (!root) return [];
+    return Array.from(root.querySelectorAll('[data-cell-key]'))
+      .map(el => el.getAttribute('data-cell-key'))
+      .filter(Boolean);
+  };
+
   const handleTableMouseDown = (e) => {
     if (!e.ctrlKey && !e.metaKey) return;
     const cell = e.target.closest('[data-cell-key]');
     if (!cell) return;
     const cellKey = cell.getAttribute('data-cell-key');
     if (!cellKey) return;
+    // Stop the inner controls (WorkerCell/TimeCell/Select) from receiving this
+    // event and opening the assignment window; suppress native text-selection.
+    e.preventDefault();
+    e.stopPropagation();
     setDragSelectStart(cellKey);
     setIsCtrlDragging(true);
     setDragPreviewCells(new Set([cellKey]));
@@ -787,28 +802,15 @@ export default function Schedule() {
     const endCellKey = cell.getAttribute('data-cell-key');
     if (!endCellKey) return;
 
-    // Parse and calculate range for live preview
-    const parseKey = (key) => {
-      const [rowId, colIdx] = key.split('__');
-      return { rowId, colIdx: parseInt(colIdx, 10) };
-    };
-    const startParsed = parseKey(dragSelectStart);
-    const endParsed = parseKey(endCellKey);
-    const startRowIdx = templateRows.findIndex(r => r.id === startParsed.rowId);
-    const endRowIdx = templateRows.findIndex(r => r.id === endParsed.rowId);
-    const startCol = Math.min(startParsed.colIdx, endParsed.colIdx);
-    const endCol = Math.max(startParsed.colIdx, endParsed.colIdx);
-    const minRow = Math.min(startRowIdx, endRowIdx);
-    const maxRow = Math.max(startRowIdx, endRowIdx);
+    const ordered = getOrderedCellKeys();
+    const startIdx = ordered.indexOf(dragSelectStart);
+    const endIdx = ordered.indexOf(endCellKey);
+    if (startIdx === -1 || endIdx === -1) return;
+    const lo = Math.min(startIdx, endIdx);
+    const hi = Math.max(startIdx, endIdx);
 
     const previewSet = new Set();
-    for (let r = minRow; r <= maxRow; r++) {
-      if (r < 0 || r >= templateRows.length) continue;
-      const row = templateRows[r];
-      for (let c = startCol; c <= endCol; c++) {
-        previewSet.add(`${row.id}__${c}`);
-      }
-    }
+    for (let i = lo; i <= hi; i++) previewSet.add(ordered[i]);
     setDragPreviewCells(previewSet);
   };
 
@@ -820,52 +822,37 @@ export default function Schedule() {
       return;
     }
     const cell = e.target.closest('[data-cell-key]');
-    if (!cell) {
-      setDragSelectStart(null);
-      setIsCtrlDragging(false);
-      setDragPreviewCells(new Set());
-      return;
-    }
-    const endCellKey = cell.getAttribute('data-cell-key');
-    if (!endCellKey) {
-      setDragSelectStart(null);
-      setIsCtrlDragging(false);
-      setDragPreviewCells(new Set());
-      return;
-    }
+    const endCellKey = cell ? cell.getAttribute('data-cell-key') : dragSelectStart;
 
-    // Apply the selection
-    const parseKey = (key) => {
-      const [rowId, colIdx] = key.split('__');
-      return { rowId, colIdx: parseInt(colIdx, 10) };
-    };
-    const startParsed = parseKey(dragSelectStart);
-    const endParsed = parseKey(endCellKey);
-    const startRowIdx = templateRows.findIndex(r => r.id === startParsed.rowId);
-    const endRowIdx = templateRows.findIndex(r => r.id === endParsed.rowId);
-    const startCol = Math.min(startParsed.colIdx, endParsed.colIdx);
-    const endCol = Math.max(startParsed.colIdx, endParsed.colIdx);
-    const minRow = Math.min(startRowIdx, endRowIdx);
-    const maxRow = Math.max(startRowIdx, endRowIdx);
+    const ordered = getOrderedCellKeys();
+    const startIdx = ordered.indexOf(dragSelectStart);
+    const endIdx = ordered.indexOf(endCellKey || dragSelectStart);
 
-    const isCurrentlyHighlighted = !!highlightedCells[dragSelectStart];
-    
     const newHighlighted = { ...highlightedCells };
-    for (let r = minRow; r <= maxRow; r++) {
-      if (r < 0 || r >= templateRows.length) continue;
-      const row = templateRows[r];
-      for (let c = startCol; c <= endCol; c++) {
-        const cellKey = `${row.id}__${c}`;
-        if (isCurrentlyHighlighted) {
-          delete newHighlighted[cellKey];
-        } else {
-          newHighlighted[cellKey] = true;
-        }
+
+    if (startIdx === -1) {
+      // fall back to a plain single-cell toggle
+      if (newHighlighted[dragSelectStart]) delete newHighlighted[dragSelectStart];
+      else newHighlighted[dragSelectStart] = true;
+    } else if (endIdx === -1 || startIdx === endIdx) {
+      // No drag movement → single-cell toggle
+      if (newHighlighted[dragSelectStart]) delete newHighlighted[dragSelectStart];
+      else newHighlighted[dragSelectStart] = true;
+    } else {
+      // Drag range → set them all to the OPPOSITE of the start cell's current state
+      const lo = Math.min(startIdx, endIdx);
+      const hi = Math.max(startIdx, endIdx);
+      const turningOn = !highlightedCells[dragSelectStart];
+      for (let i = lo; i <= hi; i++) {
+        const k = ordered[i];
+        if (turningOn) newHighlighted[k] = true;
+        else delete newHighlighted[k];
       }
     }
+
     setHighlightedCells(newHighlighted);
     localStorage.setItem('schedule_highlighted_cells', JSON.stringify(newHighlighted));
-    
+
     setDragSelectStart(null);
     setIsCtrlDragging(false);
     setDragPreviewCells(new Set());
@@ -1393,7 +1380,7 @@ export default function Schedule() {
                       </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                    <div className="overflow-x-auto" onMouseDown={handleTableMouseDown}>
+                    <div className="overflow-x-auto" data-schedule-grid onMouseDown={handleTableMouseDown}>
                       <Table>
                         <TableHeader>
                           <DraggableColumnHeader
@@ -1492,7 +1479,7 @@ export default function Schedule() {
                                      const isHighlighted = !!highlightedCells[cellKey];
                                      const isDragPreview = dragPreviewCells.has(cellKey);
                                       return (
-                                        <TableCell key={idx} dir="rtl" data-cell-key={cellKey} className={`p-0 text-center cursor-pointer select-none transition-colors ${isHighlighted ? 'bg-red-200/40' : isDragPreview ? 'bg-red-100/60' : ''}`} onClick={(e) => { if ((e.ctrlKey || e.metaKey) && !isCtrlDragging && !dragSelectStart) { e.preventDefault(); toggleCellHighlight(row.id, idx); } }} rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
+                                        <TableCell key={idx} dir="rtl" data-cell-key={cellKey} className={`p-0 text-center cursor-pointer select-none transition-colors ${isHighlighted ? 'bg-red-200/40' : isDragPreview ? 'bg-red-100/60' : ''}`} rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
                                         {col.type === "worker" ? (
                                            <WorkerCell
                                              rowId={row.id}
