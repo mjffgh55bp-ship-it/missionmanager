@@ -1045,13 +1045,15 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   const isAuto = (type) => ["shifts_count", "schedule_col", "count_by_text", "count_by_task", "count_quantitative"].includes(type);
 
   // Role name↔id maps at component level (used by both computeAutoValue and filteredWorkers)
-  const roleIdByName = {};
-  const roleNameById = {};
-  (workerRoles || []).forEach(r => {
-    const name = typeof r === "string" ? r : r.name;
-    const mid = typeof r === "string" ? r : (r.mapping_id || r.name);
-    if (name && mid) { roleIdByName[name.trim()] = mid; roleNameById[mid] = name.trim(); }
-  });
+  const { roleIdByName, roleNameById } = useMemo(() => {
+    const roleIdByName = {}, roleNameById = {};
+    (workerRoles || []).forEach(r => {
+      const name = typeof r === "string" ? r : r.name;
+      const mid = typeof r === "string" ? r : (r.mapping_id || r.name);
+      if (name && mid) { roleIdByName[name.trim()] = mid; roleNameById[mid] = name.trim(); }
+    });
+    return { roleIdByName, roleNameById };
+  }, [workerRoles]);
 
   // Shift status aliases: map any stored status value (mapping_id OR name) to all its equivalents
   const statusAliasMap = {};
@@ -1074,7 +1076,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
   };
 
   // Step 1: filter workers (no sort yet — sort needs cellValueMap)
-  const filteredWorkersBase = workers.filter(w => {
+  const filteredWorkersBase = useMemo(() => workers.filter(w => {
     if (!w.active) return false;
     if (!popMatches(w.population, selectedPopulations)) return false;
     if (selectedRoles.length > 0) {
@@ -1097,7 +1099,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
     if (guide === "yes" && !w.is_guide) return false;
     if (guide === "no" && w.is_guide) return false;
     return true;
-  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [workers, selectedPopulations, selectedRoles, selectedQualifications, selectedWorkerIds, guide, workerQualifications, roleNameById, roleIdByName]);
 
   // Step 2: pre-compute cell values (depends on filtered workers list)
   const cellValueMap = useMemo(() => {
@@ -1621,7 +1624,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   <Input value={workerSearch} onChange={e => setWorkerSearch(e.target.value)} placeholder="חיפוש עובד..." className="h-7 text-xs mb-1" dir="rtl" />
                   <div className="flex gap-2 mb-1">
                     <button type="button" className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                      onClick={() => setSelectedWorkerIds(searchedWorkers.map(w => w.id))}>
+                      onClick={() => setSelectedWorkerIds(prev => {
+                        const newIds = searchedWorkers.map(w => w.id);
+                        const existing = prev.filter(id => !searchedWorkers.some(w => w.id === id));
+                        return [...existing, ...newIds];
+                      })}>
                       בחר הכל ({searchedWorkers.length})
                     </button>
                     <button type="button" className="text-xs px-2 py-0.5 rounded bg-gray-400 text-white hover:bg-gray-500 transition-colors"
@@ -1630,19 +1637,27 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                     </button>
                   </div>
                   <div className="max-h-32 overflow-y-auto border rounded bg-white space-y-0.5 p-1">
-                    {searchedWorkers.map(w => (
-                      <label key={w.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-0.5 rounded">
-                        <input type="checkbox" checked={selectedWorkerIds.length === 0 || selectedWorkerIds.includes(w.id)}
-                          onChange={e => {
-                            if (e.target.checked) setSelectedWorkerIds(prev => prev.length === 0 ? [] : [...prev, w.id]);
-                            else setSelectedWorkerIds(prev => {
-                              const all = prev.length === 0 ? preFilteredWorkers.map(pw => pw.id) : prev;
-                              return all.filter(id => id !== w.id);
-                            });
-                          }} className="rounded" />
-                        <span className="text-xs">{w.nickname}</span>
-                      </label>
-                    ))}
+                    {searchedWorkers.map(w => {
+                      const isChecked = selectedWorkerIds.length === 0 || selectedWorkerIds.includes(w.id);
+                      return (
+                        <label key={w.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-0.5 rounded">
+                          <input type="checkbox" checked={isChecked}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                // Adding: if currently "all selected" (empty array), start explicit list from preFiltered minus this worker
+                                setSelectedWorkerIds(prev => prev.length === 0 ? [] : [...prev, w.id]);
+                              } else {
+                                // Removing: if "all selected", expand to explicit list first
+                                setSelectedWorkerIds(prev => {
+                                  const base = prev.length === 0 ? preFilteredWorkers.map(pw => pw.id) : prev;
+                                  return base.filter(id => id !== w.id);
+                                });
+                              }
+                            }} className="rounded" />
+                          <span className="text-xs">{w.nickname}</span>
+                        </label>
+                      );
+                    })}
                     {searchedWorkers.length === 0 && <p className="text-xs text-gray-400 text-center py-1">אין תוצאות</p>}
                   </div>
                 </div>
