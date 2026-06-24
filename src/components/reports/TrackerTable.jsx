@@ -1588,9 +1588,16 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
             </div>
           </div>
 
-          {/* Filters panel */}
+          {/* Filters panel — floats above everything so the card's overflow:hidden can't clip it */}
           {showFilters && (
-            <div className="pt-3 mt-3 border-t space-y-3">
+            <>
+              <div className="fixed inset-0 z-[90]" onMouseDown={() => setShowFilters(false)} />
+              <div
+                className="fixed z-[100] bg-white border rounded-xl shadow-2xl p-4 space-y-3 w-[min(92vw,520px)] max-h-[80vh] overflow-y-auto"
+                style={{ top: 80, right: 24 }}
+                onMouseDown={e => e.stopPropagation()}
+                dir="rtl"
+              >
               <div>
                 <Label className="text-xs block mb-1 font-semibold text-gray-500">תקופה</Label>
                 <div className="flex flex-wrap gap-1">
@@ -1635,17 +1642,11 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   <div className="flex gap-2 mb-1">
                     <button type="button" className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                       onClick={() => {
-                        // If no search active and all preFiltered are already shown, reset to "all"
-                        if (!workerSearch) {
-                          setSelectedWorkerIds([]);
-                        } else {
-                          // Add searched workers to selection (keep others)
-                          setSelectedWorkerIds(prev => {
-                            const base = prev.length === 0 ? preFilteredWorkers.map(w => w.id) : prev;
-                            const newIds = searchedWorkers.map(w => w.id);
-                            return [...new Set([...base, ...newIds])];
-                          });
-                        }
+                        // Explicitly select every currently-searched worker (merge with existing selection).
+                        setSelectedWorkerIds(prev => {
+                          const ids = searchedWorkers.map(w => w.id);
+                          return [...new Set([...prev, ...ids])];
+                        });
                       }}>
                       בחר הכל ({searchedWorkers.length})
                     </button>
@@ -1656,18 +1657,17 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   </div>
                   <div className="max-h-32 overflow-y-auto border rounded bg-white space-y-0.5 p-1">
                     {searchedWorkers.map(w => {
-                      const isChecked = selectedWorkerIds.length === 0 || selectedWorkerIds.includes(w.id);
+                      // Explicit selection: empty list = no worker filter (handled in filtering),
+                      // but a checkbox is "checked" only when this worker is explicitly selected.
+                      const isChecked = selectedWorkerIds.includes(w.id);
                       return (
                         <label key={w.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-0.5 rounded">
                           <input type="checkbox" checked={isChecked}
                             onChange={e => {
                               if (e.target.checked) {
-                                setSelectedWorkerIds(prev => prev.length === 0 ? [] : [...prev, w.id]);
+                                setSelectedWorkerIds(prev => [...new Set([...prev, w.id])]);
                               } else {
-                                setSelectedWorkerIds(prev => {
-                                  const base = prev.length === 0 ? preFilteredWorkers.map(pw => pw.id) : prev;
-                                  return base.filter(id => id !== w.id);
-                                });
+                                setSelectedWorkerIds(prev => prev.filter(id => id !== w.id));
                               }
                             }} className="rounded" />
                           <span className="text-xs">{w.nickname}</span>
@@ -1678,7 +1678,8 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
                   </div>
                 </div>
               </div>
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>
