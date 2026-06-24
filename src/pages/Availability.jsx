@@ -1661,12 +1661,6 @@ END:VEVENT
               {/* Two date columns always visible — התחלה right, סיום left */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="block mb-1 text-xs text-gray-600 text-center">תאריך סיום</Label>
-                  <Input type="date" value={unavailabilityForm.end_date}
-                    onChange={(e) => { setEndDateTouched(true); setUnavailabilityForm(prev => ({ ...prev, end_date: e.target.value })); }}
-                    className="text-xs h-9 w-full px-1" />
-                </div>
-                <div>
                   <Label className="block mb-1 text-xs text-gray-600 text-center">תאריך התחלה</Label>
                   <Input type="date" value={unavailabilityForm.start_date}
                     onChange={(e) => {
@@ -1679,16 +1673,22 @@ END:VEVENT
                     }}
                     className="text-xs h-9 w-full px-1" />
                 </div>
+                <div>
+                  <Label className="block mb-1 text-xs text-gray-600 text-center">תאריך סיום</Label>
+                  <Input type="date" value={unavailabilityForm.end_date}
+                    onChange={(e) => { setEndDateTouched(true); setUnavailabilityForm(prev => ({ ...prev, end_date: e.target.value })); }}
+                    className="text-xs h-9 w-full px-1" />
+                </div>
               </div>
               {/* Two time columns — התחלה right, סיום left */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="block mb-1 text-xs text-gray-600 text-center">שעת סיום</Label>
-                  <Input type="time" value={unavailabilityForm.end_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_time: e.target.value })} className="text-sm h-9 w-full" />
-                </div>
-                <div>
                   <Label className="block mb-1 text-xs text-gray-600 text-center">שעת התחלה</Label>
                   <Input type="time" value={unavailabilityForm.start_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, start_time: e.target.value })} className="text-sm h-9 w-full" />
+                </div>
+                <div>
+                  <Label className="block mb-1 text-xs text-gray-600 text-center">שעת סיום</Label>
+                  <Input type="time" value={unavailabilityForm.end_time} onChange={(e) => setUnavailabilityForm({ ...unavailabilityForm, end_time: e.target.value })} className="text-sm h-9 w-full" />
                 </div>
               </div>
               <div>
