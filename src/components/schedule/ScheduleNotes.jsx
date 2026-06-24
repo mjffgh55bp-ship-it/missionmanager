@@ -70,8 +70,8 @@ export default function ScheduleNotes({ notes, height, editMode, onSave, onHeigh
       {/* Header bar */}
       <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200 select-none">
         {/* drag handle — only shown in edit mode; has dragHandleProps attached by parent */}
-        <div {...dragHandleProps} className="flex-shrink-0 cursor-grab active:cursor-grabbing">
-          <GripVertical className="w-4 h-4 text-gray-400" />
+        <div {...(editMode ? dragHandleProps : {})} className={`flex-shrink-0 ${editMode ? "cursor-grab active:cursor-grabbing" : "opacity-0 pointer-events-none w-4"}`}>
+          {editMode && <GripVertical className="w-4 h-4 text-gray-400" />}
         </div>
 
         <AlignLeft className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
