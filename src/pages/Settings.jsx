@@ -404,11 +404,26 @@ export default function Settings() {
     }
   };
 
+  // Retry a call up to 3 times when the backend returns a transient rate-limit error
+  const withRateLimitRetry = async (fn, retries = 3) => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await fn();
+      } catch (e) {
+        const isRateLimit = (e?.message || "").toLowerCase().includes("rate limit");
+        if (!isRateLimit || attempt >= retries) throw e;
+        await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+      }
+    }
+  };
+
   const saveScheduleColumns = async (updated) => {
-    const settings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
     const data = { setting_key: "custom_schedule_params", setting_value: JSON.stringify(updated) };
-    if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
-    else await base44.entities.AppSettings.create(data);
+    await withRateLimitRetry(async () => {
+      const settings = await base44.entities.AppSettings.filter({ setting_key: "custom_schedule_params" });
+      if (settings.length > 0) await base44.entities.AppSettings.update(settings[0].id, data);
+      else await base44.entities.AppSettings.create(data);
+    });
     setScheduleColumns(updated);
   };
 
