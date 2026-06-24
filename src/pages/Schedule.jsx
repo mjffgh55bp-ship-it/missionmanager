@@ -104,6 +104,10 @@ export default function Schedule() {
   const [exportSelectionMode, setExportSelectionMode] = useState(false);
   const [selectedMokedKeys, setSelectedMokedKeys] = useState(new Set()); // group keys: templateId_groupId
   const [exportingMokeds, setExportingMokeds] = useState(false);
+  const [highlightedCells, setHighlightedCells] = useState(() => {
+    const saved = localStorage.getItem('schedule_highlighted_cells');
+    return saved ? JSON.parse(saved) : {};
+  });
   const staticDataLoaded = useRef(false);
   const lastWeekStart = useRef(null);
   const initialLoadStarted = useRef(false);
@@ -750,6 +754,18 @@ export default function Schedule() {
     invalidateSettingsCache();
   };
 
+  const toggleCellHighlight = (rowId, colName) => {
+    const cellKey = `${rowId}__${colName}`;
+    const newHighlighted = { ...highlightedCells };
+    if (newHighlighted[cellKey]) {
+      delete newHighlighted[cellKey];
+    } else {
+      newHighlighted[cellKey] = true;
+    }
+    setHighlightedCells(newHighlighted);
+    localStorage.setItem('schedule_highlighted_cells', JSON.stringify(newHighlighted));
+  };
+
   const weekStartStrForPublish = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
   const isCurrentWeekPublished = publishedWeeks.includes(weekStartStrForPublish);
 
@@ -1361,26 +1377,28 @@ export default function Schedule() {
                                      return (
                                        <TableCell key={idx} dir="rtl" className="p-0 text-center" rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
                                         {col.type === "worker" ? (
-                                          <WorkerCell
-                                            rowId={row.id}
-                                            columnName={col.name}
-                                            currentValue={row.values?.[col.name]}
-                                            currentRowValues={row.values || {}}
-                                            workers={workers}
-                                            workerRoles={workerRoles}
-                                            roleFilter={col.role_filter || (col.type === "worker" ? col.name : null)}
-                                            availabilities={availabilities}
-                                            unavailabilities={unavailabilities}
-                                            dateString={dateString}
-                                            rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
-                                            rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
-                                            taskQualifiedWorkerIds={(() => { const key = col.task_name || (row.values?.task); if (!key) return undefined; const tObj = typeof key === 'string' ? tasksList.find(tt => (typeof tt === 'object' ? tt.name : tt) === key) || key : key; const q = getTaskQuals(taskQualifications, tObj); return Object.values(q).flat(); })()}
-                                            workerDayAssignments={workerDayAssignments}
-                                            onSaved={(workerId) => {
-                                            const newValues = { ...row.values, [col.name]: workerId };
-                                            recordChange({ rowId: row.id, beforeValues: row.values || {}, afterValues: newValues });
-                                            setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
-                                            }} />
+                                           <WorkerCell
+                                             rowId={row.id}
+                                             columnName={col.name}
+                                             currentValue={row.values?.[col.name]}
+                                             currentRowValues={row.values || {}}
+                                             workers={workers}
+                                             workerRoles={workerRoles}
+                                             roleFilter={col.role_filter || (col.type === "worker" ? col.name : null)}
+                                             availabilities={availabilities}
+                                             unavailabilities={unavailabilities}
+                                             dateString={dateString}
+                                             rowStartTime={row.values?.["התחלה"] || row.values?.["שעת התחלה"]}
+                                             rowEndTime={row.values?.["סיום"] || row.values?.["שעת סיום"]}
+                                             taskQualifiedWorkerIds={(() => { const key = col.task_name || (row.values?.task); if (!key) return undefined; const tObj = typeof key === 'string' ? tasksList.find(tt => (typeof tt === 'object' ? tt.name : tt) === key) || key : key; const q = getTaskQuals(taskQualifications, tObj); return Object.values(q).flat(); })()}
+                                             workerDayAssignments={workerDayAssignments}
+                                             isHighlighted_prop={!!highlightedCells[`${row.id}__${col.name}`]}
+                                             onHighlightToggle={() => toggleCellHighlight(row.id, col.name)}
+                                             onSaved={(workerId) => {
+                                             const newValues = { ...row.values, [col.name]: workerId };
+                                             recordChange({ rowId: row.id, beforeValues: row.values || {}, afterValues: newValues });
+                                             setTemplateRows((prev) => prev.map((r) => r.id === row.id ? { ...r, values: newValues } : r));
+                                             }} />
                                         ) : col.type === "time" ? (
                                           <TimeCell
                                             rowId={row.id}

@@ -35,6 +35,8 @@ export default function WorkerCell({
   currentValue,
   currentRowValues,
   workers,
+  isHighlighted_prop = false,
+  onHighlightToggle,
   workerRoles,
   roleFilter,
   availabilities,
@@ -232,9 +234,15 @@ export default function WorkerCell({
   const isCurrentDoubleBooked = selectedWorker ? isWorkerDoubleBooked(selectedWorker.id) : false;
 
   const existingComment = selectedWorker ? getWorkerComment(selectedWorker.id) : "";
+  const isHighlighted = isHighlighted_prop;
 
   return (
-    <div ref={containerRef} className="relative w-full h-full min-h-full" style={{ height: '100%' }} dir="rtl">
+    <div 
+      ref={containerRef} 
+      className={`relative w-full h-full min-h-full ${isHighlighted ? "bg-red-200/40" : ""}`} 
+      style={{ height: '100%' }} 
+      dir="rtl"
+    >
       {/* Cell display / input */}
       {editing ? (
         <input
@@ -256,7 +264,14 @@ export default function WorkerCell({
       ) : (
         <div className="relative group w-full h-full">
           <button
-            onClick={() => setEditing(true)}
+            onClick={(e) => {
+              if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                onHighlightToggle?.();
+              } else {
+                setEditing(true);
+              }
+            }}
             onContextMenu={(e) => {
               if (!selectedWorker) return;
               e.preventDefault();
@@ -265,7 +280,7 @@ export default function WorkerCell({
             onMouseEnter={() => setHovering(true)}
             onMouseLeave={() => setHovering(false)}
             className={`w-full text-center p-2 hover:bg-blue-50 transition-colors ${isCurrentUnavailable ? "bg-red-50" : ""}`}
-            style={{ minHeight: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ minHeight: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
             dir="rtl"
           >
             {selectedWorker ? (
