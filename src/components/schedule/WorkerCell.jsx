@@ -296,39 +296,42 @@ export default function WorkerCell({
             </div>
           )}
 
-          {/* Comment edit popup */}
-          {commentOpen && selectedWorker && (
-            <div
-              ref={commentRef}
-              className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-2xl p-3 flex flex-col gap-2"
-              style={{ top: "calc(100% + 4px)", right: 0, width: 220 }}
-              dir="rtl"
-            >
-              <div className="text-xs font-semibold text-gray-700">הערה עבור {selectedWorker.nickname}</div>
-              <textarea
-                ref={commentInputRef}
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                placeholder="הוסף הערה..."
-                className="text-xs border border-gray-200 rounded p-1.5 resize-none outline-none focus:border-blue-400"
-                rows={3}
+          {/* Comment edit popup - uses fixed positioning to break out of table overflow */}
+          {commentOpen && selectedWorker && containerRef.current && (() => {
+            const rect = containerRef.current.getBoundingClientRect();
+            return (
+              <div
+                ref={commentRef}
+                className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-2xl p-3 flex flex-col gap-2"
+                style={{ top: `${rect.bottom + 4}px`, right: `${window.innerWidth - rect.right}px`, width: 220 }}
                 dir="rtl"
-              />
-              <div className="flex gap-1 justify-end">
-                <button
-                  onClick={() => {
-                    setWorkerComment(selectedWorker.id, commentText.trim());
-                    setCommentOpen(false);
-                  }}
-                  className="text-xs bg-blue-600 text-white rounded px-2 py-1 hover:bg-blue-700"
-                >שמור</button>
-                <button
-                  onClick={() => setCommentOpen(false)}
-                  className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1 hover:bg-gray-200"
-                >ביטול</button>
+              >
+                <div className="text-xs font-semibold text-gray-700">הערה עבור {selectedWorker.nickname}</div>
+                <textarea
+                  ref={commentInputRef}
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  placeholder="הוסף הערה..."
+                  className="text-xs border border-gray-200 rounded p-1.5 resize-none outline-none focus:border-blue-400"
+                  rows={3}
+                  dir="rtl"
+                />
+                <div className="flex gap-1 justify-end">
+                  <button
+                    onClick={() => {
+                      setWorkerComment(selectedWorker.id, commentText.trim());
+                      setCommentOpen(false);
+                    }}
+                    className="text-xs bg-blue-600 text-white rounded px-2 py-1 hover:bg-blue-700"
+                  >שמור</button>
+                  <button
+                    onClick={() => setCommentOpen(false)}
+                    className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1 hover:bg-gray-200"
+                  >ביטול</button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
