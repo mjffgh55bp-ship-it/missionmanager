@@ -46,6 +46,7 @@ import TimeCell from "../components/schedule/TimeCell";
 import PresetsDialog from "../components/schedule/PresetsDialog";
 import ScheduleNotes from "../components/schedule/ScheduleNotes";
 import MokedIdEditor from "../components/schedule/MokedIdEditor";
+import RowColorPicker from "../components/schedule/RowColorPicker";
 import { suggestMappingId } from "@/components/settings/MappableItemRow";
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
 import { getMokedDisplayName } from "@/lib/shiftDemand";
@@ -1331,12 +1332,25 @@ export default function Schedule() {
                               });
                               return templateRowsForTemplate.map((row, rowIndex) => (
                                 <Draggable key={row.id} draggableId={`row-${row.id}`} index={rowIndex} isDragDisabled={!editMode}>
-                                {(rowDrag, rowSnap) => (
-                                <TableRow ref={rowDrag.innerRef} {...rowDrag.draggableProps} className={`h-8 ${row.values?.is_continuation ? "bg-orange-50" : ""} ${rowSnap.isDragging ? "opacity-70 bg-blue-50" : ""}`}>
+                                {(rowDrag, rowSnap) => {
+                                const rowColor = row.values?._row_color || null;
+                                const rowBgStyle = rowColor ? { backgroundColor: rowColor } : {};
+                                return (
+                                <TableRow ref={rowDrag.innerRef} {...rowDrag.draggableProps} className={`h-8 ${!rowColor && row.values?.is_continuation ? "bg-orange-50" : ""} ${rowSnap.isDragging ? "opacity-70 bg-blue-50" : ""}`} style={rowBgStyle}>
                                   {editMode && (
-                                    <TableCell className="w-[28px] p-0 text-center">
-                                      <div {...rowDrag.dragHandleProps} className="cursor-grab active:cursor-grabbing flex items-center justify-center h-full px-1 text-gray-400 hover:text-gray-600">
-                                        <GripVertical className="w-3.5 h-3.5" />
+                                    <TableCell className="w-[44px] p-0 text-center">
+                                      <div className="flex items-center justify-center gap-0.5 px-1 h-full">
+                                        <div {...rowDrag.dragHandleProps} className="cursor-grab active:cursor-grabbing flex items-center justify-center text-gray-400 hover:text-gray-600">
+                                          <GripVertical className="w-3.5 h-3.5" />
+                                        </div>
+                                        <RowColorPicker
+                                          currentColor={rowColor}
+                                          onColorChange={async (color) => {
+                                            const newValues = { ...row.values, _row_color: color || undefined };
+                                            if (!color) delete newValues._row_color;
+                                            await updateRowValues(row.id, row.values || {}, newValues);
+                                          }}
+                                        />
                                       </div>
                                     </TableCell>
                                   )}
@@ -1450,7 +1464,8 @@ export default function Schedule() {
                                     </TableCell>
                                   )}
                                 </TableRow>
-                                )}
+                                );
+                                }}
                                 </Draggable>
                                 ));
                                 })()}

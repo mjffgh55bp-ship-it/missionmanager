@@ -1,8 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Star, Check, X } from "lucide-react";
+import { AlertTriangle, Star, Check, X, MessageSquare } from "lucide-react";
 import { getOperationalMinutes, getOperationalEndMinutes, getOperationalDate } from "@/lib/operationalDate";
+
+// Per-worker comment storage (localStorage, keyed by workerId)
+const getWorkerComment = (workerId) => {
+  try { return localStorage.getItem(`worker_comment_${workerId}`) || ""; } catch { return ""; }
+};
+const setWorkerComment = (workerId, comment) => {
+  try {
+    if (comment) localStorage.setItem(`worker_comment_${workerId}`, comment);
+    else localStorage.removeItem(`worker_comment_${workerId}`);
+  } catch {}
+};
 
 // Operational-aware time helpers (handle overnight shifts that cross midnight,
 // e.g. 22:00–02:00). Mirrors the logic used on the Matrix page.
@@ -37,8 +48,13 @@ export default function WorkerCell({
 }) {
   const [editing, setEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [hovering, setHovering] = useState(false);
   const inputRef = useRef(null);
   const containerRef = useRef(null);
+  const commentRef = useRef(null);
+  const commentInputRef = useRef(null);
 
   const selectedWorker = currentValue ? workers.find((w) => w.id === currentValue) : null;
 
@@ -58,6 +74,23 @@ export default function WorkerCell({
     if (editing) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [editing]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (commentRef.current && !commentRef.current.contains(e.target)) {
+        setCommentOpen(false);
+      }
+    };
+    if (commentOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [commentOpen]);
+
+  useEffect(() => {
+    if (commentOpen && commentInputRef.current) {
+      commentInputRef.current.focus();
+      setCommentText(selectedWorker ? getWorkerComment(selectedWorker.id) : "");
+    }
+  }, [commentOpen]);
 
   const isWorkerUnavailable = (workerId, startTime, endTime) => {
     if (!workerId || !startTime || !endTime) return false;
@@ -198,6 +231,8 @@ export default function WorkerCell({
     !taskQualifiedWorkerIds.includes(selectedWorker.id);
   const isCurrentDoubleBooked = selectedWorker ? isWorkerDoubleBooked(selectedWorker.id) : false;
 
+  const existingComment = selectedWorker ? getWorkerComment(selectedWorker.id) : "";
+
   return (
     <div ref={containerRef} className="relative w-full h-full min-h-full" style={{ height: '100%' }} dir="rtl">
       {/* Cell display / input */}
@@ -219,27 +254,82 @@ export default function WorkerCell({
           dir="rtl"
         />
       ) : (
-        <button
-          onClick={() => setEditing(true)}
-          className={`w-full text-center p-2 hover:bg-blue-50 transition-colors ${isCurrentUnavailable ? "bg-red-50" : ""}`}
-          style={{ minHeight: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          dir="rtl"
-        >
-          {selectedWorker ? (
-            <div className="flex items-center gap-1 justify-center">
-              <span className={`text-xs font-medium truncate ${isCurrentUnqualified ? 'text-orange-600' : 'text-gray-950'}`}>
-                {selectedWorker.nickname}
-              </span>
-              {isCurrentUnavailable && <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />}
-              {isCurrentDoubleBooked && !isCurrentUnavailable && (
-                <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" title="עובד זה כבר שובץ למשמרת חופפת" />
-              )}
-              {isCurrentUnqualified && <span className="text-[10px] text-orange-500 flex-shrink-0">⚠</span>}
+        <div className="relative group w-full h-full">
+          <button
+            onClick={() => setEditing(true)}
+            onContextMenu={(e) => {
+              if (!selectedWorker) return;
+              e.preventDefault();
+              setCommentOpen(true);
+            }}
+            onMouseEnter={() => setHovering(true)}
+            onMouseLeave={() => setHovering(false)}
+            className={`w-full text-center p-2 hover:bg-blue-50 transition-colors ${isCurrentUnavailable ? "bg-red-50" : ""}`}
+            style={{ minHeight: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            dir="rtl"
+          >
+            {selectedWorker ? (
+              <div className="flex items-center gap-1 justify-center">
+                <span className={`text-xs font-medium truncate ${isCurrentUnqualified ? 'text-orange-600' : 'text-gray-950'}`}>
+                  {selectedWorker.nickname}
+                </span>
+                {isCurrentUnavailable && <AlertTriangle className="w-3 h-3 text-red-500 flex-shrink-0" />}
+                {isCurrentDoubleBooked && !isCurrentUnavailable && (
+                  <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" title="עובד זה כבר שובץ למשמרת חופפת" />
+                )}
+                {isCurrentUnqualified && <span className="text-[10px] text-orange-500 flex-shrink-0">⚠</span>}
+                {existingComment && <MessageSquare className="w-3 h-3 text-blue-400 flex-shrink-0" />}
+              </div>
+            ) : (
+              <span className="text-gray-300 text-xs">+ בחר עובד</span>
+            )}
+          </button>
+
+          {/* Comment tooltip on hover */}
+          {hovering && existingComment && !commentOpen && (
+            <div
+              className="absolute z-50 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl max-w-[200px] whitespace-pre-wrap pointer-events-none"
+              style={{ bottom: "calc(100% + 4px)", right: 0 }}
+              dir="rtl"
+            >
+              {existingComment}
             </div>
-          ) : (
-            <span className="text-gray-300 text-xs">+ בחר עובד</span>
           )}
-        </button>
+
+          {/* Comment edit popup */}
+          {commentOpen && selectedWorker && (
+            <div
+              ref={commentRef}
+              className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-2xl p-3 flex flex-col gap-2"
+              style={{ bottom: "calc(100% + 4px)", right: 0, width: 220 }}
+              dir="rtl"
+            >
+              <div className="text-xs font-semibold text-gray-700">הערה עבור {selectedWorker.nickname}</div>
+              <textarea
+                ref={commentInputRef}
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                placeholder="הוסף הערה..."
+                className="text-xs border border-gray-200 rounded p-1.5 resize-none outline-none focus:border-blue-400"
+                rows={3}
+                dir="rtl"
+              />
+              <div className="flex gap-1 justify-end">
+                <button
+                  onClick={() => {
+                    setWorkerComment(selectedWorker.id, commentText.trim());
+                    setCommentOpen(false);
+                  }}
+                  className="text-xs bg-blue-600 text-white rounded px-2 py-1 hover:bg-blue-700"
+                >שמור</button>
+                <button
+                  onClick={() => setCommentOpen(false)}
+                  className="text-xs bg-gray-100 text-gray-700 rounded px-2 py-1 hover:bg-gray-200"
+                >ביטול</button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Dropdown list */}
