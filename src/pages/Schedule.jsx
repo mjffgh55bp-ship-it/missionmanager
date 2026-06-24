@@ -44,6 +44,7 @@ import ColumnCell from "../components/schedule/ColumnCell";
 import WorkerCell from "../components/schedule/WorkerCell";
 import TimeCell from "../components/schedule/TimeCell";
 import PresetsDialog from "../components/schedule/PresetsDialog";
+import ScheduleNotes from "../components/schedule/ScheduleNotes";
 import MokedIdEditor from "../components/schedule/MokedIdEditor";
 import { suggestMappingId } from "@/components/settings/MappableItemRow";
 import { isVisibleScheduleTemplate } from "@/lib/scheduleVisibility";
@@ -97,6 +98,8 @@ export default function Schedule() {
   const [publishedWeeks, setPublishedWeeks] = useState([]);
   const [togglingPublish, setTogglingPublish] = useState(false);
   const [mokedIdEditorTarget, setMokedIdEditorTarget] = useState(null); // { templateId, name, mappingId }
+  const [scheduleNotes, setScheduleNotes] = useState("");
+  const [scheduleNotesHeight, setScheduleNotesHeight] = useState(80);
   const [exportSelectionMode, setExportSelectionMode] = useState(false);
   const [selectedMokedKeys, setSelectedMokedKeys] = useState(new Set()); // group keys: templateId_groupId
   const [exportingMokeds, setExportingMokeds] = useState(false);
@@ -217,7 +220,11 @@ export default function Schedule() {
     const mokedOrderSettings = allSettings.filter(s => s.setting_key === `moked_order_${dateString}`);
     const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
     const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
+    const notesSettings = allSettings.filter(s => s.setting_key === "schedule_admin_notes");
+    const notesHeightSettings = allSettings.filter(s => s.setting_key === "schedule_admin_notes_height");
     allSettings.forEach(s => { appSettingsIdCache.current[s.setting_key] = s.id; });
+    if (notesSettings.length > 0) setScheduleNotes(notesSettings[0].setting_value || "");
+    if (notesHeightSettings.length > 0) setScheduleNotesHeight(parseInt(notesHeightSettings[0].setting_value) || 80);
     setPublishedWeeks(parseSetting(allSettings, "published_weeks", []));
     applyStaticData({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData });
     applyDailyData({ dateString, templateRowsData, allTemplatesData, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
@@ -720,6 +727,26 @@ export default function Schedule() {
     setTimeout(() => { mokedOrderSavingRef.current = false; }, 3000);
   };
 
+  const saveScheduleNotes = async (text) => {
+    setScheduleNotes(text);
+    const key = "schedule_admin_notes";
+    const data = { setting_key: key, setting_value: text };
+    const cachedId = appSettingsIdCache.current[key];
+    if (cachedId) { await base44.entities.AppSettings.update(cachedId, data); }
+    else { const created = await base44.entities.AppSettings.create(data); appSettingsIdCache.current[key] = created.id; }
+    invalidateSettingsCache();
+  };
+
+  const saveScheduleNotesHeight = async (h) => {
+    setScheduleNotesHeight(h);
+    const key = "schedule_admin_notes_height";
+    const data = { setting_key: key, setting_value: String(h) };
+    const cachedId = appSettingsIdCache.current[key];
+    if (cachedId) { await base44.entities.AppSettings.update(cachedId, data); }
+    else { const created = await base44.entities.AppSettings.create(data); appSettingsIdCache.current[key] = created.id; }
+    invalidateSettingsCache();
+  };
+
   const weekStartStrForPublish = format(startOfWeek(currentDate, { weekStartsOn: 0 }), "yyyy-MM-dd");
   const isCurrentWeekPublished = publishedWeeks.includes(weekStartStrForPublish);
 
@@ -735,6 +762,28 @@ export default function Schedule() {
     } finally {
       setTogglingPublish(false);
     }
+  };
+
+  // Builds a flat ordered array of { type: 'notes' } | { type: 'moked', group, groupIndex }
+  // respecting mokedOrder which may contain '__notes__' as a positional marker.
+  const buildOrderedItems = (groups, order) => {
+    const notesInOrder = order.includes('__notes__');
+    const items = [];
+    if (notesInOrder) {
+      // interleave notes and groups according to order
+      const groupsByKey = Object.fromEntries(groups.map((g, i) => [g.key, { group: g, groupIndex: i }]));
+      order.forEach(key => {
+        if (key === '__notes__') { items.push({ type: 'notes' }); }
+        else if (groupsByKey[key]) { items.push({ type: 'moked', ...groupsByKey[key] }); delete groupsByKey[key]; }
+      });
+      // append any groups not in order
+      Object.values(groupsByKey).forEach(g => items.push({ type: 'moked', ...g }));
+    } else {
+      // notes go first by default when not in order yet
+      items.push({ type: 'notes' });
+      groups.forEach((group, groupIndex) => items.push({ type: 'moked', group, groupIndex }));
+    }
+    return items;
   };
 
   const groupedMokeds = useMemo(() => {
@@ -977,24 +1026,50 @@ export default function Schedule() {
           </div>
         )}
         {templates.length === 0 && templateRows.length === 0 ? (
-          <Card className="border-none shadow-lg">
-            <CardContent className="py-16 text-center" dir="rtl">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">אין מוקדים ליום זה</h3>
-              <p className="text-gray-600">לחץ על "מצב עריכה" ואז "צור מוקד חדש" להתחיל.</p>
-            </CardContent>
-          </Card>
+          <>
+            <ScheduleNotes notes={scheduleNotes} height={scheduleNotesHeight} editMode={editMode} onSave={saveScheduleNotes} onHeightChange={saveScheduleNotesHeight} dragHandleProps={{}} />
+            <Card className="border-none shadow-lg mt-4">
+              <CardContent className="py-16 text-center" dir="rtl">
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">אין מוקדים ליום זה</h3>
+                <p className="text-gray-600">לחץ על "מצב עריכה" ואז "צור מוקד חדש" להתחיל.</p>
+              </CardContent>
+            </Card>
+          </>
         ) : (
           <DragDropContext onDragEnd={(result) => {
             if (!result.destination || !editMode) return;
-            const newOrder = groupedMokeds.map(g => g.key);
-            const [removed] = newOrder.splice(result.source.index, 1);
-            newOrder.splice(result.destination.index, 0, removed);
-            saveMokedOrder(newOrder);
+            // Build the full ordered list including the notes item
+            const allItems = buildOrderedItems(groupedMokeds, mokedOrder);
+            const keys = allItems.map(item => item.type === 'notes' ? '__notes__' : item.group.key);
+            const [removed] = keys.splice(result.source.index, 1);
+            keys.splice(result.destination.index, 0, removed);
+            saveMokedOrder(keys);
           }}>
             <Droppable droppableId="moked-list">
               {(provided) => (
                 <div className="space-y-4" ref={provided.innerRef} {...provided.droppableProps}>
-                  {groupedMokeds.map((group, groupIndex) => {
+                  {(() => {
+                    const orderedItems = buildOrderedItems(groupedMokeds, mokedOrder);
+                    return orderedItems.map((item, itemIndex) => {
+                    if (item.type === 'notes') {
+                      return (
+                        <Draggable key="__notes__" draggableId="__notes__" index={itemIndex} isDragDisabled={!editMode}>
+                          {(provided, snapshot) => (
+                            <div ref={provided.innerRef} {...provided.draggableProps} className={snapshot.isDragging ? "opacity-70" : ""}>
+                              <ScheduleNotes
+                                notes={scheduleNotes}
+                                height={scheduleNotesHeight}
+                                editMode={editMode}
+                                onSave={saveScheduleNotes}
+                                onHeightChange={saveScheduleNotesHeight}
+                                dragHandleProps={provided.dragHandleProps}
+                              />
+                            </div>
+                          )}
+                        </Draggable>
+                      );
+                    }
+                    const { group } = item;
                 const template = allTemplates.find((t) => t.id === group.template_id);
                 if (!template) return null;
                 const templateRowsForTemplate = group.rows;
@@ -1013,7 +1088,7 @@ export default function Schedule() {
                   (col.column_id && scheduleColumnsById[col.column_id]?.name) || col.name;
 
                 return (
-                  <Draggable key={group.key} draggableId={group.key} index={groupIndex} isDragDisabled={!editMode}>
+                  <Draggable key={group.key} draggableId={group.key} index={itemIndex} isDragDisabled={!editMode}>
                     {(provided, snapshot) => (
                       <div ref={provided.innerRef} {...provided.draggableProps} className={snapshot.isDragging ? "opacity-70" : ""}>
                   <Card className={`border-none shadow-lg overflow-hidden transition-all ${exportSelectionMode && selectedMokedKeys.has(group.key) ? "ring-4 ring-emerald-400 ring-offset-1" : ""}`}>
@@ -1402,8 +1477,9 @@ export default function Schedule() {
                       </div>
                     )}
                   </Draggable>
-                );
-              })}
+                  );
+                  });  // end orderedItems.map
+                  })()}
                   {provided.placeholder}
                 </div>
               )}
