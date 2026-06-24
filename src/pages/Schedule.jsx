@@ -802,15 +802,31 @@ export default function Schedule() {
     const endCellKey = cell.getAttribute('data-cell-key');
     if (!endCellKey) return;
 
-    const ordered = getOrderedCellKeys();
-    const startIdx = ordered.indexOf(dragSelectStart);
-    const endIdx = ordered.indexOf(endCellKey);
-    if (startIdx === -1 || endIdx === -1) return;
-    const lo = Math.min(startIdx, endIdx);
-    const hi = Math.max(startIdx, endIdx);
+    // Parse cell keys to get row/column indices and compute rectangular range
+    const parseKey = (key) => {
+      const [rowId, colIdx] = key.split('__');
+      return { rowId, colIdx: parseInt(colIdx, 10) };
+    };
+    const startParsed = parseKey(dragSelectStart);
+    const endParsed = parseKey(endCellKey);
+    
+    const startRowIdx = templateRows.findIndex(r => r.id === startParsed.rowId);
+    const endRowIdx = templateRows.findIndex(r => r.id === endParsed.rowId);
+    if (startRowIdx === -1 || endRowIdx === -1) return;
+    
+    const minRow = Math.min(startRowIdx, endRowIdx);
+    const maxRow = Math.max(startRowIdx, endRowIdx);
+    const minCol = Math.min(startParsed.colIdx, endParsed.colIdx);
+    const maxCol = Math.max(startParsed.colIdx, endParsed.colIdx);
 
     const previewSet = new Set();
-    for (let i = lo; i <= hi; i++) previewSet.add(ordered[i]);
+    for (let r = minRow; r <= maxRow; r++) {
+      if (r < 0 || r >= templateRows.length) continue;
+      const row = templateRows[r];
+      for (let c = minCol; c <= maxCol; c++) {
+        previewSet.add(`${row.id}__${c}`);
+      }
+    }
     setDragPreviewCells(previewSet);
   };
 
@@ -824,29 +840,41 @@ export default function Schedule() {
     const cell = e.target.closest('[data-cell-key]');
     const endCellKey = cell ? cell.getAttribute('data-cell-key') : dragSelectStart;
 
-    const ordered = getOrderedCellKeys();
-    const startIdx = ordered.indexOf(dragSelectStart);
-    const endIdx = ordered.indexOf(endCellKey || dragSelectStart);
+    const parseKey = (key) => {
+      const [rowId, colIdx] = key.split('__');
+      return { rowId, colIdx: parseInt(colIdx, 10) };
+    };
+    const startParsed = parseKey(dragSelectStart);
+    const endParsed = parseKey(endCellKey || dragSelectStart);
+    
+    const startRowIdx = templateRows.findIndex(r => r.id === startParsed.rowId);
+    const endRowIdx = templateRows.findIndex(r => r.id === endParsed.rowId);
 
     const newHighlighted = { ...highlightedCells };
 
-    if (startIdx === -1) {
+    if (startRowIdx === -1) {
       // fall back to a plain single-cell toggle
       if (newHighlighted[dragSelectStart]) delete newHighlighted[dragSelectStart];
       else newHighlighted[dragSelectStart] = true;
-    } else if (endIdx === -1 || startIdx === endIdx) {
+    } else if (endRowIdx === -1 || startRowIdx === endRowIdx && startParsed.colIdx === endParsed.colIdx) {
       // No drag movement → single-cell toggle
       if (newHighlighted[dragSelectStart]) delete newHighlighted[dragSelectStart];
       else newHighlighted[dragSelectStart] = true;
     } else {
       // Drag range → set them all to the OPPOSITE of the start cell's current state
-      const lo = Math.min(startIdx, endIdx);
-      const hi = Math.max(startIdx, endIdx);
+      const minRow = Math.min(startRowIdx, endRowIdx);
+      const maxRow = Math.max(startRowIdx, endRowIdx);
+      const minCol = Math.min(startParsed.colIdx, endParsed.colIdx);
+      const maxCol = Math.max(startParsed.colIdx, endParsed.colIdx);
       const turningOn = !highlightedCells[dragSelectStart];
-      for (let i = lo; i <= hi; i++) {
-        const k = ordered[i];
-        if (turningOn) newHighlighted[k] = true;
-        else delete newHighlighted[k];
+      for (let r = minRow; r <= maxRow; r++) {
+        if (r < 0 || r >= templateRows.length) continue;
+        const row = templateRows[r];
+        for (let c = minCol; c <= maxCol; c++) {
+          const k = `${row.id}__${c}`;
+          if (turningOn) newHighlighted[k] = true;
+          else delete newHighlighted[k];
+        }
       }
     }
 
@@ -1479,8 +1507,8 @@ export default function Schedule() {
                                      const isHighlighted = !!highlightedCells[cellKey];
                                      const isDragPreview = dragPreviewCells.has(cellKey);
                                       return (
-                                        <TableCell key={idx} dir="rtl" data-cell-key={cellKey} className={`p-0 text-center cursor-pointer select-none transition-colors ${isHighlighted ? 'bg-red-200/40' : isDragPreview ? 'bg-red-100/60' : ''}`} rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
-                                        {col.type === "worker" ? (
+                                        <TableCell key={idx} dir="rtl" data-cell-key={cellKey} className={`p-0 text-center cursor-pointer select-none transition-colors ${isHighlighted ? 'bg-red-200/40' : isDragPreview ? 'bg-red-100/60' : ''}`} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) e.stopPropagation(); }} rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
+                                         {col.type === "worker" ? (
                                            <WorkerCell
                                              rowId={row.id}
                                              columnName={col.name}
