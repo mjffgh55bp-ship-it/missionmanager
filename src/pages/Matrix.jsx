@@ -1751,10 +1751,19 @@ export default function Matrix() {
     // Resolve task/mission name from column_values — look for any task-type column that has a value for this row
     const taskName = (() => {
       if (!assignment.column_values) return null;
-      for (const col of scheduleParams) {
+      // Check scheduleParams (custom_schedule_params) for task-type columns
+      const allCols = [...(scheduleParams || [])];
+      // Also check template columns for task type
+      const template = allTemplates.find(t => t.id === assignment.template_id);
+      if (template?.columns) {
+        template.columns.forEach(c => {
+          if (c.type === "task" && !allCols.find(sc => sc.name === c.name)) allCols.push(c);
+        });
+      }
+      for (const col of allCols) {
         if (col.type !== "task") continue;
         const val = assignment.column_values[col.name];
-        if (val && typeof val === "string" && val.trim()) return `${col.name}: ${val.trim()}`;
+        if (val && typeof val === "string" && val.trim()) return val.trim();
       }
       return null;
     })();
