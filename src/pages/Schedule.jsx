@@ -220,10 +220,10 @@ export default function Schedule() {
     const mokedOrderSettings = allSettings.filter(s => s.setting_key === `moked_order_${dateString}`);
     const columnOrderSettings = allSettings.filter(s => s.setting_key === `schedule_column_order_${dateString}`);
     const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
-    const notesSettings = allSettings.filter(s => s.setting_key === "schedule_admin_notes");
-    const notesHeightSettings = allSettings.filter(s => s.setting_key === "schedule_admin_notes_height");
+    const notesSettings = allSettings.filter(s => s.setting_key === `schedule_admin_notes_${dateString}`);
+    const notesHeightSettings = allSettings.filter(s => s.setting_key === `schedule_admin_notes_height_${dateString}`);
     allSettings.forEach(s => { appSettingsIdCache.current[s.setting_key] = s.id; });
-    if (notesSettings.length > 0) setScheduleNotes(notesSettings[0].setting_value || "");
+    setScheduleNotes(notesSettings.length > 0 ? (notesSettings[0].setting_value || "") : "");
     if (notesHeightSettings.length > 0) setScheduleNotesHeight(parseInt(notesHeightSettings[0].setting_value) || 80);
     setPublishedWeeks(parseSetting(allSettings, "published_weeks", []));
     applyStaticData({ colTypesSettings, allTemplatesData, shiftStatusesSettings, workerRolesSettings, tasksSettings, taskQualSettings, openRegSettings, workersData });
@@ -322,6 +322,8 @@ export default function Schedule() {
     const dailyColumnsSettings = allSettings.filter(s => s.setting_key === `schedule_daily_columns_${dateString}`);
     allSettings.forEach(s => { appSettingsIdCache.current[s.setting_key] = s.id; });
     setPublishedWeeks(parseSetting(allSettings, "published_weeks", []));
+    const freshNotesSettings = allSettings.filter(s => s.setting_key === `schedule_admin_notes_${dateString}`);
+    setScheduleNotes(freshNotesSettings.length > 0 ? (freshNotesSettings[0].setting_value || "") : "");
     applyDailyData({ dateString, templateRowsData, allTemplatesData: freshTemplates, mokedOrderSettings, columnOrderSettings, dailyColumnsSettings, availabilitiesData, unavailabilitiesData });
     } finally {
     setDailyLoading(false);
@@ -729,7 +731,7 @@ export default function Schedule() {
 
   const saveScheduleNotes = async (text) => {
     setScheduleNotes(text);
-    const key = "schedule_admin_notes";
+    const key = `schedule_admin_notes_${dateString}`;
     const data = { setting_key: key, setting_value: text };
     const cachedId = appSettingsIdCache.current[key];
     if (cachedId) { await base44.entities.AppSettings.update(cachedId, data); }
@@ -739,7 +741,7 @@ export default function Schedule() {
 
   const saveScheduleNotesHeight = async (h) => {
     setScheduleNotesHeight(h);
-    const key = "schedule_admin_notes_height";
+    const key = `schedule_admin_notes_height_${dateString}`;
     const data = { setting_key: key, setting_value: String(h) };
     const cachedId = appSettingsIdCache.current[key];
     if (cachedId) { await base44.entities.AppSettings.update(cachedId, data); }
