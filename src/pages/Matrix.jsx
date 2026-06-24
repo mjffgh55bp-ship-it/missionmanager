@@ -646,7 +646,10 @@ export default function Matrix() {
       const rawPops = parseSetting("worker_populations") || ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
       setPopulations(rawPops.map(p => (typeof p === "string" ? p : p.name)));
       const rawRoles = parseSetting("worker_roles") || ["שף", "סו-שף"];
-      setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? r : r.name)));
+      // Keep full role objects { name, mapping_id }. The summary-count criteria and
+      // the role chips need the mapping_id; consumers that want just the name
+      // (e.g. ViewPresetDialog) already normalize internally.
+      setWorkerRoles(rawRoles.map(r => (typeof r === "string" ? { name: r, mapping_id: r } : r)));
       setQualifications((qualsData || []).map(q => ({ id: q.id, name: q.name })));
       setWorkerQualifications(workerQualsData || []);
       const rawStatuses = parseSetting("shift_statuses") || [];
