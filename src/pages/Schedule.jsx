@@ -1506,9 +1506,15 @@ export default function Schedule() {
                                      const cellKey = `${row.id}__${idx}`;
                                      const isHighlighted = !!highlightedCells[cellKey];
                                      const isDragPreview = dragPreviewCells.has(cellKey);
+                                      const handleCellMouseDown = (e) => {
+                                        if (e.ctrlKey || e.metaKey) {
+                                          e.preventDefault();
+                                        }
+                                      };
                                       return (
-                                        <TableCell key={idx} dir="rtl" data-cell-key={cellKey} className={`p-0 text-center cursor-pointer select-none transition-colors ${isHighlighted ? 'bg-red-200/40' : isDragPreview ? 'bg-red-100/60' : ''}`} onMouseDown={(e) => { if (e.ctrlKey || e.metaKey) e.stopPropagation(); }} rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
-                                         {col.type === "worker" ? (
+                                       <TableCell key={idx} dir="rtl" data-cell-key={cellKey} className={`p-0 text-center cursor-pointer select-none transition-colors ${isHighlighted ? 'bg-red-200/40' : isDragPreview ? 'bg-red-100/60' : ''}`} rowSpan={span > 1 ? span : undefined} style={span > 1 ? { verticalAlign: 'top', height: `${span * 32}px` } : {}}>
+                                        <div onMouseDown={handleCellMouseDown} style={{ pointerEvents: 'auto' }}>
+                                        {col.type === "worker" ? (
                                            <WorkerCell
                                              rowId={row.id}
                                              columnName={col.name}
@@ -1572,6 +1578,7 @@ export default function Schedule() {
                                         ) : (
                                           <div className="px-2 py-1 text-sm text-center">{row.values?.[col.name] || ''}</div>
                                         )}
+                                        </div>
                                       </TableCell>
                                     );
                                   })}
