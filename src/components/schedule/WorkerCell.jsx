@@ -301,7 +301,7 @@ export default function WorkerCell({
             <div
               ref={commentRef}
               className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-2xl p-3 flex flex-col gap-2"
-              style={{ bottom: "calc(100% + 4px)", right: 0, width: 220 }}
+              style={{ top: "calc(100% + 4px)", right: 0, width: 220 }}
               dir="rtl"
             >
               <div className="text-xs font-semibold text-gray-700">הערה עבור {selectedWorker.nickname}</div>
