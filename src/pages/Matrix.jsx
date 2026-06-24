@@ -28,6 +28,7 @@ import useViewPresets from "../hooks/useViewPresets";
 import ViewPresetDialog from "../components/matrix/ViewPresetDialog";
 import { popUndo } from "@/lib/undoStack";
 import { exportMatrixToExcel } from "@/lib/matrixExport";
+import SummaryColumnsHeader from "../components/matrix/SummaryColumnsHeader";
 
 // ── Timeline constants ──────────────────────────────────────────────────────
 const DAILY_TOTAL_MINUTES = 24 * 60;        // 1440
@@ -142,6 +143,12 @@ export default function Matrix() {
   const [customPpm, setCustomPpm] = useState(null);
 
   const [summaryColumns, setSummaryColumns] = useState([]);
+  const [summaryColWidths, setSummaryColWidths] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('matrix_summary_col_widths') || '{}'); } catch { return {}; }
+  });
+  const [workerOrder, setWorkerOrder] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('matrix_worker_order') || 'null'); } catch { return null; }
+  });
 
   const totalMins = viewMode === 'daily' ? DAILY_TOTAL_MINUTES : WEEKLY_TOTAL_MINUTES;
 
@@ -1984,11 +1991,68 @@ export default function Matrix() {
     [currentDate]
   );
 
+  // ── Summary column helpers ────────────────────────────────────────────────────
+  const handleSummaryColReorder = (newCols) => {
+    saveSummaryColumns(newCols);
+  };
+  const handleSummaryColResize = (colId, newWidth) => {
+    setSummaryColWidths(prev => {
+      const next = { ...prev, [colId]: newWidth };
+      try { localStorage.setItem('matrix_summary_col_widths', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  // ── Worker row reorder ────────────────────────────────────────────────────────
+  const workerDragRef = useRef(null);
+  const handleWorkerDragStart = (workerId) => { workerDragRef.current = workerId; };
+  const handleWorkerDrop = (targetWorkerId) => {
+    const fromId = workerDragRef.current;
+    if (!fromId || fromId === targetWorkerId) { workerDragRef.current = null; return; }
+    setWorkerOrder(prev => {
+      const base = prev
+        ? workers.filter(w => prev.includes(w.id)).sort((a, b) => prev.indexOf(a.id) - prev.indexOf(b.id)).concat(workers.filter(w => !prev.includes(w.id)))
+        : [...workers];
+      const currentOrder = filteredWorkersRef.current.map(w => w.id);
+      // reorder within filteredWorkers, then rebuild full order
+      const fromIdx = currentOrder.indexOf(fromId);
+      const toIdx = currentOrder.indexOf(targetWorkerId);
+      if (fromIdx < 0 || toIdx < 0) return prev;
+      const newFiltered = [...currentOrder];
+      newFiltered.splice(toIdx, 0, newFiltered.splice(fromIdx, 1)[0]);
+      // Merge: non-filtered workers keep their relative position before/after
+      const allIds = workers.map(w => w.id);
+      const filteredSet = new Set(currentOrder);
+      const nonFiltered = allIds.filter(id => !filteredSet.has(id));
+      const merged = [];
+      let fi = 0, nfi = 0;
+      allIds.forEach(id => {
+        if (filteredSet.has(id)) merged.push(newFiltered[fi++]);
+        else merged.push(nonFiltered[nfi++]);
+      });
+      try { localStorage.setItem('matrix_worker_order', JSON.stringify(merged)); } catch {}
+      return merged;
+    });
+    workerDragRef.current = null;
+  };
+
   // ── Filtered workers ──────────────────────────────────────────────────────────
-  const filteredWorkers = useMemo(() => workers.filter(w => {
-    if (activePreset && !activePreset.workerIds.includes(w.id)) return false;
-    return true;
-  }), [workers, activePreset]);
+  const filteredWorkers = useMemo(() => {
+    let list = workers.filter(w => {
+      if (activePreset && !activePreset.workerIds.includes(w.id)) return false;
+      return true;
+    });
+    if (workerOrder && workerOrder.length > 0) {
+      const orderMap = {};
+      workerOrder.forEach((id, i) => { orderMap[id] = i; });
+      list = [...list].sort((a, b) => {
+        const ai = orderMap[a.id] ?? 99999;
+        const bi = orderMap[b.id] ?? 99999;
+        return ai - bi;
+      });
+    }
+    return list;
+  }, [workers, activePreset, workerOrder]);
   filteredWorkersRef.current = filteredWorkers;
 
   const handleRowClick = useCallback((e, worker, index) => {
@@ -2085,11 +2149,15 @@ export default function Matrix() {
     );
   };
 
-  const renderSummaryCell = (worker, col, index, isSelected) => (
-    <div key={col.id} className={`w-[60px] min-w-[60px] border-r flex items-center justify-center h-8 ${isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ height: `${ROW_H}px` }}>
-      <span className="text-xs font-bold text-gray-700">{columnCount(worker.id, col)}</span>
-    </div>
-  );
+  const renderSummaryCell = (worker, col, index, isSelected) => {
+    const w = summaryColWidths[col.id] || 60;
+    const count = columnCount(worker.id, col);
+    return (
+      <div key={col.id} className={`border-r flex items-center justify-center h-8 ${isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`} style={{ width: `${w}px`, minWidth: `${w}px`, height: `${ROW_H}px` }}>
+        {count > 0 && <span className="text-xs font-bold text-gray-700">{count}</span>}
+      </div>
+    );
+  };
 
   const getWorkerBriefingMarkers = (workerId) => {
     return briefingMarkers.filter(m => {
@@ -2232,6 +2300,9 @@ export default function Matrix() {
     availabilities, weekStartDate, renderSummaryCell, ROW_H, renderWorkerCellContent, handleRowClick,
     timelineWidth, renderTimelineHeader, currentDate, ppm, handlePointerDown, handlePointerMove,
     handlePointerUp, renderTimelineRow, satAssigned, satAvail, satUnavail, allTemplates, isStandbyStatus,
+    summaryColWidths, handleSummaryColReorder, handleSummaryColResize,
+    handleWorkerDragStart, handleWorkerDrop,
+    SummaryColumnsHeaderComponent: SummaryColumnsHeader,
   };
 
   const renderPinnedLayout = () => (

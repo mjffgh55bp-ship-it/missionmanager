@@ -1,5 +1,5 @@
-import React from "react";
-import { Plus, FileSpreadsheet } from "lucide-react";
+import React, { useState } from "react";
+import { Plus, FileSpreadsheet, GripVertical } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import MasterControls from "./MasterControls";
 import SaturdayReferenceStrip from "./SaturdayReferenceStrip";
@@ -23,7 +23,10 @@ export function PinnedLayout({
   timelineHeaderRef, timelineWidth, renderTimelineHeader, currentDate, ppm,
   timelineScrollRef, handlePointerDown, handlePointerMove, handlePointerUp,
   renderTimelineRow, satAssigned, satAvail, satUnavail, allTemplates, isStandbyStatus,
+  summaryColWidths, handleSummaryColReorder, handleSummaryColResize,
+  handleWorkerDragStart, handleWorkerDrop, SummaryColumnsHeaderComponent,
 }) {
+  const [dragOverWorkerId, setDragOverWorkerId] = useState(null);
   return (
     <div className="flex flex-1 min-h-0" dir="rtl">
       <div className="flex flex-col flex-shrink-0 bg-white z-20" style={{ width: `${fixedColumnsWidth}px`, boxShadow: '-4px 0 8px rgba(0,0,0,0.06)', borderLeft: '1px solid #e5e7eb' }}>
@@ -40,15 +43,14 @@ export function PinnedLayout({
                 isWeekPublished={isCurrentWeekPublished} onTogglePublish={handleTogglePublish} togglingPublish={togglingPublish} />
             </div>
             {viewMode === 'weekly' && <AvailabilityStatsHeader />}
-            {viewMode === 'weekly' && summaryColumns.map(col => (
-              <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1 h-full" title={col.name}>
-                <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
-              </div>
-            ))}
-            {viewMode === 'weekly' && (
-              <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center h-full">
-                <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
-              </div>
+            {viewMode === 'weekly' && SummaryColumnsHeaderComponent && (
+              <SummaryColumnsHeaderComponent
+                summaryColumns={summaryColumns}
+                columnWidths={summaryColWidths}
+                onReorder={handleSummaryColReorder}
+                onResize={handleSummaryColResize}
+                setShowSummaryColumnsDialog={() => setShowSummaryColumnsDialog(true)}
+              />
             )}
           </div>
         </div>
@@ -59,9 +61,21 @@ export function PinnedLayout({
             : filteredWorkers.map((worker, index) => {
               const isSelected = selectedWorkerIds.has(worker.id);
               const rowBg = isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
+              const isDropTarget = dragOverWorkerId === worker.id;
               return (
-                <div key={worker.id} className={`flex border-b cursor-pointer select-none ${rowBg}`} style={{ height: `${ROW_H}px` }} onClick={e => handleRowClick(e, worker, index)}>
+                <div
+                  key={worker.id}
+                  draggable
+                  onDragStart={() => handleWorkerDragStart(worker.id)}
+                  onDragOver={e => { e.preventDefault(); setDragOverWorkerId(worker.id); }}
+                  onDrop={() => { handleWorkerDrop(worker.id); setDragOverWorkerId(null); }}
+                  onDragEnd={() => setDragOverWorkerId(null)}
+                  className={`flex border-b cursor-pointer select-none ${rowBg} ${isDropTarget ? 'border-t-2 border-blue-400' : ''}`}
+                  style={{ height: `${ROW_H}px` }}
+                  onClick={e => handleRowClick(e, worker, index)}
+                >
                   <div className={`px-1 font-medium text-gray-800 border-r flex items-center gap-1 h-full ${rowBg}`} style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
+                    <GripVertical className="w-3 h-3 text-gray-300 flex-shrink-0 cursor-grab" />
                     {renderWorkerCellContent(worker, index)}
                   </div>
                   {viewMode === 'weekly' && <AvailabilityStatsCell workerId={worker.id} availabilities={availabilities} weekStartDate={weekStartDate} />}
@@ -102,7 +116,10 @@ export function ClassicLayout({
   setShowNotificationDialog, isCurrentWeekPublished, handleTogglePublish, togglingPublish, refreshWorkers,
   summaryColumns, setShowSummaryColumnsDialog, workersLoadFailed, loadStaticData, availabilities,
   weekStartDate, renderSummaryCell, renderWorkerCellContent, handleRowClick,
+  summaryColWidths, handleSummaryColReorder, handleSummaryColResize,
+  handleWorkerDragStart, handleWorkerDrop, SummaryColumnsHeaderComponent,
 }) {
+  const [dragOverWorkerId, setDragOverWorkerId] = useState(null);
   return (
     <div ref={scrollContainerRef} dir="ltr" className="overflow-x-auto overflow-y-auto flex-1 min-h-0 matrix-scroll-container" onMouseDown={handlePointerDown} onMouseMove={handlePointerMove} onMouseUp={handlePointerUp}>
       <div style={{ display: 'flex', flexDirection: 'row' }}>
@@ -139,15 +156,14 @@ export function ClassicLayout({
                   isWeekPublished={isCurrentWeekPublished} onTogglePublish={handleTogglePublish} togglingPublish={togglingPublish} />
               </div>
               {viewMode === 'weekly' && <AvailabilityStatsHeader />}
-              {viewMode === 'weekly' && summaryColumns.map(col => (
-                <div key={col.id} className="w-[60px] min-w-[60px] border-r bg-gray-100 flex flex-col items-center justify-center text-center px-0.5 py-1 h-full" title={col.name}>
-                  <span className="text-[9px] font-semibold text-gray-600 leading-tight">{col.name}</span>
-                </div>
-              ))}
-              {viewMode === 'weekly' && (
-                <div className="w-[28px] min-w-[28px] border-r bg-gray-100 flex items-center justify-center h-full">
-                  <button onClick={() => setShowSummaryColumnsDialog(true)} className="text-gray-400 hover:text-gray-600 p-1" title="נהל עמודות סיכום"><Plus className="w-3 h-3" /></button>
-                </div>
+              {viewMode === 'weekly' && SummaryColumnsHeaderComponent && (
+                <SummaryColumnsHeaderComponent
+                  summaryColumns={summaryColumns}
+                  columnWidths={summaryColWidths}
+                  onReorder={handleSummaryColReorder}
+                  onResize={handleSummaryColResize}
+                  setShowSummaryColumnsDialog={() => setShowSummaryColumnsDialog(true)}
+                />
               )}
             </div>
           </div>
@@ -157,9 +173,21 @@ export function ClassicLayout({
             : filteredWorkers.map((worker, index) => {
               const isSelected = selectedWorkerIds.has(worker.id);
               const rowBg = isSelected ? 'bg-blue-50' : index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50';
+              const isDropTarget = dragOverWorkerId === worker.id;
               return (
-                <div key={worker.id} className={`flex border-b cursor-pointer select-none ${rowBg}`} style={{ height: `${ROW_H}px` }} onClick={e => handleRowClick(e, worker, index)}>
+                <div
+                  key={worker.id}
+                  draggable
+                  onDragStart={() => handleWorkerDragStart(worker.id)}
+                  onDragOver={e => { e.preventDefault(); setDragOverWorkerId(worker.id); }}
+                  onDrop={() => { handleWorkerDrop(worker.id); setDragOverWorkerId(null); }}
+                  onDragEnd={() => setDragOverWorkerId(null)}
+                  className={`flex border-b cursor-pointer select-none ${rowBg} ${isDropTarget ? 'border-t-2 border-blue-400' : ''}`}
+                  style={{ height: `${ROW_H}px` }}
+                  onClick={e => handleRowClick(e, worker, index)}
+                >
                   <div className={`px-1 font-medium text-gray-800 border-r flex items-center gap-1 h-full ${rowBg}`} style={{ width: `${WORKER_COL_WIDTH}px`, minWidth: `${WORKER_COL_WIDTH}px` }}>
+                    <GripVertical className="w-3 h-3 text-gray-300 flex-shrink-0 cursor-grab" />
                     {renderWorkerCellContent(worker, index)}
                   </div>
                   {viewMode === 'weekly' && <AvailabilityStatsCell workerId={worker.id} availabilities={availabilities} weekStartDate={weekStartDate} />}
