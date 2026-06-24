@@ -1594,7 +1594,7 @@ export default function TrackerTable({ tracker: initialTracker, workers, assignm
               <div className="fixed inset-0 z-[90]" onMouseDown={() => setShowFilters(false)} />
               <div
                 className="fixed z-[100] bg-white border rounded-xl shadow-2xl p-4 space-y-3 w-[min(92vw,520px)] max-h-[80vh] overflow-y-auto"
-                style={{ top: 80, right: 24 }}
+                style={{ top: 64, left: 24 }}
                 onMouseDown={e => e.stopPropagation()}
                 dir="rtl"
               >
