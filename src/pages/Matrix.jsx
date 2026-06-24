@@ -1251,6 +1251,22 @@ export default function Matrix() {
       }
       return; // wait until either promoted or mouseup clears it
     }
+    // Unavailability resize drag — handle independently of availability drag
+    if (unavailDragging) {
+      const { action: uAction, originalStart: uOrigStart, originalEnd: uOrigEnd, dayIndex: uDay } = unavailDragging;
+      const uSlot = getSlotFromPointer(e);
+      let curAbs;
+      if (uSlot) { curAbs = Number(uSlot.dataset.dayIndex || 0) * 1440 + Number(uSlot.dataset.operationalMinute || 0); }
+      else { const { opMinutes: om, dayIndex: fd } = clientXToOpMinutes(e.clientX); curAbs = fd * 1440 + om; }
+      let ns = uOrigStart, ne = uOrigEnd;
+      if (uAction === 'resize-start') {
+        ns = operationalMinutesToTime(Math.max(0, curAbs - uDay * 1440));
+      } else if (uAction === 'resize-end') {
+        ne = operationalMinutesToTime(Math.max(0, curAbs - uDay * 1440 + 60));
+      }
+      setUnavailDragging(prev => ({ ...prev, previewStart: ns, previewEnd: ne }));
+    }
+
     if (!dragging) return;
     const { worker, shift, action, startAbsMinute, originalStart, originalEnd, originalDay } = dragging;
 
@@ -1300,22 +1316,6 @@ export default function Matrix() {
     }
 
     setDragPreview({ workerId: dragging.workerId, start: newStart, end: newEnd, day: newDay, type: shift?.type || 'available' });
-
-    // Unavailability resize drag
-    if (unavailDragging) {
-      const { action, startAbsMinute: uStartAbs, originalStart, originalEnd, dayIndex: uDay } = unavailDragging;
-      const slot2 = getSlotFromPointer(e);
-      let curAbs;
-      if (slot2) { curAbs = Number(slot2.dataset.dayIndex || 0) * 1440 + Number(slot2.dataset.operationalMinute || 0); }
-      else { const { opMinutes: om, dayIndex: fd } = clientXToOpMinutes(e.clientX); curAbs = fd * 1440 + om; }
-      let ns = originalStart, ne = originalEnd;
-      if (action === 'resize-start') {
-        ns = operationalMinutesToTime(Math.max(0, curAbs - uDay * 1440));
-      } else if (action === 'resize-end') {
-        ne = operationalMinutesToTime(Math.max(0, curAbs - uDay * 1440 + 60));
-      }
-      setUnavailDragging(prev => ({ ...prev, previewStart: ns, previewEnd: ne }));
-    }
   };
 
   const handleMouseUp = async () => {
