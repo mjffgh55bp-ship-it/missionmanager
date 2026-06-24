@@ -130,8 +130,10 @@ export default function Yearly() {
       setWorkers(workersData);
       // People row in Yearly shows only חו״ל / חופש. לו״ז, אישי and event constraints are excluded.
       setUnavailabilities(unavailData.filter(u => u.date >= yearStart && u.date <= yearEnd && ['overseas', 'vacation'].includes(u.reason)));
-      setWorkerRoles(rolesS ? JSON.parse(rolesS.setting_value) : ["שף", "סו-שף"]);
-      setWorkerPopulations(popsS ? JSON.parse(popsS.setting_value) : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"]);
+      const rawRoles = rolesS ? JSON.parse(rolesS.setting_value) : ["שף", "סו-שף"];
+      setWorkerRoles(rawRoles.map(r => (typeof r === 'string' ? r : r.name || r.mapping_id || "")));
+      const rawPops = popsS ? JSON.parse(popsS.setting_value) : ["מנהל", "קבוע בכיר", "קבוע", "קבלן בכיר", "קבלן", "קבלן מיוחד", "ותיק"];
+      setWorkerPopulations(rawPops.map(p => (typeof p === 'string' ? p : p.name || p.mapping_id || "")));
       const rawTasksY = tasksS ? JSON.parse(tasksS.setting_value) : [];
       setTasks(rawTasksY.map(t => {
       if (typeof t === 'string') return { name: t, mapping_id: "", export_name: "", is_importable: true, is_exportable: true };
