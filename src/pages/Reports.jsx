@@ -128,8 +128,11 @@ export default function Reports() {
     setTaskQualifications(taskQuals);
     const taskIdToName = {};
     (tasksList || []).forEach(t => { if (typeof t === "object" && t.mapping_id) taskIdToName[t.mapping_id] = t.name; });
-    const taskQualNames = Object.keys(taskQuals).map(k => taskIdToName[k] || k);
-    const taskListNames = tasksList.map(t => typeof t === 'string' ? t : t.name);
+    // Only use task_qual keys that have a resolved display name in tasks_list (skip orphaned IDs)
+    const taskQualNames = Object.keys(taskQuals)
+      .map(k => taskIdToName[k])
+      .filter(Boolean);
+    const taskListNames = tasksList.map(t => typeof t === 'string' ? t : t.name).filter(Boolean);
     const qualsFromEntity = qualificationsData.map(q => ({ id: q.id, name: q.name }));
     const allTaskNames = [...new Set([...taskQualNames, ...taskListNames])];
     const entityNameSet = new Set(qualsFromEntity.map(q => q.name));
