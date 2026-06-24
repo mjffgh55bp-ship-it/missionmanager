@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { GripVertical, ChevronDown, ChevronUp, Pencil, Check, X, AlignLeft } from "lucide-react";
+import { GripVertical, ChevronDown, ChevronUp, Check, X, AlignLeft } from "lucide-react";
 
 const DEFAULT_HEIGHT = 80;
 const MIN_HEIGHT = 40;
@@ -60,23 +60,14 @@ export default function ScheduleNotes({ notes, height, editMode, onSave, onHeigh
       {/* Header bar */}
       <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200 select-none">
         {/* drag handle — only shown in edit mode; has dragHandleProps attached by parent */}
-        <div {...(editMode ? dragHandleProps : {})} className={`flex-shrink-0 ${editMode ? "cursor-grab active:cursor-grabbing" : "opacity-0 pointer-events-none"}`}>
+        <div {...dragHandleProps} className="flex-shrink-0 cursor-grab active:cursor-grabbing">
           <GripVertical className="w-4 h-4 text-gray-400" />
         </div>
 
         <AlignLeft className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-        <span className="text-xs font-semibold text-gray-600 flex-1" dir="rtl">הערות למנהלים</span>
+        <span className="text-xs font-semibold text-gray-600 flex-1" dir="rtl">הערות</span>
 
         <div className="flex items-center gap-1">
-          {editMode && !editing && (
-            <button
-              onClick={() => { setDraft(notes || ""); setEditing(true); }}
-              className="p-1 rounded hover:bg-gray-200 transition-colors"
-              title="ערוך הערות"
-            >
-              <Pencil className="w-3.5 h-3.5 text-gray-500" />
-            </button>
-          )}
           {editing && (
             <>
               <button onClick={handleSave} className="p-1 rounded hover:bg-green-100 transition-colors" title="שמור">
@@ -101,7 +92,7 @@ export default function ScheduleNotes({ notes, height, editMode, onSave, onHeigh
       <div
         style={{ height: expanded ? undefined : displayHeight, minHeight: expanded ? 120 : undefined }}
         className={`relative overflow-hidden ${expanded ? "" : "overflow-y-auto"}`}
-        onClick={() => { if (!editing && editMode) { setDraft(notes || ""); setEditing(true); } }}
+        onClick={() => { if (!editing && editMode && !expanded) { setDraft(notes || ""); setEditing(true); } }}
       >
         {editing ? (
           <textarea
@@ -119,13 +110,13 @@ export default function ScheduleNotes({ notes, height, editMode, onSave, onHeigh
             dir="rtl"
             className={`p-3 text-sm whitespace-pre-wrap ${isEmpty ? "text-gray-400 italic" : "text-gray-700"} ${editMode ? "cursor-text" : ""}`}
           >
-            {isEmpty ? "אין הערות. לחץ על עריכה להוסיף." : notes}
+            {isEmpty ? (editMode ? "לחץ להוספת הערות..." : "") : notes}
           </div>
         )}
       </div>
 
-      {/* Resize handle — only in edit mode, not expanded */}
-      {editMode && !expanded && (
+      {/* Resize handle — always available, not expanded */}
+      {!expanded && (
         <div
           className="h-2 bg-gray-100 border-t border-gray-200 cursor-ns-resize hover:bg-blue-100 transition-colors flex items-center justify-center"
           onMouseDown={handleResizeMouseDown}
