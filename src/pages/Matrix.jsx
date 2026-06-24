@@ -980,7 +980,8 @@ export default function Matrix() {
         food_cart_name: template.name || row.template_name,
         hours: null,
         status: row.values?.status || null,
-        isTemplateShift: true
+        isTemplateShift: true,
+        column_values: row.values || {},
       });
     });
     return shifts;
@@ -1747,6 +1748,16 @@ export default function Matrix() {
       const qual = qualifications.find(q => q.name === colName || q.id === colName);
       return qual ? qual.name : (colName !== assignment.food_cart_name ? colName : null);
     })();
+    // Resolve task/mission name from column_values — look for any task-type column that has a value for this row
+    const taskName = (() => {
+      if (!assignment.column_values) return null;
+      for (const col of scheduleParams) {
+        if (col.type !== "task") continue;
+        const val = assignment.column_values[col.name];
+        if (val && typeof val === "string" && val.trim()) return `${col.name}: ${val.trim()}`;
+      }
+      return null;
+    })();
     if (standby) {
       const borderColor = isTemplate ? '#a855f7' : '#3b82f6';
       return (
@@ -1755,7 +1766,7 @@ export default function Matrix() {
             <span className="text-[9px] font-bold truncate" style={{ color: borderColor }}>{resolvedStatus}</span>
           </div>
         </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
-          <p className="font-bold">{assignment.food_cart_name}{qualName ? ` · ${qualName}` : ''}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p><p>סטטוס כוננות: {resolvedStatus}</p>
+          <p className="font-bold">{assignment.food_cart_name}{qualName ? ` · ${qualName}` : ''}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p><p>סטטוס כוננות: {resolvedStatus}</p>{taskName && <p>{taskName}</p>}
         </TooltipContent></Tooltip></TooltipProvider>
       );
     }
@@ -1766,7 +1777,7 @@ export default function Matrix() {
           {resolvedStatus && <span className="text-white text-[8px] truncate">{resolvedStatus}</span>}
         </div>
       </TooltipTrigger><TooltipContent className="bg-gray-800 text-white border-none">
-        <p className="font-bold">{assignment.food_cart_name}{qualName ? ` · ${qualName}` : ''}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p>{resolvedStatus && <p>סטטוס: {resolvedStatus}</p>}
+        <p className="font-bold">{assignment.food_cart_name}{qualName ? ` · ${qualName}` : ''}</p><p>זמן: {assignment.start_time} - {assignment.end_time}</p>{resolvedStatus && <p>סטטוס: {resolvedStatus}</p>}{taskName && <p>{taskName}</p>}
       </TooltipContent></Tooltip></TooltipProvider>
     );
   };
