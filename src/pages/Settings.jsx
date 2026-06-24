@@ -1316,9 +1316,10 @@ export default function Settings() {
                              <Input
                                value={col.mapping_id || ""}
                                onChange={e => {
-                                 const updated = scheduleColumns.map((c, i) => i === idx ? { ...c, mapping_id: e.target.value.trim().toLowerCase() } : c);
-                                 saveScheduleColumns(updated);
+                                 const v = e.target.value.trim().toLowerCase();
+                                 setScheduleColumns(prev => prev.map((c, i) => i === idx ? { ...c, mapping_id: v } : c));
                                }}
+                               onBlur={() => saveScheduleColumns(scheduleColumns)}
                                placeholder="col_..."
                                className="h-7 text-xs font-mono flex-1"
                                dir="ltr"
@@ -1422,13 +1423,14 @@ export default function Settings() {
                                    {/* Name — plain editable, no data impact */}
                                    <Input
                                      value={so.name}
-                                     onChange={async e => {
-                                       const updated = scheduleColumns.map((c, i) => i === idx ? {
+                                     onChange={e => {
+                                       const val = e.target.value;
+                                       setScheduleColumns(prev => prev.map((c, i) => i === idx ? {
                                          ...c,
-                                         sub_options: (c.sub_options || []).map((s, j) => j === si ? { ...s, name: e.target.value } : s)
-                                       } : c);
-                                       await saveScheduleColumns(updated);
+                                         sub_options: (c.sub_options || []).map((s, j) => j === si ? { ...s, name: val } : s)
+                                       } : c));
                                      }}
+                                     onBlur={() => saveScheduleColumns(scheduleColumns)}
                                      className="h-6 text-xs flex-1 min-w-0"
                                      dir="rtl"
                                      placeholder="שם"
